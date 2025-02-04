@@ -105,13 +105,50 @@ function viator_get_search_results($searchTerm) {
         $title = esc_html($tour['title']);
         $description = esc_html($tour['description']);
         $price = isset($tour['pricing']['summary']['fromPrice']) ? 'R$ ' . number_format($tour['pricing']['summary']['fromPrice'], 2, ',', '.') : 'Preço não disponível';
-        $rating = isset($tour['reviews']['combinedAverageRating']) ? number_format($tour['reviews']['combinedAverageRating'], 1) . '⭐' : 'Sem avaliações';
+        $rating = isset($tour['reviews']['combinedAverageRating']) ? number_format($tour['reviews']['combinedAverageRating'], 1) . '⭐' : '';
         
         // Captura o total de avaliações e ajusta para singular/plural
         $total_reviews = isset($tour['reviews']['totalReviews']) ? $tour['reviews']['totalReviews'] : 0;
-        $rating_count = $total_reviews > 0 ? '(' . $total_reviews . ' avaliação' . ($total_reviews != 1 ? 's' : '') . ')' : '';
+        if ($total_reviews == 0) {
+            $rating_count = 'Sem avaliações';
+        } elseif ($total_reviews == 1) {
+            $rating_count = '(1 avaliação)';
+        } else {
+            $rating_count = '(' . $total_reviews . ' avaliações)';
+        }
         
-        $duration = isset($tour['durationInMinutes']) ? $tour['durationInMinutes'] . ' minutos' : 'Duração não disponível'; // Duração do passeio
+        // Captura a duração do passeio
+        $duration_fixed = isset($tour['duration']['fixedDurationInMinutes']) ? $tour['duration']['fixedDurationInMinutes'] : null;
+        $duration_from = isset($tour['duration']['variableDurationFromMinutes']) ? $tour['duration']['variableDurationFromMinutes'] : null;
+        $duration_to = isset($tour['duration']['variableDurationToMinutes']) ? $tour['duration']['variableDurationToMinutes'] : null;
+
+        // Formata a duração
+        if ($duration_fixed !== null) {
+            // Duração fixa
+            if ($duration_fixed < 60) {
+                $duration = $duration_fixed . ' minutos';
+            } else {
+                $hours = floor($duration_fixed / 60); // Calcula as horas
+                $minutes = $duration_fixed % 60; // Calcula os minutos restantes
+                $duration = $hours . ' hora' . ($hours != 1 ? 's' : '') . ($minutes > 0 ? ' e ' . $minutes . ' minuto' . ($minutes != 1 ? 's' : '') : '');
+            }
+        } elseif ($duration_from !== null && $duration_to !== null) {
+            // Duração variável
+            if ($duration_to < 60) {
+                $duration = ' De ' . $duration_from . ' a ' . $duration_to . ' minutos';
+            } else {
+                $hours_from = floor($duration_from / 60); // Calcula as horas do início
+                $minutes_from = $duration_from % 60; // Calcula os minutos restantes do início
+                $hours_to = floor($duration_to / 60); // Calcula as horas do fim
+                $minutes_to = $duration_to % 60; // Calcula os minutos restantes do fim
+
+                $duration = ' De ' . $hours_from . ' a ' . $hours_to . ' hora' . ($hours_to != 1 ? 's' : '') . ($minutes_to > 0 ? ' e ' . $minutes_to . ' minuto' . ($minutes_to != 1 ? 's' : '') : '');
+            }
+        } else {
+            // Duração não disponível
+            $duration = 'Duração não disponível';
+        }
+        
         $flags = isset($tour['flags']) ? $tour['flags'] : []; // Flags
         $url = esc_url($tour['productUrl']);
     
@@ -147,8 +184,8 @@ function viator_get_search_results($searchTerm) {
                 }
     
         $output .= '</p>
-                <p class="viator-card-duration"><img src="https://img.icons8.com/?size=100&id=82767&format=png&color=000000" alt="Ícone de características" width="15" height="15"> ' . $duration . '</p>
-                <p class="viator-card-price"><img src="https://img.icons8.com/?size=100&id=ZXJaNFNjWGZF&format=png&color=000000" alt="Ícone de preço" width="15" height="15"> a partir de <strong>' . $price . '</strong></p>                
+                <p class="viator-card-duration"><img src="https://img.icons8.com/?size=100&id=82767&format=png&color=000000" alt="Duração" width="15" height="15"> ' . $duration . '</p>
+                <p class="viator-card-price"><img src="https://img.icons8.com/?size=100&id=ZXJaNFNjWGZF&format=png&color=000000" alt="Preço" width="15" height="15"> a partir de <strong>' . $price . '</strong></p>                
                 <a href="' . $url . '" target="_blank">Ver detalhes</a>
             </div>
         </div>';

@@ -137,6 +137,10 @@
             color: #fff;
         }
 
+        .viator-card-duration {
+            gap: 5px; /* Adiciona um espaço entre elementos internos */
+        }
+
         /* Responsividade */
         @media (max-width: 768px) {
             #viator-search-form {
