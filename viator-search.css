@@ -111,15 +111,19 @@
         }
 
         .viator-card p {
+            display: flex;
+            align-items: center;
             font-size: 14px;
             color: #666;
             margin: 0;
         }
 
         .viator-card-price {
-            font-size: 20px;
+            display: flex;
+            align-items: center;
+            gap: 5px; /* Adiciona um espaço entre elementos internos */
+            font-size: 18px; /* Ajuste o tamanho conforme necessário */
             color: #E74C3C;
-            margin: 10px 0;
         }
 
         .viator-card a {
@@ -177,40 +181,35 @@
             animation: fadeIn 0.5s ease;
         }
 
-        /* Estilos para as flags */
-.badge {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background-color: red;
-    color: white;
-    padding: 5px 10px;
-    border-radius: 5px;
-    font-size: 12px;
-}
+        /* Estilo para a badge "Geralmente se esgota" */
+        .viator-badge {
+            display: inline-block;
+            background-color: #E74C3C;
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            position: absolute;
+            top: 20px; /* Espaçamento de 20px do topo */
+            right: 20px; /* Espaçamento de 20px da direita */
+            z-index: 1;
+        }
 
-.badge-special-offer {
-    background-color: #FF5733;
-}
+        /* Container da imagem do card */
+        .viator-card-img {
+            position: relative; /* Garante que a badge seja posicionada em relação à imagem */
+            width: 100%;
+            height: 200px;
+            overflow: hidden;
+        }
 
-.badge-likely-to-sell-out {
-    background-color: #E74C3C;
-}
-
-.icon-free-cancellation {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    background-color: #27AE60;
-    color: white;
-    padding: 8px;
-    border-radius: 50%;
-    font-size: 16px;
-}
-
-.viator-card-img {
-    position: relative;
-    width: 100%;
-    height: 200px;
-    overflow: hidden;
-}
+        /* Estilo para as flags */
+        .viator-flag {
+            display: inline-block;
+            background-color: #04846b;
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-right: 5px;
+        }

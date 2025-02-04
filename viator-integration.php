@@ -20,7 +20,11 @@ function viator_search_form() {
     ?>
     <form method="GET" action="" id="viator-search-form">
         <input type="text" name="viator_query" placeholder="🌍 Aonde você quer ir?" required>
-        <button type="submit">Pesquisar Passeios</button>
+        <button type="submit" id="search-button">
+            <span id="search-text">Pesquisar Passeios</span>
+            <span id="search-icon"></span>
+            <span id="loading-icon" class="viator-loading" style="display: none;">⏳</span>
+        </button>
     </form>
 
     <div id="viator-results" style="display: <?php echo $hasResults ? 'block' : 'none'; ?>;">
@@ -55,11 +59,11 @@ function viator_get_search_results($searchTerm) {
                 "from" => 0,
                 "to" => 5
             ],
-            "flags" => ["NEW_ON_VIATOR", "PRIVATE_TOUR"], // Exemplo de flags
+            "flags" => ["NEW_ON_VIATOR", "PRIVATE_TOUR"],
         ],
         "searchTypes" => [
-            ["searchType" => "PRODUCTS", "pagination" => ["start" => 1, "count" => 10]],
-            ["searchType" => "ATTRACTIONS", "pagination" => ["start" => 1, "count" => 10]],
+            ["searchType" => "PRODUCTS", "pagination" => ["start" => 1, "count" => 12]],
+            ["searchType" => "ATTRACTIONS", "pagination" => ["start" => 1, "count" => 12]],
         ],
         "currency" => "BRL"
     ]);
@@ -103,21 +107,43 @@ function viator_get_search_results($searchTerm) {
         $rating = isset($tour['reviews']['combinedAverageRating']) ? number_format($tour['reviews']['combinedAverageRating'], 1) . '⭐' : 'Sem avaliações';
         $rating_count = isset($tour['reviews']['reviewCount']) ? '(' . $tour['reviews']['reviewCount'] . ' avaliações)' : ''; // Total de avaliações
         $duration = isset($tour['durationInMinutes']) ? $tour['durationInMinutes'] . ' minutos' : 'Duração não disponível'; // Duração do passeio
-        $flags = isset($tour['flags']) ? implode(', ', $tour['flags']) : ''; // Flags (como "PRIVATE_TOUR")
+        $flags = isset($tour['flags']) ? $tour['flags'] : []; // Flags
         $url = esc_url($tour['productUrl']);
+
+        // Processar flags
+        $flag_output = '';
+        if (in_array('FREE_CANCELLATION', $flags)) {
+            $flag_output .= '<span class="viator-flag">Cancelamento gratuito</span>';
+        }
+        if (in_array('LIKELY_TO_SELL_OUT', $flags)) {
+            $flag_output .= '<span class="viator-badge">Geralmente se esgota</span>';
+        }
 
         // Criar o card
         $output .= '<div class="viator-card">
             <div class="viator-card-img">
-                <img src="' . $image_url . '" alt="' . $title . '">
-            </div>
+                <img src="' . $image_url . '" alt="' . $title . '">';
+                
+                // Adicionar a badge "Geralmente se esgota" dentro do container da imagem
+                if (in_array('LIKELY_TO_SELL_OUT', $flags)) {
+                    $output .= '<span class="viator-badge">Geralmente se esgota</span>';
+                }
+
+        $output .= '</div>
             <div class="viator-card-content">
                 <p class="viator-card-rating">' . $rating . ' ' . $rating_count . '</p>
                 <h3>' . $title . '</h3>
                 <p>' . substr($description, 0, 120) . '...</p>
-                <p class="viator-card-price">a partir de <strong>' . $price . '</strong></p>
-                <p class="viator-card-duration">Duração: ' . $duration . '</p>
-                <p class="viator-card-flags">Características: ' . $flags . '</p>
+                <p class="viator-card-flags">';
+                
+                // Adicionar a flag "Cancelamento gratuito"
+                if (in_array('FREE_CANCELLATION', $flags)) {
+                    $output .= '<span class="viator-flag">Cancelamento gratuito</span>';
+                }
+
+        $output .= '</p>
+                <p class="viator-card-duration"><img src="https://img.icons8.com/?size=100&id=82767&format=png&color=000000" alt="Ícone de características" width="15" height="15"> ' . $duration . '</p>
+                <p class="viator-card-price"><img src="https://img.icons8.com/?size=100&id=ZXJaNFNjWGZF&format=png&color=000000" alt="Ícone de preço" width="15" height="15"> a partir de <strong>' . $price . '</strong></p>                
                 <a href="' . $url . '" target="_blank">Ver detalhes</a>
             </div>
         </div>';
@@ -125,17 +151,6 @@ function viator_get_search_results($searchTerm) {
 
     // Fechar grid
     $output .= '</div>';
-
-    // Adicionar Paginação (caso necessário)
-    if (isset($data['products']['pagination'])) {
-        $pagination = $data['products']['pagination'];
-        if ($pagination['totalResults'] > $pagination['count']) {
-            $output .= '<div class="pagination">';
-            $output .= '<button class="prev">Anterior</button>';
-            $output .= '<button class="next">Próxima</button>';
-            $output .= '</div>';
-        }
-    }
 
     return $output;
 }
