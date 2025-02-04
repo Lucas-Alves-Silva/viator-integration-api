@@ -43,11 +43,6 @@
             transform: translateY(-2px);
         }
 
-        #viator-search-form button::before {
-            content: "🔍";
-            font-size: 20px;
-        }
-
         /* Layout dos cards (grid) */
         .viator-grid {
             display: grid;
@@ -212,4 +207,39 @@
             border-radius: 5px;
             font-size: 12px;
             margin-right: 5px;
+        }
+
+        /* Animação do avião voando */
+        @keyframes fly {
+            0% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-5px);
+            }
+            100% {
+                transform: translateY(0);
+            }
+        }
+
+        /* Estilo do ícone do avião */
+        .airplane-icon {
+            display: inline-block;
+            animation: fly 1s infinite ease-in-out;
+        }
+
+        /* Efeito de carregamento nos 3 pontinhos */
+        @keyframes blink {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .loading-dots::after {
+            content: '...';
+            display: inline-block;
+            animation: blink 1.5s infinite;
         }

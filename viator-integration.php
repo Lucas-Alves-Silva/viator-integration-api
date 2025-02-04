@@ -21,8 +21,8 @@ function viator_search_form() {
     <form method="GET" action="" id="viator-search-form">
         <input type="text" name="viator_query" placeholder="🌍 Aonde você quer ir?" required>
         <button type="submit" id="search-button">
-            <span id="search-text">Pesquisar Passeios</span>
-            <span id="search-icon"></span>
+            <span id="search-text">Pesquisar</span>
+            <span id="search-icon">🔍</span>
             <span id="loading-icon" class="viator-loading" style="display: none;">⏳</span>
         </button>
     </form>
@@ -49,7 +49,7 @@ function viator_get_search_results($searchTerm) {
         "productFiltering" => [
             "dateRange" => [
                 "from" => "2024-01-01",
-                "to" => "2025-02-03"
+                "to" => "2025-02-04"
             ],
             "price" => [
                 "from" => 0,
@@ -64,6 +64,7 @@ function viator_get_search_results($searchTerm) {
         "searchTypes" => [
             ["searchType" => "PRODUCTS", "pagination" => ["start" => 1, "count" => 12]],
             ["searchType" => "ATTRACTIONS", "pagination" => ["start" => 1, "count" => 12]],
+            ["searchType" => "DESTINATIONS", "pagination" => ["start" => 1, "count" => 12]],
         ],
         "currency" => "BRL"
     ]);
@@ -159,7 +160,11 @@ function viator_get_search_results($searchTerm) {
 add_shortcode('viator_search', 'viator_search_form');
 
 // Enfileirar o arquivo CSS
-function viator_enqueue_styles() {
+function viator_enqueue_scripts() {
+    // Carrega o arquivo CSS
     wp_enqueue_style('viator-search-style', plugins_url('viator-search.css', __FILE__));
+
+    // Carrega o arquivo JavaScript
+    wp_enqueue_script('viator-interactions', plugins_url('interactions.js', __FILE__), array(), null, true);
 }
-add_action('wp_enqueue_scripts', 'viator_enqueue_styles');
+add_action('wp_enqueue_scripts', 'viator_enqueue_scripts');
