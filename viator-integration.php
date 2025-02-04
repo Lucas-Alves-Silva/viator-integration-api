@@ -106,7 +106,7 @@ function viator_get_search_results($searchTerm) {
         $description = esc_html($tour['description']);
         $price = isset($tour['pricing']['summary']['fromPrice']) ? 'R$ ' . number_format($tour['pricing']['summary']['fromPrice'], 2, ',', '.') : 'Preço não disponível';
         $rating = isset($tour['reviews']['combinedAverageRating']) ? number_format($tour['reviews']['combinedAverageRating'], 1) . '⭐' : 'Sem avaliações';
-        $rating_count = isset($tour['reviews']['reviewCount']) ? '(' . $tour['reviews']['reviewCount'] . ' avaliações)' : ''; // Total de avaliações
+        $rating_count = isset($tour['reviews']['totalReviews']) ? '(' . $tour['reviews']['totalReviews'] . ' avaliações)' : ''; // Total de avaliações
         $duration = isset($tour['durationInMinutes']) ? $tour['durationInMinutes'] . ' minutos' : 'Duração não disponível'; // Duração do passeio
         $flags = isset($tour['flags']) ? $tour['flags'] : []; // Flags
         $url = esc_url($tour['productUrl']);
