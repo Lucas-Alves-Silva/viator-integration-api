@@ -3,7 +3,6 @@
 
 Este plugin para WordPress permite integrar a API da Viator ao seu site, possibilitando a busca e exibição de passeios, atrações e destinos diretamente em sua plataforma. Com ele, os usuários podem pesquisar experiências de viagem, visualizar detalhes como preços, avaliações, duração e muito mais.
 
-
 ## Funcionalidades
 
 - Pesquisa de Passeios: Os usuários podem pesquisar passeios por destino.
@@ -12,12 +11,12 @@ Este plugin para WordPress permite integrar a API da Viator ao seu site, possibi
 - Responsivo: O plugin é totalmente responsivo, funcionando bem em dispositivos móveis e desktops.
 - Shortcode: Use o shortcode [viator_search] para exibir o formulário de pesquisa e os resultados em qualquer página ou post.
 
-
 ## Requisitos
 
 - WordPress 5.0 ou superior.
 - PHP 7.4 ou superior.
-- Uma chave de API da Viator (disponível no portal de desenvolvedores da Viator).
+- Uma chave de API da Viator (disponível apenas para parceiros da Viator).
+- 
 ## Instalação
 
 ```
@@ -81,7 +80,6 @@ Este projeto é licenciado sob uma Licença Comercial Exclusiva. Todos os direit
 
 - [GitHub](https://github.com/Lucas-Alves-Silva)
 - [LinkedIn](https://www.linkedin.com/in/lucasalves-da-silva/)
-
 
 ## Links Úteis
 
