@@ -75,11 +75,9 @@ Adicione o seguinte shortcode em uma página ou post:
 ```
 
 ## Licença
+Este projeto é licenciado sob uma Licença Comercial Exclusiva. Todos os direitos reservados. O código-fonte não pode ser redistribuído, modificado ou sublicenciado sem permissão expressa do desenvolvedor.
 
-[MIT](https://choosealicense.com/licenses/mit/)
-
-Este projeto está licenciado sob a MIT License. Consulte o arquivo LICENSE para mais detalhes.
-## Autores
+## Autor
 
 - [GitHub](https://github.com/Lucas-Alves-Silva)
 - [LinkedIn](https://www.linkedin.com/in/lucasalves-da-silva/)
