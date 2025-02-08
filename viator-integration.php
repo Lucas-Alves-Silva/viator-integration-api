@@ -137,16 +137,34 @@ function viator_get_search_results($searchTerm) {
 
         if ($duration_fixed !== null) {
             // Duração fixa
-            if ($duration_fixed < 60) {
+            if ($duration_fixed >= 1440) { // 24 horas = 1440 minutos
+                $days = floor($duration_fixed / 1440); // Calcula os dias
+                $remaining_minutes = $duration_fixed % 1440; // Minutos restantes
+                $hours = floor($remaining_minutes / 60); // Horas restantes
+                
+                $duration = $days . ' dia' . ($days != 1 ? 's' : '');
+                if ($hours > 0) {
+                    $duration .= ' e ' . $hours . ' hora' . ($hours != 1 ? 's' : '');
+                }
+            } elseif ($duration_fixed < 60) {
                 $duration = $duration_fixed . ' minutos';
             } else {
-                $hours = floor($duration_fixed / 60); // Calcula as horas
-                $minutes = $duration_fixed % 60; // Calcula os minutos restantes
+                $hours = floor($duration_fixed / 60);
+                $minutes = $duration_fixed % 60;
                 $duration = $hours . ' hora' . ($hours != 1 ? 's' : '') . ($minutes > 0 ? ' e ' . $minutes . ' minuto' . ($minutes != 1 ? 's' : '') : '');
             }
         } elseif ($duration_from !== null && $duration_to !== null) {
             // Duração variável
-            if ($duration_to < 60) {
+            if ($duration_to >= 1440) { // Se a duração máxima for maior que 24 horas
+                $days_from = floor($duration_from / 1440);
+                $days_to = floor($duration_to / 1440);
+                
+                if ($days_from == $days_to) {
+                    $duration = $days_from . ' dia' . ($days_from != 1 ? 's' : '');
+                } else {
+                    $duration = 'De ' . $days_from . ' a ' . $days_to . ' dia' . ($days_to != 1 ? 's' : '');
+                }
+            } elseif ($duration_to < 60) {
                 // Ambos os valores em minutos
                 $duration = 'De ' . $duration_from . ' a ' . $duration_to . ' minutos';
             } else {
