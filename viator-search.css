@@ -247,3 +247,74 @@
             display: inline-block;
             animation: blink 1.5s infinite;
         }
+
+        /* Estilos da paginação */
+        .viator-pagination {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin: 20px 0;
+            flex-wrap: wrap; /* Permite quebra de linha em telas pequenos */
+        }
+
+        .viator-pagination-btn,
+        .viator-pagination-arrow {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 35px; /* Largura mínima para manter o círculo */
+            height: 35px;
+            padding: 0;
+            border: 2px solid #04846b;
+            border-radius: 50%;
+            font-size: 14px; /* Tamanho fixo para números */
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .viator-pagination-btn {
+            background: white;
+            color: #04846b;
+        }
+
+        .viator-pagination-btn.active {
+            background: #04846b;
+            color: white;
+        }
+
+        .viator-pagination-arrow {
+            background: white;
+            color: #04846b;
+        }
+
+        .viator-pagination-arrow:hover,
+        .viator-pagination-btn:hover {
+            background: #04846b;
+            color: white;
+        }
+
+        /* Estilo para o ellipsis */
+        .viator-pagination-ellipsis {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 35px;
+            height: 35px;
+            color: #04846b;
+            user-select: none;
+        }
+
+        /* Estilização das setas (SVG) */
+        .viator-pagination-arrow svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor; /* Cor igual ao texto */
+        }
+
+        .viator-total {
+            text-align: center;
+            margin: 20px 0;
+            font-weight: 600;
+            color: #04846b;
+            font-size: 1.1em;
+        }        

@@ -16,10 +16,11 @@ function viator_search_form() {
     
     // Verifica se há uma busca em andamento
     $hasResults = isset($_GET['viator_query']) && !empty($_GET['viator_query']);
+    $searchTerm = isset($_GET['viator_query']) ? sanitize_text_field($_GET['viator_query']) : '';
     
     ?>
     <form method="GET" action="" id="viator-search-form">
-        <input type="text" name="viator_query" placeholder="🌍 Aonde você quer ir?" required>
+        <input type="text" name="viator_query" placeholder="🌍 Aonde você quer ir?" value="<?php echo esc_attr($searchTerm); ?>" required>
         <button type="submit" id="search-button">
             <span id="search-text">Pesquisar</span>
             <span id="search-icon">🔍</span>
@@ -30,7 +31,7 @@ function viator_search_form() {
     <div id="viator-results" style="display: <?php echo $hasResults ? 'block' : 'none'; ?>;">
         <?php
         if ($hasResults) {
-            echo viator_get_search_results($_GET['viator_query']);
+            echo viator_get_search_results($searchTerm);
         }
         ?>
     </div>
@@ -38,12 +39,17 @@ function viator_search_form() {
     return ob_get_clean();
 }
 
-// Função para chamar a API e buscar resultados e exibir como cards
+// Função para chamar a API e buscar resultados
 function viator_get_search_results($searchTerm) {
     $api_key = '602cf35e-ee1c-4b6e-8977-2b49246c9c5c';
     $url = "https://api.sandbox.viator.com/partner/search/freetext";
 
-    // Corpo da requisição JSON com os filtros e parâmetros
+    // Paginação
+    $per_page = 12; // Número de itens por página
+    $page = isset($_GET['viator_page']) ? intval($_GET['viator_page']) : 1; // Página atual
+    $start = ($page - 1) * $per_page + 1; // Índice inicial dos resultados
+
+    // Corpo da requisição JSON
     $body = json_encode([
         "searchTerm" => $searchTerm,
         "productFiltering" => [
@@ -59,17 +65,15 @@ function viator_get_search_results($searchTerm) {
                 "from" => 0,
                 "to" => 5
             ],
-            "flags" => ["NEW_ON_VIATOR", "PRIVATE_TOUR"],
+            // "flags" => ["NEW_ON_VIATOR", "PRIVATE_TOUR"], Filtrar por flags
         ],
         "searchTypes" => [
-            ["searchType" => "PRODUCTS", "pagination" => ["start" => 1, "count" => 12]],
-            ["searchType" => "ATTRACTIONS", "pagination" => ["start" => 1, "count" => 12]],
-            ["searchType" => "DESTINATIONS", "pagination" => ["start" => 1, "count" => 12]],
+            ["searchType" => "PRODUCTS", "pagination" => ["start" => $start, "count" => $per_page]],
         ],
         "currency" => "BRL"
     ]);
 
-    // Enviar a requisição POST para a API da Viator
+    // Enviar a requisição POST para a API
     $response = wp_remote_post($url, [
         'headers' => [
             'Accept'           => 'application/json;version=2.0',
@@ -94,8 +98,15 @@ function viator_get_search_results($searchTerm) {
         return '<p>Nenhum passeio encontrado para "' . esc_html($searchTerm) . '".</p>';
     }
 
+    // Total de produtos e cálculo do número de páginas
+    $total_products = isset($data['products']['totalCount']) ? intval($data['products']['totalCount']) : 0;
+    $total_pages = ceil($total_products / $per_page);
+
+    // Exibir o total encontrado
+    $output = '<p class="viator-total">' . $total_products . ' resultados</p>';
+
     // Iniciar grid de cards
-    $output = '<div class="viator-grid">';
+    $output .= '<div class="viator-grid">';
 
     foreach ($data['products']['results'] as $tour) {
         // Pegar a imagem de melhor qualidade
@@ -216,6 +227,78 @@ function viator_get_search_results($searchTerm) {
 
     // Fechar grid
     $output .= '</div>';
+
+// Paginação
+if ($total_pages > 1) {
+    $output .= '<div class="viator-pagination">';
+    
+    // Link para a página anterior
+    if ($page > 1) {
+        $prev_url = add_query_arg([
+            'viator_page' => $page - 1,
+            'viator_query' => $searchTerm,
+        ]);
+        $prev_arrow = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/></svg>';
+        $output .= '<a class="viator-pagination-arrow" href="' . esc_url($prev_url) . '">' . $prev_arrow . '</a>';
+    }
+
+    // Gerar links das páginas com ellipsis
+    $adjacent = 2;
+    $pages = array();
+
+    // Sempre mostra a primeira página
+    $pages[] = 1;
+
+    // Calcula páginas adjacentes
+    $start = max(2, $page - $adjacent);
+    $end = min($total_pages - 1, $page + $adjacent);
+
+    // Adiciona ellipsis se necessário antes das páginas intermediárias
+    if ($start > 2) {
+        $pages[] = '...';
+    }
+
+    // Páginas intermediárias
+    for ($i = $start; $i <= $end; $i++) {
+        $pages[] = $i;
+    }
+
+    // Adiciona ellipsis se necessário após as páginas intermediárias
+    if ($end < $total_pages - 1) {
+        $pages[] = '...';
+    }
+
+    // Sempre mostra a última página se houver mais de uma
+    if ($total_pages > 1) {
+        $pages[] = $total_pages;
+    }
+
+    // Loop para gerar os links ou ellipsis
+    foreach ($pages as $page_num) {
+        if ($page_num === '...') {
+            $output .= '<span class="viator-pagination-ellipsis">...</span>';
+        } else {
+            $url = add_query_arg([
+                'viator_page' => $page_num,
+                'viator_query' => $searchTerm,
+            ]);
+            $active_class = ($page_num == $page) ? ' active' : '';
+            $output .= '<a class="viator-pagination-btn' . $active_class . '" href="' . esc_url($url) . '">' . $page_num . '</a>';
+        }
+    }
+
+    // Link para a próxima página
+    if ($page < $total_pages) {
+        $next_url = add_query_arg([
+            'viator_page' => $page + 1,
+            'viator_query' => $searchTerm,
+        ]);
+        $next_arrow = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/></svg>';
+        $output .= '<a class="viator-pagination-arrow" href="' . esc_url($next_url) . '">' . $next_arrow . '</a>';
+    }
+
+    $output .= '</div>';
+}
 
     return $output;
 }
