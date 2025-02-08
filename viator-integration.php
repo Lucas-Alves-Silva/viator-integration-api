@@ -134,9 +134,12 @@ function viator_get_search_results($searchTerm) {
         $duration_fixed = isset($tour['duration']['fixedDurationInMinutes']) ? $tour['duration']['fixedDurationInMinutes'] : null;
         $duration_from = isset($tour['duration']['variableDurationFromMinutes']) ? $tour['duration']['variableDurationFromMinutes'] : null;
         $duration_to = isset($tour['duration']['variableDurationToMinutes']) ? $tour['duration']['variableDurationToMinutes'] : null;
+        $unstructured_duration = isset($tour['duration']['unstructuredDuration']) ? $tour['duration']['unstructuredDuration'] : null;
 
-        if ($duration_fixed !== null) {
-            // Duração fixa
+        if ($unstructured_duration !== null) {
+            // Se tiver unstructuredDuration, define como 1 hora
+            $duration = '1 hora';
+        } elseif ($duration_fixed !== null) {
             if ($duration_fixed >= 1440) { // 24 horas = 1440 minutos
                 $days = floor($duration_fixed / 1440); // Calcula os dias
                 $remaining_minutes = $duration_fixed % 1440; // Minutos restantes
