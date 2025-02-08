@@ -203,7 +203,7 @@
         }
 
         /* Estilo para as flags */
-        .viator-flag {
+        .viator-flag-cancelamento {
             display: inline-block;
             background-color: #04846b;
             color: #fff;

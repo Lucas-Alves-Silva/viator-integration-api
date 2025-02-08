@@ -214,7 +214,7 @@ function viator_get_search_results($searchTerm) {
                 
                 // Adicionar a flag "Cancelamento gratuito"
                 if (in_array('FREE_CANCELLATION', $flags)) {
-                    $output .= '<span class="viator-flag">Cancelamento gratuito</span>';
+                    $output .= '<span class="viator-flag-cancelamento">Cancelamento gratuito</span>';
                 }
     
         $output .= '</p>
