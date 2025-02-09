@@ -49,9 +49,38 @@ function viator_get_search_results($searchTerm) {
     $page = isset($_GET['viator_page']) ? intval($_GET['viator_page']) : 1; // Página atual
     $start = ($page - 1) * $per_page + 1; // Índice inicial dos resultados
 
+    // Determinar ordenação
+    $sort_param = isset($_GET['viator_sort']) ? $_GET['viator_sort'] : 'DEFAULT';
+    
+    // Configurar parâmetros de ordenação
+    $sorting = [];
+    switch ($sort_param) {
+        case 'REVIEW_AVG_RATING':
+            $sorting = ['sort' => 'REVIEW_AVG_RATING'];
+            break;
+        case 'PRICE_ASC':
+            $sorting = ['sort' => 'PRICE', 'order' => 'ASCENDING'];
+            break;
+        case 'PRICE_DESC':
+            $sorting = ['sort' => 'PRICE', 'order' => 'DESCENDING'];
+            break;
+        case 'DURATION_ASC':
+            $sorting = ['sort' => 'ITINERARY_DURATION', 'order' => 'ASCENDING'];
+            break;
+        case 'DURATION_DESC':
+            $sorting = ['sort' => 'ITINERARY_DURATION', 'order' => 'DESCENDING'];
+            break;
+        case 'DATE_ADDED_DESC':
+            $sorting = ['sort' => 'DATE_ADDED', 'order' => 'DESCENDING'];
+            break;
+        default:
+            $sorting = ['sort' => 'DEFAULT'];
+    }
+
     // Corpo da requisição JSON
     $body = json_encode([
         "searchTerm" => $searchTerm,
+        "productSorting" => $sorting,
         "productFiltering" => [
             "dateRange" => [
                 "from" => "2024-01-01",
@@ -102,8 +131,24 @@ function viator_get_search_results($searchTerm) {
     $total_products = isset($data['products']['totalCount']) ? intval($data['products']['totalCount']) : 0;
     $total_pages = ceil($total_products / $per_page);
 
-    // Exibir o total encontrado
-    $output = '<p class="viator-total">' . $total_products . ' resultados</p>';
+    // Cabeçalho com total e ordenação
+    $output = '<div class="viator-header">';
+    $output .= '<p class="viator-total">' . $total_products . ' resultados</p>';
+    
+    // Select de ordenação
+    $current_sort = isset($_GET['viator_sort']) ? $_GET['viator_sort'] : 'DEFAULT';
+    $output .= '<div class="viator-sort">
+        <select name="viator_sort" id="viator-sort" onchange="updateSort(this.value)">
+            <option value="DEFAULT"' . selected($current_sort, 'DEFAULT', false) . '>Em destaque</option>
+            <option value="REVIEW_AVG_RATING"' . selected($current_sort, 'REVIEW_AVG_RATING', false) . '>Melhor avaliados</option>
+            <option value="PRICE_ASC"' . selected($current_sort, 'PRICE_ASC', false) . '>Preço (menor para maior)</option>
+            <option value="PRICE_DESC"' . selected($current_sort, 'PRICE_DESC', false) . '>Preço (maior para menor)</option>
+            <option value="DURATION_ASC"' . selected($current_sort, 'DURATION_ASC', false) . '>Duração (crescente)</option>
+            <option value="DURATION_DESC"' . selected($current_sort, 'DURATION_DESC', false) . '>Duração (decrescente)</option>
+            <option value="DATE_ADDED_DESC"' . selected($current_sort, 'DATE_ADDED_DESC', false) . '>Novidade na Viator</option>
+        </select>
+    </div>';
+    $output .= '</div>';
 
     // Iniciar grid de cards
     $output .= '<div class="viator-grid">';

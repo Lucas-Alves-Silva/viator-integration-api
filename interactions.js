@@ -19,3 +19,19 @@ document.addEventListener('DOMContentLoaded', function () {
         searchButton.disabled = true;
     });
 });
+
+function updateSort(value) {
+    // Pegar a URL atual
+    let url = new URL(window.location.href);
+    let params = new URLSearchParams(url.search);
+    
+    // Atualizar ou adicionar o parâmetro de ordenação
+    params.set('viator_sort', value);
+    
+    // Resetar a página para 1 ao mudar a ordenação
+    params.set('viator_page', '1');
+    
+    // Atualizar a URL e recarregar a página
+    url.search = params.toString();
+    window.location.href = url.toString();
+}
