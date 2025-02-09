@@ -372,12 +372,36 @@ if ($total_pages > 1) {
 // Criar o shortcode para exibir o formulário e os resultados
 add_shortcode('viator_search', 'viator_search_form');
 
-// Enfileirar o arquivo CSS
+// Enfileirar scripts e estilos
 function viator_enqueue_scripts() {
     // Carrega o arquivo CSS
     wp_enqueue_style('viator-search-style', plugins_url('viator-search.css', __FILE__));
 
     // Carrega o arquivo JavaScript
-    wp_enqueue_script('viator-interactions', plugins_url('interactions.js', __FILE__), array(), null, true);
+    wp_enqueue_script('viator-interactions', plugins_url('interactions.js', __FILE__), array('jquery'), null, true);
+
+    // Adicionar variáveis para o JavaScript
+    wp_localize_script('viator-interactions', 'viatorAjax', array(
+        'ajaxurl' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('viator_sort_nonce')
+    ));
 }
 add_action('wp_enqueue_scripts', 'viator_enqueue_scripts');
+
+// Handler AJAX
+function viator_ajax_update_sort() {
+    // Verificar nonce
+    check_ajax_referer('viator_sort_nonce', 'nonce');
+    
+    // Pegar parâmetros
+    $search_term = isset($_POST['viator_query']) ? sanitize_text_field($_POST['viator_query']) : '';
+    $_GET['viator_query'] = $search_term; // Necessário para manter a compatibilidade
+    $_GET['viator_sort'] = isset($_POST['viator_sort']) ? sanitize_text_field($_POST['viator_sort']) : 'DEFAULT';
+    $_GET['viator_page'] = isset($_POST['viator_page']) ? intval($_POST['viator_page']) : 1;
+    
+    // Retornar resultados
+    echo viator_get_search_results($search_term);
+    wp_die();
+}
+add_action('wp_ajax_viator_update_sort', 'viator_ajax_update_sort');
+add_action('wp_ajax_nopriv_viator_update_sort', 'viator_ajax_update_sort');
