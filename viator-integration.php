@@ -303,6 +303,7 @@ if ($total_pages > 1) {
         $prev_url = add_query_arg([
             'viator_page' => $page - 1,
             'viator_query' => $searchTerm,
+            'viator_sort' => $current_sort
         ]);
         $prev_arrow = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/></svg>';
         $output .= '<a class="viator-pagination-arrow" href="' . esc_url($prev_url) . '">' . $prev_arrow . '</a>';
@@ -347,6 +348,7 @@ if ($total_pages > 1) {
             $url = add_query_arg([
                 'viator_page' => $page_num,
                 'viator_query' => $searchTerm,
+                'viator_sort' => $current_sort
             ]);
             $active_class = ($page_num == $page) ? ' active' : '';
             $output .= '<a class="viator-pagination-btn' . $active_class . '" href="' . esc_url($url) . '">' . $page_num . '</a>';
@@ -358,6 +360,7 @@ if ($total_pages > 1) {
         $next_url = add_query_arg([
             'viator_page' => $page + 1,
             'viator_query' => $searchTerm,
+            'viator_sort' => $current_sort
         ]);
         $next_arrow = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/></svg>';
         $output .= '<a class="viator-pagination-arrow" href="' . esc_url($next_url) . '">' . $next_arrow . '</a>';

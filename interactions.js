@@ -18,6 +18,56 @@ document.addEventListener('DOMContentLoaded', function () {
         // Desabilita o botão para evitar múltiplos cliques
         searchButton.disabled = true;
     });
+
+    // Adicionar evento para links de paginação
+    document.addEventListener('click', function(e) {
+        // Verificar se é um link de paginação
+        if (e.target.closest('.viator-pagination-btn') || e.target.closest('.viator-pagination-arrow')) {
+            e.preventDefault();
+            const link = e.target.closest('a');
+            if (!link) return;
+
+            // Mostrar indicador de carregamento
+            document.querySelector('.viator-grid').style.opacity = '0.5';
+
+            // Pegar parâmetros da URL do link
+            const url = new URL(link.href);
+            const params = new URLSearchParams(url.search);
+
+            // Fazer requisição AJAX
+            fetch(viatorAjax.ajaxurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    action: 'viator_update_sort',
+                    viator_query: params.get('viator_query'),
+                    viator_sort: params.get('viator_sort'),
+                    viator_page: params.get('viator_page'),
+                    nonce: viatorAjax.nonce
+                })
+            })
+            .then(response => response.text())
+            .then(html => {
+                // Atualizar a URL sem recarregar a página
+                window.history.pushState({}, '', link.href);
+                
+                // Atualizar o conteúdo
+                document.getElementById('viator-results').innerHTML = html;
+                
+                // Rolar para o topo dos resultados
+                document.getElementById('viator-results').scrollIntoView({ behavior: 'smooth' });
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                window.location.href = link.href;
+            })
+            .finally(() => {
+                document.querySelector('.viator-grid').style.opacity = '1';
+            });
+        }
+    });
 });
 
 function updateSort(value) {
