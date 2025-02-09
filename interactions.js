@@ -5,8 +5,19 @@ document.addEventListener('DOMContentLoaded', function () {
     const searchIcon = document.getElementById('search-icon');
 
     searchForm.addEventListener('submit', function (event) {
-        // Previne o envio do formulário para testar a animação
-        // event.preventDefault();
+        event.preventDefault(); // Previne o envio padrão do formulário
+        
+        // Pega o valor da pesquisa
+        const searchQuery = this.querySelector('input[name="viator_query"]').value;
+        
+        // Cria uma nova URL apenas com o parâmetro de pesquisa
+        const url = new URL(window.location.href);
+        url.search = new URLSearchParams({
+            'viator_query': searchQuery
+        }).toString();
+        
+        // Redireciona para a URL limpa
+        window.location.href = url.toString();
 
         // Altera o texto do botão
         searchText.innerHTML = 'Pesquisando<span class="loading-dots"></span>';
