@@ -1,3 +1,77 @@
+/* Importar a fonte Poppins do Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+/* Definir as variáveis de fonte no root */
+:root {
+    --font-primary: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+}
+
+/* Aplicar a fonte base em todo o container */
+#viator-search-form,
+.viator-grid,
+.viator-header {
+    font-family: var(--font-primary);
+}
+
+/* Input de pesquisa */
+#viator-search-form input[type="text"] {
+    font-family: var(--font-primary);
+    font-weight: 400;
+}
+
+/* Botão de pesquisa */
+#viator-search-form button {
+    font-family: var(--font-primary);
+    font-weight: 500;
+}
+
+/* Título dos cards */
+.viator-card h3 {
+    font-family: var(--font-primary);
+    font-weight: 600;
+    letter-spacing: -0.3px;
+}
+
+/* Descrição dos cards */
+.viator-card p {
+    font-family: var(--font-primary);
+    font-weight: 400;
+}
+
+/* Preço */
+.viator-card-price {
+    font-family: var(--font-primary);
+    font-weight: 500;
+}
+
+/* Badge e flags */
+.viator-badge,
+.viator-flag-cancelamento {
+    font-family: var(--font-primary);
+    font-weight: 500;
+}
+
+/* Select de ordenação */
+.viator-sort:before {
+    font-family: var(--font-primary);
+    font-weight: 400;
+}
+
+.viator-sort select {
+    font-family: var(--font-primary);
+    font-weight: 400;
+}
+
+.viator-sort select option {
+    font-family: var(--font-primary);
+}
+
+/* Total de resultados */
+.viator-total {
+    font-family: var(--font-primary);
+    font-weight: 500;
+}
+
         /* Formulário Responsivo */
         #viator-search-form {
             display: flex;
@@ -321,6 +395,7 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
+            font-size: 15px; /* Tamanho base padrão para todos os elementos */
         }
 
         .viator-sort {
@@ -329,7 +404,7 @@
         }
 
         .viator-sort:before {
-            content: "Ordenar por:  "; /* Adicionei mais um espaço após os dois pontos */
+            content: "Ordenar por:\00a0\00a0\00a0"; /* Usando caracteres Unicode para espaço não-quebrável */
             position: absolute;
             left: 12px;
             top: 50%;
@@ -337,14 +412,17 @@
             color: #666;
             pointer-events: none;
             z-index: 1;
+            font-size: 15px;
+            font-weight: 400;
+            white-space: pre; /* Preserva os espaços */
         }
 
         .viator-sort select {
-            padding: 8px 12px 8px 105px; /* Aumentei para 105px para dar mais espaço após o texto fixo */
+            padding: 8px 12px 8px 115px; /* Ajustado para acomodar o novo espaçamento */
             border: 1px solid #ddd;
             border-radius: 4px;
-            font-size: 14px;
-            min-width: 250px;
+            font-size: 15px;
+            min-width: 270px;
             background-color: #fff;
             cursor: pointer;
             appearance: none;
@@ -354,14 +432,15 @@
             background-repeat: no-repeat;
             background-position: calc(100% - 12px) center;
             padding-right: 35px;
-            font-weight: bold; /* Texto selecionado em negrito */
+            font-weight: 500;
         }
 
         /* Alinhamento à esquerda para as opções do dropdown */
         .viator-sort select option {
             padding-left: 12px !important;
             text-align: left;
-            font-weight: normal; /* Opções não selecionadas com peso normal */
+            font-size: 15px; /* Mesmo tamanho do header */
+            font-weight: 400; /* Normal para as opções */
         }
 
         .viator-sort select:hover {
