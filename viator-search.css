@@ -72,17 +72,21 @@
             width: 100%;
             height: 200px;
             overflow: hidden;
+            position: relative; /* Para manter o posicionamento da badge */
         }
 
         .viator-card-img img {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transition: transform 0.3s ease;
+            /* Ajusta a imagem para mostrar mais do conteúdo */
+            object-position: center;
+            transform: scale(1.0); /* Inicia sem zoom */
+            transition: transform 0.5s ease;
         }
 
         .viator-card:hover .viator-card-img img {
-            transform: scale(1.1);
+            transform: scale(1.05); /* Reduz o zoom no hover para 5% */
         }
 
         .viator-card-content {
@@ -192,14 +196,6 @@
             top: 20px; /* Espaçamento de 20px do topo */
             right: 20px; /* Espaçamento de 20px da direita */
             z-index: 1;
-        }
-
-        /* Container da imagem do card */
-        .viator-card-img {
-            position: relative; /* Garante que a badge seja posicionada em relação à imagem */
-            width: 100%;
-            height: 200px;
-            overflow: hidden;
         }
 
         /* Estilo para as flags */

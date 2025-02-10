@@ -19,7 +19,7 @@ function viator_search_form() {
     $searchTerm = isset($_GET['viator_query']) ? sanitize_text_field($_GET['viator_query']) : '';
     
     ?>
-    <form method="GET" action="" id="viator-search-form">
+    <form method="GET" action="<?php echo esc_url(get_permalink()); ?>" id="viator-search-form">
         <input type="text" name="viator_query" placeholder="🌍 Aonde você quer ir?" value="<?php echo esc_attr($searchTerm); ?>" required>
         <button type="submit" id="search-button">
             <span id="search-text">Pesquisar</span>
@@ -45,7 +45,7 @@ function viator_get_search_results($searchTerm) {
     $url = "https://api.sandbox.viator.com/partner/search/freetext";
 
     // Paginação
-    $per_page = 12; // Número de itens por página
+    $per_page = 21; // Número de itens por página
     $page = isset($_GET['viator_page']) ? intval($_GET['viator_page']) : 1; // Página atual
     $start = ($page - 1) * $per_page + 1; // Índice inicial dos resultados
 
