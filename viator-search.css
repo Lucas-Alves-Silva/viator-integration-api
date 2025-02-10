@@ -458,4 +458,247 @@
                 width: 100%;
                 min-width: auto;
             }
-        }        
+        }
+
+/* Container principal que envolve filtros e grid */
+.viator-content-wrapper {
+    display: flex;
+    gap: 30px;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px 40px;
+    justify-content: center; /* Centraliza o conteúdo horizontalmente */
+}
+
+/* Container dos resultados */
+.viator-results-container {
+    flex: 1;
+    max-width: 1200px; /* Aumentado de 1000px para 1200px */
+}
+
+/* Sidebar de filtros */
+.viator-filters {
+    width: 300px;
+    flex-shrink: 0;
+}
+
+/* Ajuste do grid para acomodar a sidebar */
+.viator-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); /* Aumentado de 300px para 350px */
+    gap: 25px;
+    width: 100%;
+}
+
+/* Ajuste do container de resultados */
+#viator-results {
+    width: 100%;
+    max-width: 1400px;
+    margin: 150px auto 0;
+    padding: 0 20px;
+}
+
+/* Estilo do container do filtro de data */
+.viator-date-filter {
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.viator-date-filter h3 {
+    display: flex;
+    justify-content: center;
+    font-family: var(--font-primary);
+    font-size: 16px;
+    font-weight: 500;
+    color: #333;
+    margin: 0 0 15px 0;
+}
+
+/* Estilo do botão de seleção de data */
+.viator-date-selector {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: var(--font-primary);
+    font-size: 16px;
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    outline: none; /* Remove o outline padrão */
+}
+
+.viator-date-selector:hover {
+    border-color: #04846b; /* Cor verde do tema */
+    background-color: #f8f8f8;
+}
+
+.viator-date-selector:focus {
+    border-color: #04846b;
+    box-shadow: 0 0 0 2px rgba(4, 132, 107, 0.1); /* Sombra sutil na cor do tema */
+}
+
+.viator-date-selector i {
+    margin-right: 10px;
+    color: #666;
+}
+
+.viator-date-selector span {
+    color: #666;
+    font-size: 14px;
+    font-weight: 400;
+}
+
+/* Responsividade */
+@media (max-width: 1200px) {
+    .viator-content-wrapper {
+        padding: 20px;
+    }
+    
+    .viator-results-container {
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    .viator-content-wrapper {
+        flex-direction: column;
+        padding: 15px;
+    }
+
+    .viator-filters {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+    }
+}
+
+/* Remover os botões antigos */
+.viator-date-buttons {
+    display: none !important;
+}
+
+/* Estilização do Flatpickr */
+.flatpickr-calendar {
+    font-family: var(--font-primary) !important;
+    box-shadow: 0 3px 13px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Container dos botões dentro do calendário */
+.flatpickr-buttons {
+    display: flex !important;
+    gap: 10px !important;
+    padding: 10px 15px 15px !important;
+    border-top: 1px solid #e6e6e6 !important;
+    background-color: #fff !important;
+}
+
+/* Estilo base para os botões do Flatpickr */
+.flatpickr-button {
+    flex: 1 !important;
+    padding: 8px 15px !important;
+    border-radius: 6px !important;
+    font-family: var(--font-primary) !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+}
+
+/* Botão Redefinir do Flatpickr */
+.flatpickr-button.reset {
+    background-color: transparent !important;
+    border: 1px solid #333 !important;
+    color: #333 !important;
+}
+
+.flatpickr-button.reset:hover {
+    background-color: #f5f5f5 !important;
+}
+
+/* Botão Aplicar do Flatpickr */
+.flatpickr-button.apply {
+    background-color: #008768 !important;
+    border: 1px solid #008768 !important;
+    color: white !important;
+}
+
+.flatpickr-button.apply:hover {
+    background-color: #006b53 !important;
+    border-color: #006b53 !important;
+}
+
+/* Garantir que o seletor de data não tenha estilos indesejados */
+.viator-date-selector {
+    border: 1px solid #ddd !important;
+    background-color: #fff !important;
+}
+
+.viator-date-selector:hover,
+.viator-date-selector:focus {
+    border-color: #008768 !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+/* Estilização personalizada do Flatpickr */
+.flatpickr-calendar {
+    font-family: var(--font-primary) !important;
+    box-shadow: 0 3px 13px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Dia selecionado */
+.flatpickr-day.selected,
+.flatpickr-day.selected:hover,
+.flatpickr-day.selected:focus {
+    background: #04846b !important;
+    border-color: #04846b !important;
+    color: #ffffff !important;
+    font-weight: 500 !important;
+}
+
+/* Hover nos dias */
+.flatpickr-day:hover {
+    background: #f5f5f5 !important;
+    border-color: #04846b !important;
+}
+
+/* Dia atual */
+.flatpickr-day.today {
+    border-color: #04846b !important;
+}
+
+.flatpickr-day.today:hover {
+    background: #f5f5f5 !important;
+    color: #04846b !important;
+}
+
+/* Dias desabilitados */
+.flatpickr-day.disabled,
+.flatpickr-day.disabled:hover {
+    color: rgba(72, 72, 72, 0.3) !important;
+    border-color: transparent !important;
+    background: transparent !important;
+    cursor: not-allowed !important;
+}
+
+/* Mês e ano no cabeçalho */
+.flatpickr-current-month .flatpickr-monthDropdown-months,
+.flatpickr-current-month input.cur-year {
+    font-family: var(--font-primary) !important;
+    font-weight: 500 !important;
+}
+
+/* Setas de navegação */
+.flatpickr-months .flatpickr-prev-month:hover svg,
+.flatpickr-months .flatpickr-next-month:hover svg {
+    fill: #04846b !important;
+}        

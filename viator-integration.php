@@ -136,8 +136,23 @@ function viator_get_search_results($searchTerm) {
     $total_products = isset($data['products']['totalCount']) ? intval($data['products']['totalCount']) : 0;
     $total_pages = ceil($total_products / $per_page);
 
-    // Cabeçalho com total e ordenação
-    $output = '<div class="viator-header">';
+    // Início do wrapper de conteúdo
+    $output = '<div class="viator-content-wrapper">';
+
+    // Sidebar de filtros
+    $output .= '<div class="viator-filters">
+        <div class="viator-date-filter">
+            <h3>Quando você pretende viajar?</h3>
+            <button type="button" class="viator-date-selector">
+                <i>📅</i>
+                <span>Escolher data</span>
+            </button>
+        </div>
+    </div>';
+
+    // Header com total e ordenação
+    $output .= '<div class="viator-results-container">';
+    $output .= '<div class="viator-header">';
     $output .= '<p class="viator-total">' . $total_products . ' resultados</p>';
     
     // Select de ordenação
@@ -388,6 +403,9 @@ if ($total_pages > 1) {
     $output .= '</div>';
 }
 
+    $output .= '</div>'; // Fecha viator-results-container
+    $output .= '</div>'; // Fecha viator-content-wrapper
+
     return $output;
 }
 
@@ -407,6 +425,11 @@ function viator_enqueue_scripts() {
         'ajaxurl' => admin_url('admin-ajax.php'),
         'nonce' => wp_create_nonce('viator_sort_nonce')
     ));
+
+    // Adicionar Flatpickr
+    wp_enqueue_style('flatpickr', 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css');
+    wp_enqueue_script('flatpickr', 'https://cdn.jsdelivr.net/npm/flatpickr', array(), null, true);
+    wp_enqueue_script('flatpickr-pt', 'https://npmcdn.com/flatpickr/dist/l10n/pt.js', array('flatpickr'), null, true);
 }
 add_action('wp_enqueue_scripts', 'viator_enqueue_scripts');
 
