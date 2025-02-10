@@ -77,14 +77,19 @@ function viator_get_search_results($searchTerm) {
             $sorting = ['sort' => 'DEFAULT'];
     }
 
+    // Calcular datas dinamicamente
+    $data_atual = new DateTime();
+    $data_fim = $data_atual->format('Y-m-d');
+    $data_inicio = (new DateTime())->modify('-1 year')->format('Y-m-d');
+
     // Corpo da requisição JSON
     $body = json_encode([
         "searchTerm" => $searchTerm,
         "productSorting" => $sorting,
         "productFiltering" => [
             "dateRange" => [
-                "from" => "2024-01-01",
-                "to" => "2025-02-04"
+                "from" => $data_inicio, // Data de 1 ano atrás
+                "to" => $data_fim      // Data atual
             ],
             "price" => [
                 "from" => 0,
