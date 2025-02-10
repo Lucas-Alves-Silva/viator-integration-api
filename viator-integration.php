@@ -121,7 +121,7 @@ function viator_get_search_results($searchTerm) {
 
     // Verificar se houve erro na requisição
     if (is_wp_error($response)) {
-        return '<p>OPS! Aguarde um instante e tente novamente.</p>';
+        return '<p class="viator-error-message">OPS! Aguarde um instante e tente novamente.</p>';
     }
 
     // Processar resposta da API
@@ -129,7 +129,7 @@ function viator_get_search_results($searchTerm) {
     $data = json_decode($body, true);
 
     if (empty($data) || !isset($data['products']['results'])) {
-        return '<p>Nenhum passeio encontrado para "' . esc_html($searchTerm) . '".</p>';
+        return '<p class="viator-error-message">Nenhum passeio encontrado para "' . esc_html($searchTerm) . '".</p>';
     }
 
     // Total de produtos e cálculo do número de páginas
