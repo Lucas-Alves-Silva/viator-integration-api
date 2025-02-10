@@ -62,6 +62,102 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
     });
+
+    function initializeDatePicker() {
+        const dateSelector = document.querySelector('.viator-date-selector');
+        if (!dateSelector) return;
+
+        let selectedTempDate = null;
+
+        const fp = flatpickr(dateSelector, {
+            mode: "single",
+            minDate: "today",
+            maxDate: new Date().fp_incr(365),
+            dateFormat: "d/m/Y",
+            closeOnSelect: false,
+            locale: {
+                firstDayOfWeek: 0,
+                weekdays: {
+                    shorthand: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
+                    longhand: ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+                },
+                months: {
+                    shorthand: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+                    longhand: ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+                }
+            },
+            onChange: function(selectedDates, dateStr) {
+                if (selectedDates.length === 1) {
+                    selectedTempDate = dateStr;
+                }
+            },
+            onReady: function(selectedDates, dateStr, instance) {
+                const buttonsContainer = document.createElement('div');
+                buttonsContainer.className = 'flatpickr-buttons';
+                
+                const resetButton = document.createElement('button');
+                resetButton.textContent = 'Redefinir';
+                resetButton.className = 'flatpickr-button reset';
+                resetButton.type = 'button';
+                
+                const applyButton = document.createElement('button');
+                applyButton.textContent = 'Aplicar';
+                applyButton.className = 'flatpickr-button apply';
+                applyButton.type = 'button';
+                
+                buttonsContainer.appendChild(resetButton);
+                buttonsContainer.appendChild(applyButton);
+                
+                instance.calendarContainer.appendChild(buttonsContainer);
+                
+                resetButton.addEventListener('click', function() {
+                    instance.clear();
+                    dateSelector.querySelector('span').textContent = 'Escolher data';
+                    selectedTempDate = null;
+                    instance.close();
+                });
+                
+                applyButton.addEventListener('click', function() {
+                    if (selectedTempDate) {
+                        dateSelector.querySelector('span').textContent = selectedTempDate;
+                        // Aqui você implementa a lógica de filtro
+                        console.log('Data selecionada:', selectedTempDate);
+                        instance.close();
+                    }
+                });
+            }
+        });
+
+        return fp;
+    }
+
+    // Inicializar o datepicker
+    let flatpickrInstance = initializeDatePicker();
+
+    // Função para reinicializar o datepicker após mudanças na página
+    function reinitializeDatePicker() {
+        if (flatpickrInstance) {
+            flatpickrInstance.destroy();
+        }
+        flatpickrInstance = initializeDatePicker();
+    }
+
+    // Observar mudanças no DOM para reinicializar o datepicker quando necessário
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'childList' && mutation.target.id === 'viator-results') {
+                reinitializeDatePicker();
+            }
+        });
+    });
+
+    const viatorResults = document.getElementById('viator-results');
+    if (viatorResults) {
+        observer.observe(viatorResults, {
+            childList: true,
+            subtree: true
+        });
+    }
 });
 
 function updateSort(value) {
