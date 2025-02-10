@@ -151,16 +151,16 @@
 
         .viator-card-img img {
             width: 100%;
-            height: 100%;
+            height: 120%; /* Aumenta a altura da imagem para ter espaço para mover */
             object-fit: cover;
             /* Ajusta a imagem para mostrar mais do conteúdo */
-            object-position: center;
-            transform: scale(1.0); /* Inicia sem zoom */
-            transition: transform 0.5s ease;
+            object-position: center top; /* Alinha ao topo */
+            transform: translateY(0); /* Posição inicial */
+            transition: transform 0.8s ease; /* Transição suave para o movimento vertical */
         }
 
         .viator-card:hover .viator-card-img img {
-            transform: scale(1.05); /* Reduz o zoom no hover para 5% */
+            transform: translateY(-20%); /* Move a imagem para cima no hover */
         }
 
         .viator-card-content {
