@@ -323,19 +323,45 @@
             margin-bottom: 20px;
         }
 
+        .viator-sort {
+            position: relative;
+            display: inline-block;
+        }
+
+        .viator-sort:before {
+            content: "Ordenar por:  "; /* Adicionei mais um espaço após os dois pontos */
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #666;
+            pointer-events: none;
+            z-index: 1;
+        }
+
         .viator-sort select {
-            padding: 8px 35px 8px 12px; /* Aumenta o padding direito para a seta */
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            background-color: white;
+            padding: 8px 12px 8px 105px; /* Aumentei para 105px para dar mais espaço após o texto fixo */
+            border: 1px solid #ddd;
+            border-radius: 4px;
             font-size: 14px;
-            color: #333;
+            min-width: 250px;
+            background-color: #fff;
             cursor: pointer;
-            min-width: 200px;
-            appearance: none; /* Remove a seta padrão */
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23333' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
-            background-position: right 12px center; /* Posiciona a seta */
+            background-position: calc(100% - 12px) center;
+            padding-right: 35px;
+            font-weight: bold; /* Texto selecionado em negrito */
+        }
+
+        /* Alinhamento à esquerda para as opções do dropdown */
+        .viator-sort select option {
+            padding-left: 12px !important;
+            text-align: left;
+            font-weight: normal; /* Opções não selecionadas com peso normal */
         }
 
         .viator-sort select:hover {
@@ -345,5 +371,12 @@
         .viator-sort select:focus {
             outline: none;
             border-color: #666;
-            box-shadow: 0 0 3px rgba(0,0,0,0.1);
+            box-shadow: 0 0 0 2px rgba(0,0,0,0.1);
+        }
+
+        @media (max-width: 768px) {
+            .viator-sort select {
+                width: 100%;
+                min-width: auto;
+            }
         }        
