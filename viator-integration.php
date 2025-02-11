@@ -121,7 +121,13 @@ function viator_get_search_results($searchTerm) {
 
     // Verificar se houve erro na requisição
     if (is_wp_error($response)) {
-        return '<p class="viator-error-message">OPS! Aguarde um instante e tente novamente.</p>';
+        // Criar a estrutura básica mesmo com erro
+        $output = '<div class="viator-content-wrapper">';
+        $output .= '<div class="viator-results-container">';
+        $output .= '<p class="viator-error-message">OPS! Aguarde um instante e tente novamente.</p>';
+        $output .= '</div>'; // Fecha viator-results-container
+        $output .= '</div>'; // Fecha viator-content-wrapper
+        return $output;
     }
 
     // Processar resposta da API
@@ -129,7 +135,12 @@ function viator_get_search_results($searchTerm) {
     $data = json_decode($body, true);
 
     if (empty($data) || !isset($data['products']['results'])) {
-        return '<p class="viator-error-message">Nenhum passeio encontrado para "' . esc_html($searchTerm) . '".</p>';
+        $output = '<div class="viator-content-wrapper">';
+        $output .= '<div class="viator-results-container">';
+        $output .= '<p class="viator-error-message">Nenhum passeio encontrado para "' . esc_html($searchTerm) . '".</p>';
+        $output .= '</div>'; // Fecha viator-results-container
+        $output .= '</div>'; // Fecha viator-content-wrapper
+        return $output;
     }
 
     // Total de produtos e cálculo do número de páginas
@@ -153,7 +164,10 @@ function viator_get_search_results($searchTerm) {
     // Header com total e ordenação
     $output .= '<div class="viator-results-container">';
     $output .= '<div class="viator-header">';
+    $output .= '<div class="viator-header-info">';
+    $output .= '<span class="viator-header-cancel"><img src="https://img.icons8.com/?size=100&id=82767&format=png&color=000000" alt="Ícone" width="15" height="15"> Cancelamento grátis até 24 horas antes do início da experiência (horário local)</span>';
     $output .= '<p class="viator-total">' . $total_products . ' resultados</p>';
+    $output .= '</div>';
     
     // Select de ordenação
     $current_sort = isset($_GET['viator_sort']) ? $_GET['viator_sort'] : 'DEFAULT';
