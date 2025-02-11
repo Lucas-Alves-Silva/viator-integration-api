@@ -394,7 +394,7 @@
         /* Estilo para o header e o select de ordenação */
         .viator-header {
             display: flex;
-            justify-content: flex-start;
+            justify-content: flex-end;
             align-items: center;
             margin-bottom: 20px;
             font-size: 15px; /* Tamanho base padrão para todos os elementos */
