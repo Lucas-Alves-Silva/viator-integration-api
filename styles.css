@@ -522,7 +522,10 @@
 /* Sidebar de filtros */
 .viator-filters {
     width: 300px;
+    height: 500px;
     flex-shrink: 0;
+    border: 1px solid #ccc;
+    border-radius: 10px;
 }
 
 /* Ajuste do grid para acomodar a sidebar */
@@ -548,7 +551,7 @@
     flex-direction: column;
     background: #04846b;
     padding: 20px;
-    border-radius: 12px;
+    border-radius: 10px 10px 0 0;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
@@ -577,6 +580,7 @@
     cursor: pointer;
     transition: all 0.3s ease;
     outline: none; /* Remove o outline padrão */
+    gap: 5px;
 }
 
 .viator-date-selector:hover {

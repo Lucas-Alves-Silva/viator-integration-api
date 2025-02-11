@@ -167,7 +167,7 @@ function viator_get_search_results($searchTerm) {
         <div class="viator-date-filter">
             <h3>Quando você pretende viajar?</h3>
             <button type="button" class="viator-date-selector">
-                <i>📅</i>
+                <b>📅</b>
                 <span>Escolher data</span>
             </button>
         </div>
@@ -177,7 +177,7 @@ function viator_get_search_results($searchTerm) {
     $output .= '<div class="viator-results-container">';
     $output .= '<div class="viator-header">';
     $output .= '<div class="viator-header-info">';
-    $output .= '<span class="viator-header-cancel"><img src="https://img.icons8.com/?size=100&id=82767&format=png&color=000000" alt="Ícone" width="15" height="15"> Cancelamento grátis até 24 horas antes do início da experiência (horário local)</span>';
+    $output .= '<span class="viator-header-cancel"><img src="https://img.icons8.com/?size=100&id=82742&format=png&color=000000" alt="Ícone" width="15" height="15"> Cancelamento grátis até 24 horas antes do início da experiência (horário local)</span>';
     $output .= '<p class="viator-total">' . $total_products . ' resultados</p>';
     $output .= '</div>';
     
@@ -335,16 +335,13 @@ function viator_get_search_results($searchTerm) {
             <div class="viator-card-content">
                 <p class="viator-card-rating">' . $rating . ' ' . $rating_count . '</p>
                 <h3>' . $title . '</h3>
-                <p>' . substr($description, 0, 120) . '...</p>
-                <p class="viator-card-flags">';
-                
-                // Adicionar a flag "Cancelamento gratuito"
-                if (in_array('FREE_CANCELLATION', $flags)) {
-                    $output .= '<span class="viator-flag-cancelamento">Cancelamento gratuito</span>';
-                }
-    
-        $output .= '</p>
-                <p class="viator-card-duration"><img src="https://img.icons8.com/?size=100&id=82767&format=png&color=000000" alt="Duração" title="Duração aproximada" width="15" height="15"> ' . $duration . '</p>
+                <p>' . substr($description, 0, 120) . '...</p>';
+
+        if (in_array('FREE_CANCELLATION', $flags)) {
+            $output .= '<p class="viator-card-duration"><img src="https://img.icons8.com/?size=100&id=85097&format=png&color=04846b" alt="Cancelamento gratuito" title="Política de cancelamento" width="15" height="15"> Cancelamento gratuito</p>';
+        }
+
+        $output .= '<p class="viator-card-duration"><img src="https://img.icons8.com/?size=100&id=82767&format=png&color=000000" alt="Duração" title="Duração aproximada" width="15" height="15"> ' . $duration . '</p>
                 <p class="viator-card-price"><img src="https://img.icons8.com/?size=100&id=ZXJaNFNjWGZF&format=png&color=000000" alt="Preço" width="15" height="15"> a partir de <strong>' . $price . '</strong></p>                
                 <a href="' . $url . '" target="_blank">Ver detalhes</a>
             </div>
