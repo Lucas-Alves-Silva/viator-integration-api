@@ -392,10 +392,11 @@
         /* Estilo para o header e o select de ordenação */
         .viator-header {
             display: flex;
-            justify-content: space-between;
+            justify-content: flex-start;
             align-items: center;
             margin-bottom: 20px;
             font-size: 15px; /* Tamanho base padrão para todos os elementos */
+            gap: 10px;
         }
 
         .viator-sort {

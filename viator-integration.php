@@ -415,7 +415,7 @@ add_shortcode('viator_search', 'viator_search_form');
 // Enfileirar scripts e estilos
 function viator_enqueue_scripts() {
     // Carrega o arquivo CSS
-    wp_enqueue_style('viator-search-style', plugins_url('viator-search.css', __FILE__));
+    wp_enqueue_style('viator-search-style', plugins_url('styles.css', __FILE__));
 
     // Carrega o arquivo JavaScript
     wp_enqueue_script('viator-interactions', plugins_url('interactions.js', __FILE__), array('jquery'), null, true);
