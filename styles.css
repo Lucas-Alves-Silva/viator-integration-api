@@ -764,4 +764,30 @@
     .viator-error-message {
         width: 90% !important; /* Mais largo em telas pequenas */
     }
+}
+
+/* Estilização do intervalo de datas */
+.flatpickr-day.inRange {
+    background-color: rgba(4, 132, 107, 0.1) !important;
+    border-color: transparent !important;
+    color: #333 !important;
+    box-shadow: none !important;
+}
+
+.flatpickr-day.selected.startRange,
+.flatpickr-day.startRange.startRange,
+.flatpickr-day.endRange.endRange {
+    background: #04846b !important;
+    border-color: #04846b !important;
+    color: #fff !important;
+}
+
+.flatpickr-day.selected.startRange,
+.flatpickr-day.startRange.startRange {
+    border-radius: 50px 0 0 50px !important;
+}
+
+.flatpickr-day.selected.endRange,
+.flatpickr-day.endRange.endRange {
+    border-radius: 0 50px 50px 0 !important;
 }        

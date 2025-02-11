@@ -77,10 +77,17 @@ function viator_get_search_results($searchTerm) {
             $sorting = ['sort' => 'DEFAULT'];
     }
 
-    // Calcular datas dinamicamente
-    $data_atual = new DateTime();
-    $data_fim = $data_atual->format('Y-m-d');
-    $data_inicio = (new DateTime())->modify('-1 year')->format('Y-m-d');
+    // Verificar se há um intervalo de datas selecionado
+    $date_start = isset($_GET['viator_date_start']) ? $_GET['viator_date_start'] : '';
+    $date_end = isset($_GET['viator_date_end']) ? $_GET['viator_date_end'] : '';
+    
+    if (!empty($date_start) && !empty($date_end)) {
+        $date_from = $date_start;
+        $date_to = date('Y-m-d', strtotime($date_end . ' +1 day')); // Adiciona um dia para incluir o último dia
+    } else {
+        $date_from = date('Y-m-d');
+        $date_to = date('Y-m-d', strtotime('+1 year'));
+    }
 
     // Corpo da requisição JSON
     $body = json_encode([
@@ -88,8 +95,8 @@ function viator_get_search_results($searchTerm) {
         "productSorting" => $sorting,
         "productFiltering" => [
             "dateRange" => [
-                "from" => $data_inicio, // Data de 1 ano atrás
-                "to" => $data_fim      // Data atual
+                "from" => $date_from,
+                "to" => $date_to
             ],
             "price" => [
                 "from" => 0,
@@ -121,12 +128,10 @@ function viator_get_search_results($searchTerm) {
 
     // Verificar se houve erro na requisição
     if (is_wp_error($response)) {
-        // Criar a estrutura básica mesmo com erro
         $output = '<div class="viator-content-wrapper">';
         $output .= '<div class="viator-results-container">';
         $output .= '<p class="viator-error-message">OPS! Aguarde um instante e tente novamente.</p>';
-        $output .= '</div>'; // Fecha viator-results-container
-        $output .= '</div>'; // Fecha viator-content-wrapper
+        $output .= '</div></div>';
         return $output;
     }
 
@@ -134,12 +139,19 @@ function viator_get_search_results($searchTerm) {
     $body = wp_remote_retrieve_body($response);
     $data = json_decode($body, true);
 
-    if (empty($data) || !isset($data['products']['results'])) {
+    // Verificar se há resultados para as datas selecionadas
+    if (empty($data) || !isset($data['products']['results']) || empty($data['products']['results'])) {
+        $date_message = '';
+        if (isset($_GET['viator_date_start']) && isset($_GET['viator_date_end'])) {
+            $start = date('d/m/Y', strtotime($_GET['viator_date_start']));
+            $end = date('d/m/Y', strtotime($_GET['viator_date_end']));
+            $date_message = " para o período de $start a $end";
+        }
+        
         $output = '<div class="viator-content-wrapper">';
         $output .= '<div class="viator-results-container">';
-        $output .= '<p class="viator-error-message">Nenhum passeio encontrado para "' . esc_html($searchTerm) . '".</p>';
-        $output .= '</div>'; // Fecha viator-results-container
-        $output .= '</div>'; // Fecha viator-content-wrapper
+        $output .= '<p class="viator-error-message">Nenhum passeio encontrado' . $date_message . '. Por favor, tente outras datas.</p>';
+        $output .= '</div></div>';
         return $output;
     }
 
@@ -351,7 +363,9 @@ if ($total_pages > 1) {
         $prev_url = add_query_arg([
             'viator_page' => $page - 1,
             'viator_query' => $searchTerm,
-            'viator_sort' => $current_sort
+            'viator_sort' => $current_sort,
+            'viator_date_start' => isset($_GET['viator_date_start']) ? $_GET['viator_date_start'] : '',
+            'viator_date_end' => isset($_GET['viator_date_end']) ? $_GET['viator_date_end'] : ''
         ]);
         $prev_arrow = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/></svg>';
         $output .= '<a class="viator-pagination-arrow" href="' . esc_url($prev_url) . '">' . $prev_arrow . '</a>';
@@ -396,7 +410,9 @@ if ($total_pages > 1) {
             $url = add_query_arg([
                 'viator_page' => $page_num,
                 'viator_query' => $searchTerm,
-                'viator_sort' => $current_sort
+                'viator_sort' => $current_sort,
+                'viator_date_start' => isset($_GET['viator_date_start']) ? $_GET['viator_date_start'] : '',
+                'viator_date_end' => isset($_GET['viator_date_end']) ? $_GET['viator_date_end'] : ''
             ]);
             $active_class = ($page_num == $page) ? ' active' : '';
             $output .= '<a class="viator-pagination-btn' . $active_class . '" href="' . esc_url($url) . '">' . $page_num . '</a>';
@@ -408,7 +424,9 @@ if ($total_pages > 1) {
         $next_url = add_query_arg([
             'viator_page' => $page + 1,
             'viator_query' => $searchTerm,
-            'viator_sort' => $current_sort
+            'viator_sort' => $current_sort,
+            'viator_date_start' => isset($_GET['viator_date_start']) ? $_GET['viator_date_start'] : '',
+            'viator_date_end' => isset($_GET['viator_date_end']) ? $_GET['viator_date_end'] : ''
         ]);
         $next_arrow = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/></svg>';
         $output .= '<a class="viator-pagination-arrow" href="' . esc_url($next_url) . '">' . $next_arrow . '</a>';
@@ -452,20 +470,54 @@ function viator_enqueue_scripts() {
 }
 add_action('wp_enqueue_scripts', 'viator_enqueue_scripts');
 
-// Handler AJAX
+// Modificar o handler AJAX de ordenação
 function viator_ajax_update_sort() {
-    // Verificar nonce
     check_ajax_referer('viator_sort_nonce', 'nonce');
     
-    // Pegar parâmetros
+    // Verificar e sanitizar todos os parâmetros necessários
     $search_term = isset($_POST['viator_query']) ? sanitize_text_field($_POST['viator_query']) : '';
-    $_GET['viator_query'] = $search_term; // Necessário para manter a compatibilidade
+    if (empty($search_term)) {
+        wp_send_json_error(['message' => 'Termo de busca não fornecido']);
+        wp_die();
+    }
+
+    // Configurar os parâmetros GET para a função de busca
+    $_GET['viator_query'] = $search_term;
     $_GET['viator_sort'] = isset($_POST['viator_sort']) ? sanitize_text_field($_POST['viator_sort']) : 'DEFAULT';
     $_GET['viator_page'] = isset($_POST['viator_page']) ? intval($_POST['viator_page']) : 1;
+    $_GET['viator_date_start'] = isset($_POST['viator_date_start']) ? sanitize_text_field($_POST['viator_date_start']) : '';
+    $_GET['viator_date_end'] = isset($_POST['viator_date_end']) ? sanitize_text_field($_POST['viator_date_end']) : '';
     
-    // Retornar resultados
-    echo viator_get_search_results($search_term);
+    // Obter os resultados
+    $results = viator_get_search_results($search_term);
+    
+    // Verificar se os resultados são válidos
+    if (empty($results)) {
+        wp_send_json_error(['message' => 'Nenhum resultado encontrado']);
+        wp_die();
+    }
+
+    // Retornar os resultados como HTML
+    echo $results;
     wp_die();
 }
 add_action('wp_ajax_viator_update_sort', 'viator_ajax_update_sort');
 add_action('wp_ajax_nopriv_viator_update_sort', 'viator_ajax_update_sort');
+
+// Adicionar nova action para o filtro
+add_action('wp_ajax_viator_update_filter', 'viator_ajax_update_filter');
+add_action('wp_ajax_nopriv_viator_update_filter', 'viator_ajax_update_filter');
+
+function viator_ajax_update_filter() {
+    check_ajax_referer('viator_sort_nonce', 'nonce');
+    
+    $search_term = isset($_POST['viator_query']) ? sanitize_text_field($_POST['viator_query']) : '';
+    $_GET['viator_query'] = $search_term;
+    $_GET['viator_sort'] = isset($_POST['viator_sort']) ? sanitize_text_field($_POST['viator_sort']) : 'DEFAULT';
+    $_GET['viator_page'] = isset($_POST['viator_page']) ? intval($_POST['viator_page']) : 1;
+    $_GET['viator_date_start'] = isset($_POST['viator_date_start']) ? sanitize_text_field($_POST['viator_date_start']) : '';
+    $_GET['viator_date_end'] = isset($_POST['viator_date_end']) ? sanitize_text_field($_POST['viator_date_end']) : '';
+    
+    echo viator_get_search_results($search_term);
+    wp_die();
+}
