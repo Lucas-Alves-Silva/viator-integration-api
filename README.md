@@ -61,7 +61,7 @@ viator-api-integration/
 
 ├── viator-integration.php      // Arquivo principal do plugin
 
-├── viator-search.css               // Estilos CSS para o formulário e cards
+├── styles.css               // Estilos CSS para o formulário e cards
 
 ├── interactions.js                 // Lógica de interações dinâmicas
 ## Uso/Exemplos
