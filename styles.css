@@ -754,13 +754,19 @@
     text-align: center !important;
     font-family: var(--font-primary) !important;
     font-size: 16px !important;
-    color: #550909 !important;
-    margin: 30px auto !important; /* Mudado para auto nas laterais */
+    color: #ffffff !important;
+    margin: 30px auto !important;
     width: 50% !important;
-    background: darksalmon;
-    border-radius: 7px;
-    padding: 10px;
-    display: block; /* Garante que ocupe a linha toda */
+    background: #93003f !important;
+    border-radius: 7px !important;
+    padding: 10px !important;
+    display: block !important;
+    transition: background-color 0.3s ease !important;
+}
+
+/* Estilo para a mensagem quando está pesquisando */
+.viator-error-message.searching {
+    background-color: #04846b !important;
 }
 
 /* Ajuste para mobile */

@@ -377,9 +377,17 @@ function updateSort(value) {
 // Função para definir o destino no campo de busca
 function setSearchDestination(destino) {
     const searchInput = document.querySelector('input[name="viator_query"]');
+    const errorMessage = document.querySelector('.viator-error-message');
+    
     if (searchInput) {
+        // Atualizar o estilo e texto da mensagem de erro
+        if (errorMessage) {
+            errorMessage.classList.add('searching');
+            errorMessage.textContent = 'Vamos lá! Pesquisando...';
+        }
+        
+        // Definir o valor do input e submeter o form
         searchInput.value = destino;
-        // Opcional: fazer submit automático do formulário
         searchInput.closest('form').submit();
     }
 }
