@@ -199,10 +199,44 @@ function viator_get_search_results($searchTerm) {
 
     // Verificar se há resultados
     if (empty($data) || !isset($data['products']['results']) || empty($data['products']['results'])) {
-        $output = '<div class="viator-content-wrapper">';
+        // Adicionar o script de scroll primeiro
+        $output = '<script>
+            window.addEventListener("load", function() {
+                setTimeout(function() {
+                    const targetElement = document.querySelector(".viator-results-container");
+                    if (targetElement) {
+                        const startPosition = window.pageYOffset;
+                        const targetPosition = targetElement.getBoundingClientRect().top + window.pageYOffset - 20;
+                        const distance = targetPosition - startPosition;
+                        const duration = 1000;
+                        let start = null;
+
+                        function animation(currentTime) {
+                            if (start === null) start = currentTime;
+                            const timeElapsed = currentTime - start;
+                            const progress = Math.min(timeElapsed / duration, 1);
+
+                            const easeInOutCubic = progress => {
+                                return progress < 0.5
+                                    ? 4 * progress * progress * progress
+                                    : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+                            };
+
+                            window.scrollTo(0, startPosition + (distance * easeInOutCubic(progress)));
+
+                            if (timeElapsed < duration) {
+                                requestAnimationFrame(animation);
+                            }
+                        }
+
+                        requestAnimationFrame(animation);
+                    }
+                }, 500);
+            });
+        </script>';
+
+        // Depois adicionar o conteúdo
         $output .= '<div class="viator-results-container">';
-        
-        // Mensagem de erro personalizada com a palavra buscada
         $output .= '<p class="viator-error-message">Nenhum passeio encontrado para "' . esc_html($searchTerm) . '".</p>';
         
         // Adiciona sugestões de destinos
@@ -217,7 +251,7 @@ function viator_get_search_results($searchTerm) {
         }
         
         $output .= '</div></div>';
-        $output .= '</div></div>';
+        $output .= '</div>';
         return $output;
     }
 
@@ -229,10 +263,12 @@ function viator_get_search_results($searchTerm) {
     $output = '<script>
         window.addEventListener("load", function() {
             setTimeout(function() {
-                const contentWrapper = document.querySelector(".viator-content-wrapper");
-                if (contentWrapper) {
+                // Procurar primeiro pela mensagem de erro, se não encontrar, procurar pelo wrapper de conteúdo
+                const targetElement = document.querySelector(".viator-error-message") || document.querySelector(".viator-content-wrapper");
+                
+                if (targetElement) {
                     const startPosition = window.pageYOffset;
-                    const targetPosition = contentWrapper.getBoundingClientRect().top + window.pageYOffset - 20;
+                    const targetPosition = targetElement.getBoundingClientRect().top + window.pageYOffset - 20;
                     const distance = targetPosition - startPosition;
                     const duration = 1000; // 1 segundo de duração
                     let start = null;
