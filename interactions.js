@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', function () {
     searchForm.addEventListener('submit', function (event) {
         // Não previne o envio do formulário
         // Apenas atualiza a interface
-        searchText.innerHTML = 'Pesquisando<span class="loading-dots"></span>';
+        searchText.innerHTML = 'Pesquisando<div class="bouncy-loader"><span></span><span></span><span></span></div>';
         searchIcon.innerHTML = '✈️';
         searchIcon.classList.add('airplane-icon');
         searchButton.disabled = true;
@@ -383,7 +383,8 @@ function setSearchDestination(destino) {
         // Atualizar o estilo e texto da mensagem de erro
         if (errorMessage) {
             errorMessage.classList.add('searching');
-            errorMessage.textContent = 'Vamos lá! Pesquisando...';
+            // Adiciona o texto e os pontos animados
+            errorMessage.innerHTML = 'Vamos lá! Pesquisando<div class="bouncy-loader"><span></span><span></span><span></span></div>';
         }
         
         // Definir o valor do input e submeter o form

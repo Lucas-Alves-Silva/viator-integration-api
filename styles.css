@@ -310,20 +310,29 @@
             animation: fly 1s infinite ease-in-out;
         }
 
-        /* Efeito de carregamento nos 3 pontinhos */
-        @keyframes blink {
-            0%, 100% {
-                opacity: 1;
-            }
-            50% {
-                opacity: 0.5;
-            }
+        /* Ajustar o estilo do bouncy loader no botão */
+        #search-button .bouncy-loader {
+            display: inline-flex !important;
+            gap: 3px !important;
+            margin-left: 4px !important;
+            vertical-align: middle !important;
         }
 
-        .loading-dots::after {
-            content: '...';
-            display: inline-block;
-            animation: blink 1.5s infinite;
+        #search-button .bouncy-loader span {
+            width: 4px !important; /* Ligeiramente menor para o botão */
+            height: 4px !important;
+            background-color: #fff !important;
+            border-radius: 50% !important;
+            display: inline-block !important;
+            animation: bouncy 0.6s infinite !important;
+        }
+
+        #search-button .bouncy-loader span:nth-child(2) {
+            animation-delay: 0.2s !important;
+        }
+
+        #search-button .bouncy-loader span:nth-child(3) {
+            animation-delay: 0.4s !important;
         }
 
         /* Estilos da paginação */
@@ -896,5 +905,38 @@
 @media (max-width: 768px) {
     .viator-suggestions-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+/* Adicione estes estilos para a animação dos pontos */
+.bouncy-loader {
+    display: inline-flex !important;
+    gap: 3px !important;
+    margin-left: 4px !important;
+}
+
+.bouncy-loader span {
+    width: 5px !important;
+    height: 5px !important;
+    background-color: #fff !important;
+    border-radius: 50% !important;
+    display: inline-block !important;
+    animation: bouncy 0.6s infinite !important;
+}
+
+.bouncy-loader span:nth-child(2) {
+    animation-delay: 0.2s !important;
+}
+
+.bouncy-loader span:nth-child(3) {
+    animation-delay: 0.4s !important;
+}
+
+@keyframes bouncy {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-5px);
     }
 }        
