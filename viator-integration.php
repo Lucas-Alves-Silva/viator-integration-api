@@ -259,6 +259,9 @@ function viator_get_search_results($searchTerm) {
     $total_products = isset($data['products']['totalCount']) ? intval($data['products']['totalCount']) : 0;
     $total_pages = ceil($total_products / $per_page);
 
+    // Formatar o número total com ponto de milhar apenas se for maior que 1000
+    $formatted_total = $total_products >= 1000 ? number_format($total_products, 0, ',', '.') : $total_products;
+
     // Modificar o script de scroll no início do output
     $output = '<script>
         window.addEventListener("load", function() {
@@ -317,7 +320,7 @@ function viator_get_search_results($searchTerm) {
     $output .= '<div class="viator-header">';
     $output .= '<div class="viator-header-info">';
     $output .= '<span class="viator-header-cancel"><img src="https://img.icons8.com/?size=100&id=82742&format=png&color=000000" alt="Ícone" width="15" height="15"> Cancelamento grátis até 24 horas antes do início da experiência (horário local)</span>';
-    $output .= '<p class="viator-total">' . $total_products . ' resultados</p>';
+    $output .= '<p class="viator-total">' . $formatted_total . ' resultados</p>';
     $output .= '</div>';
     
     // Select de ordenação
