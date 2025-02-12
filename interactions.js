@@ -177,7 +177,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 
                 resetButton.addEventListener('click', function() {
                     instance.clear();
-                    dateSelector.querySelector('span').textContent = 'Escolher data';
+                    // Resetar o texto para o valor padrão
+                    const dateSelector = document.querySelector('.viator-date-selector');
+                    if (dateSelector) {
+                        const spanElement = dateSelector.querySelector('span');
+                        if (spanElement) {
+                            spanElement.textContent = 'Escolher data';
+                        }
+                    }
                     selectedDateRange = null;
                     instance.close();
                     
@@ -185,7 +192,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     
                     let url = new URL(window.location.href);
                     let params = new URLSearchParams(url.search);
-                    params.delete('viator_date');
+                    // Remover os parâmetros de data da URL
+                    params.delete('viator_date_start');
+                    params.delete('viator_date_end');
                     
                     fetch(viatorAjax.ajaxurl, {
                         method: 'POST',
@@ -197,7 +206,8 @@ document.addEventListener('DOMContentLoaded', function () {
                             viator_query: params.get('viator_query'),
                             viator_sort: params.get('viator_sort') || 'DEFAULT',
                             viator_page: '1',
-                            viator_date: '',
+                            viator_date_start: '',
+                            viator_date_end: '',
                             nonce: viatorAjax.nonce
                         })
                     })
