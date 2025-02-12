@@ -314,11 +314,24 @@ function viator_get_search_results($searchTerm) {
     
         // Processar flags
         $flag_output = '';
-        if (in_array('FREE_CANCELLATION', $flags)) {
-            $flag_output .= '<span class="viator-flag">Cancelamento gratuito</span>';
-        }
         if (in_array('LIKELY_TO_SELL_OUT', $flags)) {
-            $flag_output .= '<span class="viator-badge">Geralmente se esgota</span>';
+            $flag_output .= '<span class="viator-badge" data-type="sell-out">Geralmente se esgota</span>';
+        }
+        if (in_array('SPECIAL_OFFER', $flags)) {
+            $flag_output .= '<span class="viator-badge" data-type="special-offer">Oferta especial</span>';
+        }
+    
+        // Processar preços
+        $price_html = '';
+        if (in_array('SPECIAL_OFFER', $flags) && isset($tour['pricing']['summary']['fromPriceBeforeDiscount'])) {
+            // Se for oferta especial e tiver preço com desconto
+            $original_price = number_format($tour['pricing']['summary']['fromPriceBeforeDiscount'], 2, ',', '.');
+            $discounted_price = number_format($tour['pricing']['summary']['fromPrice'], 2, ',', '.');
+            $price_html = '<span class="viator-original-price">R$ ' . $original_price . '</span> <span class="viator-discount-price">R$ ' . $discounted_price . '</span>';
+        } else {
+            // Preço normal sem desconto
+            $price = isset($tour['pricing']['summary']['fromPrice']) ? number_format($tour['pricing']['summary']['fromPrice'], 2, ',', '.') : '0,00';
+            $price_html = '<strong>R$ ' . $price . '</strong>';
         }
     
         // Criar o card
@@ -326,9 +339,9 @@ function viator_get_search_results($searchTerm) {
             <div class="viator-card-img">
                 <img src="' . $image_url . '" alt="' . $title . '">';
                 
-                // Adicionar a badge "Geralmente se esgota" dentro do container da imagem
-                if (in_array('LIKELY_TO_SELL_OUT', $flags)) {
-                    $output .= '<span class="viator-badge">Geralmente se esgota</span>';
+                // Adicionar as badges no container da imagem
+                if (!empty($flag_output)) {
+                    $output .= '<div class="viator-badge-container">' . $flag_output . '</div>';
                 }
     
         $output .= '</div>
@@ -342,7 +355,7 @@ function viator_get_search_results($searchTerm) {
         }
 
         $output .= '<p class="viator-card-duration"><img src="https://img.icons8.com/?size=100&id=82767&format=png&color=000000" alt="Duração" title="Duração aproximada" width="15" height="15"> ' . $duration . '</p>
-                <p class="viator-card-price"><img src="https://img.icons8.com/?size=100&id=ZXJaNFNjWGZF&format=png&color=000000" alt="Preço" width="15" height="15"> a partir de <strong>' . $price . '</strong></p>                
+                <p class="viator-card-price"><img src="https://img.icons8.com/?size=100&id=ZXJaNFNjWGZF&format=png&color=000000" alt="Preço" width="15" height="15"> a partir de ' . $price_html . '</p>                
                 <a href="' . $url . '" target="_blank">Ver detalhes</a>
             </div>
         </div>';

@@ -267,7 +267,7 @@
         }
 
         /* Estilo para a badge "Geralmente se esgota" */
-        .viator-badge {
+        /* .viator-badge {
             display: inline-block;
             background-color: #E74C3C;
             color: #fff;
@@ -275,10 +275,10 @@
             border-radius: 5px;
             font-size: 12px;
             position: absolute;
-            top: 20px; /* Espaçamento de 20px do topo */
-            right: 20px; /* Espaçamento de 20px da direita */
+            top: 20px;
+            left: 20px;
             z-index: 1;
-        }
+        } */
 
         /* Estilo para as flags */
         .viator-flag-cancelamento {
@@ -794,4 +794,48 @@
 .flatpickr-day.selected.endRange,
 .flatpickr-day.endRange.endRange {
     border-radius: 0 50px 50px 0 !important;
+}
+
+/* Manter apenas estas definições atualizadas para as badges */
+.viator-badge-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 1;
+}
+
+.viator-badge {
+    background-color: #c81e3a; /* Cor padrão para "Geralmente se esgota" */
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    white-space: nowrap;
+    text-align: center; /* Centraliza o texto */
+}
+
+/* Badge específica para Oferta especial */
+.viator-badge:contains("Oferta especial") {
+    background-color: #04846b;
+}
+
+/* Alternativa caso o :contains não funcione em alguns navegadores */
+.viator-badge[data-type="special-offer"] {
+    background-color: #04846b;
+}
+
+.viator-original-price {
+    text-decoration: line-through;
+    color: #666;
+    margin-right: 8px;
+}
+
+.viator-discount-price {
+    color: #c81e3a;
+    font-weight: bold;
 }        
