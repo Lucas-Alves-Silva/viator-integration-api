@@ -225,8 +225,45 @@ function viator_get_search_results($searchTerm) {
     $total_products = isset($data['products']['totalCount']) ? intval($data['products']['totalCount']) : 0;
     $total_pages = ceil($total_products / $per_page);
 
+    // Modificar o script de scroll no início do output
+    $output = '<script>
+        window.addEventListener("load", function() {
+            setTimeout(function() {
+                const contentWrapper = document.querySelector(".viator-content-wrapper");
+                if (contentWrapper) {
+                    const startPosition = window.pageYOffset;
+                    const targetPosition = contentWrapper.getBoundingClientRect().top + window.pageYOffset - 20;
+                    const distance = targetPosition - startPosition;
+                    const duration = 1000; // 1 segundo de duração
+                    let start = null;
+
+                    function animation(currentTime) {
+                        if (start === null) start = currentTime;
+                        const timeElapsed = currentTime - start;
+                        const progress = Math.min(timeElapsed / duration, 1);
+
+                        // Função de easing para suavizar o movimento
+                        const easeInOutCubic = progress => {
+                            return progress < 0.5
+                                ? 4 * progress * progress * progress
+                                : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+                        };
+
+                        window.scrollTo(0, startPosition + (distance * easeInOutCubic(progress)));
+
+                        if (timeElapsed < duration) {
+                            requestAnimationFrame(animation);
+                        }
+                    }
+
+                    requestAnimationFrame(animation);
+                }
+            }, 500);
+        });
+    </script>';
+
     // Início do wrapper de conteúdo
-    $output = '<div class="viator-content-wrapper">';
+    $output .= '<div class="viator-content-wrapper">';
 
     // Sidebar de filtros
     $output .= '<div class="viator-filters">

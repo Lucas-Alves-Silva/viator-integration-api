@@ -4,9 +4,26 @@ document.addEventListener('DOMContentLoaded', function () {
     const searchText = document.getElementById('search-text');
     const searchIcon = document.getElementById('search-icon');
 
+    // Verificar se deve fazer scroll (movido para fora do segundo DOMContentLoaded)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('scroll_to_results')) {
+        const contentWrapper = document.querySelector('.viator-content-wrapper');
+        if (contentWrapper) {
+            setTimeout(() => {
+                contentWrapper.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+                // Remover o parâmetro da URL sem recarregar a página
+                urlParams.delete('scroll_to_results');
+                const newUrl = window.location.pathname + '?' + urlParams.toString();
+                window.history.replaceState({}, '', newUrl);
+            }, 500); // Aumentado para 500ms para garantir que o conteúdo esteja carregado
+        }
+    }
+
     searchForm.addEventListener('submit', function (event) {
-        // Não previne o envio do formulário
-        // Apenas atualiza a interface
+        // Atualiza a interface
         searchText.innerHTML = 'Pesquisando<div class="bouncy-loader"><span></span><span></span><span></span></div>';
         searchIcon.innerHTML = '✈️';
         searchIcon.classList.add('airplane-icon');
@@ -390,14 +407,11 @@ function setSearchDestination(destino) {
     const errorMessage = document.querySelector('.viator-error-message');
     
     if (searchInput) {
-        // Atualizar o estilo e texto da mensagem de erro
         if (errorMessage) {
             errorMessage.classList.add('searching');
-            // Adiciona o texto e os pontos animados
             errorMessage.innerHTML = 'Vamos lá! Pesquisando<div class="bouncy-loader"><span></span><span></span><span></span></div>';
         }
         
-        // Definir o valor do input e submeter o form
         searchInput.value = destino;
         searchInput.closest('form').submit();
     }
