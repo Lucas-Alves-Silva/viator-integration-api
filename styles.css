@@ -861,25 +861,29 @@
     justify-content: center;
 }
 
-.viator-suggestion-btn {
-    background-color: #fff;
-    border: 2px solid #04846b;
-    color: #04846b;
-    padding: 12px 20px;
-    border-radius: 8px;
-    font-size: 14px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-family: var(--font-primary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+/* Aumentando a especificidade e forçando alguns estilos */
+.viator-suggestions .viator-suggestion-btn {
+    background-color: #fff !important;
+    border: 2px solid #04846b !important;
+    color: #04846b !important;
+    padding: 12px 20px !important;
+    border-radius: 8px !important;
+    font-size: 14px !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    font-family: var(--font-primary) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
 }
 
-.viator-suggestion-btn:hover {
-    background-color: #04846b;
-    color: #fff;
-    transform: translateY(-2px);
+.viator-suggestions .viator-suggestion-btn:hover,
+.viator-suggestions .viator-suggestion-btn:active,
+.viator-suggestions .viator-suggestion-btn:focus {
+    background-color: #04846b !important;
+    color: #fff !important;
+    transform: translateY(-2px) !important;
+    border-color: #04846b !important;
 }
 
 /* Ajuste responsivo */
