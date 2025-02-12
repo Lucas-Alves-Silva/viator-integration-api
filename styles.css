@@ -838,4 +838,53 @@
 .viator-discount-price {
     color: #c81e3a;
     font-weight: bold;
+}
+
+/* Estilo para as sugestões de destinos */
+.viator-suggestions {
+    text-align: center;
+    margin: 30px auto;
+    max-width: 800px;
+    padding: 20px;
+}
+
+.viator-suggestions p {
+    color: #666;
+    font-size: 16px;
+    margin-bottom: 20px;
+}
+
+.viator-suggestions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    justify-content: center;
+}
+
+.viator-suggestion-btn {
+    background-color: #fff;
+    border: 2px solid #04846b;
+    color: #04846b;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: var(--font-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.viator-suggestion-btn:hover {
+    background-color: #04846b;
+    color: #fff;
+    transform: translateY(-2px);
+}
+
+/* Ajuste responsivo */
+@media (max-width: 768px) {
+    .viator-suggestions-grid {
+        grid-template-columns: 1fr;
+    }
 }        

@@ -373,3 +373,13 @@ function updateSort(value) {
         document.querySelector('.viator-grid').style.opacity = '1';
     });
 }
+
+// Função para definir o destino no campo de busca
+function setSearchDestination(destino) {
+    const searchInput = document.querySelector('input[name="viator_query"]');
+    if (searchInput) {
+        searchInput.value = destino;
+        // Opcional: fazer submit automático do formulário
+        searchInput.closest('form').submit();
+    }
+}

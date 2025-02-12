@@ -139,18 +139,84 @@ function viator_get_search_results($searchTerm) {
     $body = wp_remote_retrieve_body($response);
     $data = json_decode($body, true);
 
-    // Verificar se há resultados para as datas selecionadas
+    // Array com sugestões de destinos populares
+    $destinos_sugeridos = array(
+    'Paris, França',
+    'Roma, Itália',
+    'Barcelona, Espanha',
+    'Nova York, EUA',
+    'Tóquio, Japão',
+    'Dubai, Emirados Árabes',
+    'Londres, Inglaterra',
+    'Amsterdã, Holanda',
+    'Lisboa, Portugal',
+    'Rio de Janeiro, Brasil',
+    'Buenos Aires, Argentina',
+    'Cidade do Cabo, África do Sul',
+    'Sydney, Austrália',
+    'São Paulo, Brasil',
+    'Salvador, Brasil',
+    'Florianópolis, Brasil',
+    'Foz do Iguaçu, Brasil',
+    'Gramado, Brasil',
+    'Búzios, Brasil',
+    'Recife, Brasil',
+    'Fortaleza, Brasil',
+    'Curitiba, Brasil',
+    'Manaus, Brasil',
+    'Belém, Brasil',
+    'Maceió, Brasil',
+    'Porto de Galinhas, Brasil',
+    'Natal, Brasil',
+    'Belo Horizonte, Brasil',
+    'Porto Alegre, Brasil',
+    'Vitória, Brasil',
+    'Balneário Camboriú, Brasil',
+    'Jericoacoara, Brasil',
+    'Paraty, Brasil',
+    'Ouro Preto, Brasil',
+    'Campos do Jordão, Brasil',
+    'Bonito, Brasil',
+    'Lençóis Maranhenses, Brasil',
+    'Chapada Diamantina, Brasil',
+    'Ilha Grande, Brasil',
+    'Arraial do Cabo, Brasil',
+    'Trancoso, Brasil',
+    'Istambul, Turquia',
+    'Berlim, Alemanha',
+    'Praga, República Tcheca',
+    'Viena, Áustria',
+    'Cancún, México',
+    'Bali, Indonésia',
+    'Phuket, Tailândia',
+    'Seul, Coreia do Sul',
+    'Marrakech, Marrocos'
+    );
+
+    // Embaralha o array e pega 5 destinos aleatórios
+    shuffle($destinos_sugeridos);
+    $destinos_aleatorios = array_slice($destinos_sugeridos, 0, 6);
+
+    // Verificar se há resultados
     if (empty($data) || !isset($data['products']['results']) || empty($data['products']['results'])) {
-        $date_message = '';
-        if (isset($_GET['viator_date_start']) && isset($_GET['viator_date_end'])) {
-            $start = date('d/m/Y', strtotime($_GET['viator_date_start']));
-            $end = date('d/m/Y', strtotime($_GET['viator_date_end']));
-            $date_message = " para o período de $start a $end";
-        }
-        
         $output = '<div class="viator-content-wrapper">';
         $output .= '<div class="viator-results-container">';
-        $output .= '<p class="viator-error-message">Nenhum passeio encontrado' . $date_message . '. Por favor, tente outras datas.</p>';
+        
+        // Mensagem de erro personalizada com a palavra buscada
+        $output .= '<p class="viator-error-message">Nenhum passeio encontrado para "' . esc_html($searchTerm) . '".</p>';
+        
+        // Adiciona sugestões de destinos
+        $output .= '<div class="viator-suggestions">';
+        $output .= '<p>Que tal experimentar um destes destinos populares?</p>';
+        $output .= '<div class="viator-suggestions-grid">';
+        
+        foreach ($destinos_aleatorios as $destino) {
+            $output .= '<button class="viator-suggestion-btn" onclick="setSearchDestination(\'' . esc_attr($destino) . '\')">';
+            $output .= '🌍 ' . esc_html($destino);
+            $output .= '</button>';
+        }
+        
+        $output .= '</div></div>';
         $output .= '</div></div>';
         return $output;
     }
