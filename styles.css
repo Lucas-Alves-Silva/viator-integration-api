@@ -908,7 +908,7 @@
     }
 }
 
-/* Adicione estes estilos para a animação dos pontos */
+/* Animação dos pontos */
 .bouncy-loader {
     display: inline-flex !important;
     gap: 3px !important;
