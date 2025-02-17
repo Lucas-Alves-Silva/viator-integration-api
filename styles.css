@@ -536,6 +536,8 @@
     flex-shrink: 0;
     border: 1px solid #ccc;
     border-radius: 10px;
+    background: #fdfdfd;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 /* Ajuste do grid para acomodar a sidebar */
@@ -940,4 +942,53 @@
     50% {
         transform: translateY(-5px);
     }
+}
+
+/* Estilo para o filtro de duração */
+.viator-duration-filter {
+    padding: 20px 10px 40px 10px;
+    display: flex; /* Usar flexbox para centralizar o conteúdo */
+    flex-direction: column; /* Alinhar os itens em coluna */
+    align-items: flex-start; /* Alinhar os itens à esquerda */
+    position: relative; /* Para posicionar a borda corretamente */
+    border-bottom: 1px solid #ccc;
+    width: 90%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Título do filtro de duração */
+.viator-duration-filter h3 {
+    font-family: var(--font-primary); /* Fonte do projeto */
+    font-size: 18px; /* Tamanho da fonte */
+    color: #333; /* Cor do texto */
+    margin-bottom: 15px; /* Espaçamento inferior */
+}
+
+/* Estilo para as checkboxes */
+.viator-duration-filter label {
+    display: flex; /* Flexbox para alinhamento */
+    align-items: center; /* Alinhamento vertical */
+    font-family: var(--font-primary); /* Fonte do projeto */
+    font-size: 16px; /* Tamanho da fonte */
+    color: #666; /* Cor do texto */
+    margin-bottom: -10px; /* Reduzir o espaçamento inferior entre as checkboxes */
+}
+
+/* Estilo para checkboxes */
+.viator-duration-filter input[type="checkbox"] {
+    width: 15px; /* Aumentar o tamanho da checkbox */
+    height: 15px; /* Aumentar o tamanho da checkbox */
+    margin-right: 10px; /* Espaçamento à direita */
+}
+
+/* Estilo para checkboxes marcadas */
+.viator-duration-filter input[type="checkbox"]:checked {
+    accent-color: #04846b; /* Definir a cor verde do projeto quando marcada */
+}
+
+/* Estilo para checkboxes marcadas (aplicando a cor ao label) */
+.viator-duration-filter input[type="checkbox"]:checked + label {
+    color: #04846b !important; /* Cor verde do projeto quando marcada */
+    font-weight: bold !important; /* Negrito quando marcada */
 }        
