@@ -946,7 +946,7 @@
 
 /* Estilo para o filtro de duração */
 .viator-duration-filter {
-    padding: 20px 10px 40px 10px;
+    padding: 20px 10px 15px 10px;
     display: flex; /* Usar flexbox para centralizar o conteúdo */
     flex-direction: column; /* Alinhar os itens em coluna */
     align-items: flex-start; /* Alinhar os itens à esquerda */
@@ -973,6 +973,7 @@
     font-size: 16px; /* Tamanho da fonte */
     color: #666; /* Cor do texto */
     margin-bottom: -10px; /* Reduzir o espaçamento inferior entre as checkboxes */
+    gap: 6px;
 }
 
 /* Estilo para checkboxes */

@@ -89,8 +89,33 @@ function viator_get_search_results($searchTerm) {
         $date_to = date('Y-m-d', strtotime('+1 year'));
     }
 
+    // Verificar se há um intervalo de duração selecionado
+    $duration_filters = isset($_GET['duration_filter']) ? [$_GET['duration_filter']] : [];
+    $duration_conditions = [];
+    
+    if (!empty($duration_filters)) {
+        foreach ($duration_filters as $filter) {
+            list($min, $max) = explode('-', $filter);
+            
+            if ($max === '') {
+                // Para "Mais de três dias"
+                $duration_conditions[] = [
+                    'from' => (int)$min
+                ];
+            } else {
+                $duration_conditions[] = [
+                    'from' => (int)$min,
+                    'to' => (int)$max
+                ];
+            }
+        }
+    }
+    
+    // Usar diretamente as condições sem processamento adicional
+    $duration_filter = !empty($duration_conditions) ? $duration_conditions : null;
+
     // Corpo da requisição JSON
-    $body = json_encode([
+    $body_data = [ // Primeiro crie o array
         "searchTerm" => $searchTerm,
         "productSorting" => $sorting,
         "productFiltering" => [
@@ -106,13 +131,17 @@ function viator_get_search_results($searchTerm) {
                 "from" => 0,
                 "to" => 5
             ],
-            // "flags" => ["NEW_ON_VIATOR", "PRIVATE_TOUR"], Filtrar por flags
+            "durationInMinutes" => !empty($duration_filter) ? $duration_filter[0] : null,
+            "includeAutomaticTranslations" => true
         ],
         "searchTypes" => [
             ["searchType" => "PRODUCTS", "pagination" => ["start" => $start, "count" => $per_page]],
         ],
         "currency" => "BRL"
-    ]);
+    ];
+
+    $body = json_encode($body_data);
+    error_log('Request Body: ' . $body);
 
     // Enviar a requisição POST para a API
     $response = wp_remote_post($url, [
@@ -138,6 +167,10 @@ function viator_get_search_results($searchTerm) {
     // Processar resposta da API
     $body = wp_remote_retrieve_body($response);
     $data = json_decode($body, true);
+    error_log('Filtros de Duração Enviados: ' . print_r($duration_filter, true));
+
+    // Debug: Verifique a resposta da API
+    error_log('Resposta da API: ' . print_r($data, true));
 
     // Array com sugestões de destinos populares
     $destinos_sugeridos = array(
@@ -208,7 +241,7 @@ function viator_get_search_results($searchTerm) {
                         const startPosition = window.pageYOffset;
                         const targetPosition = targetElement.getBoundingClientRect().top + window.pageYOffset - 20;
                         const distance = targetPosition - startPosition;
-                        const duration = 1000;
+                        const duration = 1000; // 1 segundo de duração
                         let start = null;
 
                         function animation(currentTime) {
@@ -216,6 +249,7 @@ function viator_get_search_results($searchTerm) {
                             const timeElapsed = currentTime - start;
                             const progress = Math.min(timeElapsed / duration, 1);
 
+                            // Função de easing para suavizar o movimento
                             const easeInOutCubic = progress => {
                                 return progress < 0.5
                                     ? 4 * progress * progress * progress
@@ -312,8 +346,31 @@ function viator_get_search_results($searchTerm) {
                 <b>📅</b>
                 <span>Escolher data</span>
             </button>
-        </div>
-    </div>';
+        </div>';
+
+    // Adicionando o filtro de duração
+    $output .= '<div class="viator-duration-filter">
+        <h3>Duração</h3>';
+
+    // Opções de filtro com valores corretos
+    $duration_options = [
+        '0-60' => 'Até uma hora',
+        '60-240' => '1 a 4 horas',
+        '240-1440' => '4 horas a 1 dia',
+        '1440-4320' => '1 a 3 dias',
+        '4320-' => 'Mais de três dias'
+    ];
+
+    // Verificar filtros ativos
+    $active_filters = isset($_GET['duration_filter']) ? (array) $_GET['duration_filter'] : [];
+
+    foreach ($duration_options as $value => $label) {
+        $checked = in_array($value, $active_filters) ? 'checked' : '';
+        $output .= "<label><input type='radio' name='duration_filter' value='$value' $checked> $label</label><br>";
+    }
+
+    $output .= '</div>
+    </div>'; // Fechar div.viator-filters
 
     // Header com total e ordenação
     $output .= '<div class="viator-results-container">';
@@ -670,6 +727,29 @@ function viator_ajax_update_filter() {
     $_GET['viator_date_start'] = isset($_POST['viator_date_start']) ? sanitize_text_field($_POST['viator_date_start']) : '';
     $_GET['viator_date_end'] = isset($_POST['viator_date_end']) ? sanitize_text_field($_POST['viator_date_end']) : '';
     
-    echo viator_get_search_results($search_term);
+    // Adicionando o filtro de duração
+    if (isset($_POST['duration_filter']) && !empty($_POST['duration_filter'])) {
+        $_GET['duration_filter'] = sanitize_text_field($_POST['duration_filter']);
+    } else {
+        unset($_GET['duration_filter']);
+    }
+
+    // Debug: Verifique os parâmetros recebidos
+    error_log('Parâmetros recebidos: ' . print_r($_GET, true));
+
+    // Obter os resultados
+    $results = viator_get_search_results($search_term);
+    
+    // Debug: Verifique os resultados
+    error_log('Resultados: ' . print_r($results, true));
+
+    // Verificar se os resultados são válidos
+    if (empty($results)) {
+        wp_send_json_error(['message' => 'Nenhum resultado encontrado']);
+        wp_die();
+    }
+
+    // Retornar os resultados como HTML
+    echo $results;
     wp_die();
 }

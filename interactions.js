@@ -90,6 +90,93 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    // Adicionar evento para checkboxes de duração
+    const durationRadios = document.querySelectorAll('input[name="duration_filter"]');
+    durationRadios.forEach(radio => {
+        radio.addEventListener('change', function () {
+            // Obter o valor selecionado
+            const selectedFilter = document.querySelector('input[name="duration_filter"]:checked')?.value || '';
+            // Mostrar indicador de carregamento
+            const gridElement = document.querySelector('.viator-grid');
+            if (gridElement) {
+                gridElement.style.opacity = '0.5';
+            }
+
+            // Pegar a URL atual e parâmetros
+            let url = new URL(window.location.href);
+            let params = new URLSearchParams(url.search);
+
+            // Pegar os parâmetros necessários
+            const searchTerm = params.get('viator_query');
+            const page = params.get('viator_page') || '1';
+            const dateStart = params.get('viator_date_start');
+            const dateEnd = params.get('viator_date_end');
+
+            const selectedFilters = Array.from(document.querySelectorAll('input[name="duration_filter[]"]:checked'))
+                           .map(checkbox => checkbox.value);
+            console.log('Filtros de duração enviados:', selectedFilters);
+
+            // Fazer requisição AJAX
+            fetch(viatorAjax.ajaxurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    action: 'viator_update_filter',
+                    viator_query: searchTerm,
+                    viator_sort: params.get('viator_sort') || 'DEFAULT',
+                    viator_page: page,
+                    viator_date_start: dateStart || '',
+                    viator_date_end: dateEnd || '',
+                    duration_filter: selectedFilter,
+                    nonce: viatorAjax.nonce
+                }),
+            })
+            .then(response => {
+                // Debug: Verifique a resposta
+                console.log('Resposta da requisição:', response);
+                return response.text();
+            })
+            .then(html => {
+                // Atualizar o conteúdo
+                document.getElementById('viator-results').innerHTML = html;
+                
+                // Atualizar a URL SEM recarregar a página
+                const newUrl = new URL(window.location);
+                newUrl.searchParams.delete('duration_filter[]');
+                
+                // Adicionar filtros atuais à URL
+                Array.from(document.querySelectorAll('input[name="duration_filter[]"]:checked'))
+                    .forEach(checkbox => {
+                        newUrl.searchParams.append('duration_filter[]', checkbox.value);
+                    });
+
+                history.replaceState({}, '', newUrl);
+                
+                // Sincronizar checkboxes com a nova URL
+                const activeFilters = newUrl.searchParams.getAll('duration_filter[]');
+                document.querySelectorAll('input[name="duration_filter[]"]').forEach(checkbox => {
+                    checkbox.checked = activeFilters.includes(checkbox.value);
+                });
+                
+                reinitializeDatePicker();
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                // Em caso de erro, manter o usuário na página atual
+                if (gridElement) {
+                    gridElement.style.opacity = '1';
+                }
+            })
+            .finally(() => {
+                if (gridElement) {
+                    gridElement.style.opacity = '1';
+                }
+            });
+        });
+    });
+
     function initializeDatePicker() {
         const dateSelector = document.querySelector('.viator-date-selector');
         if (!dateSelector) return;
