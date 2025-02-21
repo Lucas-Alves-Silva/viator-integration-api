@@ -428,7 +428,7 @@
             gap: 8px;
             font-size: 14px;
             color: #333;
-            background-color: #f5f5f5;
+            background-color: #d9fff6;
             padding: 8px 12px;
             border-radius: 4px;
         }
@@ -492,6 +492,29 @@
             outline: none;
             border-color: #666;
             box-shadow: 0 0 0 2px rgba(0,0,0,0.1);
+        }
+
+        .viator-curiosities {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-family: var(--font-primary);
+            color: #333;
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        .viator-curiosities img {
+            width: 15px;
+            height: 15px;
+            object-fit: contain;
+        }
+
+        .viator-curiosities span {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
         }
 
         @media (max-width: 768px) {

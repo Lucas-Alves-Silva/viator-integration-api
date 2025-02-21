@@ -395,6 +395,50 @@ function viator_get_search_results($searchTerm) {
     </div>';
     $output .= '</div>';
 
+    // Obtenha informações de destino da Wikipedia usando a API MediaWiki
+    $wiki_url = "https://pt.wikipedia.org/w/api.php";
+    $search_params = [
+        'action' => 'query',
+        'format' => 'json',
+        'prop' => 'extracts',
+        'exintro' => true,
+        'explaintext' => true,
+        'titles' => $searchTerm
+    ];
+
+    $wiki_response = wp_remote_get(add_query_arg($search_params, $wiki_url));
+    $wiki_data = [];
+    
+    if (!is_wp_error($wiki_response)) {
+        $wiki_body = wp_remote_retrieve_body($wiki_response);
+        $wiki_data = json_decode($wiki_body, true);
+        
+        // Extraia o conteúdo da primeira página
+        $pages = isset($wiki_data['query']['pages']) ? $wiki_data['query']['pages'] : [];
+        $first_page = reset($pages);
+        $extract = isset($first_page['extract']) ? $first_page['extract'] : '';
+        
+        // Limpe e limite o texto
+        $extract = wp_trim_words($extract, 60, '...');
+    }
+
+    // Se não houver dados obtidos do Wikipedia, use curiosidades aleatórias
+    if (empty($extract)) {
+        $facts = [
+            "Você sabia que esta é uma das regiões mais visitadas pelos turistas?",
+            "Este destino oferece experiências únicas durante todo o ano!",
+            "A cultura local é rica em tradições e histórias fascinantes.",
+            "Os visitantes costumam se surpreender com a hospitalidade local."
+        ];
+        $extract = $facts[array_rand($facts)];
+    }
+
+    // Output the curiosities div
+    $output .= '<div class="viator-curiosities">
+        <span><img src="https://img.icons8.com/?size=100&id=ulD4laUCmfyE&format=png&color=000000" alt="Ícone"> 
+        <strong>Você sabia?</strong> ' . esc_html($extract) . '</span>
+    </div>';
+
     // Iniciar grid de cards
     $output .= '<div class="viator-grid">';
 
