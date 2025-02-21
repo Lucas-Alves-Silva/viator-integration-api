@@ -10,6 +10,9 @@ if (!defined('ABSPATH')) {
     exit; // Segurança
 }
 
+// Include debug functions
+require_once plugin_dir_path(__FILE__) . 'debug.php';
+
 // Função que gera o formulário de pesquisa
 function viator_search_form() {
     ob_start();
@@ -141,7 +144,7 @@ function viator_get_search_results($searchTerm) {
     ];
 
     $body = json_encode($body_data);
-    error_log('Request Body: ' . $body);
+    viator_debug_log('Request Body:', $body);
 
     // Enviar a requisição POST para a API
     $response = wp_remote_post($url, [
@@ -164,13 +167,96 @@ function viator_get_search_results($searchTerm) {
         return $output;
     }
 
+    // Inicializar a variável results
+    $results = '';
+
+    // Array com sugestões de destinos populares
+    $destinos_sugeridos = array(
+        'Paris, França',
+        'Roma, Itália',
+        'Barcelona, Espanha',
+        'Nova York, EUA',
+        'Tóquio, Japão',
+        'Dubai, Emirados Árabes',
+        'Londres, Inglaterra',
+        'Amsterdã, Holanda',
+        'Lisboa, Portugal',
+        'Rio de Janeiro, Brasil',
+        'Buenos Aires, Argentina',
+        'Cidade do Cabo, África do Sul',
+        'Sydney, Austrália',
+        'São Paulo, Brasil',
+        'Salvador, Brasil',
+        'Florianópolis, Brasil',
+        'Foz do Iguaçu, Brasil',
+        'Gramado, Brasil',
+        'Búzios, Brasil',
+        'Recife, Brasil',
+        'Fortaleza, Brasil',
+        'Curitiba, Brasil',
+        'Manaus, Brasil',
+        'Belém, Brasil',
+        'Maceió, Brasil',
+        'Porto de Galinhas, Brasil',
+        'Natal, Brasil',
+        'Belo Horizonte, Brasil',
+        'Porto Alegre, Brasil',
+        'Vitória, Brasil',
+        'Balneário Camboriú, Brasil',
+        'Jericoacoara, Brasil',
+        'Paraty, Brasil',
+        'Ouro Preto, Brasil',
+        'Campos do Jordão, Brasil',
+        'Bonito, Brasil',
+        'Lençóis Maranhenses, Brasil',
+        'Chapada Diamantina, Brasil',
+        'Ilha Grande, Brasil',
+        'Arraial do Cabo, Brasil',
+        'Trancoso, Brasil',
+        'Istambul, Turquia',
+        'Berlim, Alemanha',
+        'Praga, República Tcheca',
+        'Viena, Áustria',
+        'Cancún, México',
+        'Bali, Indonésia',
+        'Phuket, Tailândia',
+        'Seul, Coreia do Sul',
+        'Marrakech, Marrocos'
+    );
+
     // Processar resposta da API
     $body = wp_remote_retrieve_body($response);
     $data = json_decode($body, true);
-    error_log('Filtros de Duração Enviados: ' . print_r($duration_filter, true));
+    viator_debug_log('Filtros de Duração Enviados:', $duration_filter);
+    viator_debug_log('Resposta da API:', $data);
+    viator_debug_log('Parâmetros recebidos:', $_GET);
 
-    // Debug: Verifique a resposta da API
-    error_log('Resposta da API: ' . print_r($data, true));
+    // Verificar se há produtos na resposta
+    if (empty($data['products']) || $data['products']['totalCount'] === 0) {
+        // Embaralhar e pegar 6 destinos aleatórios
+        shuffle($destinos_sugeridos);
+        $destinos_aleatorios = array_slice($destinos_sugeridos, 0, 6);
+
+        $output = '<div class="viator-content-wrapper">';
+        $output .= '<div class="viator-results-container">';
+        $output .= '<p class="viator-error-message">Nenhum passeio encontrado para "' . esc_html($_GET['viator_query']) . '".</p>';
+        
+        // Adiciona sugestões de destinos
+        $output .= '<div class="viator-suggestions">';
+        $output .= '<p>Que tal experimentar um destes destinos populares?</p>';
+        $output .= '<div class="viator-suggestions-grid">';
+        
+        foreach ($destinos_aleatorios as $destino) {
+            $output .= '<button class="viator-suggestion-btn" onclick="setSearchDestination(\'' . esc_attr($destino) . '\')">🌍 ' . esc_html($destino) . '</button>';
+        }
+        
+        $output .= '</div></div>';
+        $output .= '</div></div>';
+        viator_debug_log('Nenhum resultado encontrado para a busca:', $_GET['viator_query']);
+        return $output;
+    }
+
+    viator_debug_log('Resultados:', $results);
 
     // Array com sugestões de destinos populares
     $destinos_sugeridos = array(
@@ -233,46 +319,13 @@ function viator_get_search_results($searchTerm) {
     // Verificar se há resultados
     if (empty($data) || !isset($data['products']['results']) || empty($data['products']['results'])) {
         // Adicionar o script de scroll primeiro
-        $output = '<script>
-            window.addEventListener("load", function() {
-                setTimeout(function() {
-                    const targetElement = document.querySelector(".viator-results-container");
-                    if (targetElement) {
-                        const startPosition = window.pageYOffset;
-                        const targetPosition = targetElement.getBoundingClientRect().top + window.pageYOffset - 20;
-                        const distance = targetPosition - startPosition;
-                        const duration = 1000; // 1 segundo de duração
-                        let start = null;
-
-                        function animation(currentTime) {
-                            if (start === null) start = currentTime;
-                            const timeElapsed = currentTime - start;
-                            const progress = Math.min(timeElapsed / duration, 1);
-
-                            // Função de easing para suavizar o movimento
-                            const easeInOutCubic = progress => {
-                                return progress < 0.5
-                                    ? 4 * progress * progress * progress
-                                    : 1 - Math.pow(-2 * progress + 2, 3) / 2;
-                            };
-
-                            window.scrollTo(0, startPosition + (distance * easeInOutCubic(progress)));
-
-                            if (timeElapsed < duration) {
-                                requestAnimationFrame(animation);
-                            }
-                        }
-
-                        requestAnimationFrame(animation);
-                    }
-                }, 500);
-            });
-        </script>';
-
-        // Depois adicionar o conteúdo
-        $output .= '<div class="viator-results-container">';
-        $output .= '<p class="viator-error-message">Nenhum passeio encontrado para "' . esc_html($searchTerm) . '".</p>';
-        
+        $output = '<script>document.addEventListener("DOMContentLoaded", function() {
+            const resultsContainer = document.querySelector(".viator-results-container");
+            if (resultsContainer) {
+                resultsContainer.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+        });</script>';
+                
         // Adiciona sugestões de destinos
         $output .= '<div class="viator-suggestions">';
         $output .= '<p>Que tal experimentar um destes destinos populares?</p>';
@@ -779,13 +832,13 @@ function viator_ajax_update_filter() {
     }
 
     // Debug: Verifique os parâmetros recebidos
-    error_log('Parâmetros recebidos: ' . print_r($_GET, true));
+    // error_log('Parâmetros recebidos: ' . print_r($_GET, true));
 
     // Obter os resultados
     $results = viator_get_search_results($search_term);
     
     // Debug: Verifique os resultados
-    error_log('Resultados: ' . print_r($results, true));
+    // error_log('Resultados: ' . print_r($results, true));
 
     // Verificar se os resultados são válidos
     if (empty($results)) {
