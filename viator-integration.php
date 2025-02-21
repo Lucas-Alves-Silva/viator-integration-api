@@ -237,7 +237,39 @@ function viator_get_search_results($searchTerm) {
         shuffle($destinos_sugeridos);
         $destinos_aleatorios = array_slice($destinos_sugeridos, 0, 6);
 
-        $output = '<div class="viator-content-wrapper">';
+        $output = '<script>
+        window.addEventListener("load", function() {
+            setTimeout(function() {
+                const errorMessage = document.querySelector(".viator-error-message");
+                if (errorMessage) {
+                    const startPosition = window.pageYOffset;
+                    const targetPosition = errorMessage.getBoundingClientRect().top + window.pageYOffset - 50;
+                    const distance = targetPosition - startPosition;
+                    const duration = 2500; // Increased duration for smoother animation
+
+                    function easeOutCubic(t) {
+                        return 1 - Math.pow(1 - t, 3);
+                    }
+
+                    let startTime = null;
+                    function animate(currentTime) {
+                        if (!startTime) startTime = currentTime;
+                        const timeElapsed = currentTime - startTime;
+                        const progress = Math.min(timeElapsed / duration, 1);
+
+                        window.scrollTo(0, startPosition + (distance * easeOutCubic(progress)));
+
+                        if (progress < 1) {
+                            requestAnimationFrame(animate);
+                        }
+                    }
+
+                    requestAnimationFrame(animate);
+                }
+            }, 800); // Increased delay for better timing
+        });
+        </script>';
+        $output .= '<div class="viator-content-wrapper">';
         $output .= '<div class="viator-results-container">';
         $output .= '<p class="viator-error-message">Nenhum passeio encontrado para "' . esc_html($_GET['viator_query']) . '".</p>';
         
@@ -360,7 +392,7 @@ function viator_get_search_results($searchTerm) {
                     const startPosition = window.pageYOffset;
                     const targetPosition = targetElement.getBoundingClientRect().top + window.pageYOffset - 20;
                     const distance = targetPosition - startPosition;
-                    const duration = 1000; // 1 segundo de duração
+                    const duration = 2000; // 2 segundos de duração para uma transição mais suave
                     let start = null;
 
                     function animation(currentTime) {
@@ -368,14 +400,12 @@ function viator_get_search_results($searchTerm) {
                         const timeElapsed = currentTime - start;
                         const progress = Math.min(timeElapsed / duration, 1);
 
-                        // Função de easing para suavizar o movimento
-                        const easeInOutCubic = progress => {
-                            return progress < 0.5
-                                ? 4 * progress * progress * progress
-                                : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+                        // Função de easing melhorada para um movimento mais natural
+                        const easeOutQuint = progress => {
+                            return 1 - Math.pow(1 - progress, 5);
                         };
 
-                        window.scrollTo(0, startPosition + (distance * easeInOutCubic(progress)));
+                        window.scrollTo(0, startPosition + (distance * easeOutQuint(progress)));
 
                         if (timeElapsed < duration) {
                             requestAnimationFrame(animation);

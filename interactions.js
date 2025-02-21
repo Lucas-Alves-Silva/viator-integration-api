@@ -28,8 +28,14 @@ document.addEventListener('DOMContentLoaded', function () {
         searchIcon.innerHTML = '✈️';
         searchIcon.classList.add('airplane-icon');
         searchButton.disabled = true;
-    });
 
+        // Adiciona parâmetro para scroll automático
+        const currentUrl = new URL(window.location.href);
+        const params = new URLSearchParams(currentUrl.search);
+        params.set('scroll_to_results', '1');
+        const newUrl = `${currentUrl.pathname}?${params.toString()}`;
+        window.history.replaceState({}, '', newUrl);
+    });
     // Adicionar evento para links de paginação
     document.addEventListener('click', function(e) {
         if (e.target.closest('.viator-pagination-btn') || e.target.closest('.viator-pagination-arrow')) {
