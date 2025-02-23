@@ -482,6 +482,21 @@ function reinitializeDurationFilter() {
 
 function getLocationName(latitude, longitude) {
     return new Promise((resolve, reject) => {
+        // Check if we have cached location data
+        const cachedData = localStorage.getItem('viatorLocationCache');
+        if (cachedData) {
+            const { location, timestamp, lat, lon } = JSON.parse(cachedData);
+            const now = new Date().getTime();
+            const oneHour = 60 * 60 * 1000; // 1 hour in milliseconds
+
+            // If cache is less than 1 hour old and coordinates are close enough, use it
+            if (now - timestamp < oneHour && 
+                Math.abs(lat - latitude) < 0.01 && 
+                Math.abs(lon - longitude) < 0.01) {
+                return resolve(location);
+            }
+        }
+
         fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&accept-language=pt-BR`)
             .then(response => {
                 if (!response.ok) {
@@ -494,7 +509,15 @@ function getLocationName(latitude, longitude) {
                     const city = data.address.city || data.address.town || data.address.village;
                     const state = data.address.state;
                     if (city && state) {
-                        resolve(`${city}, ${state}`);
+                        const location = `${city}, ${state}`;
+                        // Cache the location data with current timestamp and coordinates
+                        localStorage.setItem('viatorLocationCache', JSON.stringify({
+                            location: location,
+                            timestamp: new Date().getTime(),
+                            lat: latitude,
+                            lon: longitude
+                        }));
+                        resolve(location);
                         return;
                     }
                 }
@@ -507,7 +530,20 @@ function getLocationName(latitude, longitude) {
     });
 }
 function getLocationByIP() {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
+        // Check if we have cached location data
+        const cachedData = localStorage.getItem('viatorLocationCache');
+        if (cachedData) {
+            const { location, timestamp } = JSON.parse(cachedData);
+            const now = new Date().getTime();
+            const threeHours = 3 * 60 * 60 * 1000; // 3 horas em millisegundos
+
+            // Se o cache tiver menos de 3 horas, execute isso
+            if (now - timestamp < threeHours) {
+                return resolve(location);
+            }
+        }
+
         const API_KEY = '545988903dc94379913912dc88a2da1a';
         const API_URL = `https://api.ipgeolocation.io/ipgeo?apiKey=${API_KEY}&fields=city,state_prov,country_name`;
 
@@ -528,6 +564,11 @@ function getLocationByIP() {
                 if (data.city && data.state_prov) {
                     const location = `${data.city}, ${data.state_prov}${data.country_name ? ', ' + data.country_name : ''}`;
                     console.log('Localização encontrada:', location);
+                    // Cache the location data with current timestamp
+                    localStorage.setItem('viatorLocationCache', JSON.stringify({
+                        location: location,
+                        timestamp: new Date().getTime()
+                    }));
                     resolve(location);
                     return;
                 }
@@ -631,6 +672,21 @@ function updateNearbySuggestion() {
 
 function getLocationName(latitude, longitude) {
     return new Promise((resolve, reject) => {
+        // Check if we have cached location data
+        const cachedData = localStorage.getItem('viatorLocationCache');
+        if (cachedData) {
+            const { location, timestamp, lat, lon } = JSON.parse(cachedData);
+            const now = new Date().getTime();
+            const oneHour = 60 * 60 * 1000; // 1 hour in milliseconds
+
+            // If cache is less than 1 hour old and coordinates are close enough, use it
+            if (now - timestamp < oneHour && 
+                Math.abs(lat - latitude) < 0.01 && 
+                Math.abs(lon - longitude) < 0.01) {
+                return resolve(location);
+            }
+        }
+
         fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&accept-language=pt-BR`)
             .then(response => {
                 if (!response.ok) {
@@ -643,7 +699,15 @@ function getLocationName(latitude, longitude) {
                     const city = data.address.city || data.address.town || data.address.village;
                     const state = data.address.state;
                     if (city && state) {
-                        resolve(`${city}, ${state}`);
+                        const location = `${city}, ${state}`;
+                        // Cache the location data with current timestamp and coordinates
+                        localStorage.setItem('viatorLocationCache', JSON.stringify({
+                            location: location,
+                            timestamp: new Date().getTime(),
+                            lat: latitude,
+                            lon: longitude
+                        }));
+                        resolve(location);
                         return;
                     }
                 }
