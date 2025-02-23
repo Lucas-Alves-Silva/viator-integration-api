@@ -4,37 +4,31 @@ document.addEventListener('DOMContentLoaded', function () {
     const searchText = document.getElementById('search-text');
     const searchIcon = document.getElementById('search-icon');
 
-    // Verificar se deve fazer scroll (movido para fora do segundo DOMContentLoaded)
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('scroll_to_results')) {
-        const contentWrapper = document.querySelector('.viator-content-wrapper');
-        if (contentWrapper) {
-            setTimeout(() => {
-                contentWrapper.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'start'
-                });
-                // Remover o parâmetro da URL sem recarregar a página
-                urlParams.delete('scroll_to_results');
-                const newUrl = window.location.pathname + '?' + urlParams.toString();
-                window.history.replaceState({}, '', newUrl);
-            }, 500); // Aumentado para 500ms para garantir que o conteúdo esteja carregado
-        }
-    }
+    // Initialize geolocation suggestion
+    updateNearbySuggestion();
 
-    searchForm.addEventListener('submit', function (event) {
-        // Atualiza a interface
+    // Prevent form submission on enter key
+    searchForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+    });
+
+    // Handle search button click
+    searchButton.addEventListener('click', function() {
+        // Update interface
         searchText.innerHTML = 'Pesquisando<div class="bouncy-loader"><span></span><span></span><span></span></div>';
         searchIcon.innerHTML = '✈️';
         searchIcon.classList.add('airplane-icon');
         searchButton.disabled = true;
 
-        // Adiciona parâmetro para scroll automático
+        // Add parameter for automatic scroll
         const currentUrl = new URL(window.location.href);
         const params = new URLSearchParams(currentUrl.search);
         params.set('scroll_to_results', '1');
         const newUrl = `${currentUrl.pathname}?${params.toString()}`;
         window.history.replaceState({}, '', newUrl);
+
+        // Submit the form
+        searchForm.submit();
     });
     // Adicionar evento para links de paginação
     document.addEventListener('click', function(e) {
@@ -485,6 +479,286 @@ function reinitializeDurationFilter() {
         });
     });
 }
+
+function getLocationName(latitude, longitude) {
+    return new Promise((resolve, reject) => {
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&accept-language=pt-BR`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.address) {
+                    const city = data.address.city || data.address.town || data.address.village;
+                    const state = data.address.state;
+                    if (city && state) {
+                        resolve(`${city}, ${state}`);
+                        return;
+                    }
+                }
+                reject(new Error('Location not found'));
+            })
+            .catch(error => {
+                console.error('Error fetching location:', error);
+                reject(error);
+            });
+    });
+}
+function getLocationByIP() {
+    return new Promise((resolve, reject) => {
+        const API_KEY = '545988903dc94379913912dc88a2da1a';
+        const API_URL = `https://api.ipgeolocation.io/ipgeo?apiKey=${API_KEY}&fields=city,state_prov,country_name`;
+
+        fetch(API_URL)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('IP Geolocation Resposta:', data);
+                
+                if (data.message) {
+                    throw new Error(data.message);
+                }
+
+                if (data.city && data.state_prov) {
+                    const location = `${data.city}, ${data.state_prov}${data.country_name ? ', ' + data.country_name : ''}`;
+                    console.log('Localização encontrada:', location);
+                    resolve(location);
+                    return;
+                }
+                throw new Error('Localização não encontrada');
+            })
+            .catch(error => {
+                console.error('Erro ao buscar localização por IP:', error);
+                resolve(null);
+            });
+    });
+}
+
+function updateNearbySuggestion() {
+    const nearbySuggestion = document.querySelector('.viator-nearby-suggestion');
+    const suggestionText = nearbySuggestion?.querySelector('span:last-child');
+    const errorMessage = document.querySelector('.viator-error-message');
+
+    if (nearbySuggestion && suggestionText) {
+        nearbySuggestion.addEventListener('click', function() {
+            if (suggestionText.textContent !== 'Obtendo localização...') {
+                const locationText = suggestionText.textContent;
+                if (locationText) {
+                    const searchInput = document.querySelector('input[name="viator_query"]');
+                    if (searchInput) {
+                        searchInput.value = locationText;
+                        nearbySuggestion.style.display = 'none';
+                    }
+                }
+            }
+        });
+
+        if ('geolocation' in navigator) {
+            nearbySuggestion.style.display = 'flex';
+            suggestionText.textContent = 'Obtendo localização...';
+            
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    getLocationName(position.coords.latitude, position.coords.longitude)
+                        .then(locationName => {
+                            if (locationName) {
+                                suggestionText.textContent = locationName;
+                                nearbySuggestion.style.cursor = 'pointer';
+                            } else {
+                                // Fallback to IP-based geolocation
+                                getLocationByIP().then(ipLocation => {
+                                    if (ipLocation) {
+                                        suggestionText.textContent = ipLocation;
+                                        nearbySuggestion.style.cursor = 'pointer';
+                                    } else {
+                                        nearbySuggestion.style.display = 'none';
+                                    }
+                                });
+                            }
+                        })
+                        .catch(() => {
+                            // Fallback to IP-based geolocation
+                            getLocationByIP().then(ipLocation => {
+                                if (ipLocation) {
+                                    suggestionText.textContent = ipLocation;
+                                    nearbySuggestion.style.cursor = 'pointer';
+                                } else {
+                                    nearbySuggestion.style.display = 'none';
+                                }
+                            });
+                        });
+                },
+                error => {
+                    console.error('Geolocation error:', error);
+                    // Fallback to IP-based geolocation
+                    getLocationByIP().then(ipLocation => {
+                        if (ipLocation) {
+                            suggestionText.textContent = ipLocation;
+                            nearbySuggestion.style.cursor = 'pointer';
+                        } else {
+                            nearbySuggestion.style.display = 'none';
+                        }
+                    });
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
+        } else {
+            // Browser doesn't support geolocation, try IP-based geolocation
+            getLocationByIP().then(ipLocation => {
+                if (ipLocation) {
+                    suggestionText.textContent = ipLocation;
+                    nearbySuggestion.style.cursor = 'pointer';
+                    nearbySuggestion.style.display = 'flex';
+                    if (errorMessage) errorMessage.textContent = '';
+                } else {
+                    nearbySuggestion.style.display = 'none';
+                    if (errorMessage) errorMessage.textContent = 'Seu navegador não suporta geolocalização.';
+                }
+            });
+        }
+    }
+}
+
+function getLocationName(latitude, longitude) {
+    return new Promise((resolve, reject) => {
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&accept-language=pt-BR`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.address) {
+                    const city = data.address.city || data.address.town || data.address.village;
+                    const state = data.address.state;
+                    if (city && state) {
+                        resolve(`${city}, ${state}`);
+                        return;
+                    }
+                }
+                reject(new Error('Location not found'));
+            })
+            .catch(error => {
+                console.error('Error fetching location:', error);
+                reject(error);
+            });
+    });
+}
+
+function updateNearbySuggestion() {
+    const nearbySuggestion = document.querySelector('.viator-nearby-suggestion');
+    const suggestionText = nearbySuggestion?.querySelector('span:last-child');
+    const errorMessage = document.querySelector('.viator-error-message');
+
+    if (nearbySuggestion && suggestionText) {
+        nearbySuggestion.addEventListener('click', function() {
+            if (suggestionText.textContent !== 'Obtendo localização...') {
+                const locationText = suggestionText.textContent;
+                if (locationText) {
+                    const searchInput = document.querySelector('input[name="viator_query"]');
+                    if (searchInput) {
+                        searchInput.value = locationText;
+                        searchInput.closest('form').submit();
+                    }
+                }
+            }
+        });
+
+        if ('geolocation' in navigator) {
+            nearbySuggestion.style.display = 'flex';
+            suggestionText.textContent = 'Obtendo localização...';
+            
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    getLocationName(position.coords.latitude, position.coords.longitude)
+                        .then(locationName => {
+                            if (locationName) {
+                                suggestionText.textContent = locationName;
+                                nearbySuggestion.style.cursor = 'pointer';
+                            } else {
+                                // Fallback to IP-based geolocation
+                                getLocationByIP().then(ipLocation => {
+                                    if (ipLocation) {
+                                        suggestionText.textContent = ipLocation;
+                                        nearbySuggestion.style.cursor = 'pointer';
+                                    } else {
+                                        nearbySuggestion.style.display = 'none';
+                                    }
+                                });
+                            }
+                        })
+                        .catch(() => {
+                            // Fallback to IP-based geolocation
+                            getLocationByIP().then(ipLocation => {
+                                if (ipLocation) {
+                                    suggestionText.textContent = ipLocation;
+                                    nearbySuggestion.style.cursor = 'pointer';
+                                } else {
+                                    nearbySuggestion.style.display = 'none';
+                                }
+                            });
+                        });
+                },
+                error => {
+                    console.error('Geolocation error:', error);
+                    // Fallback to IP-based geolocation
+                    getLocationByIP().then(ipLocation => {
+                        if (ipLocation) {
+                            suggestionText.textContent = ipLocation;
+                            nearbySuggestion.style.cursor = 'pointer';
+                        } else {
+                            nearbySuggestion.style.display = 'none';
+                        }
+                    });
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
+        } else {
+            nearbySuggestion.style.display = 'none';
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.querySelector('input[name="viator_query"]');
+    const nearbySuggestion = document.querySelector('.viator-nearby-suggestion');
+
+    if (searchInput && nearbySuggestion) {
+        searchInput.addEventListener('focus', function() {
+            nearbySuggestion.style.display = 'flex';
+            updateNearbySuggestion();
+        });
+
+        nearbySuggestion.addEventListener('click', function() {
+            const locationText = this.querySelector('span:last-child').textContent;
+            if (locationText && locationText !== 'Obtendo localização...') {
+                searchInput.value = locationText;
+                searchInput.closest('form').submit();
+            }
+        });
+
+        searchInput.addEventListener('blur', function() {
+            setTimeout(() => {
+                nearbySuggestion.style.display = 'none';
+            }, 200);
+        });
+    }
+});
 
 function setSearchDestination(destino) {
     const searchInput = document.querySelector('input[name="viator_query"]');

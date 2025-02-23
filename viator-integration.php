@@ -13,6 +13,35 @@ if (!defined('ABSPATH')) {
 // Include debug functions
 require_once plugin_dir_path(__FILE__) . 'debug.php';
 
+// Enqueue scripts and styles
+function viator_enqueue_scripts() {
+    $plugin_dir = plugin_dir_url(__FILE__);
+    
+    // Enqueue styles
+    wp_enqueue_style(
+        'viator-search-style', 
+        $plugin_dir . 'styles.css', 
+        array(), 
+        '1.0'
+    );
+
+    // Enqueue scripts
+    wp_enqueue_script('ipgeolocation-api', 'https://api.ipgeolocation.io/javascript/ipgeolocation.js', array(), '1.0.0', true);
+    wp_enqueue_script('viator-interactions', $plugin_dir . 'interactions.js', array('jquery', 'ipgeolocation-api'), '1.0.0', true);
+
+    // Add JavaScript variables
+    wp_localize_script('viator-interactions', 'viatorAjax', array(
+        'ajaxurl' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('viator_sort_nonce')
+    ));
+
+    // Add Flatpickr
+    wp_enqueue_style('flatpickr', 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css');
+    wp_enqueue_script('flatpickr', 'https://cdn.jsdelivr.net/npm/flatpickr', array(), null, true);
+    wp_enqueue_script('flatpickr-pt', 'https://npmcdn.com/flatpickr/dist/l10n/pt.js', array('flatpickr'), null, true);
+}
+add_action('wp_enqueue_scripts', 'viator_enqueue_scripts');
+
 // Função que gera o formulário de pesquisa
 function viator_search_form() {
     ob_start();
@@ -23,7 +52,13 @@ function viator_search_form() {
     
     ?>
     <form method="GET" action="<?php echo esc_url(get_permalink()); ?>" id="viator-search-form">
-        <input type="text" name="viator_query" placeholder="🌍 Aonde você quer ir?" value="<?php echo esc_attr($searchTerm); ?>" required>
+        <div class="viator-search-wrapper">
+            <input type="text" name="viator_query" placeholder="🌍 Aonde você quer ir?" value="<?php echo esc_attr($searchTerm); ?>" required>
+            <div class="viator-nearby-suggestion" style="display: none;">
+                <span class="location-icon"><img src="https://img.icons8.com/?size=100&id=3009BI6rABJa&format=png&color=04846B" alt="Ícone" width="15" height="15"></span>
+                <span>Nos arredores</span>
+            </div>
+        </div>
         <button type="submit" id="search-button">
             <span id="search-text">Pesquisar</span>
             <span id="search-icon">🔍</span>
@@ -780,32 +815,6 @@ if ($total_pages > 1) {
 // Criar o shortcode para exibir o formulário e os resultados
 add_shortcode('viator_search', 'viator_search_form');
 
-// Enfileirar scripts e estilos
-function viator_enqueue_scripts() {
-    $plugin_dir = plugin_dir_url(__FILE__);
-    wp_enqueue_style(
-        'viator-search-style', 
-        $plugin_dir . 'styles.css', 
-        array(), 
-        '1.0'
-    );
-
-    // Carrega o arquivo JavaScript
-    wp_enqueue_script('viator-interactions', plugins_url('interactions.js', __FILE__), array('jquery'), null, true);
-
-    // Adicionar variáveis para o JavaScript
-    wp_localize_script('viator-interactions', 'viatorAjax', array(
-        'ajaxurl' => admin_url('admin-ajax.php'),
-        'nonce' => wp_create_nonce('viator_sort_nonce')
-    ));
-
-    // Adicionar Flatpickr
-    wp_enqueue_style('flatpickr', 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css');
-    wp_enqueue_script('flatpickr', 'https://cdn.jsdelivr.net/npm/flatpickr', array(), null, true);
-    wp_enqueue_script('flatpickr-pt', 'https://npmcdn.com/flatpickr/dist/l10n/pt.js', array('flatpickr'), null, true);
-}
-add_action('wp_enqueue_scripts', 'viator_enqueue_scripts');
-
 // Modificar o handler AJAX de ordenação
 function viator_ajax_update_sort() {
     check_ajax_referer('viator_sort_nonce', 'nonce');
@@ -832,7 +841,6 @@ function viator_ajax_update_sort() {
         wp_send_json_error(['message' => 'Nenhum resultado encontrado']);
         wp_die();
     }
-
     // Retornar os resultados como HTML
     echo $results;
     wp_die();
@@ -875,7 +883,6 @@ function viator_ajax_update_filter() {
         wp_send_json_error(['message' => 'Nenhum resultado encontrado']);
         wp_die();
     }
-
     // Retornar os resultados como HTML
     echo $results;
     wp_die();
