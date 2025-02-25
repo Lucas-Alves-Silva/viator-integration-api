@@ -614,10 +614,16 @@ function updateNearbySuggestion() {
                 const locationText = suggestionText.textContent;
                 if (locationText) {
                     const searchInput = document.querySelector('input[name="viator_query"]');
-                    if (searchInput) {
+                    if (searchInput && searchButton) {
                         searchInput.value = locationText;
                         nearbySuggestion.style.display = 'none';
-                        searchInput.closest('form').submit();
+                        // Apply loading animation
+                        searchButton.disabled = true;
+                        searchText.innerHTML = 'Pesquisando<div class="bouncy-loader"><span></span><span></span><span></span></div>';
+                        searchIcon.innerHTML = '✈️';
+                        searchIcon.classList.add('airplane-icon');
+                        // Submit the form
+                        document.querySelector('#viator-search-form').submit();
                     }
                 }
             }
@@ -793,7 +799,6 @@ function getLocationByIP() {
             });
     });
 }
-
 function updateNearbySuggestion() {
     const nearbySuggestion = document.querySelector('.viator-nearby-suggestion');
     const suggestionText = nearbySuggestion?.querySelector('span:last-child');
@@ -810,9 +815,28 @@ function updateNearbySuggestion() {
                 const locationText = suggestionText.textContent;
                 if (locationText) {
                     const searchInput = document.querySelector('input[name="viator_query"]');
+                    const searchButton = document.getElementById('search-button');
+                    const searchText = document.getElementById('search-text');
+                    const searchIcon = document.getElementById('search-icon');
+                    
                     if (searchInput) {
                         searchInput.value = locationText;
                         nearbySuggestion.style.display = 'none';
+                        
+                        // Update interface for search
+                        searchText.innerHTML = 'Pesquisando<div class="bouncy-loader"><span></span><span></span><span></span></div>';
+                        searchIcon.innerHTML = '✈️';
+                        searchIcon.classList.add('airplane-icon');
+                        searchButton.disabled = true;
+                        
+                        // Add parameter for automatic scroll
+                        const currentUrl = new URL(window.location.href);
+                        const params = new URLSearchParams(currentUrl.search);
+                        params.set('scroll_to_results', '1');
+                        const newUrl = `${currentUrl.pathname}?${params.toString()}`;
+                        window.history.replaceState({}, '', newUrl);
+                        
+                        searchInput.closest('form').submit();
                     }
                 }
             }
