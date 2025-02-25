@@ -13,6 +13,55 @@ if (!defined('ABSPATH')) {
 // Include debug functions
 require_once plugin_dir_path(__FILE__) . 'debug.php';
 
+// Add admin menu and settings page
+function viator_admin_menu() {
+    add_menu_page(
+        'Viator API Integration',
+        'Viator Integration',
+        'manage_options',
+        'viator-settings',
+        'viator_settings_page',
+        'dashicons-admin-site',
+        100
+    );
+}
+add_action('admin_menu', 'viator_admin_menu');
+
+// Register settings
+function viator_register_settings() {
+    register_setting('viator_settings', 'viator_api_key');
+}
+add_action('admin_init', 'viator_register_settings');
+
+// Settings page content
+function viator_settings_page() {
+    ?>
+    <div class="wrap">
+        <h1>Viator API Integration Settings</h1>
+        <form method="post" action="options.php">
+            <?php
+            settings_fields('viator_settings');
+            do_settings_sections('viator_settings');
+            ?>
+            <table class="form-table">
+                <tr>
+                    <th scope="row">API Key</th>
+                    <td>
+                        <input type="text" 
+                               name="viator_api_key" 
+                               value="<?php echo esc_attr(get_option('viator_api_key')); ?>" 
+                               class="regular-text"
+                               required>
+                        <p class="description">Insira sua chave API aqui.</p>
+                    </td>
+                </tr>
+            </table>
+            <?php submit_button(); ?>
+        </form>
+    </div>
+    <?php
+}
+
 // Enqueue scripts and styles
 function viator_enqueue_scripts() {
     $plugin_dir = plugin_dir_url(__FILE__);
@@ -78,7 +127,11 @@ function viator_search_form() {
 
 // Função para chamar a API e buscar resultados
 function viator_get_search_results($searchTerm) {
-    $api_key = '602cf35e-ee1c-4b6e-8977-2b49246c9c5c';
+    $api_key = get_option('viator_api_key');
+    if (empty($api_key)) {
+        return '<p class="error">Por favor, configure sua chave API da Viator nas configurações do WordPress.</p>';
+    }
+    
     $url = "https://api.sandbox.viator.com/partner/search/freetext";
 
     // Paginação
