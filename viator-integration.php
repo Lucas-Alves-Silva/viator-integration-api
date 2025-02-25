@@ -62,7 +62,6 @@ function viator_search_form() {
         <button type="submit" id="search-button">
             <span id="search-text">Pesquisar</span>
             <span id="search-icon">🔍</span>
-            <span id="loading-icon" class="viator-loading" style="display: none;">⏳</span>
         </button>
     </form>
 
