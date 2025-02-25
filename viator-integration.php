@@ -51,9 +51,9 @@ function viator_search_form() {
     $searchTerm = isset($_GET['viator_query']) ? sanitize_text_field($_GET['viator_query']) : '';
     
     ?>
-    <form method="GET" action="<?php echo esc_url(get_permalink()); ?>" id="viator-search-form">
+    <form method="GET" action="<?php echo esc_url(get_permalink()); ?>" id="viator-search-form" autocomplete="off">
         <div class="viator-search-wrapper">
-            <input type="text" name="viator_query" placeholder="🌍 Aonde você quer ir?" value="<?php echo esc_attr($searchTerm); ?>" required>
+            <input type="text" name="viator_query" autocomplete="off" placeholder="🌍 Aonde você quer ir?" value="<?php echo esc_attr($searchTerm); ?>" required>
             <div class="viator-nearby-suggestion" style="display: none;">
                 <span class="location-icon"><img src="https://img.icons8.com/?size=100&id=3009BI6rABJa&format=png&color=04846B" alt="Ícone" width="15" height="15"></span>
                 <span>Nos arredores</span>
