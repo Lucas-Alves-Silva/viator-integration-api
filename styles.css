@@ -130,6 +130,18 @@
             transition: border-color 0.3s ease;
         }
 
+        #viator-search-form input[type="text"].error {
+            border-color: #ff4444;
+            background-color: #fff8f8;
+        }
+
+        .viator-error-message {
+            color: #ff4444;
+            font-size: 14px;
+            margin-top: 8px;
+            text-align: left;
+        }
+
         #viator-search-form input[type="text"]:focus {
             border-color: #0056b3;
         }

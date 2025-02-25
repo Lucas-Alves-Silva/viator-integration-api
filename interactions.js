@@ -3,18 +3,36 @@ document.addEventListener('DOMContentLoaded', function () {
     const searchButton = document.getElementById('search-button');
     const searchText = document.getElementById('search-text');
     const searchIcon = document.getElementById('search-icon');
+    const searchInput = document.querySelector('input[name="viator_query"]');
 
-    // Initialize geolocation suggestion
-    updateNearbySuggestion();
+    // Add focus event listener to search input
+    if (searchInput) {
+        searchInput.addEventListener('focus', updateNearbySuggestion);
+    }
 
-    // Prevent form submission on enter key
+    // Prevent form submission on enter key and validate input
     searchForm.addEventListener('submit', function(event) {
         event.preventDefault();
-    });
+        
+        if (!searchInput || !searchInput.value.trim()) {
+            // Add visual feedback for empty input
+            searchInput.classList.add('error');
+            const errorMessage = document.querySelector('.viator-error-message');
+            if (errorMessage) {
+                errorMessage.textContent = 'Por favor, insira um destino';
+                errorMessage.classList.remove('searching');
+            }
+            return;
+        }
 
-    // Handle search button click
-    searchButton.addEventListener('click', function() {
-        // Update interface
+        // Remove error state if input is valid
+        searchInput.classList.remove('error');
+        const errorMessage = document.querySelector('.viator-error-message');
+        if (errorMessage) {
+            errorMessage.textContent = '';
+        }
+
+        // Update interface for search
         searchText.innerHTML = 'Pesquisando<div class="bouncy-loader"><span></span><span></span><span></span></div>';
         searchIcon.innerHTML = '✈️';
         searchIcon.classList.add('airplane-icon');
@@ -580,11 +598,15 @@ function getLocationByIP() {
             });
     });
 }
-
 function updateNearbySuggestion() {
     const nearbySuggestion = document.querySelector('.viator-nearby-suggestion');
     const suggestionText = nearbySuggestion?.querySelector('span:last-child');
     const errorMessage = document.querySelector('.viator-error-message');
+    
+    // Hide suggestion by default
+    if (nearbySuggestion) {
+        nearbySuggestion.style.display = 'none';
+    }
 
     if (nearbySuggestion && suggestionText) {
         nearbySuggestion.addEventListener('click', function() {
@@ -595,6 +617,7 @@ function updateNearbySuggestion() {
                     if (searchInput) {
                         searchInput.value = locationText;
                         nearbySuggestion.style.display = 'none';
+                        searchInput.closest('form').submit();
                     }
                 }
             }
@@ -719,11 +742,67 @@ function getLocationName(latitude, longitude) {
             });
     });
 }
+function getLocationByIP() {
+    return new Promise((resolve) => {
+        // Check if we have cached location data
+        const cachedData = localStorage.getItem('viatorLocationCache');
+        if (cachedData) {
+            const { location, timestamp } = JSON.parse(cachedData);
+            const now = new Date().getTime();
+            const threeHours = 3 * 60 * 60 * 1000; // 3 horas em millisegundos
+
+            // Se o cache tiver menos de 3 horas, execute isso
+            if (now - timestamp < threeHours) {
+                return resolve(location);
+            }
+        }
+
+        const API_KEY = '545988903dc94379913912dc88a2da1a';
+        const API_URL = `https://api.ipgeolocation.io/ipgeo?apiKey=${API_KEY}&fields=city,state_prov,country_name`;
+
+        fetch(API_URL)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('IP Geolocation Resposta:', data);
+                
+                if (data.message) {
+                    throw new Error(data.message);
+                }
+
+                if (data.city && data.state_prov) {
+                    const location = `${data.city}, ${data.state_prov}${data.country_name ? ', ' + data.country_name : ''}`;
+                    console.log('Localização encontrada:', location);
+                    // Cache the location data with current timestamp
+                    localStorage.setItem('viatorLocationCache', JSON.stringify({
+                        location: location,
+                        timestamp: new Date().getTime()
+                    }));
+                    resolve(location);
+                    return;
+                }
+                throw new Error('Localização não encontrada');
+            })
+            .catch(error => {
+                console.error('Erro ao buscar localização por IP:', error);
+                resolve(null);
+            });
+    });
+}
 
 function updateNearbySuggestion() {
     const nearbySuggestion = document.querySelector('.viator-nearby-suggestion');
     const suggestionText = nearbySuggestion?.querySelector('span:last-child');
     const errorMessage = document.querySelector('.viator-error-message');
+    
+    // Hide suggestion by default
+    if (nearbySuggestion) {
+        nearbySuggestion.style.display = 'none';
+    }
 
     if (nearbySuggestion && suggestionText) {
         nearbySuggestion.addEventListener('click', function() {
@@ -733,7 +812,7 @@ function updateNearbySuggestion() {
                     const searchInput = document.querySelector('input[name="viator_query"]');
                     if (searchInput) {
                         searchInput.value = locationText;
-                        searchInput.closest('form').submit();
+                        nearbySuggestion.style.display = 'none';
                     }
                 }
             }
