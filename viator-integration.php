@@ -135,7 +135,7 @@ function viator_get_search_results($searchTerm) {
     $url = "https://api.sandbox.viator.com/partner/search/freetext";
 
     // Paginação
-    $per_page = 21; // Número de itens por página
+    $per_page = 39; // Número de itens por página
     $page = isset($_GET['viator_page']) ? intval($_GET['viator_page']) : 1; // Página atual
     $start = ($page - 1) * $per_page + 1; // Índice inicial dos resultados
 
