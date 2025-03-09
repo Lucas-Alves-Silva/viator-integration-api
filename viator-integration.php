@@ -242,7 +242,7 @@ function viator_get_search_results($searchTerm) {
             'Accept-Language'  => 'pt-BR',
         ],
         'body'    => $body,
-        'timeout' => 15,
+        'timeout' => 120,
     ]);
 
     // Verificar se houve erro na requisição
