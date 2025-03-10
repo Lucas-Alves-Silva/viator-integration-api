@@ -3,6 +3,460 @@
 /* Importar a fonte Poppins do Google Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
+/* Product Detail Page Styles */
+.viator-product-detail {
+    font-family: var(--font-primary);
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Breadcrumbs */
+.viator-breadcrumbs {
+    margin-bottom: 20px;
+    font-size: 14px;
+    color: #666;
+}
+
+.viator-breadcrumbs a {
+    color: #04846b;
+    text-decoration: none;
+}
+
+.viator-breadcrumbs a:hover {
+    text-decoration: underline;
+}
+
+/* Product Header */
+.viator-product-header {
+    margin-bottom: 30px;
+}
+
+.viator-product-header h1 {
+    font-size: 28px;
+    font-weight: 600;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.viator-product-rating {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+.viator-stars {
+    color: #FFD700;
+    font-size: 18px;
+    letter-spacing: 2px;
+}
+
+.viator-rating-number {
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.viator-review-count {
+    color: #666;
+    font-size: 14px;
+}
+
+.viator-product-flags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.viator-flag {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.viator-flag-cancelamento {
+    background-color: #d9fff6;
+    color: #04846b;
+}
+
+.viator-flag-esgota {
+    background-color: #ffe9e9;
+    color: #E74C3C;
+}
+
+.viator-flag-oferta {
+    background-color: #fff5e5;
+    color: #ff8c00;
+}
+
+/* Product Main Section */
+.viator-product-main {
+    display: grid;
+    grid-template-columns: 3fr 2fr;
+    gap: 30px;
+    margin-bottom: 40px;
+}
+
+/* Gallery */
+.viator-product-gallery {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.viator-gallery-main {
+    width: 100%;
+    height: 400px;
+    overflow: hidden;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.viator-gallery-main img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.viator-gallery-thumbs {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 10px;
+}
+
+.viator-thumb {
+    width: 80px;
+    height: 60px;
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.3s ease;
+}
+
+.viator-thumb.active {
+    opacity: 1;
+    border: 2px solid #04846b;
+}
+
+.viator-thumb:hover {
+    opacity: 0.9;
+}
+
+.viator-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Product Info */
+.viator-product-info {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.viator-product-price-box {
+    background-color: #fff;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.viator-product-price-header {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.viator-product-original-price {
+    font-size: 16px;
+    color: #999;
+    text-decoration: line-through;
+}
+
+.viator-product-price {
+    font-size: 28px;
+    font-weight: 600;
+    color: #04846b;
+    margin-bottom: 5px;
+}
+
+.viator-product-price-note {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 15px;
+}
+
+.viator-booking-button {
+    display: block;
+    background: linear-gradient(135deg, #04846b, #025a49);
+    color: white;
+    text-align: center;
+    padding: 12px;
+    border-radius: 4px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    margin-bottom: 15px;
+}
+
+.viator-booking-button:hover {
+    background: linear-gradient(135deg, #025a49, #013e32);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.viator-cancellation-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #04846b;
+}
+
+/* Quick Info */
+.viator-product-quick-info {
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.viator-info-item {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.viator-info-item:last-child {
+    margin-bottom: 0;
+}
+
+.viator-info-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.viator-info-content {
+    flex: 1;
+}
+
+.viator-info-label {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 3px;
+}
+
+.viator-info-value {
+    font-size: 16px;
+    color: #333;
+}
+
+/* Tabs */
+.viator-product-tabs {
+    margin-bottom: 40px;
+}
+
+.viator-tabs-nav {
+    display: flex;
+    gap: 5px;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 20px;
+    overflow-x: auto;
+    padding-bottom: 1px;
+}
+
+.viator-tab-button {
+    padding: 12px 20px;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    font-family: var(--font-primary);
+    font-size: 16px;
+    font-weight: 500;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.viator-tab-button:hover {
+    color: #04846b;
+}
+
+.viator-tab-button.active {
+    color: #04846b;
+    border-bottom-color: #04846b;
+}
+
+.viator-tab-content {
+    display: none;
+    padding: 10px 0;
+}
+
+.viator-tab-content.active {
+    display: block;
+    animation: fadeIn 0.5s ease;
+}
+
+.viator-tab-content h2 {
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.viator-tab-content h3 {
+    font-size: 18px;
+    font-weight: 500;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+/* Description */
+.viator-description {
+    line-height: 1.6;
+    color: #444;
+}
+
+/* Itinerary */
+.viator-itinerary {
+    line-height: 1.6;
+}
+
+.viator-itinerary-items {
+    margin-top: 20px;
+}
+
+.viator-itinerary-item {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.viator-itinerary-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+/* Inclusions/Exclusions */
+.viator-inclusions,
+.viator-exclusions {
+    margin-bottom: 30px;
+}
+
+.viator-inclusions ul,
+.viator-exclusions ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.viator-inclusions li,
+.viator-exclusions li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.viator-inclusions li:last-child,
+.viator-exclusions li:last-child {
+    border-bottom: none;
+}
+
+/* Additional Info */
+.viator-additional-info {
+    line-height: 1.6;
+}
+
+.viator-info-section {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.viator-info-section:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+/* Booking Section */
+.viator-booking-section {
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    padding: 30px;
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.viator-booking-section h2 {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.viator-booking-section p {
+    margin-bottom: 20px;
+    color: #666;
+}
+
+.viator-booking-link {
+    display: inline-block;
+    background: linear-gradient(135deg, #04846b, #025a49);
+    color: white;
+    padding: 15px 30px;
+    border-radius: 4px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.viator-booking-link:hover {
+    background: linear-gradient(135deg, #025a49, #013e32);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+    .viator-product-main {
+        grid-template-columns: 1fr;
+    }
+    
+    .viator-gallery-main {
+        height: 300px;
+    }
+    
+    .viator-product-header h1 {
+        font-size: 24px;
+    }
+    
+    .viator-tabs-nav {
+        padding-bottom: 10px;
+    }
+    
+    .viator-tab-button {
+        padding: 10px 15px;
+        font-size: 14px;
+    }
+}
+
 /* Definir as variáveis de fonte no root */
 :root {
     --font-primary: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;

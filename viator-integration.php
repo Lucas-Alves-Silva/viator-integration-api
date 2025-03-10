@@ -13,6 +13,9 @@ if (!defined('ABSPATH')) {
 // Include debug functions
 require_once plugin_dir_path(__FILE__) . 'debug.php';
 
+// Include product detail page functionality
+require_once plugin_dir_path(__FILE__) . 'unique-product.php';
+
 // Add admin menu and settings page
 function viator_admin_menu() {
     add_menu_page(
@@ -769,7 +772,7 @@ function viator_get_search_results($searchTerm) {
 
         $output .= '<p class="viator-card-duration"><img src="https://img.icons8.com/?size=100&id=82767&format=png&color=000000" alt="Duração" title="Duração aproximada" width="15" height="15"> ' . $duration . '</p>
                 <p class="viator-card-price"><img src="https://img.icons8.com/?size=100&id=ZXJaNFNjWGZF&format=png&color=000000" alt="Preço" width="15" height="15"> a partir de ' . $price_html . '</p>                
-                <a href="' . $url . '" target="_blank">Ver detalhes</a>
+                <a href="' . esc_url(home_url('/produto-unico/') . '?product_code=' . $tour['productCode']) . '">Ver detalhes</a>
             </div>
         </div>';
     }
