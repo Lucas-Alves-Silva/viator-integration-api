@@ -334,6 +334,7 @@ function viator_get_product_details($product_code) {
                                     'PICKUP_POINT' => 'Ponto de embarque',
                                     'PICKUP_HOTEL' => 'Busca no hotel',
                                     'PICKUP_AND_MEET_AT_START_POINT' => 'Serviço de transporte e encontro no ponto de partida',
+                                    'ATTRACTION_START_POINT' => 'Ponto de partida da atração',
                                     'NONE' => ''
                                 ];
                                 
@@ -443,14 +444,17 @@ function viator_get_product_details($product_code) {
                                     // Definir ícones para cada tipo de informação adicional
                                     $info_type = $info['type'];
                                     $info_icons = [
-                                        'STROLLER_ACCESSIBLE' => '👶',
+                                        'STROLLER_ACCESSIBLE' => '<img width="24" height="24" src="https://img.icons8.com/android/24/stroller.png" alt="stroller"/>',
                                         'PETS_WELCOME' => '🐾',
                                         'PUBLIC_TRANSPORTATION_NEARBY' => '🚌',
-                                        'PHYSICAL_EASY' => '👌',
+                                        'PHYSICAL_EASY' => '💪🏻',
                                         'PHYSICAL_MODERATE' => '🚶',
                                         'PHYSICAL_STRENUOUS' => '🏃',
                                         'WHEELCHAIR_ACCESSIBLE' => '♿',
-                                        'INFANT_FRIENDLY' => '👶',
+                                        'TRANSPORTATION_WHEELCHAIR_ACCESSIBLE' => '♿',
+                                        'INFANT_FRIENDLY' => '🍼',
+                                        'INFANT_SEATS_AVAILABLE' => '👶',
+                                        'INFANTS_MUST_SIT_ON_LAPS' => '<img width="48" height="48" src="https://img.icons8.com/color/48/tummy-time.png" alt="tummy-time"/>',
                                         'KID_FRIENDLY' => '👨‍👩‍👧‍👦',
                                         'SENIOR_FRIENDLY' => '🧓',
                                         'PICKUP_AVAILABLE' => '🚐',
@@ -458,6 +462,9 @@ function viator_get_product_details($product_code) {
                                         'VEGETARIAN_OPTION' => '🥗',
                                         'SKIP_THE_LINE' => '⏩',
                                         'PRIVATE_TOUR' => '👤',
+                                        'NO_PREGNANT' => '🚫',
+                                        'NO_HEART_PROBLEMS' => '🚫',
+                                        'NO_BACK_PROBLEMS' => '🚫',
                                         'GROUP_TOUR' => '👥'
                                     ];
                                     echo isset($info_icons[$info_type]) ? $info_icons[$info_type] : '📌';
@@ -474,16 +481,24 @@ function viator_get_product_details($product_code) {
                                             'PHYSICAL_EASY' => 'Adequado para Todos os Níveis de Condicionamento Físico',
                                             'PHYSICAL_MODERATE' => 'Nível Moderado de Atividade Física',
                                             'PHYSICAL_STRENUOUS' => 'Nível Intenso de Atividade Física',
-                                            'WHEELCHAIR_ACCESSIBLE' => 'Acessível para Cadeiras de Rodas',
+                                            'WHEELCHAIR_ACCESSIBLE' => 'Acessível para Cadeirantes',
+                                            'SURFACES_WHEELCHAIR_ACCESSIBLE' => 'Superfícies acessíveis para cadeira de rodas',
+                                            'TRANSPORTATION_WHEELCHAIR_ACCESSIBLE' => 'Transporte acessível para cadeira de rodas',
                                             'INFANT_FRIENDLY' => 'Adequado para Bebês',
+                                            'INFANT_SEATS_AVAILABLE' => 'Assentos para Bebês Disponíveis',
                                             'KID_FRIENDLY' => 'Adequado para Crianças',
                                             'SENIOR_FRIENDLY' => 'Adequado para Idosos',
+                                            'INFANTS_MUST_SIT_ON_LAPS' => 'Crianças pequenas no colo',
+                                            'NO_PREGNANT' => 'Não grávidas',
+                                            'NO_HEART_PROBLEMS' => 'Não Cardíacos',
+                                            'NO_BACK_PROBLEMS' => 'Sem Problemas na Coluna',
                                             'PICKUP_AVAILABLE' => 'Serviço de Transporte Disponível',
                                             'SHOPPING_OPPORTUNITY' => 'Oportunidade de Compras',
                                             'VEGETARIAN_OPTION' => 'Opção Vegetariana Disponível',
                                             'SKIP_THE_LINE' => 'Acesso Sem Fila',
                                             'PRIVATE_TOUR' => 'Tour Privado',
-                                            'GROUP_TOUR' => 'Tour em Grupo'
+                                            'GROUP_TOUR' => 'Tour em Grupo',
+                                            'OTHER' => 'Outros'
                                         ];
                                         echo esc_html(isset($info_types_pt[$info_type]) ? $info_types_pt[$info_type] : $info_type);
                                         ?>
