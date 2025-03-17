@@ -327,6 +327,23 @@ function viator_get_product_details($product_code) {
                                     })));
                                 }
                                 
+                                // Mapeamento de códigos logísticos para mensagens amigáveis em português
+                                $logistics_codes = [
+                                    'MEET_EVERYONE_AT_START_POINT' => 'Encontro no ponto de partida',
+                                    'PICKUP_EVERYONE' => 'Serviço de transporte para todos os participantes',
+                                    'PICKUP_POINT' => 'Ponto de embarque',
+                                    'PICKUP_HOTEL' => 'Busca no hotel',
+                                    'PICKUP_AND_MEET_AT_START_POINT' => 'Serviço de transporte e encontro no ponto de partida',
+                                    'NONE' => ''
+                                ];
+                                
+                                // Substituir códigos conhecidos por mensagens amigáveis
+                                foreach ($logistics_codes as $code => $friendly_message) {
+                                    if (strpos($logistic, $code) !== false) {
+                                        $logistic = str_replace($code, $friendly_message, $logistic);
+                                    }
+                                }
+                                
                                 // Remove códigos de identificação como 'NONE', 'PICKUP_EVERYONE', 'PICKUP_AND_MEET_AT_START_POINT' seguidos de números ou sozinhos
                                 $logistic = preg_replace('/^\s*(NONE|PICKUP_EVERYONE|PICKUP_POINT|PICKUP_HOTEL|PICKUP_AND_MEET_AT_START_POINT)(\s+\d+(?:\s+\d+)?\s*\*?\s*|\s+|$)/im', '', $logistic);
                                 
