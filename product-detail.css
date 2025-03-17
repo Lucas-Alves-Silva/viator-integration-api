@@ -1,0 +1,287 @@
+/* Product Detail Page Styles */
+.viator-product-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    margin-bottom: 40px;
+}
+
+/* Image Gallery */
+.viator-product-gallery {
+    position: relative;
+}
+
+.viator-main-image {
+    margin-bottom: 15px;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer; /* Add cursor pointer to indicate it's clickable */
+}
+
+.viator-main-image img {
+    width: 100%;
+    height: auto;
+    display: block;
+    transition: transform 0.3s ease; /* Add smooth transition effect */
+}
+
+.viator-main-image img:hover {
+    transform: scale(1.02); /* Slight zoom effect on hover */
+}
+
+.viator-thumbnails {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 10px;
+}
+
+.viator-thumbnail {
+    flex: 0 0 80px;
+    height: 60px;
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.3s ease;
+}
+
+.viator-thumbnail.active {
+    opacity: 1;
+    border: 2px solid #04846b;
+}
+
+.viator-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Lightbox Styles */
+.viator-lightbox {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.9);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+}
+
+.viator-lightbox.active {
+    display: flex;
+}
+
+.viator-lightbox-content {
+    position: relative;
+    width: 90%;
+    max-width: 1000px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.viator-lightbox-close {
+    position: absolute;
+    top: -40px;
+    right: 0;
+    color: white;
+    font-size: 30px;
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 10;
+}
+
+.viator-lightbox-image-container {
+    position: relative;
+    width: 100%;
+    height: 70vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.viator-lightbox-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.viator-lightbox-prev,
+.viator-lightbox-next {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    color: white;
+    font-size: 30px;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 16px;
+    background-color: rgba(0, 0, 0, 0.3);
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: background-color 0.3s ease;
+}
+
+.viator-lightbox-prev:hover,
+.viator-lightbox-next:hover {
+    background-color: rgba(0, 0, 0, 0.6);
+}
+
+.viator-lightbox-prev {
+    left: 10px;
+}
+
+.viator-lightbox-next {
+    right: 10px;
+}
+
+.viator-lightbox-thumbnails {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding: 10px 0;
+    margin-top: 10px;
+    justify-content: center;
+}
+
+.viator-lightbox-thumbnail {
+    flex: 0 0 80px;
+    height: 60px;
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: opacity 0.3s ease;
+}
+
+.viator-lightbox-thumbnail.active {
+    opacity: 1;
+    border: 2px solid white;
+}
+
+.viator-lightbox-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Product Info Container */
+.viator-product-info-container {
+    padding: 20px;
+}
+
+/* Quick Info */
+.viator-quick-info {
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.viator-info-item {
+    display: flex;
+    margin-bottom: 10px;
+}
+
+.viator-info-label {
+    font-weight: 600;
+    min-width: 120px;
+}
+
+/* Sections */
+.viator-product-description,
+.viator-logistics-section,
+.viator-inclusions-exclusions,
+.viator-cancellation-policy,
+.viator-language-guides,
+.viator-tags {
+    margin: 40px 0;
+}
+
+.viator-product-description h2,
+.viator-logistics-section h2,
+.viator-inclusions-exclusions h2,
+.viator-cancellation-policy h2,
+.viator-language-guides h2,
+.viator-tags h2 {
+    color: #333;
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+
+/* Logistics */
+.viator-logistics-section {
+    background-color: #f9f9f9;
+    padding: 30px;
+    border-radius: 8px;
+}
+
+.viator-special-instructions h3 {
+    color: #04846b;
+    margin: 20px 0 15px;
+}
+
+/* Inclusions & Exclusions */
+.viator-inclusions-exclusions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+}
+
+.viator-inclusions ul,
+.viator-exclusions ul {
+    list-style: none;
+    padding: 0;
+}
+
+.viator-inclusions li,
+.viator-exclusions li {
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.viator-inclusions li:before {
+    content: '✓';
+    color: #04846b;
+    margin-right: 10px;
+}
+
+.viator-exclusions li:before {
+    content: '×';
+    color: #dc3545;
+    margin-right: 10px;
+}
+
+/* Tags */
+.viator-tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.viator-tag {
+    background-color: #f0f0f0;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 14px;
+    color: #666;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .viator-product-container {
+        grid-template-columns: 1fr;
+    }
+
+    .viator-inclusions-exclusions {
+        grid-template-columns: 1fr;
+    }
+}

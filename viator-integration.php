@@ -94,6 +94,19 @@ function viator_enqueue_scripts() {
 }
 add_action('wp_enqueue_scripts', 'viator_enqueue_scripts');
 
+// Enqueue styles
+function viator_enqueue_styles() {
+    wp_enqueue_style('viator-styles', plugins_url('styles.css', __FILE__));
+    wp_enqueue_style('viator-product-detail', plugins_url('product-detail.css', __FILE__));
+    
+    // Enqueue product gallery script only on pages with the product shortcode
+    global $post;
+    if (is_a($post, 'WP_Post') && has_shortcode($post->post_content, 'viator_product')) {
+        wp_enqueue_script('viator-product-gallery', plugins_url('product-gallery.js', __FILE__), array('jquery'), '1.0', true);
+    }
+}
+add_action('wp_enqueue_scripts', 'viator_enqueue_styles');
+
 // Função que gera o formulário de pesquisa
 function viator_search_form() {
     ob_start();
@@ -772,9 +785,19 @@ function viator_get_search_results($searchTerm) {
 
         $output .= '<p class="viator-card-duration"><img src="https://img.icons8.com/?size=100&id=82767&format=png&color=000000" alt="Duração" title="Duração aproximada" width="15" height="15"> ' . $duration . '</p>
                 <p class="viator-card-price"><img src="https://img.icons8.com/?size=100&id=ZXJaNFNjWGZF&format=png&color=000000" alt="Preço" width="15" height="15"> a partir de ' . $price_html . '</p>                
-                <a href="' . esc_url(home_url('/produto-unico/') . '?product_code=' . $tour['productCode']) . '">Ver detalhes</a>
+                <a href="' . esc_url(home_url('/produto-unico/') . '?product_code=' . $tour['productCode']) . '">Ver detalhes</a>';
+                
+                // Armazenar informações de preço para uso na página de detalhes do produto
+                $product_price_data = array(
+                    'fromPrice' => isset($tour['pricing']['summary']['fromPrice']) ? $tour['pricing']['summary']['fromPrice'] : null,
+                    'fromPriceBeforeDiscount' => isset($tour['pricing']['summary']['fromPriceBeforeDiscount']) ? $tour['pricing']['summary']['fromPriceBeforeDiscount'] : null,
+                    'flags' => $flags
+                );
+                update_option('viator_product_' . $tour['productCode'] . '_price', $product_price_data, false);
+                
+                $output .= "
             </div>
-        </div>';
+        </div>";
     }
 
     // Fechar grid
