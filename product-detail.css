@@ -260,6 +260,74 @@
     margin-right: 10px;
 }
 
+/* Additional Info Section */
+.viator-additional-info-section {
+    margin: 40px 0;
+}
+
+.viator-additional-info-section h2 {
+    color: #333;
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+
+.viator-additional-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+@media (max-width: 768px) {
+    .viator-additional-info {
+        grid-template-columns: 1fr;
+    }
+}
+
+.viator-info-section {
+    background-color: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+}
+
+.viator-info-section:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    background-color: #f0f9f7;
+}
+
+.viator-info-icon {
+    font-size: 24px;
+    min-width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #e6f4f1;
+    border-radius: 50%;
+    color: #04846b;
+}
+
+.viator-info-content {
+    flex: 1;
+}
+
+.viator-info-type {
+    font-weight: 600;
+    color: #04846b;
+    margin-bottom: 8px;
+    font-size: 16px;
+}
+
+.viator-info-description {
+    color: #555;
+    line-height: 1.5;
+    font-size: 14px;
+}
+
 /* Tags */
 .viator-tag-list {
     display: flex;

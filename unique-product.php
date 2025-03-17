@@ -412,6 +412,73 @@ function viator_get_product_details($product_code) {
                 </div>
             <?php endif; ?>
         </div>
+
+        <!-- Additional Info -->
+        <?php if (!empty($additional_info)): ?>
+            <div class="viator-additional-info-section">
+                <h2>Informações Adicionais</h2>
+                <div class="viator-additional-info">
+                    <?php foreach ($additional_info as $info): ?>
+                        <?php if (isset($info['type']) && isset($info['description'])): ?>
+                            <div class="viator-info-section">
+                                <div class="viator-info-icon">
+                                    <?php 
+                                    // Definir ícones para cada tipo de informação adicional
+                                    $info_type = $info['type'];
+                                    $info_icons = [
+                                        'STROLLER_ACCESSIBLE' => '👶',
+                                        'PETS_WELCOME' => '🐾',
+                                        'PUBLIC_TRANSPORTATION_NEARBY' => '🚌',
+                                        'PHYSICAL_EASY' => '👌',
+                                        'PHYSICAL_MODERATE' => '🚶',
+                                        'PHYSICAL_STRENUOUS' => '🏃',
+                                        'WHEELCHAIR_ACCESSIBLE' => '♿',
+                                        'INFANT_FRIENDLY' => '👶',
+                                        'KID_FRIENDLY' => '👨‍👩‍👧‍👦',
+                                        'SENIOR_FRIENDLY' => '🧓',
+                                        'PICKUP_AVAILABLE' => '🚐',
+                                        'SHOPPING_OPPORTUNITY' => '🛍️',
+                                        'VEGETARIAN_OPTION' => '🥗',
+                                        'SKIP_THE_LINE' => '⏩',
+                                        'PRIVATE_TOUR' => '👤',
+                                        'GROUP_TOUR' => '👥'
+                                    ];
+                                    echo isset($info_icons[$info_type]) ? $info_icons[$info_type] : '📌';
+                                    ?>
+                                </div>
+                                <div class="viator-info-content">
+                                    <div class="viator-info-type">
+                                        <?php 
+                                        // Traduzir os tipos de informações adicionais para português
+                                        $info_types_pt = [
+                                            'STROLLER_ACCESSIBLE' => 'Acessível para Carrinhos de Bebê',
+                                            'PETS_WELCOME' => 'Animais de Serviço Permitidos',
+                                            'PUBLIC_TRANSPORTATION_NEARBY' => 'Transporte Público Próximo',
+                                            'PHYSICAL_EASY' => 'Adequado para Todos os Níveis de Condicionamento Físico',
+                                            'PHYSICAL_MODERATE' => 'Nível Moderado de Atividade Física',
+                                            'PHYSICAL_STRENUOUS' => 'Nível Intenso de Atividade Física',
+                                            'WHEELCHAIR_ACCESSIBLE' => 'Acessível para Cadeiras de Rodas',
+                                            'INFANT_FRIENDLY' => 'Adequado para Bebês',
+                                            'KID_FRIENDLY' => 'Adequado para Crianças',
+                                            'SENIOR_FRIENDLY' => 'Adequado para Idosos',
+                                            'PICKUP_AVAILABLE' => 'Serviço de Transporte Disponível',
+                                            'SHOPPING_OPPORTUNITY' => 'Oportunidade de Compras',
+                                            'VEGETARIAN_OPTION' => 'Opção Vegetariana Disponível',
+                                            'SKIP_THE_LINE' => 'Acesso Sem Fila',
+                                            'PRIVATE_TOUR' => 'Tour Privado',
+                                            'GROUP_TOUR' => 'Tour em Grupo'
+                                        ];
+                                        echo esc_html(isset($info_types_pt[$info_type]) ? $info_types_pt[$info_type] : $info_type);
+                                        ?>
+                                    </div>
+                                    <div class="viator-info-description"><?php echo esc_html($info['description']); ?></div>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        <?php endif; ?>
     
         <!-- Cancellation Policy -->
         <?php if (!empty($cancellation_policy)): ?>
