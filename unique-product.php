@@ -327,8 +327,11 @@ function viator_get_product_details($product_code) {
                                     })));
                                 }
                                 
-                                // Remove códigos de identificação como 'NONE' e 'PICKUP_EVERYONE' seguidos de números
-                                $logistic = preg_replace('/^(NONE|PICKUP_EVERYONE|PICKUP_POINT|PICKUP_HOTEL)\s+\d*\s*\*?\s*/i', '', $logistic);
+                                // Remove códigos de identificação como 'NONE', 'PICKUP_EVERYONE', 'PICKUP_AND_MEET_AT_START_POINT' seguidos de números ou sozinhos
+                                $logistic = preg_replace('/^\s*(NONE|PICKUP_EVERYONE|PICKUP_POINT|PICKUP_HOTEL|PICKUP_AND_MEET_AT_START_POINT)(\s+\d+(?:\s+\d+)?\s*\*?\s*|\s+|$)/im', '', $logistic);
+                                
+                                // Garantir que não haja 'NONE' isolado no início de qualquer linha
+                                $logistic = preg_replace('/^\s*NONE\s*/m', '', $logistic);
                                 
                                 // Preserva os marcadores de lista (*) no início das linhas
                                 $logistic = preg_replace('/^\*\s*/m', '* ', $logistic);
@@ -351,8 +354,8 @@ function viator_get_product_details($product_code) {
                                     })));
                                 }
                                 
-                                // Remove códigos de identificação como 'NONE' e 'PICKUP_EVERYONE' seguidos de números
-                                $instruction = preg_replace('/^(NONE|PICKUP_EVERYONE|PICKUP_POINT|PICKUP_HOTEL)\s+\d*\s*\*?\s*/i', '', $instruction);
+                                // Remove códigos de identificação como 'NONE', 'PICKUP_EVERYONE', 'PICKUP_AND_MEET_AT_START_POINT' seguidos de números
+                                $instruction = preg_replace('/^(NONE|PICKUP_EVERYONE|PICKUP_POINT|PICKUP_HOTEL|PICKUP_AND_MEET_AT_START_POINT)\s+\d+(?:\s+\d+)?\s*\*?\s*/i', '', $instruction);
                                 
                                 // Preserva os marcadores de lista (*) no início das linhas
                                 $instruction = preg_replace('/^\*\s*/m', '* ', $instruction);
@@ -416,7 +419,24 @@ function viator_get_product_details($product_code) {
                 <h2>Política de Cancelamento</h2>
                 <?php 
                 if (is_array($cancellation_policy)) {
-                    $cancellation_policy = implode(" ", $cancellation_policy);
+                    // Process each element of the array to extract only the relevant text
+                    $processed_policy = [];
+                    foreach ($cancellation_policy as $policy) {
+                        if (is_string($policy)) {
+                            // Remove 'STANDARD' prefix and any numbers or technical codes
+                            $clean_policy = preg_replace('/^STANDARD\s*/', '', $policy);
+                            // Remove any trailing numbers or 'Array' text
+                            $clean_policy = preg_replace('/\s+\d+\s+\d+\s+Array$/', '', $clean_policy);
+                            if (!empty($clean_policy)) {
+                                $processed_policy[] = $clean_policy;
+                            }
+                        }
+                    }
+                    $cancellation_policy = implode(" ", $processed_policy);
+                } elseif (is_string($cancellation_policy)) {
+                    // Also clean up if it's already a string
+                    $cancellation_policy = preg_replace('/^STANDARD\s*/', '', $cancellation_policy);
+                    $cancellation_policy = preg_replace('/\s+\d+\s+\d+\s+Array$/', '', $cancellation_policy);
                 }
                 echo wpautop(esc_html($cancellation_policy)); 
                 ?>
@@ -429,7 +449,51 @@ function viator_get_product_details($product_code) {
                 <h2>Idiomas Disponíveis</h2>
                 <ul>
                     <?php foreach ($language_guides as $language): ?>
-                        <li><?php echo esc_html($language); ?></li>
+                        <li>
+                            <?php 
+                            // Check if language is an array and convert it to string if needed
+                            if (is_array($language)) {
+                                $language = implode(" ", array_map('strval', array_filter($language, function($item) {
+                                    return !is_array($item);
+                                })));
+                            }
+                            
+                            // Convert language code to user-friendly name
+                            // Extract just the language code (pt, en, es, etc.) from strings like 'GUIDE pt pt/SERVICE_GUIDE'
+                            if (preg_match('/GUIDE\s+(\w+)\s+\w+\/SERVICE_GUIDE/i', $language, $matches)) {
+                                $language_code = strtolower($matches[1]);
+                            } else {
+                                $language_code = strtolower(preg_replace('/GUIDE\s+|\s*\/.*$/i', '', $language));
+                            }
+                            $language_names = [
+                                'pt' => 'Português',
+                                'en' => 'Inglês',
+                                'es' => 'Espanhol',
+                                'fr' => 'Francês',
+                                'de' => 'Alemão',
+                                'it' => 'Italiano',
+                                'ru' => 'Russo',
+                                'ja' => 'Japonês',
+                                'zh' => 'Chinês',
+                                'ko' => 'Coreano',
+                                'nl' => 'Holandês',
+                                'sv' => 'Sueco',
+                                'da' => 'Dinamarquês',
+                                'no' => 'Norueguês',
+                                'fi' => 'Finlandês',
+                                'pl' => 'Polonês',
+                                'tr' => 'Turco',
+                                'ar' => 'Árabe',
+                                'he' => 'Hebraico',
+                                'th' => 'Tailandês',
+                                'cs' => 'Tcheco',
+                                'hu' => 'Húngaro',
+                                'el' => 'Grego'
+                            ];
+                            
+                            echo esc_html(isset($language_names[$language_code]) ? $language_names[$language_code] : $language);
+                            ?>
+                        </li>
                     <?php endforeach; ?>
                 </ul>
             </div>
