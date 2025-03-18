@@ -109,6 +109,8 @@ function viator_get_product_details($product_code) {
     
     // Get duration
     $duration = 'Duração não disponível';
+    
+    // Primeiro tenta obter a duração da resposta da API do produto
     if (isset($product['duration']['fixedDurationInMinutes'])) {
         $minutes = $product['duration']['fixedDurationInMinutes'];
         if ($minutes >= 1440) { // 24 hours or more
@@ -127,6 +129,100 @@ function viator_get_product_details($product_code) {
             $remaining_minutes = $minutes % 60;
             $duration = $hours . ' hora' . ($hours != 1 ? 's' : '') . 
                        ($remaining_minutes > 0 ? ' e ' . $remaining_minutes . ' minuto' . ($remaining_minutes != 1 ? 's' : '') : '');
+        }
+    } else {
+        // Se não encontrar na resposta da API, tenta obter dos dados armazenados
+        $stored_data = get_option('viator_product_' . $product_code . '_price');
+        
+        if ($stored_data && isset($stored_data['duration']) && $stored_data['duration'] !== 'Duração não disponível') {
+            // Usa a duração formatada que foi armazenada durante a pesquisa
+            $duration = $stored_data['duration'];
+        } elseif ($stored_data && isset($stored_data['duration_data'])) {
+            // Se tiver os dados brutos de duração, formata usando a mesma lógica dos cards
+            $duration_data = $stored_data['duration_data'];
+            $duration_fixed = $duration_data['fixedDurationInMinutes'];
+            $duration_from = $duration_data['variableDurationFromMinutes'];
+            $duration_to = $duration_data['variableDurationToMinutes'];
+            $unstructured_duration = $duration_data['unstructuredDuration'];
+            
+            if ($duration_fixed === 0) {
+                // Caso específico para duração flexível
+                $duration = 'Flexível';
+            } elseif ($unstructured_duration !== null) {
+                // Se tiver unstructuredDuration, define como 1 hora
+                $duration = '1 hora';
+            } elseif ($duration_fixed !== null) {
+                if ($duration_fixed >= 1440) { // 24 horas = 1440 minutos
+                    $days = floor($duration_fixed / 1440); // Calcula os dias
+                    $remaining_minutes = $duration_fixed % 1440; // Minutos restantes
+                    $hours = floor($remaining_minutes / 60); // Horas restantes
+                    
+                    $duration = $days . ' dia' . ($days != 1 ? 's' : '');
+                    if ($hours > 0) {
+                        $duration .= ' e ' . $hours . ' hora' . ($hours != 1 ? 's' : '');
+                    }
+                } elseif ($duration_fixed < 60) {
+                    $duration = $duration_fixed . ' minutos';
+                } else {
+                    $hours = floor($duration_fixed / 60);
+                    $minutes = $duration_fixed % 60;
+                    $duration = $hours . ' hora' . ($hours != 1 ? 's' : '') . ($minutes > 0 ? ' e ' . $minutes . ' minuto' . ($minutes != 1 ? 's' : '') : '');
+                }
+            } elseif ($duration_from !== null && $duration_to !== null) {
+                // Duração variável
+                if ($duration_to >= 1440) {
+                    $days_from = floor($duration_from / 1440);
+                    $days_to = floor($duration_to / 1440);
+                    
+                    if ($days_from == $days_to) {
+                        $duration = $days_from . ' dia' . ($days_from != 1 ? 's' : '');
+                    } else {
+                        $duration = 'De ' . $days_from . ' a ' . $days_to . ' dia' . ($days_to != 1 ? 's' : '');
+                    }
+                } elseif ($duration_to < 60) {
+                    // Ambos os valores em minutos - Formato simplificado
+                    if ($duration_from < 60 && $duration_to < 60) {
+                        $duration = 'De ' . $duration_from . ' a ' . $duration_to . ' minuto' . ($duration_to != 1 ? 's' : '');
+                    } else {
+                        $duration = 'De ' . $duration_from . ' minuto' . ($duration_from != 1 ? 's' : '') . 
+                                ' a ' . $duration_to . ' minuto' . ($duration_to != 1 ? 's' : '');
+                    }
+                } else {
+                    // Verifica se ambos os valores são múltiplos de 60 (sem minutos extras)
+                    $is_from_multiple_of_60 = ($duration_from % 60 === 0);
+                    $is_to_multiple_of_60 = ($duration_to % 60 === 0);
+
+                    if ($is_from_multiple_of_60 && $is_to_multiple_of_60) {
+                        // Exibe de forma simplificada (ex: "De 1 a 2 horas")
+                        $hours_from = floor($duration_from / 60);
+                        $hours_to = floor($duration_to / 60);
+                        $duration = 'De ' . $hours_from . ' a ' . $hours_to . ' hora' . ($hours_to != 1 ? 's' : '');
+                    } else {
+                        // Formata o valor inicial (duration_from)
+                        if ($duration_from < 60) {
+                            $duration_from_formatted = $duration_from . ' minuto' . ($duration_from != 1 ? 's' : '');
+                        } else {
+                            $hours_from = floor($duration_from / 60);
+                            $minutes_from = $duration_from % 60;
+                            $duration_from_formatted = $hours_from . ' hora' . ($hours_from != 1 ? 's' : '') . 
+                                ($minutes_from > 0 ? ' e ' . $minutes_from . ' minuto' . ($minutes_from != 1 ? 's' : '') : '');
+                        }
+
+                        // Formata o valor final (duration_to)
+                        if ($duration_to < 60) {
+                            $duration_to_formatted = $duration_to . ' minuto' . ($duration_to != 1 ? 's' : '');
+                        } else {
+                            $hours_to = floor($duration_to / 60);
+                            $minutes_to = $duration_to % 60;
+                            $duration_to_formatted = $hours_to . ' hora' . ($hours_to != 1 ? 's' : '') . 
+                                ($minutes_to > 0 ? ' e ' . $minutes_to . ' minuto' . ($minutes_to != 1 ? 's' : '') : '');
+                        }
+
+                        // Combina os valores formatados
+                        $duration = 'De ' . $duration_from_formatted . ' a ' . $duration_to_formatted;
+                    }
+                }
+            }
         }
     }
     

@@ -787,13 +787,20 @@ function viator_get_search_results($searchTerm) {
                 <p class="viator-card-price"><img src="https://img.icons8.com/?size=100&id=ZXJaNFNjWGZF&format=png&color=000000" alt="Preço" width="15" height="15"> a partir de ' . $price_html . '</p>                
                 <a href="' . esc_url(home_url('/produto-unico/') . '?product_code=' . $tour['productCode']) . '">Ver detalhes</a>';
                 
-                // Armazenar informações de preço para uso na página de detalhes do produto
-                $product_price_data = array(
+                // Armazenar informações de preço e duração para uso na página de detalhes do produto
+                $product_data = array(
                     'fromPrice' => isset($tour['pricing']['summary']['fromPrice']) ? $tour['pricing']['summary']['fromPrice'] : null,
                     'fromPriceBeforeDiscount' => isset($tour['pricing']['summary']['fromPriceBeforeDiscount']) ? $tour['pricing']['summary']['fromPriceBeforeDiscount'] : null,
-                    'flags' => $flags
+                    'flags' => $flags,
+                    'duration' => $duration,
+                    'duration_data' => array(
+                        'fixedDurationInMinutes' => $duration_fixed,
+                        'variableDurationFromMinutes' => $duration_from,
+                        'variableDurationToMinutes' => $duration_to,
+                        'unstructuredDuration' => $unstructured_duration
+                    )
                 );
-                update_option('viator_product_' . $tour['productCode'] . '_price', $product_price_data, false);
+                update_option('viator_product_' . $tour['productCode'] . '_price', $product_data, false);
                 
                 $output .= "
             </div>
