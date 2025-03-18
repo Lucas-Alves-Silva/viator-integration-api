@@ -821,12 +821,31 @@ function viator_get_product_details($product_code) {
                                 })));
                             }
                             
-                            // Convert language code to user-friendly name
-                            // Extract just the language code (pt, en, es, etc.) from strings like 'GUIDE pt pt/SERVICE_GUIDE'
+                            // Convert language code to user-friendly name and determine service type
+                            $service_type = '';
+                            $language_code = '';
+                            
+                            // Check for GUIDE format
                             if (preg_match('/GUIDE\s+(\w+)\s+\w+\/SERVICE_GUIDE/i', $language, $matches)) {
                                 $language_code = strtolower($matches[1]);
-                            } else {
-                                $language_code = strtolower(preg_replace('/GUIDE\s+|\s*\/.*$/i', '', $language));
+                                $service_type = 'Guia';
+                            }
+                            // Check for WRITTEN format
+                            elseif (preg_match('/WRITTEN\s+(\w+)\s+\w+\/SERVICE_WRITTEN/i', $language, $matches)) {
+                                $language_code = strtolower($matches[1]);
+                                $service_type = 'Escrita';
+                            }
+                            // Default fallback for other formats
+                            else {
+                                // Remove service type prefix and suffix
+                                $language_code = strtolower(preg_replace('/(?:GUIDE|WRITTEN)\s+|\s*\/.*$/i', '', $language));
+                                
+                                // Try to determine service type from the string
+                                if (stripos($language, 'GUIDE') !== false) {
+                                    $service_type = 'Guia';
+                                } elseif (stripos($language, 'WRITTEN') !== false) {
+                                    $service_type = 'Escrita';
+                                }
                             }
                             $language_names = [
                                 'pt' => 'Português',
@@ -854,7 +873,12 @@ function viator_get_product_details($product_code) {
                                 'el' => 'Grego'
                             ];
                             
-                            echo esc_html(isset($language_names[$language_code]) ? $language_names[$language_code] : $language);
+                            // Display language name with service type in parentheses if available
+                            $display_name = isset($language_names[$language_code]) ? $language_names[$language_code] : $language;
+                            if (!empty($service_type)) {
+                                $display_name .= ' (' . $service_type . ')';
+                            }
+                            echo esc_html($display_name);
                             ?>
                         </li>
                     <?php endforeach; ?>
