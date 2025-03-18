@@ -440,7 +440,7 @@ function viator_get_product_details($product_code) {
     
                     <!-- Price Section -->
                     <div class="viator-product-price-section">
-                        <?php if (!empty($original_price)): ?>
+                        <?php if (!empty($original_price) && $is_special_offer): ?>
                             <div class="viator-product-original-price"><?php echo esc_html($original_price); ?></div>
                         <?php endif; ?>
                         <div class="viator-product-price"><?php echo esc_html($price); ?></div>
