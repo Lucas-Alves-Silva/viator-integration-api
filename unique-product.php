@@ -397,11 +397,43 @@ function viator_get_product_details($product_code) {
                             <?php if (is_array($inclusion) && (isset($inclusion['otherDescription']) || isset($inclusion['description']))): ?>
                                 <li>
                                 <?php 
+                                    // Obter a descrição da inclusão
+                                    $inclusion_text = '';
                                     if (isset($inclusion['otherDescription'])) {
-                                        echo esc_html($inclusion['otherDescription']);
+                                        $inclusion_text = $inclusion['otherDescription'];
                                     } elseif (isset($inclusion['description'])) {
-                                        echo esc_html($inclusion['description']);
+                                        $inclusion_text = $inclusion['description'];
                                     }
+                                    
+                                    // Dicionário de traduções para inclusões comuns
+                                    $inclusion_translations = [
+                                        'Local guide' => 'Guia local',
+                                        'Professional guide' => 'Guia profissional',
+                                        'Hotel pickup and drop-off' => 'Serviço de busca e entrega no hotel',
+                                        'Hotel pickup and drop-off (selected hotels only)' => 'Serviço de busca e entrega no hotel (apenas hotéis selecionados)',
+                                        'Transport by air-conditioned coach' => 'Transporte em ônibus com ar-condicionado',
+                                        'Transport by air-conditioned minivan' => 'Transporte em van com ar-condicionado',
+                                        'Entry/Admission' => 'Entrada/Ingresso',
+                                        'All taxes, fees and handling charges' => 'Todos os impostos, taxas e encargos',
+                                        'Bottled water' => 'Água engarrafada',
+                                        'Coffee and/or Tea' => 'Café e/ou chá',
+                                        'Alcoholic Beverages' => 'Bebidas alcoólicas',
+                                        'Snacks' => 'Lanches',
+                                        'Lunch' => 'Almoço',
+                                        'Dinner' => 'Jantar',
+                                        'Breakfast' => 'Café da manhã',
+                                        'WiFi on board' => 'WiFi a bordo',
+                                        'Gratuities' => 'Gorjetas',
+                                        'Private tour' => 'Tour privado',
+                                        'Small-group tour' => 'Tour em pequeno grupo',
+                                        'Use of bicycle' => 'Uso de bicicleta',
+                                        'Use of helmet' => 'Uso de capacete'
+                                    ];
+                                    
+                                    // Verificar se a inclusão tem uma tradução disponível
+                                    echo esc_html(isset($inclusion_translations[$inclusion_text]) ? 
+                                        $inclusion_translations[$inclusion_text] : 
+                                        $inclusion_text);
                                 ?>
                                 </li>
                             <?php endif; ?>
@@ -417,11 +449,38 @@ function viator_get_product_details($product_code) {
                             <?php if (is_array($exclusion) && (isset($exclusion['otherDescription']) || isset($exclusion['description']))): ?>
                                 <li>
                                 <?php 
+                                    // Obter a descrição da exclusão
+                                    $exclusion_text = '';
                                     if (isset($exclusion['otherDescription'])) {
-                                        echo esc_html($exclusion['otherDescription']);
+                                        $exclusion_text = $exclusion['otherDescription'];
                                     } elseif (isset($exclusion['description'])) {
-                                        echo esc_html($exclusion['description']);
+                                        $exclusion_text = $exclusion['description'];
                                     }
+                                    
+                                    // Dicionário de traduções para exclusões comuns
+                                    $exclusion_translations = [
+                                        'Food and drinks' => 'Comidas e bebidas',
+                                        'Drinks' => 'Bebidas',
+                                        'Food' => 'Comida',
+                                        'Alcoholic drinks' => 'Bebidas alcoólicas',
+                                        'Gratuities' => 'Gorjetas',
+                                        'Hotel pickup and drop-off' => 'Serviço de busca e entrega no hotel',
+                                        'Transportation to/from attractions' => 'Transporte de/para atrações',
+                                        'Souvenir photos' => 'Fotos de lembrança',
+                                        'DVD (available to purchase)' => 'DVD (disponível para compra)',
+                                        'Entrance fees' => 'Taxas de entrada',
+                                        'Lunch' => 'Almoço',
+                                        'Dinner' => 'Jantar',
+                                        'Breakfast' => 'Café da manhã',
+                                        'Guide' => 'Guia',
+                                        'Hotel drop-off' => 'Entrega no hotel',
+                                        'Hotel pickup' => 'Busca no hotel'
+                                    ];
+                                    
+                                    // Verificar se a exclusão tem uma tradução disponível
+                                    echo esc_html(isset($exclusion_translations[$exclusion_text]) ? 
+                                        $exclusion_translations[$exclusion_text] : 
+                                        $exclusion_text);
                                 ?>
                                 </li>
                             <?php endif; ?>
@@ -436,7 +495,26 @@ function viator_get_product_details($product_code) {
             <div class="viator-additional-info-section">
                 <h2>Informações Adicionais</h2>
                 <div class="viator-additional-info">
-                    <?php foreach ($additional_info as $info): ?>
+                    <?php 
+                    // Agrupar informações adicionais por tipo
+                    $grouped_info = [];
+                    $other_info = [];
+                    
+                    // Separar os tipos 'OTHER' dos demais tipos
+                    foreach ($additional_info as $info) {
+                        if (isset($info['type']) && isset($info['description'])) {
+                            if ($info['type'] === 'OTHER') {
+                                $other_info[] = $info;
+                            } else {
+                                $grouped_info[] = $info;
+                            }
+                        }
+                    }
+                    
+                    // Adicionar os tipos 'OTHER' ao final
+                    $grouped_info = array_merge($grouped_info, $other_info);
+                    
+                    foreach ($grouped_info as $info): ?>
                         <?php if (isset($info['type']) && isset($info['description'])): ?>
                             <div class="viator-info-section">
                                 <div class="viator-info-icon">
@@ -452,6 +530,7 @@ function viator_get_product_details($product_code) {
                                         'PHYSICAL_STRENUOUS' => '🏃',
                                         'WHEELCHAIR_ACCESSIBLE' => '♿',
                                         'TRANSPORTATION_WHEELCHAIR_ACCESSIBLE' => '♿',
+                                        'SURFACES_WHEELCHAIR_ACCESSIBLE' => '<img width="30" height="30" src="https://img.icons8.com/plasticine/30/wheelchair-ramp.png" alt="wheelchair-ramp"/>',
                                         'INFANT_FRIENDLY' => '🍼',
                                         'INFANT_SEATS_AVAILABLE' => '👶',
                                         'INFANTS_MUST_SIT_ON_LAPS' => '<img width="48" height="48" src="https://img.icons8.com/color/48/tummy-time.png" alt="tummy-time"/>',
@@ -503,7 +582,26 @@ function viator_get_product_details($product_code) {
                                         echo esc_html(isset($info_types_pt[$info_type]) ? $info_types_pt[$info_type] : $info_type);
                                         ?>
                                     </div>
-                                    <div class="viator-info-description"><?php echo esc_html($info['description']); ?></div>
+                                    <div class="viator-info-description">
+                                        <?php 
+                                        // Dicionário de traduções para descrições comuns
+                                        $description_translations = [
+                                            'Service animals allowed' => 'Animais de serviço permitidos',
+                                            'Infants are required to sit on an adult\'s lap' => 'Bebês devem sentar no colo de um adulto',
+                                            'Suitable for all physical fitness levels' => 'Adequado para todos os níveis de condicionamento físico',
+                                            'Child rate applies only when sharing with 2 paying adults' => 'Tarifa infantil aplicável apenas quando compartilhando com 2 adultos pagantes',
+                                            'Children must be accompanied by an adult' => 'Crianças devem estar acompanhadas por um adulto',
+                                            // Adicione mais traduções conforme necessário
+                                        ];
+                                        
+                                        // Verificar se a descrição tem uma tradução disponível
+                                        $description = isset($description_translations[$info['description']]) ? 
+                                            $description_translations[$info['description']] : 
+                                            $info['description'];
+                                            
+                                        echo esc_html($description);
+                                        ?>
+                                    </div>
                                 </div>
                             </div>
                         <?php endif; ?>
