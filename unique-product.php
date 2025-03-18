@@ -376,6 +376,9 @@ function viator_get_product_details($product_code) {
             <?php endif; ?>
             <span><?php echo esc_html($title); ?></span>
         </div>
+        
+        <!-- Título do produto -->
+        <h1><?php echo esc_html($title); ?></h1>
     
         <div class="viator-product-container">
             <!-- Image Gallery -->
@@ -399,8 +402,6 @@ function viator_get_product_details($product_code) {
             <div class="viator-product-info-container">
                 <!-- Product Header -->
                 <div class="viator-product-header">
-                    <h1><?php echo esc_html($title); ?></h1>
-                    
                     <!-- Rating and Reviews -->
                     <?php if ($rating > 0): ?>
                         <div class="viator-product-rating">
