@@ -11,6 +11,69 @@ if (!defined('ABSPATH')) {
 }
 
 /**
+ * Modifica o título da página para mostrar o título do produto Viator
+ */
+function viator_modify_page_title($title, $sep = '|') {
+    global $post;
+    
+    // Verifica se estamos em uma página ou post com o shortcode viator_product
+    if (is_a($post, 'WP_Post') && has_shortcode($post->post_content, 'viator_product')) {
+        // Obtém o código do produto da URL
+        $product_code = isset($_GET['product_code']) ? sanitize_text_field($_GET['product_code']) : '';
+        
+        // Se tiver um código de produto, busca o título do produto
+        if (!empty($product_code)) {
+            // Tenta obter o título do produto do cache
+            $cached_title = get_transient('viator_product_' . $product_code . '_title');
+            
+            if ($cached_title) {
+                // Retorna o título do produto + separador + nome do site
+                return esc_html($cached_title) . ' ' . $sep . ' ' . get_bloginfo('name');
+            } else {
+                // Se não tiver no cache, busca diretamente da API
+                $api_key = get_option('viator_api_key');
+                if (!empty($api_key)) {
+                    $url = "https://api.sandbox.viator.com/partner/products/{$product_code}";
+                    $response = wp_remote_get($url, [
+                        'headers' => [
+                            'Accept'           => 'application/json;version=2.0',
+                            'Content-Type'     => 'application/json;version=2.0',
+                            'exp-api-key'      => $api_key,
+                            'Accept-Language'  => 'pt-BR',
+                        ],
+                        'timeout' => 10, // Timeout reduzido para não atrasar muito o carregamento da página
+                    ]);
+                    
+                    if (!is_wp_error($response)) {
+                        $body = wp_remote_retrieve_body($response);
+                        $product = json_decode($body, true);
+                        
+                        if (!empty($product) && isset($product['title'])) {
+                            // Armazena o título no cache para futuras requisições
+                            set_transient('viator_product_' . $product_code . '_title', $product['title'], DAY_IN_SECONDS);
+                            return esc_html($product['title']) . ' ' . $sep . ' ' . get_bloginfo('name');
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Se não for uma página de produto ou não conseguir obter o título, retorna o título padrão
+    return $title;
+}
+// Aumenta a prioridade dos filtros para garantir que eles sejam executados antes das configurações de links permanentes
+add_filter('wp_title', 'viator_modify_page_title', 1, 2);
+add_filter('pre_get_document_title', 'viator_modify_page_title', 1, 2);
+add_filter('document_title_parts', function($title_parts) {
+    $custom_title = viator_modify_page_title(implode(' | ', $title_parts), '|');
+    if ($custom_title !== implode(' | ', $title_parts)) {
+        return ['title' => $custom_title];
+    }
+    return $title_parts;
+}, 1);
+
+/**
  * Register the shortcode for product details
  */
 function viator_product_detail_shortcode($atts) {
@@ -74,6 +137,11 @@ function viator_get_product_details($product_code) {
     
     // Get main product details
     $title = isset($product['title']) ? esc_html($product['title']) : 'Título não disponível';
+    
+    // Armazena o título do produto em cache para uso na função de título da página
+    if (isset($product['title'])) {
+        set_transient('viator_product_' . $product_code . '_title', $product['title'], DAY_IN_SECONDS);
+    }
     $description = isset($product['description']) ? esc_html($product['description']) : 'Descrição não disponível';
     $rating = isset($product['reviews']['combinedAverageRating']) ? number_format($product['reviews']['combinedAverageRating'], 1) : 0;
     $review_count = isset($product['reviews']['totalReviews']) ? intval($product['reviews']['totalReviews']) : 0;
@@ -654,6 +722,7 @@ function viator_get_product_details($product_code) {
                                             'PETS_WELCOME' => 'Animais de Serviço Permitidos',
                                             'PUBLIC_TRANSPORTATION_NEARBY' => 'Transporte Público Próximo',
                                             'PHYSICAL_EASY' => 'Adequado para Todos os Níveis de Condicionamento Físico',
+                                            'PHYSICAL_MEDIUM' => 'Nível Médio de Atividade Física',
                                             'PHYSICAL_MODERATE' => 'Nível Moderado de Atividade Física',
                                             'PHYSICAL_STRENUOUS' => 'Nível Intenso de Atividade Física',
                                             'WHEELCHAIR_ACCESSIBLE' => 'Acessível para Cadeirantes',
