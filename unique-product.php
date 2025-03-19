@@ -836,6 +836,11 @@ function viator_get_product_details($product_code) {
                                 $language_code = strtolower($matches[1]);
                                 $service_type = 'Escrita';
                             }
+                            // Check for AUDIO format
+                            elseif (preg_match('/AUDIO\s+(\w+)\s+\w+\/SERVICE_AUDIO/i', $language, $matches)) {
+                                $language_code = strtolower($matches[1]);
+                                $service_type = 'Áudio Guia';
+                            }
                             // Default fallback for other formats
                             else {
                                 // Remove service type prefix and suffix
@@ -843,9 +848,11 @@ function viator_get_product_details($product_code) {
                                 
                                 // Try to determine service type from the string
                                 if (stripos($language, 'GUIDE') !== false) {
-                                    $service_type = 'Guia';
+                                    $service_type = 'Guia Presencial';
                                 } elseif (stripos($language, 'WRITTEN') !== false) {
-                                    $service_type = 'Escrita';
+                                    $service_type = 'Guia Escrito';
+                                } else {
+                                    $service_type = 'Áudio Guia';
                                 }
                             }
                             $language_names = [
@@ -858,6 +865,7 @@ function viator_get_product_details($product_code) {
                                 'ru' => 'Russo',
                                 'ja' => 'Japonês',
                                 'zh' => 'Chinês',
+                                'cmn' => 'Mandarim',
                                 'ko' => 'Coreano',
                                 'nl' => 'Holandês',
                                 'sv' => 'Sueco',
