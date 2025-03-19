@@ -904,3 +904,11 @@ function viator_get_product_details($product_code) {
     $output = ob_get_clean();
     return $output;
 }
+
+/**
+ * Add timezone formatter script
+ */
+function viator_enqueue_timezone_script() {
+    wp_enqueue_script('timezone-formatter', plugin_dir_url(__FILE__) . 'timezone-formatter.js', array('jquery'), '1.0.0', true);
+}
+add_action('wp_enqueue_scripts', 'viator_enqueue_timezone_script');
