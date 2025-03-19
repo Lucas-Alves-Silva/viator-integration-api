@@ -785,7 +785,7 @@ function viator_get_search_results($searchTerm) {
 
         $output .= '<p class="viator-card-duration"><img src="https://img.icons8.com/?size=100&id=82767&format=png&color=000000" alt="Duração" title="Duração aproximada" width="15" height="15"> ' . $duration . '</p>
                 <p class="viator-card-price"><img src="https://img.icons8.com/?size=100&id=ZXJaNFNjWGZF&format=png&color=000000" alt="Preço" width="15" height="15"> a partir de ' . $price_html . '</p>                
-                <a href="' . esc_url(home_url('/produto-unico/') . '?product_code=' . $tour['productCode']) . '">Ver detalhes</a>';
+                <a href="' . esc_url(home_url('/produto-unico/') . '?product_code=' . $tour['productCode']) . '" target="_blank" rel="noopener noreferrer">Ver detalhes</a>';
                 
                 // Armazenar informações de preço e duração para uso na página de detalhes do produto
                 $product_data = array(
