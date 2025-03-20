@@ -829,12 +829,12 @@ function viator_get_product_details($product_code) {
                             // Check for GUIDE format
                             if (preg_match('/GUIDE\s+(\w+)\s+\w+\/SERVICE_GUIDE/i', $language, $matches)) {
                                 $language_code = strtolower($matches[1]);
-                                $service_type = 'Guia';
+                                $service_type = 'Guia Presencial';
                             }
                             // Check for WRITTEN format
                             elseif (preg_match('/WRITTEN\s+(\w+)\s+\w+\/SERVICE_WRITTEN/i', $language, $matches)) {
                                 $language_code = strtolower($matches[1]);
-                                $service_type = 'Escrita';
+                                $service_type = 'Guia Escrito';
                             }
                             // Check for AUDIO format
                             elseif (preg_match('/AUDIO\s+(\w+)\s+\w+\/SERVICE_AUDIO/i', $language, $matches)) {
