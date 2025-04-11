@@ -782,14 +782,18 @@ function viator_get_product_details($product_code) {
             <div class="viator-cancellation-section">
                 <h2>Política de Cancelamento</h2>
                 <?php 
-                if (is_array($cancellation_policy)) {
-                    // Process each element of the array to extract only the relevant text
+                // Verifica se a política de cancelamento está no formato esperado com type e description
+                if (isset($cancellation_policy['description'])) {
+                    // Exibe apenas a descrição da política de cancelamento
+                    echo wpautop(esc_html($cancellation_policy['description']));
+                } elseif (is_array($cancellation_policy)) {
+                    // Processo legado para outros formatos de array
                     $processed_policy = [];
                     foreach ($cancellation_policy as $policy) {
                         if (is_string($policy)) {
-                            // Remove 'STANDARD' prefix and any numbers or technical codes
-                            $clean_policy = preg_replace('/^STANDARD\s*/', '', $policy);
-                            // Remove any trailing numbers or 'Array' text
+                            // Remove 'STANDARD' prefix e outros códigos técnicos
+                            $clean_policy = preg_replace('/^(STANDARD|ALL_SALES_FINAL|FREE_CANCELLATION|[A-Z_]+)\s*/', '', $policy);
+                            // Remove qualquer número ou texto 'Array' no final
                             $clean_policy = preg_replace('/\s+\d+\s+\d+\s+Array$/', '', $clean_policy);
                             if (!empty($clean_policy)) {
                                 $processed_policy[] = $clean_policy;
@@ -797,12 +801,13 @@ function viator_get_product_details($product_code) {
                         }
                     }
                     $cancellation_policy = implode(" ", $processed_policy);
+                    echo wpautop(esc_html($cancellation_policy));
                 } elseif (is_string($cancellation_policy)) {
-                    // Also clean up if it's already a string
-                    $cancellation_policy = preg_replace('/^STANDARD\s*/', '', $cancellation_policy);
-                    $cancellation_policy = preg_replace('/\s+\d+\s+\d+\s+Array$/', '', $cancellation_policy);
+                    // Limpa códigos técnicos se já for uma string
+                    $clean_policy = preg_replace('/^(STANDARD|ALL_SALES_FINAL|FREE_CANCELLATION|[A-Z_]+)\s*/', '', $cancellation_policy);
+                    $clean_policy = preg_replace('/\s+\d+\s+\d+\s+Array$/', '', $clean_policy);
+                    echo wpautop(esc_html($clean_policy));
                 }
-                echo wpautop(esc_html($cancellation_policy)); 
                 ?>
             </div>
         <?php endif; ?>
