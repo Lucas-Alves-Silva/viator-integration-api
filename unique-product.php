@@ -18,8 +18,11 @@ function viator_modify_page_title($title, $sep = '|') {
     
     // Verifica se estamos em uma página ou post com o shortcode viator_product
     if (is_a($post, 'WP_Post') && has_shortcode($post->post_content, 'viator_product')) {
-        // Obtém o código do produto da URL
-        $product_code = isset($_GET['product_code']) ? sanitize_text_field($_GET['product_code']) : '';
+        // Obtém o código do produto da URL (suporta tanto o formato antigo quanto o novo)
+        $product_code = get_query_var('product_code', '');
+        if (empty($product_code)) {
+            $product_code = isset($_GET['product_code']) ? sanitize_text_field($_GET['product_code']) : '';
+        }
         
         // Se tiver um código de produto, busca o título do produto
         if (!empty($product_code)) {
@@ -84,7 +87,15 @@ function viator_product_detail_shortcode($atts) {
     
     // If no product code is provided in the shortcode, check URL parameter
     if (empty($atts['product_code'])) {
-        $atts['product_code'] = isset($_GET['product_code']) ? sanitize_text_field($_GET['product_code']) : '';
+        // Primeiro verifica se está usando o novo formato de URL
+        $product_code = get_query_var('product_code', '');
+        
+        // Se não encontrar, verifica o formato antigo com parâmetro de consulta
+        if (empty($product_code)) {
+            $product_code = isset($_GET['product_code']) ? sanitize_text_field($_GET['product_code']) : '';
+        }
+        
+        $atts['product_code'] = $product_code;
     }
     
     // If still no product code, show error message
@@ -408,7 +419,7 @@ function viator_get_product_details($product_code) {
                     <span class="product-code-tooltip" style="position: relative; cursor: help; margin-bottom: 10px; display: inline-block;">
                         Código do produto: <strong><?php echo esc_html($product_code); ?></strong>
                         <span class="tooltip-text">
-                            Informe esse código ao suporte.
+                        Cite este código de produto ao falar com o suporte ao cliente.
                         </span>
                     </span>
                     
