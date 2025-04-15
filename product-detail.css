@@ -361,3 +361,31 @@
         grid-template-columns: 1fr;
     }
 }
+
+.product-code-tooltip {
+    font-size: .9rem;
+    position: relative;
+    cursor: help;
+    display: inline-block;
+}
+.product-code-tooltip .tooltip-text {
+    font-size: .9rem;
+    visibility: hidden;
+    width: 300px;
+    background-color: #0B1543;
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    padding: 5px;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    margin-left: -100px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+.product-code-tooltip:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}

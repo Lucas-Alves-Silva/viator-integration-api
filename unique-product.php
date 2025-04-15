@@ -367,14 +367,16 @@ function viator_get_product_details($product_code) {
     ?>
     <div class="viator-product-detail">
         <!-- Breadcrumbs -->
-        <div class="viator-breadcrumbs">
-            <a href="<?php echo esc_url(home_url()); ?>" target="_blank">Home</a> &gt; 
-            <?php if (!empty($destination)): ?>
-                <a href="<?php echo esc_url(add_query_arg('viator_query', urlencode($destination), home_url())); ?>" target="_blank">
-                    <?php echo esc_html($destination); ?>
-                </a> &gt; 
-            <?php endif; ?>
-            <span><?php echo esc_html($title); ?></span>
+        <div class="viator-breadcrumbs" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <a href="<?php echo esc_url(home_url()); ?>" target="_blank">Home</a> &gt; 
+                <?php if (!empty($destination)): ?>
+                    <a href="<?php echo esc_url(add_query_arg('viator_query', urlencode($destination), home_url())); ?>" target="_blank">
+                        <?php echo esc_html($destination); ?>
+                    </a> &gt; 
+                <?php endif; ?>
+                <span><?php echo esc_html($title); ?></span>
+            </div>
         </div>
         
         <!-- Título do produto -->
@@ -402,6 +404,14 @@ function viator_get_product_details($product_code) {
             <div class="viator-product-info-container">
                 <!-- Product Header -->
                 <div class="viator-product-header">
+                    <!-- Código do produto -->
+                    <span class="product-code-tooltip" style="position: relative; cursor: help; margin-bottom: 10px; display: inline-block;">
+                        Código do produto: <strong><?php echo esc_html($product_code); ?></strong>
+                        <span class="tooltip-text">
+                            Informe esse código ao suporte.
+                        </span>
+                    </span>
+                    
                     <!-- Rating and Reviews -->
                     <?php if ($rating > 0): ?>
                         <div class="viator-product-rating">
