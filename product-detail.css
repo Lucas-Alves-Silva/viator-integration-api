@@ -362,30 +362,65 @@
     }
 }
 
+/* --- Tooltip --- */
+/* O elemento que contém o texto e aciona o tooltip */
 .product-code-tooltip {
-    font-size: .9rem;
-    position: relative;
-    cursor: help;
-    display: inline-block;
-}
-.product-code-tooltip .tooltip-text {
-    font-size: .9rem;
-    visibility: hidden;
-    width: 300px;
-    background-color: #0B1543;
-    color: #fff;
-    text-align: center;
-    border-radius: 6px;
-    padding: 5px;
+    font-size: 0.9rem; /* Mantido, ajuste se necessário */
+    position: relative; /* Necessário para posicionar o tooltip */
+    display: inline-block; /* Para que o span se comporte como bloco mas flua inline */
+    border-bottom: 1px dashed #0b1543; /* Linha pontilhada sutil para indicar interatividade */
+    cursor: help; /* Cursor de ajuda */
+    color: #333; /* Cor do texto principal, ajuste conforme seu site */
+  }
+  
+  /* O container do texto do tooltip */
+  .product-code-tooltip .tooltip-text {
+    /* Visibilidade e Animação */
+    visibility: hidden; /* Escondido por padrão */
+    opacity: 0; /* Transparente por padrão */
+    transition: opacity 0.3s ease, transform 0.3s ease; /* Transição suave */
+  
+    /* Aparência */
+    background-color: #0b1543; /* Azul vibrante (cor primária comum, boa para turismo) */
+    color: #fff; /* Texto branco para contraste */
+    text-align: left; /* Alinhamento à esquerda (geralmente melhor para leitura) */
+    border-radius: 8px; /* Bordas mais arredondadas */
+    padding: 10px 15px; /* Mais espaçamento interno */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); /* Sombra suave para profundidade */
+    font-size: 0.85rem; /* Levemente menor que o texto principal */
+    font-weight: 400; /* Peso normal */
+    line-height: 1.4; /* Espaçamento entre linhas */
+  
+    /* Posicionamento */
     position: absolute;
-    z-index: 1;
-    bottom: 125%;
-    left: 50%;
-    margin-left: -100px;
-    opacity: 0;
-    transition: opacity 0.3s;
-}
-.product-code-tooltip:hover .tooltip-text {
-    visibility: visible;
-    opacity: 1;
-}
+    z-index: 10; /* Garante que fique sobre outros elementos */
+    bottom: 130%; /* Posição acima do elemento pai (com espaço para a seta) */
+    left: 50%; /* Centraliza horizontalmente */
+    transform: translateX(-50%) translateY(10px); /* Centraliza e move um pouco para baixo (para animação) */
+  
+    /* Tamanho */
+    min-width: 180px; /* Largura mínima */
+    max-width: 300px; /* Largura máxima */
+    width: max-content; /* Ajusta a largura ao conteúdo, até o max-width */
+    white-space: normal; /* Permite quebra de linha */
+  }
+  
+  /* Seta/Indicador do Tooltip */
+  .product-code-tooltip .tooltip-text::after {
+    content: ''; /* Necessário para pseudo-elementos */
+    position: absolute;
+    top: 100%; /* Posiciona abaixo do corpo do tooltip */
+    left: 50%; /* Centraliza horizontalmente */
+    margin-left: -6px; /* Metade da largura da seta para centralizar */
+    border-width: 6px; /* Tamanho da seta */
+    border-style: solid;
+    border-color: #0b1543 transparent transparent transparent; /* Cor da seta (mesma do fundo) e o resto transparente */
+    /* Se mudar a cor de fundo, mude aqui também */
+  }
+  
+  /* Efeito Hover: Mostrar o Tooltip */
+  .product-code-tooltip:hover .tooltip-text {
+    visibility: visible; /* Torna visível */
+    opacity: 1; /* Torna opaco */
+    transform: translateX(-50%) translateY(0); /* Move para a posição final (animação) */
+  }
