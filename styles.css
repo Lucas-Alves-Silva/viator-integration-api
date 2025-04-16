@@ -60,6 +60,7 @@
 .viator-review-count {
     color: #666;
     font-size: 14px;
+    text-decoration: underline !important;
 }
 
 .viator-product-flags {

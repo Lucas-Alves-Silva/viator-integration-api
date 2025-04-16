@@ -443,7 +443,7 @@ function viator_get_product_details($product_code) {
                                 ?>
                             </span>
                             <span class="viator-rating-number"><?php echo number_format($rating, 1); ?></span>
-                            <span class="viator-review-count">(<?php echo $review_count; ?> <?php echo $review_count == 1 ? 'avaliação' : 'avaliações'; ?>)</span>
+                            <a href="#viator-reviews" class="viator-review-count">(<?php echo $review_count; ?> <?php echo $review_count == 1 ? 'avaliação' : 'avaliações'; ?>)</a>
                         </div>
                     <?php endif; ?>
     
@@ -922,7 +922,7 @@ function viator_get_product_details($product_code) {
         <?php endif; ?>
     
         <!-- Reviews Section -->
-        <div class="viator-reviews">
+        <div id="viator-reviews" class="viator-reviews">
             <h2>Avaliações <span class="review-count">(<?php echo esc_html($review_count); ?> avaliações)</span></h2>
             
             <div class="viator-reviews-summary">
