@@ -921,6 +921,53 @@ function viator_get_product_details($product_code) {
             </div>
         <?php endif; ?>
     
+        <!-- Reviews Section -->
+        <div class="viator-reviews">
+            <h2>Avaliações <span class="review-count">(<?php echo esc_html($review_count); ?> avaliações)</span></h2>
+            
+            <div class="viator-reviews-summary">
+                <div class="viator-reviews-rating"><?php echo esc_html($rating); ?></div>
+                <div class="viator-reviews-stars">
+                    <?php 
+                    // Display stars based on rating
+                    $full_stars = floor($rating);
+                    $half_star = ($rating - $full_stars) >= 0.5;
+                    $empty_stars = 5 - $full_stars - ($half_star ? 1 : 0);
+                    
+                    // Output full stars
+                    for ($i = 0; $i < $full_stars; $i++) {
+                        echo '<span class="star">★</span>';
+                    }
+                    
+                    // Output half star if needed
+                    if ($half_star) {
+                        echo '<span class="star">★</span>';
+                    }
+                    
+                    // Output empty stars
+                    for ($i = 0; $i < $empty_stars; $i++) {
+                        echo '<span class="star" style="color: #ddd;">★</span>';
+                    }
+                    ?>
+                </div>
+            </div>
+            
+            <div class="viator-reviews-filter">
+                <button class="active" data-rating="all">Todas</button>
+                <button data-rating="5">5 estrelas</button>
+                <button data-rating="4">4 estrelas</button>
+                <button data-rating="3">3 estrelas</button>
+                <button data-rating="2">2 estrelas</button>
+                <button data-rating="1">1 estrela</button>
+            </div>
+            
+            <div class="viator-reviews-list" data-product-code="<?php echo esc_attr($product_code); ?>">
+                <div class="viator-reviews-loading">Carregando avaliações...</div>
+            </div>
+            
+            <div class="viator-reviews-pagination"></div>
+        </div>
+        
         <!-- Tags -->
         <?php if (!empty($tags)): ?>
             <div class="viator-tags">
@@ -940,9 +987,87 @@ function viator_get_product_details($product_code) {
 }
 
 /**
- * Add timezone formatter script
+ * Add timezone formatter script and reviews script
  */
-function viator_enqueue_timezone_script() {
+function viator_enqueue_product_scripts() {
     wp_enqueue_script('timezone-formatter', plugin_dir_url(__FILE__) . 'timezone-formatter.js', array('jquery'), '1.0.0', true);
+    
+    // Enqueue reviews script only on product pages
+    global $post;
+    if (is_a($post, 'WP_Post') && has_shortcode($post->post_content, 'viator_product')) {
+        wp_enqueue_script('viator-reviews', plugin_dir_url(__FILE__) . 'viator-reviews.js', array('jquery'), '1.0.0', true);
+        
+        // Add JavaScript variables
+        wp_localize_script('viator-reviews', 'viatorReviewsData', array(
+            'ajaxurl' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('viator_reviews_nonce')
+        ));
+    }
 }
-add_action('wp_enqueue_scripts', 'viator_enqueue_timezone_script');
+add_action('wp_enqueue_scripts', 'viator_enqueue_product_scripts');
+
+/**
+ * AJAX handler for fetching product reviews
+ */
+function viator_get_reviews_ajax() {
+    // Verify request
+    if (!isset($_POST['product_code']) || empty($_POST['product_code'])) {
+        wp_send_json_error(array('message' => 'Código do produto não fornecido.'));
+    }
+    
+    // Get API key
+    $api_key = get_option('viator_api_key');
+    if (empty($api_key)) {
+        wp_send_json_error(array('message' => 'Chave API não configurada.'));
+    }
+    
+    // Get parameters
+    $product_code = sanitize_text_field($_POST['product_code']);
+    $count = isset($_POST['count']) ? intval($_POST['count']) : 10;
+    $start = isset($_POST['start']) ? intval($_POST['start']) : 1;
+    $ratings = isset($_POST['ratings']) && is_array($_POST['ratings']) ? array_map('intval', $_POST['ratings']) : [5, 4, 3, 2, 1];
+    $sort_by = isset($_POST['sort_by']) ? sanitize_text_field($_POST['sort_by']) : 'MOST_RECENT_PER_LOCALE';
+    
+    // Prepare request data
+    $request_data = array(
+        'productCode' => $product_code,
+        'provider' => 'ALL',
+        'count' => $count,
+        'start' => $start,
+        'showMachineTranslated' => true,
+        'reviewsForNonPrimaryLocale' => true,
+        'ratings' => $ratings,
+        'sortBy' => $sort_by
+    );
+    
+    // Make API request
+    $response = wp_remote_post('https://api.sandbox.viator.com/partner/reviews/product', array(
+        'headers' => array(
+            'Accept' => 'application/json;version=2.0',
+            'Content-Type' => 'application/json;version=2.0',
+            'exp-api-key' => $api_key,
+            'Accept-Language' => 'pt-BR'
+        ),
+        'body' => json_encode($request_data),
+        'timeout' => 30
+    ));
+    
+    // Check for errors
+    if (is_wp_error($response)) {
+        wp_send_json_error(array('message' => 'Erro ao conectar com a API: ' . $response->get_error_message()));
+    }
+    
+    // Parse response
+    $body = wp_remote_retrieve_body($response);
+    $data = json_decode($body, true);
+    
+    // Check for API errors
+    if (isset($data['error'])) {
+        wp_send_json_error(array('message' => 'Erro da API: ' . $data['error']['message']));
+    }
+    
+    // Return reviews data
+    wp_send_json_success($data);
+}
+add_action('wp_ajax_viator_get_reviews', 'viator_get_reviews_ajax');
+add_action('wp_ajax_nopriv_viator_get_reviews', 'viator_get_reviews_ajax');

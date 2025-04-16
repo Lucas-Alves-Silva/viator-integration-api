@@ -336,6 +336,200 @@
     margin-bottom: 10px;
 }
 
+/* Reviews Section */
+.viator-reviews {
+    margin: 40px 0;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    padding: 30px;
+}
+
+.viator-reviews h2 {
+    color: #333;
+    font-size: 24px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.viator-reviews h2 .review-count {
+    font-size: 16px;
+    color: #666;
+    font-weight: normal;
+}
+
+.viator-reviews-summary {
+    display: flex;
+    align-items: center;
+    margin-bottom: 30px;
+    gap: 20px;
+}
+
+.viator-reviews-rating {
+    font-size: 48px;
+    font-weight: bold;
+    color: #04846b;
+    line-height: 1;
+}
+
+.viator-reviews-stars {
+    display: flex;
+    gap: 5px;
+}
+
+.viator-reviews-stars .star {
+    color: #ffc107;
+    font-size: 20px;
+}
+
+.viator-reviews-filter {
+    margin-bottom: 20px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.viator-reviews-filter button {
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    padding: 8px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.viator-reviews-filter button:hover,
+.viator-reviews-filter button.active {
+    background-color: #04846b;
+    color: #fff;
+    border-color: #04846b;
+}
+
+.viator-reviews-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.viator-review-item {
+    background-color: #fff;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    transition: transform 0.3s ease;
+}
+
+.viator-review-item:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.viator-review-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+}
+
+.viator-review-author {
+    font-weight: 600;
+    color: #333;
+}
+
+.viator-review-date {
+    color: #888;
+    font-size: 14px;
+}
+
+.viator-review-rating {
+    display: flex;
+    gap: 3px;
+    margin-bottom: 10px;
+}
+
+.viator-review-rating .star {
+    color: #ffc107;
+}
+
+.viator-review-title {
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.viator-review-content {
+    color: #555;
+    line-height: 1.6;
+    margin-bottom: 15px;
+}
+
+.viator-review-photos {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    flex-wrap: wrap;
+}
+
+.viator-review-photo {
+    width: 80px;
+    height: 80px;
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.viator-review-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.viator-review-photo img:hover {
+    transform: scale(1.05);
+}
+
+.viator-reviews-pagination {
+    display: flex;
+    justify-content: center;
+    margin-top: 30px;
+    gap: 5px;
+}
+
+.viator-reviews-pagination button {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid #ddd;
+    background-color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.viator-reviews-pagination button:hover,
+.viator-reviews-pagination button.active {
+    background-color: #04846b;
+    color: #fff;
+    border-color: #04846b;
+}
+
+.viator-reviews-loading {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+}
+
+.viator-no-reviews {
+    text-align: center;
+    padding: 30px;
+    color: #666;
+    font-style: italic;
+}
+
 /* Tags */
 .viator-tag-list {
     display: flex;
