@@ -12,6 +12,7 @@ jQuery(document).ready(function($) {
     const $reviewsList = $('.viator-reviews-list');
     const $pagination = $('.viator-reviews-pagination');
     const $filterButtons = $('.viator-reviews-filter button');
+    const $body = $('body');
     
     // State
     let currentPage = 1;
@@ -19,6 +20,9 @@ jQuery(document).ready(function($) {
     let totalReviews = 0;
     let totalPages = 0;
     let productCode = $reviewsList.data('product-code');
+    
+    // We'll use the existing lightbox from product-gallery.js
+    // No need to create a new lightbox container here
     
     // Initialize
     if ($reviewsList.length && productCode) {
@@ -37,6 +41,161 @@ jQuery(document).ready(function($) {
         
         // Reload reviews with new filter
         loadReviews(currentPage, currentFilter);
+    });
+    
+    // Create a separate lightbox for reviews to avoid conflicts with product gallery
+    function createReviewsLightbox() {
+        // Check if reviews lightbox already exists
+        if (document.getElementById('viator-reviews-lightbox')) return;
+        
+        // Create lightbox container
+        const lightbox = document.createElement('div');
+        lightbox.id = 'viator-reviews-lightbox';
+        lightbox.className = 'viator-lightbox';
+        
+        // Create lightbox content
+        lightbox.innerHTML = `
+            <div class="viator-lightbox-content">
+                <span class="viator-lightbox-close">&times;</span>
+                <div class="viator-lightbox-image-container">
+                    <img class="viator-lightbox-image" src="" alt="Imagem em tamanho grande">
+                    <a class="viator-lightbox-prev">&#10094;</a>
+                    <a class="viator-lightbox-next">&#10095;</a>
+                </div>
+                <div class="viator-lightbox-thumbnails"></div>
+            </div>
+        `;
+        
+        // Add lightbox to body
+        document.body.appendChild(lightbox);
+        
+        // Add close event
+        const closeBtn = lightbox.querySelector('.viator-lightbox-close');
+        closeBtn.addEventListener('click', closeReviewsLightbox);
+        
+        // Close lightbox when clicking outside the image
+        lightbox.addEventListener('click', function(e) {
+            if (e.target === lightbox) {
+                closeReviewsLightbox();
+            }
+        });
+        
+        // Add keyboard navigation
+        document.addEventListener('keydown', function(e) {
+            if (!document.getElementById('viator-reviews-lightbox').classList.contains('active')) return;
+            
+            if (e.key === 'Escape') {
+                closeReviewsLightbox();
+            } else if (e.key === 'ArrowLeft') {
+                navigateReviewsLightbox(-1);
+            } else if (e.key === 'ArrowRight') {
+                navigateReviewsLightbox(1);
+            }
+        });
+        
+        // Add navigation events
+        const prevBtn = lightbox.querySelector('.viator-lightbox-prev');
+        const nextBtn = lightbox.querySelector('.viator-lightbox-next');
+        
+        prevBtn.addEventListener('click', function() {
+            navigateReviewsLightbox(-1);
+        });
+        
+        nextBtn.addEventListener('click', function() {
+            navigateReviewsLightbox(1);
+        });
+    }
+    
+    function closeReviewsLightbox() {
+        const lightbox = document.getElementById('viator-reviews-lightbox');
+        lightbox.classList.remove('active');
+        document.body.style.overflow = ''; // Restore scrolling
+    }
+    
+    function navigateReviewsLightbox(step) {
+        const lightbox = document.getElementById('viator-reviews-lightbox');
+        const lightboxImg = lightbox.querySelector('.viator-lightbox-image');
+        const thumbnails = lightbox.querySelectorAll('.viator-lightbox-thumbnail');
+        
+        if (thumbnails.length === 0 || !window.reviewImagesArray) return;
+        
+        // Calculate new index
+        let newIndex = window.reviewsLightboxIndex + step;
+        
+        // Handle wrapping
+        if (newIndex >= window.reviewImagesArray.length) {
+            newIndex = 0;
+        } else if (newIndex < 0) {
+            newIndex = window.reviewImagesArray.length - 1;
+        }
+        
+        // Update current index
+        window.reviewsLightboxIndex = newIndex;
+        
+        // Update image
+        lightboxImg.src = window.reviewImagesArray[newIndex];
+        
+        // Update active thumbnail
+        thumbnails.forEach((thumb, index) => {
+            thumb.classList.toggle('active', index === newIndex);
+        });
+    }
+    
+    // Initialize reviews lightbox
+    createReviewsLightbox();
+    
+    // Lightbox event listeners for review photos
+    $(document).on('click', '.viator-review-photo img', function() {
+        const imgSrc = $(this).data('full-src') || $(this).attr('src');
+        const $reviewItem = $(this).closest('.viator-review-item');
+        
+        // Get all images from this specific review
+        const reviewImages = [];
+        $reviewItem.find('.viator-review-photo img').each(function() {
+            const fullSrc = $(this).data('full-src') || $(this).attr('src');
+            reviewImages.push(fullSrc);
+        });
+        
+        // Store the review images array for the reviews lightbox
+        window.reviewImagesArray = reviewImages;
+        window.reviewsLightboxIndex = reviewImages.indexOf(imgSrc);
+        if (window.reviewsLightboxIndex === -1) window.reviewsLightboxIndex = 0;
+        
+        // Use the dedicated reviews lightbox
+        const lightbox = document.getElementById('viator-reviews-lightbox');
+        const lightboxImg = lightbox.querySelector('.viator-lightbox-image');
+        const lightboxThumbnails = lightbox.querySelector('.viator-lightbox-thumbnails');
+        
+        // Set current image
+        lightboxImg.src = imgSrc;
+        
+        // Create thumbnails in lightbox
+        lightboxThumbnails.innerHTML = '';
+        reviewImages.forEach((src, index) => {
+            const thumb = document.createElement('div');
+            thumb.className = `viator-lightbox-thumbnail ${index === window.reviewsLightboxIndex ? 'active' : ''}`;
+            
+            const img = document.createElement('img');
+            img.src = src;
+            img.alt = 'Miniatura';
+            
+            thumb.appendChild(img);
+            lightboxThumbnails.appendChild(thumb);
+            
+            thumb.addEventListener('click', function() {
+                window.reviewsLightboxIndex = index;
+                lightboxImg.src = src;
+                
+                // Update active thumbnail
+                lightboxThumbnails.querySelectorAll('.viator-lightbox-thumbnail').forEach((t, i) => {
+                    t.classList.toggle('active', i === index);
+                });
+            });
+        });
+        
+        // Show lightbox
+        lightbox.classList.add('active');
+        document.body.style.overflow = 'hidden'; // Prevent scrolling
     });
     
     // Function to handle pagination clicks
@@ -157,15 +316,45 @@ jQuery(document).ready(function($) {
         
         // Create photos HTML if available
         let photosHtml = '';
+        
+        // Check for photos in the review object
         if (review.photos && review.photos.length > 0) {
             photosHtml = '<div class="viator-review-photos">';
             review.photos.forEach(function(photo) {
                 photosHtml += `
                     <div class="viator-review-photo">
-                        <img src="${photo.url}" alt="Foto da avaliação">
+                        <img src="${photo.url}" data-full-src="${photo.url}" alt="Foto da avaliação">
                     </div>
                 `;
             });
+            photosHtml += '</div>';
+        }
+        // Check for photos in photosInfo (from API)
+        else if (review.photosInfo && review.photosInfo.length > 0) {
+            photosHtml = '<div class="viator-review-photos">';
+            review.photosInfo.forEach(function(photoInfo) {
+                if (photoInfo.photoVersions && photoInfo.photoVersions.length > 0) {
+                    // Find thumbnail version for display
+                    const thumbnail = photoInfo.photoVersions.find(v => v.sizeType === 'THUMBNAIL') || photoInfo.photoVersions[0];
+                    
+                    // Find the largest image version by comparing width and height
+                    let fullSize = photoInfo.photoVersions[0];
+                    photoInfo.photoVersions.forEach(version => {
+                        // If this version has larger dimensions than our current fullSize
+                        if ((version.width > fullSize.width) || 
+                            (version.width === fullSize.width && version.height > fullSize.height)) {
+                            fullSize = version;
+                        }
+                    });
+                    
+                    photosHtml += `
+                        <div class="viator-review-photo">
+                            <img src="${thumbnail.url}" data-full-src="${fullSize.url}" class="review-photo" alt="Foto da avaliação">
+                        </div>
+                    `;
+                  }
+                }
+            );
             photosHtml += '</div>';
         }
         
