@@ -137,8 +137,8 @@ jQuery(document).ready(function($) {
      * @return {string} The HTML for the review
      */
     function createReviewHtml(review) {
-        // Format date
-        const reviewDate = new Date(review.submissionDate);
+        // Format date - use publishedDate instead of submissionDate
+        const reviewDate = new Date(review.publishedDate);
         const formattedDate = reviewDate.toLocaleDateString('pt-BR', {
             year: 'numeric',
             month: 'long',
@@ -173,7 +173,7 @@ jQuery(document).ready(function($) {
         return `
             <div class="viator-review-item">
                 <div class="viator-review-header">
-                    <div class="viator-review-author">${review.authorName || 'Viajante anônimo'}</div>
+                    <div class="viator-review-author">${review.userName || review.authorName || 'Viajante anônimo'}</div>
                     <div class="viator-review-date">${formattedDate}</div>
                 </div>
                 <div class="viator-review-rating">${starsHtml}</div>
