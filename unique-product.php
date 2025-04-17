@@ -416,10 +416,12 @@ function viator_get_product_details($product_code) {
                 <!-- Product Header -->
                 <div class="viator-product-header">
                     <!-- Código do produto -->
-                    <span class="product-code-tooltip" style="position: relative; cursor: help; margin-bottom: 10px; display: inline-block;">
-                        Código do passeio/serviço: <strong><?php echo esc_html($product_code); ?></strong>
-                        <span class="tooltip-text">
-                        Cite este código ao falar com o suporte ao cliente.
+                    <span style="margin-bottom: 10px; display: inline-block;">
+                        Código do passeio/serviço: <span class="product-code-tooltip" style="position: relative; cursor: help; display: inline-block;">
+                            <strong><?php echo esc_html($product_code); ?></strong>
+                            <span class="tooltip-text">
+                            Cite este código ao falar com o suporte ao cliente.
+                            </span>
                         </span>
                     </span>
                     

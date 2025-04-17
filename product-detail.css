@@ -567,6 +567,11 @@
     color: #333; /* Cor do texto principal, ajuste conforme seu site */
   }
   
+  /* Estilo para o texto descritivo sem o efeito dashed */
+  .product-code-tooltip strong {
+    border-bottom: none; /* Remove qualquer borda que possa ser herdada */
+  }
+  
   /* O container do texto do tooltip */
   .product-code-tooltip .tooltip-text {
     /* Visibilidade e Animação */
