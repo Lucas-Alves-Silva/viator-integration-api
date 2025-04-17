@@ -926,7 +926,7 @@
             min-width: 35px; /* Largura mínima para manter o círculo */
             height: 35px;
             padding: 0;
-            border: 2px solid #04846b;
+            border: 1px solid #04846b;
             border-radius: 50%;
             font-size: 14px; /* Tamanho fixo para números */
             text-decoration: none;
