@@ -275,7 +275,7 @@ jQuery(document).ready(function($) {
         
         // Check if there are reviews
         if (!data.reviews || data.reviews.length === 0) {
-            $reviewsList.html('<div class="viator-no-reviews">Nenhuma avaliação encontrada para este produto.</div>');
+            $reviewsList.html('<div class="viator-no-reviews">Nenhuma avaliação encontrada para este passeio/serviço.</div>');
             $pagination.empty();
             return;
         }

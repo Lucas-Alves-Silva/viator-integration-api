@@ -100,7 +100,7 @@ function viator_product_detail_shortcode($atts) {
     
     // If still no product code, show error message
     if (empty($atts['product_code'])) {
-        return '<div class="viator-error">Código do produto não fornecido.</div>';
+        return '<div class="viator-error">Código do passeio/serviço não fornecido.</div>';
     }
     
     // Get product details
@@ -417,9 +417,9 @@ function viator_get_product_details($product_code) {
                 <div class="viator-product-header">
                     <!-- Código do produto -->
                     <span class="product-code-tooltip" style="position: relative; cursor: help; margin-bottom: 10px; display: inline-block;">
-                        Código do produto: <strong><?php echo esc_html($product_code); ?></strong>
+                        Código do passeio/serviço: <strong><?php echo esc_html($product_code); ?></strong>
                         <span class="tooltip-text">
-                        Cite este código de produto ao falar com o suporte ao cliente.
+                        Cite este código ao falar com o suporte ao cliente.
                         </span>
                     </span>
                     
@@ -1012,7 +1012,7 @@ add_action('wp_enqueue_scripts', 'viator_enqueue_product_scripts');
 function viator_get_reviews_ajax() {
     // Verify request
     if (!isset($_POST['product_code']) || empty($_POST['product_code'])) {
-        wp_send_json_error(array('message' => 'Código do produto não fornecido.'));
+        wp_send_json_error(array('message' => 'Código do passeio/serviço não fornecido.'));
     }
     
     // Get API key

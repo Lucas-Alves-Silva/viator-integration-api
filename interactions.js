@@ -1,8 +1,9 @@
 document.addEventListener('DOMContentLoaded', function () {
+    // Verificar se os elementos existem antes de tentar acessá-los
     const searchForm = document.getElementById('viator-search-form');
-    const searchButton = document.getElementById('search-button');
-    const searchText = document.getElementById('search-text');
-    const searchIcon = document.getElementById('search-icon');
+    const searchButton = searchForm ? document.getElementById('search-button') : null;
+    const searchText = searchForm ? document.getElementById('search-text') : null;
+    const searchIcon = searchForm ? document.getElementById('search-icon') : null;
     const searchInput = document.querySelector('input[name="viator_query"]');
 
     // Add focus event listener to search input
@@ -10,44 +11,53 @@ document.addEventListener('DOMContentLoaded', function () {
         searchInput.addEventListener('focus', updateNearbySuggestion);
     }
 
-    // Prevent form submission on enter key and validate input
-    searchForm.addEventListener('submit', function(event) {
-        event.preventDefault();
-        
-        if (!searchInput || !searchInput.value.trim()) {
-            // Add visual feedback for empty input
-            searchInput.classList.add('error');
+    // Check if searchForm exists before adding event listener
+    if (searchForm) {
+        // Prevent form submission on enter key and validate input
+        searchForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            
+            if (!searchInput || !searchInput.value.trim()) {
+                // Add visual feedback for empty input
+                searchInput.classList.add('error');
+                const errorMessage = document.querySelector('.viator-error-message');
+                if (errorMessage) {
+                    errorMessage.textContent = 'Por favor, insira um destino';
+                    errorMessage.classList.remove('searching');
+                }
+                return;
+            }
+
+            // Remove error state if input is valid
+            searchInput.classList.remove('error');
             const errorMessage = document.querySelector('.viator-error-message');
             if (errorMessage) {
-                errorMessage.textContent = 'Por favor, insira um destino';
-                errorMessage.classList.remove('searching');
+                errorMessage.textContent = '';
             }
-            return;
-        }
 
-        // Remove error state if input is valid
-        searchInput.classList.remove('error');
-        const errorMessage = document.querySelector('.viator-error-message');
-        if (errorMessage) {
-            errorMessage.textContent = '';
-        }
+            // Update interface for search
+            if (searchText) {
+                searchText.innerHTML = 'Pesquisando<div class="bouncy-loader"><span></span><span></span><span></span></div>';
+            }
+            if (searchIcon) {
+                searchIcon.innerHTML = '✈️';
+                searchIcon.classList.add('airplane-icon');
+            }
+            if (searchButton) {
+                searchButton.disabled = true;
+            }
 
-        // Update interface for search
-        searchText.innerHTML = 'Pesquisando<div class="bouncy-loader"><span></span><span></span><span></span></div>';
-        searchIcon.innerHTML = '✈️';
-        searchIcon.classList.add('airplane-icon');
-        searchButton.disabled = true;
+            // Add parameter for automatic scroll
+            const currentUrl = new URL(window.location.href);
+            const params = new URLSearchParams(currentUrl.search);
+            params.set('scroll_to_results', '1');
+            const newUrl = `${currentUrl.pathname}?${params.toString()}`;
+            window.history.replaceState({}, '', newUrl);
 
-        // Add parameter for automatic scroll
-        const currentUrl = new URL(window.location.href);
-        const params = new URLSearchParams(currentUrl.search);
-        params.set('scroll_to_results', '1');
-        const newUrl = `${currentUrl.pathname}?${params.toString()}`;
-        window.history.replaceState({}, '', newUrl);
-
-        // Submit the form
-        searchForm.submit();
-    });
+            // Submit the form
+            searchForm.submit();
+        });
+    }
     // Adicionar evento para links de paginação
     document.addEventListener('click', function(e) {
         if (e.target.closest('.viator-pagination-btn') || e.target.closest('.viator-pagination-arrow')) {
