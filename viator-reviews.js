@@ -5,7 +5,7 @@
 
 jQuery(document).ready(function($) {
     // Constants
-    const REVIEWS_PER_PAGE = 5;
+    const REVIEWS_PER_PAGE = 5; // Quantidade de avaliações por página
     const API_ENDPOINT = '/wp-admin/admin-ajax.php';
     
     // Elements
@@ -239,7 +239,8 @@ jQuery(document).ready(function($) {
             count: REVIEWS_PER_PAGE,
             start: start,
             ratings: ratingsArray,
-            sort_by: 'MOST_RECENT_PER_LOCALE'
+            sort_by: 'MOST_RECENT_PER_LOCALE',
+            limit: 100 // Solicitar mais avaliações da API para ter dados suficientes para paginação
         };
         
         // Make AJAX request
@@ -280,11 +281,22 @@ jQuery(document).ready(function($) {
             return;
         }
         
-        // Display each review
-        data.reviews.forEach(function(review) {
+        // Armazenar todas as avaliações recebidas da API
+        window.allReviews = data.reviews;
+        
+        // Calcular quais avaliações mostrar na página atual
+        const startIndex = (currentPage - 1) * REVIEWS_PER_PAGE;
+        const endIndex = Math.min(startIndex + REVIEWS_PER_PAGE, data.reviews.length);
+        const currentPageReviews = data.reviews.slice(startIndex, endIndex);
+        
+        // Display each review for current page only
+        currentPageReviews.forEach(function(review) {
             const reviewHtml = createReviewHtml(review);
             $reviewsList.append(reviewHtml);
         });
+        
+        // Atualizar o número total de páginas com base no número real de avaliações recebidas
+        totalPages = Math.ceil(data.reviews.length / REVIEWS_PER_PAGE);
         
         // Update pagination
         updatePagination();
