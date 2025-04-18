@@ -20,7 +20,10 @@ jQuery(document).ready(function($) {
     let totalReviews = 0;
     let totalPages = 0;
     let productCode = $reviewsList.data('product-code');
-    
+    let allReviews = []; // Armazena todas as avaliações carregadas
+    let isLoading = false; // Flag para evitar requisições múltiplas
+    const REVIEWS_BATCH_SIZE = 100; // Quantidade de avaliações a buscar por requisição API
+
     // We'll use the existing lightbox from product-gallery.js
     // No need to create a new lightbox container here
     
@@ -34,7 +37,8 @@ jQuery(document).ready(function($) {
         const $button = $(this);
         currentFilter = $button.data('rating');
         currentPage = 1;
-        
+        allReviews = []; // Limpa as avaliações ao mudar o filtro
+
         // Update active button
         $filterButtons.removeClass('active');
         $button.addClass('active');
@@ -218,9 +222,27 @@ jQuery(document).ready(function($) {
      * @param {string|number} rating - The rating filter (all, 5, 4, 3, 2, 1)
      */
     function loadReviews(page, rating) {
-        // Show loading state
-        $reviewsList.html('<div class="viator-reviews-loading">Carregando avaliações...</div>');
-        
+        // Se já estiver carregando, não faz nada
+        if (isLoading) return;
+
+        // Calcula o índice inicial da avaliação para a página solicitada
+        const requestedStartIndex = (page - 1) * REVIEWS_PER_PAGE;
+
+        // Verifica se as avaliações para esta página já foram carregadas
+        if (allReviews.length > requestedStartIndex || (totalReviews > 0 && allReviews.length >= totalReviews)) {
+            // Avaliações já carregadas, apenas exibe a página correta
+            displayReviews(page);
+            return;
+        }
+
+        // Se chegou aqui, precisa buscar mais avaliações da API
+        isLoading = true;
+        // Show loading state only if the list is currently empty
+        if (allReviews.length === 0) {
+            $reviewsList.html('<div class="viator-reviews-loading">Carregando avaliações...</div>');
+        }
+        $pagination.addClass('loading'); // Adiciona um estado de loading na paginação
+
         // Prepare ratings array for API
         let ratingsArray = [];
         if (rating !== 'all') {
@@ -229,20 +251,20 @@ jQuery(document).ready(function($) {
             ratingsArray = [5, 4, 3, 2, 1];
         }
         
-        // Calculate start position for pagination
-        const start = (page - 1) * REVIEWS_PER_PAGE + 1;
-        
+        // Calculate start position for the *next batch* from the API
+        const apiStart = allReviews.length + 1;
+
         // Prepare request data
         const requestData = {
             action: 'viator_get_reviews',
             product_code: productCode,
-            count: REVIEWS_PER_PAGE,
-            start: start,
+            count: REVIEWS_BATCH_SIZE, // Busca um lote maior da API
+            start: apiStart,
             ratings: ratingsArray,
-            sort_by: 'MOST_RECENT_PER_LOCALE',
-            limit: 100 // Solicitar mais avaliações da API para ter dados suficientes para paginação
+            sort_by: 'MOST_RECENT_PER_LOCALE'
+            // Remove o 'limit' fixo, pois agora controlamos pelo 'count' e 'start'
         };
-        
+
         // Make AJAX request
         $.ajax({
             url: API_ENDPOINT,
@@ -250,54 +272,69 @@ jQuery(document).ready(function($) {
             data: requestData,
             success: function(response) {
                 if (response.success) {
-                    displayReviews(response.data);
+                    // Adiciona as novas avaliações ao array existente
+                    allReviews = allReviews.concat(response.data.reviews || []);
+                    totalReviews = response.data.totalCount || allReviews.length; // Atualiza o total
+                    displayReviews(page); // Exibe a página solicitada com os dados atualizados
                 } else {
-                    $reviewsList.html('<div class="viator-no-reviews">Não foi possível carregar as avaliações. ' + 
+                    // Se for a primeira carga e falhar
+                    if (allReviews.length === 0) {
+                         $reviewsList.html('<div class="viator-no-reviews">Não foi possível carregar as avaliações. ' +
                                      (response.data.message || 'Tente novamente mais tarde.') + '</div>');
+                    }
+                    // TODO: Adicionar feedback visual na paginação em caso de erro?
                 }
             },
             error: function() {
-                $reviewsList.html('<div class="viator-no-reviews">Erro ao carregar avaliações. Tente novamente mais tarde.</div>');
+                 // Se for a primeira carga e falhar
+                 if (allReviews.length === 0) {
+                    $reviewsList.html('<div class="viator-no-reviews">Erro ao carregar avaliações. Tente novamente mais tarde.</div>');
+                 }
+                 // TODO: Adicionar feedback visual na paginação em caso de erro?
+            },
+            complete: function() {
+                isLoading = false; // Libera para novas requisições
+                $pagination.removeClass('loading'); // Remove estado de loading da paginação
             }
         });
     }
-    
+
     /**
-     * Display reviews in the reviews list
-     * @param {Object} data - The response data from the server
+     * Display reviews in the reviews list for a specific page
+     * @param {number} page - The page number to display
      */
-    function displayReviews(data) {
+    function displayReviews(page) {
         // Update state
-        totalReviews = data.totalCount || 0;
+        // totalReviews já foi atualizado na função loadReviews ou na inicialização
         totalPages = Math.ceil(totalReviews / REVIEWS_PER_PAGE);
-        
+
         // Clear reviews list
         $reviewsList.empty();
-        
+
         // Check if there are reviews
-        if (!data.reviews || data.reviews.length === 0) {
-            $reviewsList.html('<div class="viator-no-reviews">Nenhuma avaliação encontrada para este passeio/serviço.</div>');
+        if (!allReviews || allReviews.length === 0) {
+            $reviewsList.html('<div class="viator-no-reviews">Nenhuma avaliação encontrada para este filtro.</div>');
             $pagination.empty();
             return;
         }
-        
-        // Armazenar todas as avaliações recebidas da API
-        window.allReviews = data.reviews;
-        
+
         // Calcular quais avaliações mostrar na página atual
-        const startIndex = (currentPage - 1) * REVIEWS_PER_PAGE;
-        const endIndex = Math.min(startIndex + REVIEWS_PER_PAGE, data.reviews.length);
-        const currentPageReviews = data.reviews.slice(startIndex, endIndex);
-        
-        // Display each review for current page only
-        currentPageReviews.forEach(function(review) {
-            const reviewHtml = createReviewHtml(review);
-            $reviewsList.append(reviewHtml);
-        });
-        
-        // Atualizar o número total de páginas com base no número real de avaliações recebidas
-        totalPages = Math.ceil(data.reviews.length / REVIEWS_PER_PAGE);
-        
+        const startIndex = (page - 1) * REVIEWS_PER_PAGE;
+        // Garante que não tentamos acessar um índice fora dos limites
+        const endIndex = Math.min(startIndex + REVIEWS_PER_PAGE, allReviews.length);
+        const currentPageReviews = allReviews.slice(startIndex, endIndex);
+
+        // Se por algum motivo não houver avaliações para a página atual (pode acontecer se totalReviews for impreciso inicialmente)
+        if (currentPageReviews.length === 0 && allReviews.length > 0) {
+             $reviewsList.html('<div class="viator-no-reviews">Não há mais avaliações para exibir nesta página.</div>');
+        } else {
+            // Display each review for current page only
+            currentPageReviews.forEach(function(review) {
+                const reviewHtml = createReviewHtml(review);
+                $reviewsList.append(reviewHtml);
+            });
+        }
+
         // Update pagination
         updatePagination();
     }
