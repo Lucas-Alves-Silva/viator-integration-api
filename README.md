@@ -1,88 +1,58 @@
 
-# Viator API Integration - WordPress Plugin
+# Viator API Integration – WordPress Plugin
 
-Este plugin para WordPress permite integrar a API da Viator ao seu site, possibilitando a busca e exibição de passeios, atrações e destinos diretamente em sua plataforma. Com ele, os usuários podem pesquisar experiências de viagem, visualizar detalhes como preços, avaliações, duração e muito mais.
+O **Viator API Integration** é um plugin avançado para WordPress que conecta seu site à API oficial da Viator, permitindo a busca, exibição e filtragem de passeios, atrações e experiências de viagem diretamente na sua plataforma. Ele oferece uma experiência rica e responsiva para seus usuários, com integração completa de avaliações, preços, duração, idiomas e muito mais.
 
-## Funcionalidades
+---
 
-- Pesquisa de Passeios: Os usuários podem pesquisar passeios por destino.
-- Exibição de Cards: Os resultados são exibidos em cards responsivos, com informações como título, descrição, preço, avaliações, duração e flags (ex: "Cancelamento gratuito").
-- Filtros Dinâmicos: Os resultados podem ser filtrados por preço, duração, avaliação e flags.
-- Responsivo: O plugin é totalmente responsivo, funcionando bem em dispositivos móveis e desktops.
-- Shortcode: Use o shortcode [viator_search] para exibir o formulário de pesquisa e os resultados em qualquer página ou post.
+## Funcionalidades Principais
+
+- **Busca de Passeios e Atrações:** Pesquisa dinâmica por destino, com resultados em tempo real.
+- **Exibição em Cards Responsivos:** Cards detalhados com título, descrição, preço, avaliações, duração, bandeiras (ex: "Cancelamento gratuito") e imagens.
+- **Filtros Avançados:** Filtragem por preço, duração, avaliação, datas e outros critérios.
+- **Avaliações de Clientes:** Exibição de avaliações reais, com paginação, filtro por estrelas e suporte a fotos dos usuários.
+- **Detalhamento Completo:** Página de detalhes do produto com informações traduzidas, inclusões, exclusões, políticas, idiomas disponíveis e tags.
+- **Curiosidades e Conteúdo Dinâmico:** Integração com a Wikipedia para exibir curiosidades sobre destinos.
+- **Shortcode Personalizado:** Use `[viator_search]` para inserir o formulário e resultados em qualquer página ou post.
+- **Cache Inteligente:** Dados de produtos e avaliações são armazenados em cache para otimizar performance e reduzir chamadas à API.
+- **Proteção de Conteúdo:** Avaliações são protegidas contra indexação por mecanismos de busca, conforme exigido pela Viator.
+- **Totalmente Responsivo:** Compatível com dispositivos móveis e desktops.
+
+---
 
 ## Requisitos
 
-- WordPress 5.0 ou superior.
-- PHP 7.4 ou superior.
-- Uma chave de API da Viator (disponível apenas para parceiros da Viator).
-- 
+- WordPress 5.0 ou superior
+- PHP 7.4 ou superior
+- Chave de API da Viator (disponível apenas para parceiros)
+- cURL habilitado no servidor
+
+---
+
 ## Instalação
 
-```
-1) Baixe o Plugin:
-2) Faça o download do arquivo .zip do plugin.
-3) Instale no WordPress:
-4) Acesse o painel administrativo do WordPress.
-5) Vá até Plugins > Adicionar Novo > Enviar Plugin.
-6) Selecione o arquivo .zip e clique em Instalar Agora.
-7) Ative o Plugin:
-8) Após a instalação, clique em Ativar Plugin.
-9) Configure a Chave da API:
-10) No código do plugin, localize a variável $api_key e substitua pelo valor da sua chave de API da Viator.
-```
-    
-## Como usar
+1. **Baixe o Plugin:**  
+   Faça o download do arquivo `.zip` deste repositório.
 
-#### Adicione o Shortcode:
+2. **Instale no WordPress:**  
+   - Acesse o painel administrativo do WordPress.
+   - Vá em *Plugins > Adicionar Novo > Enviar Plugin*.
+   - Selecione o arquivo `.zip` e clique em *Instalar Agora*.
 
-- Em qualquer página ou post do WordPress, adicione o shortcode [viator_search] para exibir o formulário de pesquisa e os resultados.
+3. **Ative o Plugin:**  
+   Após a instalação, clique em *Ativar Plugin*.
 
-#### Pesquise Passeios:
+4. **Configure a Chave da API:**  
+   No painel do WordPress, acesse as configurações do plugin e insira sua chave de API da Viator.
 
-- Os usuários podem digitar um destino no campo de pesquisa e clicar em "Pesquisar" para ver os resultados.
+---
 
-#### Visualize os Resultados:
+## Como Usar
 
-- Os passeios serão exibidos em cards, com informações como título, descrição, preço, avaliações, duração e flags.
-## Personalização
+### Adicionar o Shortcode
 
-#### CSS
-O plugin vem com um arquivo CSS básico para estilização. Você pode personalizar o estilo editando o arquivo viator-search.css.
+Em qualquer página ou post do WordPress, adicione o shortcode abaixo para exibir o formulário de pesquisa e os resultados:
 
-#### JavaScript
-O arquivo interactions.js contém a lógica para interações dinâmicas, como a animação do botão de pesquisa. Você pode adicionar ou modificar comportamentos conforme necessário.
-
-#### PHP
-O arquivo principal do plugin (viator-integration.php) contém toda a lógica de integração com a API da Viator. Aqui você pode ajustar os parâmetros de pesquisa, filtros e exibição dos resultados.
-## Estrutura do Projeto
-
-viator-api-integration/
-
-├── viator-integration.php      // Arquivo principal do plugin
-
-├── viator-search.css               // Estilos CSS para o formulário e cards
-
-├── interactions.js                 // Lógica de interações dinâmicas
-## Uso/Exemplos
-
-#### Shortcode
-Adicione o seguinte shortcode em uma página ou post:
-
-```javascript
+```plaintext
 [viator_search]
 ```
-
-## Licença
-Este projeto é licenciado sob uma Licença Comercial Exclusiva. Todos os direitos reservados. O código-fonte não pode ser redistribuído, modificado ou sublicenciado sem permissão expressa do desenvolvedor.
-
-## Autor
-
-- [GitHub](https://github.com/Lucas-Alves-Silva)
-- [LinkedIn](https://www.linkedin.com/in/lucasalves-da-silva/)
-
-## Links Úteis
-
-- [Documentação da API Viator](https://docs.viator.com/partner-api/technical/)
-- [WordPress Plugin Handbook](https://developer.wordpress.org/plugins/)
-- [Referência de Shortcodes no WordPress](https://codex.wordpress.org/Shortcode_API)

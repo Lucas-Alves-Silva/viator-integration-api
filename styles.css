@@ -1,0 +1,1592 @@
+/* Viator Search Styles v1.0 */
+
+/* Importar a fonte Poppins do Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+/* Product Detail Page Styles */
+.viator-product-detail {
+    font-family: var(--font-primary);
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Breadcrumbs */
+.viator-breadcrumbs {
+    margin-bottom: 20px;
+    font-size: 14px;
+    color: #666;
+}
+
+.viator-breadcrumbs a {
+    color: #04846b;
+    text-decoration: none;
+}
+
+.viator-breadcrumbs a:hover {
+    text-decoration: underline;
+}
+
+/* Product Header */
+.viator-product-header {
+    margin-bottom: 30px;
+}
+
+.viator-product-header h1 {
+    font-size: 28px;
+    font-weight: 600;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.viator-product-rating {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+.viator-stars {
+    color: #FFD700;
+    font-size: 18px;
+    letter-spacing: 2px;
+}
+
+.viator-rating-number {
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.viator-review-count {
+    color: #666;
+    font-size: 14px;
+    text-decoration: underline !important;
+}
+
+.viator-product-flags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.viator-flag {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.viator-flag-cancelamento {
+    background-color: #d9fff6;
+    color: #04846b;
+}
+
+.viator-flag-esgota {
+    background-color: #ffe9e9;
+    color: #E74C3C;
+}
+
+.viator-flag-oferta {
+    background-color: #fff5e5;
+    color: #ff8c00;
+}
+
+/* Product Main Section */
+.viator-product-main {
+    display: grid;
+    grid-template-columns: 3fr 2fr;
+    gap: 30px;
+    margin-bottom: 40px;
+}
+
+/* Gallery */
+.viator-product-gallery {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.viator-gallery-main {
+    width: 100%;
+    height: 400px;
+    overflow: hidden;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.viator-gallery-main img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.viator-gallery-thumbs {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 10px;
+}
+
+.viator-thumb {
+    width: 80px;
+    height: 60px;
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.3s ease;
+}
+
+.viator-thumb.active {
+    opacity: 1;
+    border: 2px solid #04846b;
+}
+
+.viator-thumb:hover {
+    opacity: 0.9;
+}
+
+.viator-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Product Info */
+.viator-product-info {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.viator-product-price-box {
+    background-color: #fff;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.viator-product-price-header {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.viator-product-original-price {
+    font-size: 16px;
+    color: #999;
+    text-decoration: line-through;
+}
+
+.viator-product-price {
+    font-size: 28px;
+    font-weight: 600;
+    color: #04846b;
+    margin-bottom: 5px;
+}
+
+.viator-product-price-note {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 15px;
+}
+
+.viator-booking-button {
+    display: block;
+    background: linear-gradient(135deg, #04846b, #025a49);
+    color: white;
+    text-align: center;
+    padding: 12px;
+    border-radius: 4px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    margin-bottom: 15px;
+}
+
+.viator-booking-button:hover {
+    background: linear-gradient(135deg, #025a49, #013e32);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.viator-cancellation-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #04846b;
+}
+
+/* Quick Info */
+.viator-product-quick-info {
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.viator-info-item {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.viator-info-item:last-child {
+    margin-bottom: 0;
+}
+
+.viator-info-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.viator-info-content {
+    flex: 1;
+}
+
+.viator-info-label {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 3px;
+}
+
+.viator-info-value {
+    font-size: 14px;
+    color: #333;
+}
+
+/* Tabs */
+.viator-product-tabs {
+    margin-bottom: 40px;
+}
+
+.viator-tabs-nav {
+    display: flex;
+    gap: 5px;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 20px;
+    overflow-x: auto;
+    padding-bottom: 1px;
+}
+
+.viator-tab-button {
+    padding: 12px 20px;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    font-family: var(--font-primary);
+    font-size: 16px;
+    font-weight: 500;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.viator-tab-button:hover {
+    color: #04846b;
+}
+
+.viator-tab-button.active {
+    color: #04846b;
+    border-bottom-color: #04846b;
+}
+
+.viator-tab-content {
+    display: none;
+    padding: 10px 0;
+}
+
+.viator-tab-content.active {
+    display: block;
+    animation: fadeIn 0.5s ease;
+}
+
+.viator-tab-content h2 {
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.viator-tab-content h3 {
+    font-size: 18px;
+    font-weight: 500;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+/* Description */
+.viator-description {
+    line-height: 1.6;
+    color: #444;
+}
+
+/* Itinerary */
+.viator-itinerary {
+    line-height: 1.6;
+}
+
+.viator-itinerary-items {
+    margin-top: 20px;
+}
+
+.viator-itinerary-item {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.viator-itinerary-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+/* Inclusions/Exclusions */
+.viator-inclusions,
+.viator-exclusions {
+    margin-bottom: 30px;
+}
+
+.viator-inclusions ul,
+.viator-exclusions ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.viator-inclusions li,
+.viator-exclusions li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.viator-inclusions li:last-child,
+.viator-exclusions li:last-child {
+    border-bottom: none;
+}
+
+/* Additional Info */
+.viator-additional-info {
+    line-height: 1.6;
+}
+
+.viator-info-section {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.viator-info-section:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+/* Booking Section */
+.viator-booking-section {
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    padding: 30px;
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.viator-booking-section h2 {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.viator-booking-section p {
+    margin-bottom: 20px;
+    color: #666;
+}
+
+.viator-booking-link {
+    display: inline-block;
+    background: linear-gradient(135deg, #04846b, #025a49);
+    color: white;
+    padding: 15px 30px;
+    border-radius: 4px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.viator-booking-link:hover {
+    background: linear-gradient(135deg, #025a49, #013e32);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Review Photos */
+.viator-review-photos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.viator-review-photo {
+    width: 80px;
+    height: 80px;
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+}
+
+.viator-review-photo:hover {
+    transform: scale(1.05);
+}
+
+.viator-review-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Lightbox */
+.viator-lightbox {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+}
+
+.viator-lightbox-content {
+    position: relative;
+    max-width: 90%;
+    max-height: 90%;
+    margin: auto;
+}
+
+.viator-lightbox img {
+    max-width: 100%;
+    max-height: 90vh;
+    display: block;
+    margin: 0 auto;
+    border-radius: 4px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+}
+
+.viator-lightbox-close {
+    position: absolute;
+    top: -30px;
+    right: -30px;
+    color: white;
+    font-size: 30px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.3s ease;
+}
+
+.viator-lightbox-close:hover {
+    color: #04846b;
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+    .viator-product-main {
+        grid-template-columns: 1fr;
+    }
+    
+    .viator-gallery-main {
+        height: 300px;
+    }
+    
+    .viator-product-header h1 {
+        font-size: 24px;
+    }
+    
+    .viator-tabs-nav {
+        padding-bottom: 10px;
+    }
+    
+    .viator-tab-button {
+        padding: 10px 15px;
+        font-size: 14px;
+    }
+}
+
+/* Definir as variáveis de fonte no root */
+:root {
+    --font-primary: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+}
+
+/* Aplicar a fonte base em todo o container */
+#viator-search-form,
+.viator-grid,
+.viator-header {
+    font-family: var(--font-primary);
+}
+
+/* Input de pesquisa */
+#viator-search-form input[type="text"] {
+    font-family: var(--font-primary);
+    font-weight: 400;
+}
+
+/* Botão de pesquisa */
+#viator-search-form button {
+    font-family: var(--font-primary);
+    font-weight: 500;
+}
+
+/* Título dos cards */
+.viator-card h3 {
+    font-family: var(--font-primary);
+    font-weight: 600;
+    letter-spacing: -0.3px;
+}
+
+/* Descrição dos cards */
+.viator-card p {
+    font-family: var(--font-primary);
+    font-weight: 400;
+}
+
+/* Preço */
+.viator-card-price {
+    font-family: var(--font-primary);
+    font-weight: 500;
+}
+
+/* Badge e flags */
+.viator-badge,
+.viator-flag-cancelamento {
+    font-family: var(--font-primary);
+    font-weight: 500;
+}
+
+/* Select de ordenação */
+.viator-sort:before {
+    font-family: var(--font-primary);
+    font-weight: 400;
+}
+
+.viator-sort select {
+    font-family: var(--font-primary);
+    font-weight: 400;
+}
+
+.viator-sort select option {
+    font-family: var(--font-primary);
+}
+
+/* Total de resultados */
+.viator-total {
+    font-family: var(--font-primary);
+    font-weight: 500;
+}
+
+        /* Formulário Responsivo */
+        #viator-search-form {
+            display: flex;
+            gap: 10px;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 30px;
+            background-color: #ffffff;
+            border-radius: 15px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .viator-search-wrapper {
+            position: relative;
+            flex: 1;
+        }
+
+        .viator-nearby-suggestion {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            background-color: white;
+            padding: 12px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            z-index: 100;
+            font-family: var(--font-primary);
+            font-size: 15px;
+            color: #333;
+        }
+
+        .viator-nearby-suggestion:hover {
+            background-color: #f5f5f5;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .location-icon {
+            font-size: 18px;
+        }
+
+        #viator-search-form input[type="text"] {
+            flex: 1;
+            padding: 15px;
+            border: 1px solid #cccccc;
+            border-radius: 8px;
+            font-size: 18px;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        #viator-search-form input[type="text"].error {
+            border-color: #ff4444;
+            background-color: #fff8f8;
+        }
+
+        .viator-error-message {
+            color: #ff4444;
+            font-size: 14px;
+            margin-top: 8px;
+            text-align: left;
+        }
+
+        #viator-search-form input[type="text"]:focus {
+            border-color: #0056b3;
+        }
+
+        #viator-search-form button {
+            padding: 15px 25px;
+            background: linear-gradient(135deg, #007BFF, #0056b3);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: background 0.3s ease, transform 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #viator-search-form button:hover {
+            background: linear-gradient(135deg, #0056b3, #003f7f);
+            transform: translateY(-2px);
+        }
+
+        /* Layout dos cards (grid) */
+        .viator-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .viator-card {
+            display: flex;
+            flex-direction: column;
+            background: #fff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .viator-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .viator-card-img {
+            width: 100%;
+            height: 200px;
+            overflow: hidden;
+            position: relative; /* Para manter o posicionamento da badge */
+        }
+
+        .viator-card-img img {
+            width: 100%;
+            height: 120%; /* Aumenta a altura da imagem para ter espaço para mover */
+            object-fit: cover;
+            /* Ajusta a imagem para mostrar mais do conteúdo */
+            object-position: center top; /* Alinha ao topo */
+            transform: translateY(0); /* Posição inicial */
+            transition: transform 0.8s ease; /* Transição suave para o movimento vertical */
+        }
+
+        .viator-card:hover .viator-card-img img {
+            transform: translateY(-20%); /* Move a imagem para cima no hover */
+        }
+
+        .viator-card-content {
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            justify-content: space-between; /* Adiciona espaço entre os elementos */
+        }
+
+        .viator-card-rating {
+            font-size: 14px;
+            color: #FFD700;
+            margin: 0;
+        }
+
+        .viator-card h3 {
+            font-size: 20px;
+            margin: 0;
+            color: #333;
+        }
+
+        .viator-card p {
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            color: #666;
+            margin: 0;
+        }
+
+        .viator-card-price {
+            display: flex;
+            align-items: center;
+            gap: 5px; /* Adiciona um espaço entre elementos internos */
+            font-size: 18px; /* Ajuste o tamanho conforme necessário */
+            color: #E74C3C;
+        }
+
+        .viator-card a {
+            display: inline-block;
+            padding: 10px 15px;
+            background: #007BFF;
+            color: #fff;
+            text-align: center;
+            border-radius: 5px;
+            text-decoration: none;
+            transition: background 0.3s ease;
+        }
+
+        .viator-card a:hover {
+            background: #0056b3;
+            color: #fff;
+        }
+
+        .viator-card-duration {
+            gap: 5px; /* Adiciona um espaço entre elementos internos */
+        }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+            #viator-search-form {
+                flex-direction: column;
+                padding: 20px;
+            }
+
+            #viator-search-form input[type="text"] {
+                text-align: center;
+            }
+
+            #viator-search-form button {
+                width: 100%;
+                display: flex;
+                justify-content: center;
+            }
+
+            .viator-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .viator-card {
+                flex-direction: column;
+            }
+
+            .viator-card-img {
+                height: 150px;
+            }
+        }
+
+        /* Animações */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        #viator-results {
+            animation: fadeIn 0.5s ease;
+            margin-top: 150px;
+        }
+
+        .viator-card {
+            animation: fadeIn 0.5s ease;
+        }
+
+        /* Estilo para a badge "Geralmente se esgota" */
+        /* .viator-badge {
+            display: inline-block;
+            background-color: #E74C3C;
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1;
+        } */
+
+        /* Estilo para as flags */
+        .viator-flag-cancelamento {
+            display: inline-block;
+            background-color: #04846b;
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-right: 5px;
+        }
+
+        /* Animação do avião voando */
+        @keyframes fly {
+            0% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-5px);
+            }
+            100% {
+                transform: translateY(0);
+            }
+        }
+
+        /* Estilo do ícone do avião */
+        .airplane-icon {
+            display: inline-block;
+            animation: fly 1s infinite ease-in-out;
+        }
+
+        /* Ajustar o estilo do bouncy loader no botão */
+        #search-button .bouncy-loader {
+            display: inline-flex !important;
+            gap: 3px !important;
+            margin-left: 4px !important;
+            vertical-align: middle !important;
+        }
+
+        #search-button .bouncy-loader span {
+            width: 4px !important; /* Ligeiramente menor para o botão */
+            height: 4px !important;
+            background-color: #fff !important;
+            border-radius: 50% !important;
+            display: inline-block !important;
+            animation: bouncy 0.6s infinite !important;
+        }
+
+        #search-button .bouncy-loader span:nth-child(2) {
+            animation-delay: 0.2s !important;
+        }
+
+        #search-button .bouncy-loader span:nth-child(3) {
+            animation-delay: 0.4s !important;
+        }
+
+        /* Estilos da paginação */
+        .viator-pagination {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin: 20px 0;
+            flex-wrap: wrap; /* Permite quebra de linha em telas pequenos */
+        }
+
+        .viator-pagination-btn,
+        .viator-pagination-arrow {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 35px; /* Largura mínima para manter o círculo */
+            height: 35px;
+            padding: 0;
+            border: 1px solid #04846b;
+            border-radius: 50%;
+            font-size: 14px; /* Tamanho fixo para números */
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .viator-pagination-btn {
+            background: white;
+            color: #04846b;
+        }
+
+        .viator-pagination-btn.active {
+            background: #04846b;
+            color: white;
+        }
+
+        .viator-pagination-arrow {
+            background: white;
+            color: #04846b;
+        }
+
+        .viator-pagination-arrow:hover,
+        .viator-pagination-btn:hover {
+            background: #04846b;
+            color: white;
+        }
+
+        /* Estilo para o ellipsis */
+        .viator-pagination-ellipsis {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 35px;
+            height: 35px;
+            color: #04846b;
+            user-select: none;
+        }
+
+        /* Estilização das setas (SVG) */
+        .viator-pagination-arrow svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor; /* Cor igual ao texto */
+        }
+
+        .viator-total {
+            text-align: center;
+            margin: 20px 0;
+            font-weight: 600;
+            color: #333;
+            font-size: 1.1em;
+        }
+
+        /* Estilo para o header e o select de ordenação */
+        .viator-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            font-size: 15px;
+        }
+
+        .viator-header-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .viator-header-cancel {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #333;
+            background-color: #d9fff6;
+            padding: 8px 12px;
+            border-radius: 4px;
+        }
+
+        .viator-header-cancel img {
+            width: 15px;
+            height: 15px;
+            object-fit: contain;
+        }
+
+        .viator-sort {
+            position: relative;
+            display: inline-block;
+        }
+
+        .viator-sort:before {
+            content: "Ordenar por:\00a0\00a0\00a0"; /* Usando caracteres Unicode para espaço não-quebrável */
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #666;
+            pointer-events: none;
+            z-index: 1;
+            font-size: 15px;
+            font-weight: 400;
+            white-space: pre; /* Preserva os espaços */
+        }
+
+        .viator-sort select {
+            padding: 8px 12px 8px 115px; /* Ajustado para acomodar o novo espaçamento */
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 15px;
+            min-width: 270px;
+            background-color: #fff;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23333' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: calc(100% - 12px) center;
+            padding-right: 35px;
+            font-weight: 500;
+        }
+
+        /* Alinhamento à esquerda para as opções do dropdown */
+        .viator-sort select option {
+            padding-left: 12px !important;
+            text-align: left;
+            font-size: 15px; /* Mesmo tamanho do header */
+            font-weight: 400; /* Normal para as opções */
+        }
+
+        .viator-sort select:hover {
+            border-color: #999;
+        }
+
+        .viator-sort select:focus {
+            outline: none;
+            border-color: #666;
+            box-shadow: 0 0 0 2px rgba(0,0,0,0.1);
+        }
+
+        .viator-curiosities {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-family: var(--font-primary);
+            color: #333;
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        .viator-curiosities img {
+            width: 15px;
+            height: 15px;
+            object-fit: contain;
+        }
+
+        .viator-curiosities span {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        @media (max-width: 768px) {
+            .viator-sort select {
+                width: 100%;
+                min-width: auto;
+            }
+
+            .viator-header {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .viator-header-info {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+            }
+        }
+
+/* Container principal que envolve filtros e grid */
+.viator-content-wrapper {
+    display: flex;
+    gap: 30px;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px 40px;
+    justify-content: center; /* Centraliza o conteúdo horizontalmente */
+}
+
+/* Container dos resultados */
+.viator-results-container {
+    flex: 1;
+    max-width: 1200px; /* Aumentado de 1000px para 1200px */
+}
+
+/* Sidebar de filtros */
+.viator-filters {
+    width: 300px;
+    height: 500px;
+    flex-shrink: 0;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    background: #fdfdfd;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Ajuste do grid para acomodar a sidebar */
+.viator-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); /* Aumentado de 300px para 350px */
+    gap: 25px;
+    width: 100%;
+    justify-content: center;
+}
+
+/* Ajuste do container de resultados */
+#viator-results {
+    width: 100%;
+    max-width: 1400px;
+    margin: 150px auto 0;
+    padding: 0 20px;
+}
+
+/* Estilo do container do filtro de data */
+.viator-date-filter {
+    display: flex;
+    flex-direction: column;
+    background: #04846b;
+    padding: 20px;
+    border-radius: 10px 10px 0 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.viator-date-filter h3 {
+    display: flex;
+    justify-content: center;
+    font-family: var(--font-primary);
+    font-size: 16px;
+    font-weight: 500;
+    color: #ffffff;
+    margin: 0 0 15px 0;
+}
+
+/* Estilo do botão de seleção de data */
+.viator-date-selector {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: var(--font-primary);
+    font-size: 16px;
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    outline: none; /* Remove o outline padrão */
+    gap: 5px;
+}
+
+.viator-date-selector:hover {
+    border-color: #04846b; /* Cor verde do tema */
+    background-color: #f8f8f8;
+}
+
+.viator-date-selector:focus {
+    border-color: #04846b;
+    box-shadow: 0 0 0 2px rgba(4, 132, 107, 0.1); /* Sombra sutil na cor do tema */
+}
+
+.viator-date-selector i {
+    margin-right: 10px;
+    color: #666;
+}
+
+.viator-date-selector span {
+    color: #666;
+    font-size: 14px;
+    font-weight: 400;
+}
+
+/* Responsividade */
+@media (max-width: 1200px) {
+    .viator-content-wrapper {
+        padding: 20px;
+    }
+    
+    .viator-results-container {
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    .viator-content-wrapper {
+        flex-direction: column;
+        padding: 15px;
+    }
+
+    .viator-filters {
+        width: 100%;
+    }
+}
+
+/* Remover os botões antigos */
+.viator-date-buttons {
+    display: none !important;
+}
+
+/* Estilização do Flatpickr */
+.flatpickr-calendar {
+    font-family: var(--font-primary) !important;
+    box-shadow: 0 3px 13px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Container dos botões dentro do calendário */
+.flatpickr-buttons {
+    display: flex !important;
+    gap: 10px !important;
+    padding: 10px 15px 15px !important;
+    border-top: 1px solid #e6e6e6 !important;
+    background-color: #fff !important;
+}
+
+/* Estilo base para os botões do Flatpickr */
+.flatpickr-button {
+    flex: 1 !important;
+    padding: 8px 15px !important;
+    border-radius: 6px !important;
+    font-family: var(--font-primary) !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+}
+
+/* Botão Redefinir do Flatpickr */
+.flatpickr-button.reset {
+    background-color: transparent !important;
+    border: 1px solid #333 !important;
+    color: #333 !important;
+}
+
+.flatpickr-button.reset:hover {
+    background-color: #f5f5f5 !important;
+}
+
+/* Botão Aplicar do Flatpickr */
+.flatpickr-button.apply {
+    background-color: #008768 !important;
+    border: 1px solid #008768 !important;
+    color: white !important;
+}
+
+.flatpickr-button.apply:hover {
+    background-color: #006b53 !important;
+    border-color: #006b53 !important;
+}
+
+/* Garantir que o seletor de data não tenha estilos indesejados */
+.viator-date-selector {
+    border: 1px solid #ddd !important;
+    background-color: #fff !important;
+}
+
+.viator-date-selector:hover,
+.viator-date-selector:focus {
+    border-color: #008768 !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+/* Estilização personalizada do Flatpickr */
+.flatpickr-calendar {
+    font-family: var(--font-primary) !important;
+    box-shadow: 0 3px 13px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Dia selecionado */
+.flatpickr-day.selected,
+.flatpickr-day.selected:hover,
+.flatpickr-day.selected:focus {
+    background: #04846b !important;
+    border-color: #04846b !important;
+    color: #ffffff !important;
+    font-weight: 500 !important;
+}
+
+/* Hover nos dias */
+.flatpickr-day:hover {
+    background: #f5f5f5 !important;
+    border-color: #04846b !important;
+}
+
+/* Dia atual */
+.flatpickr-day.today {
+    border-color: #04846b !important;
+}
+
+.flatpickr-day.today:hover {
+    background: #f5f5f5 !important;
+    color: #04846b !important;
+}
+
+/* Dias desabilitados */
+.flatpickr-day.disabled,
+.flatpickr-day.disabled:hover {
+    color: rgba(72, 72, 72, 0.3) !important;
+    border-color: transparent !important;
+    background: transparent !important;
+    cursor: not-allowed !important;
+}
+
+/* Mês e ano no cabeçalho */
+.flatpickr-current-month .flatpickr-monthDropdown-months,
+.flatpickr-current-month input.cur-year {
+    font-family: var(--font-primary) !important;
+    font-weight: 500 !important;
+    font-size: 14px !important;
+}
+
+/* Setas de navegação */
+.flatpickr-months .flatpickr-prev-month:hover svg,
+.flatpickr-months .flatpickr-next-month:hover svg {
+    fill: #04846b !important;
+}
+
+/* Estilo para mensagem de erro */
+.viator-error-message {
+    text-align: center !important;
+    font-family: var(--font-primary) !important;
+    font-size: 16px !important;
+    color: #ffffff !important;
+    margin: 30px auto !important;
+    width: fit-content !important; /* Ajusta a largura ao conteúdo */
+    max-width: 90%; /* Limita a largura máxima */
+    background: #93003f !important;
+    border-radius: 7px !important;
+    padding: 10px !important;
+    display: block !important;
+    transition: background-color 0.3s ease !important;
+}
+
+/* Estilo para a mensagem quando está pesquisando */
+.viator-error-message.searching {
+    background-color: #04846b !important;
+}
+
+/* Ajuste para mobile */
+@media (max-width: 768px) {
+    .viator-error-message {
+        width: 90% !important; /* Mais largo em telas pequenas */
+    }
+}
+
+/* Estilização do intervalo de datas */
+.flatpickr-day.inRange {
+    background-color: rgba(4, 132, 107, 0.1) !important;
+    border-color: transparent !important;
+    color: #333 !important;
+    box-shadow: none !important;
+}
+
+.flatpickr-day.selected.startRange,
+.flatpickr-day.startRange.startRange,
+.flatpickr-day.endRange.endRange {
+    background: #04846b !important;
+    border-color: #04846b !important;
+    color: #fff !important;
+}
+
+.flatpickr-day.selected.startRange,
+.flatpickr-day.startRange.startRange {
+    border-radius: 50px 0 0 50px !important;
+}
+
+.flatpickr-day.selected.endRange,
+.flatpickr-day.endRange.endRange {
+    border-radius: 0 50px 50px 0 !important;
+}
+
+/* Manter apenas estas definições atualizadas para as badges */
+.viator-badge-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 1;
+}
+
+.viator-badge {
+    background-color: #c81e3a; /* Cor padrão para "Geralmente se esgota" */
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    white-space: nowrap;
+    text-align: center; /* Centraliza o texto */
+}
+
+/* Badge específica para Oferta especial */
+.viator-badge:contains("Oferta especial") {
+    background-color: #04846b;
+}
+
+/* Alternativa caso o :contains não funcione em alguns navegadores */
+.viator-badge[data-type="special-offer"] {
+    background-color: #04846b;
+}
+
+.viator-original-price {
+    text-decoration: line-through;
+    color: #666;
+    margin-right: 8px;
+}
+
+.viator-discount-price {
+    color: #c81e3a;
+    font-weight: bold;
+}
+
+/* Estilo para as sugestões de destinos */
+.viator-suggestions {
+    text-align: center;
+    margin: 30px auto;
+    max-width: 800px;
+    padding: 20px;
+}
+
+.viator-suggestions p {
+    color: #666;
+    font-size: 16px;
+    margin-bottom: 20px;
+}
+
+.viator-suggestions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    justify-content: center;
+}
+
+/* Aumentando a especificidade e forçando alguns estilos */
+.viator-suggestions .viator-suggestion-btn {
+    background-color: #fff !important;
+    border: 2px solid #04846b !important;
+    color: #04846b !important;
+    padding: 12px 20px !important;
+    border-radius: 8px !important;
+    font-size: 14px !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    font-family: var(--font-primary) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+.viator-suggestions .viator-suggestion-btn:hover,
+.viator-suggestions .viator-suggestion-btn:active,
+.viator-suggestions .viator-suggestion-btn:focus {
+    background-color: #04846b !important;
+    color: #fff !important;
+    transform: translateY(-2px) !important;
+    border-color: #04846b !important;
+}
+
+/* Ajuste responsivo */
+@media (max-width: 768px) {
+    .viator-suggestions-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Animação dos pontos */
+.bouncy-loader {
+    display: inline-flex !important;
+    gap: 3px !important;
+    margin-left: 4px !important;
+}
+
+.bouncy-loader span {
+    width: 5px !important;
+    height: 5px !important;
+    background-color: #fff !important;
+    border-radius: 50% !important;
+    display: inline-block !important;
+    animation: bouncy 0.6s infinite !important;
+}
+
+.bouncy-loader span:nth-child(2) {
+    animation-delay: 0.2s !important;
+}
+
+.bouncy-loader span:nth-child(3) {
+    animation-delay: 0.4s !important;
+}
+
+@keyframes bouncy {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-5px);
+    }
+}
+
+/* Estilo para o filtro de duração */
+.viator-duration-filter {
+    padding: 20px 10px 15px 10px;
+    display: flex; /* Usar flexbox para centralizar o conteúdo */
+    flex-direction: column; /* Alinhar os itens em coluna */
+    align-items: flex-start; /* Alinhar os itens à esquerda */
+    position: relative; /* Para posicionar a borda corretamente */
+    border-bottom: 1px solid #ccc;
+    width: 90%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Título do filtro de duração */
+.viator-duration-filter h3 {
+    font-family: var(--font-primary); /* Fonte do projeto */
+    font-size: 18px; /* Tamanho da fonte */
+    color: #333; /* Cor do texto */
+    margin-bottom: 15px; /* Espaçamento inferior */
+}
+
+/* Estilo para as checkboxes */
+.viator-duration-filter label {
+    display: flex; /* Flexbox para alinhamento */
+    align-items: center; /* Alinhamento vertical */
+    font-family: var(--font-primary); /* Fonte do projeto */
+    font-size: 16px; /* Tamanho da fonte */
+    color: #666; /* Cor do texto */
+    margin-bottom: -10px; /* Reduzir o espaçamento inferior entre as checkboxes */
+    gap: 6px;
+}
+
+/* Estilo para checkboxes */
+.viator-duration-filter input[type="checkbox"] {
+    width: 15px; /* Aumentar o tamanho da checkbox */
+    height: 15px; /* Aumentar o tamanho da checkbox */
+    margin-right: 10px; /* Espaçamento à direita */
+}
+
+/* Estilo para checkboxes marcadas */
+.viator-duration-filter input[type="checkbox"]:checked {
+    accent-color: #04846b; /* Definir a cor verde do projeto quando marcada */
+}
+
+/* Estilo para checkboxes marcadas (aplicando a cor ao label) */
+.viator-duration-filter input[type="checkbox"]:checked + label {
+    color: #04846b !important; /* Cor verde do projeto quando marcada */
+    font-weight: bold !important; /* Negrito quando marcada */
+}
