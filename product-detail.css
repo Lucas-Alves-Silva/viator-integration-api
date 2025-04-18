@@ -386,7 +386,13 @@
 .viator-reviews-filter {
     margin-bottom: 20px;
     display: flex;
-    gap: 10px;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.viator-filter-ratings {
+    display: flex;
     flex-wrap: wrap;
 }
 
@@ -405,6 +411,49 @@
     background-color: #04846b;
     color: #fff;
     border-color: #04846b;
+}
+
+.viator-filter-sort {
+    margin-bottom: 8px;
+}
+
+.viator-filter-sort select {
+    /* === Estilos Originais (mantidos e ajustados) === */
+    padding: 8px 35px 8px 12px; /* Aumenta o padding DIREITO para dar espaço à nova seta */
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #f5f5f5; /* Cor de fundo base */
+    cursor: pointer;
+    min-width: 200px;
+    font-size: 14px;
+    color: #333;
+    outline: none; /* Remove o contorno padrão ao focar */
+  
+    /* === Esconder a seta padrão === */
+    appearance: none; /* Padrão W3C */
+    -webkit-appearance: none; /* Chrome, Safari, Edge */
+    -moz-appearance: none; /* Firefox */
+  
+    /* === Adicionar seta personalizada (como imagem de fundo) === */
+    background-image: url('data:image/svg+xml;utf8,<svg fill="%23666666" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>'); /* SVG de seta para baixo cinza (#666) */
+    background-repeat: no-repeat;
+    background-position: right 10px center; /* Posiciona a seta: 10px da direita, centralizada verticalmente */
+    background-size: 18px 18px; /* Tamanho da imagem da seta */
+  }
+  
+  /* === Estilo opcional para IE (que não suporta 'appearance') === */
+  /* O IE mostrará a seta padrão E a de fundo. Este hack esconde a padrão no IE 10/11 */
+  .viator-filter-sort select::-ms-expand {
+    display: none;
+  }
+
+.viator-filter-sort select:hover {
+    background-color: #e9e9e9;
+}
+
+.viator-filter-sort select:focus {
+    border-color: #04846b;
+    box-shadow: 0 0 0 2px rgba(4, 132, 107, 0.2);
 }
 
 .viator-reviews-list {

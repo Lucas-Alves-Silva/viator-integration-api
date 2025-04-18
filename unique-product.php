@@ -955,12 +955,24 @@ function viator_get_product_details($product_code) {
             </div>
             
             <div class="viator-reviews-filter">
-                <button class="active" data-rating="all">Todas</button>
-                <button data-rating="5">5 estrelas</button>
-                <button data-rating="4">4 estrelas</button>
-                <button data-rating="3">3 estrelas</button>
-                <button data-rating="2">2 estrelas</button>
-                <button data-rating="1">1 estrela</button>
+                <div class="viator-filter-ratings">
+                    <button class="active" data-rating="all">Todas</button>
+                    <button data-rating="5">5 estrelas</button>
+                    <button data-rating="4">4 estrelas</button>
+                    <button data-rating="3">3 estrelas</button>
+                    <button data-rating="2">2 estrelas</button>
+                    <button data-rating="1">1 estrela</button>
+                </div>
+                <div class="viator-filter-sort">
+                    <select id="viator-sort-reviews">
+                        <option value="MOST_RECENT_PER_LOCALE">Mais recentes</option>
+                        <option value="HIGHEST_RATING_PER_LOCALE">Melhor avaliação</option>
+                        <option value="MOST_HELPFUL_PER_LOCALE">Mais úteis</option>
+                        <option value="MOST_RECENT">Mais recentes (todos idiomas)</option>
+                        <option value="HIGHEST_RATING">Melhor avaliação (todos idiomas)</option>
+                        <option value="MOST_HELPFUL">Mais úteis (todos idiomas)</option>
+                    </select>
+                </div>
             </div>
             
             <div class="viator-reviews-list" data-product-code="<?php echo esc_attr($product_code); ?>">

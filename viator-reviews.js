@@ -11,12 +11,14 @@ jQuery(document).ready(function($) {
     // Elements
     const $reviewsList = $('.viator-reviews-list');
     const $pagination = $('.viator-reviews-pagination');
-    const $filterButtons = $('.viator-reviews-filter button');
+    const $filterButtons = $('.viator-reviews-filter .viator-filter-ratings button');
+    const $sortSelect = $('#viator-sort-reviews');
     const $body = $('body');
     
     // State
     let currentPage = 1;
     let currentFilter = 'all';
+    let currentSort = 'MOST_RECENT_PER_LOCALE';
     let totalReviews = 0;
     let totalPages = 0;
     let productCode = $reviewsList.data('product-code');
@@ -44,6 +46,16 @@ jQuery(document).ready(function($) {
         $button.addClass('active');
         
         // Reload reviews with new filter
+        loadReviews(currentPage, currentFilter);
+    });
+    
+    // Event listener para o menu suspenso de ordenação
+    $sortSelect.on('change', function() {
+        currentSort = $(this).val();
+        currentPage = 1;
+        allReviews = []; // Limpa as avaliações ao mudar a ordenação
+        
+        // Reload reviews with new sort option
         loadReviews(currentPage, currentFilter);
     });
     
@@ -261,7 +273,7 @@ jQuery(document).ready(function($) {
             count: REVIEWS_BATCH_SIZE, // Busca um lote maior da API
             start: apiStart,
             ratings: ratingsArray,
-            sort_by: 'MOST_RECENT_PER_LOCALE'
+            sort_by: currentSort
             // Remove o 'limit' fixo, pois agora controlamos pelo 'count' e 'start'
         };
 
