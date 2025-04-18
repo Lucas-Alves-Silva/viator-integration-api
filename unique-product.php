@@ -1029,11 +1029,28 @@ function viator_get_reviews_ajax() {
     $start = isset($_POST['start']) ? intval($_POST['start']) : 1;
     $ratings = isset($_POST['ratings']) && is_array($_POST['ratings']) ? array_map('intval', $_POST['ratings']) : [5, 4, 3, 2, 1];
     $sort_by = isset($_POST['sort_by']) ? sanitize_text_field($_POST['sort_by']) : 'MOST_RECENT_PER_LOCALE';
+
+    // Gerar chave única para o cache com base nos parâmetros da requisição AJAX
+    // Usamos os parâmetros POST originais para garantir que diferentes filtros/páginas tenham caches distintos
+    $cache_key_params = array(
+        'product_code' => $product_code,
+        'count' => isset($_POST['count']) ? intval($_POST['count']) : 10, // Usar o count original do POST para a chave
+        'start' => isset($_POST['start']) ? intval($_POST['start']) : 1, // Usar o start original do POST para a chave
+        'ratings' => isset($_POST['ratings']) && is_array($_POST['ratings']) ? array_map('intval', $_POST['ratings']) : [5, 4, 3, 2, 1],
+        'sort_by' => $sort_by
+    );
+    $cache_key = 'viator_reviews_' . md5(serialize($cache_key_params));
+    $cached_data = get_transient($cache_key);
+
+    // Se houver dados em cache, retorne-os
+    if (false !== $cached_data) {
+        wp_send_json_success($cached_data);
+    }
     
-    // Se o parâmetro limit estiver definido, use-o para sobrescrever o count
-    // Isso permite solicitar mais avaliações da API para paginação no lado do cliente
+    // Se o parâmetro limit estiver definido (usado pelo JS para buscar lotes maiores), use-o para a API
+    // Mas a chave de cache usa os parâmetros originais 'count' e 'start' do JS
     if (isset($_POST['limit']) && intval($_POST['limit']) > $count) {
-        $count = intval($_POST['limit']);
+        $count = intval($_POST['limit']); // $count para a API pode ser diferente do $count para o cache_key
     }
     
     // Prepare request data
@@ -1074,6 +1091,9 @@ function viator_get_reviews_ajax() {
         wp_send_json_error(array('message' => 'Erro da API: ' . $data['error']['message']));
     }
     
+    // Cache the successful response for 1 week (7 days)
+    set_transient($cache_key, $data, WEEK_IN_SECONDS);
+
     // Return reviews data
     wp_send_json_success($data);
 }

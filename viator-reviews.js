@@ -313,7 +313,7 @@ jQuery(document).ready(function($) {
 
         // Check if there are reviews
         if (!allReviews || allReviews.length === 0) {
-            $reviewsList.html('<div class="viator-no-reviews">Nenhuma avaliação encontrada para este filtro.</div>');
+            $reviewsList.html('<div class="viator-no-reviews">Nenhuma avaliação encontrada para esta classificação.</div>');
             $pagination.empty();
             return;
         }
