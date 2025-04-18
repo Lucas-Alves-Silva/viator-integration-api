@@ -426,28 +426,30 @@ function viator_get_product_details($product_code) {
                     </span>
                     
                     <!-- Rating and Reviews -->
-                    <?php if ($rating > 0): ?>
-                        <div class="viator-product-rating">
-                            <span class="viator-stars">
-                                <?php 
-                                $full_stars = floor($rating);
-                                $half_star = ($rating - $full_stars) >= 0.5;
-                                
-                                for ($i = 1; $i <= 5; $i++) {
-                                    if ($i <= $full_stars) {
-                                        echo '★'; // Full star
-                                    } elseif ($i == $full_stars + 1 && $half_star) {
-                                        echo '★'; // Half star - using the same character for consistency
-                                    } else {
-                                        echo '☆'; // Empty star
-                                    }
+                    <div class="viator-product-rating">
+                        <span class="viator-stars">
+                            <?php 
+                            $full_stars = floor($rating);
+                            $half_star = ($rating - $full_stars) >= 0.5;
+                            
+                            for ($i = 1; $i <= 5; $i++) {
+                                if ($i <= $full_stars) {
+                                    echo '★'; // Full star
+                                } elseif ($i == $full_stars + 1 && $half_star) {
+                                    echo '★'; // Half star - using the same character for consistency
+                                } else {
+                                    echo '☆'; // Empty star
                                 }
-                                ?>
-                            </span>
+                            }
+                            ?>
+                        </span>
+                        <?php if ($rating > 0): ?>
                             <span class="viator-rating-number"><?php echo number_format($rating, 1); ?></span>
                             <a href="#viator-reviews" class="viator-review-count">(<?php echo $review_count; ?> <?php echo $review_count == 1 ? 'avaliação' : 'avaliações'; ?>)</a>
-                        </div>
-                    <?php endif; ?>
+                        <?php else: ?>
+                            <span class="viator-review-count">Sem avaliações</span>
+                        <?php endif; ?>
+                    </div>
     
                     <!-- Flags/Badges -->
                     <div class="viator-product-flags">
