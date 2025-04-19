@@ -1436,12 +1436,12 @@
 
 /* Badge específica para Oferta especial */
 .viator-badge:contains("Oferta especial") {
-    background-color: #04846b;
+    background-color: #FF8C00;
 }
 
 /* Alternativa caso o :contains não funcione em alguns navegadores */
 .viator-badge[data-type="special-offer"] {
-    background-color: #04846b;
+    background-color: #FF8C00;
 }
 
 .viator-original-price {

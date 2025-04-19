@@ -175,16 +175,20 @@ function viator_get_product_details($product_code) {
             if (isset($stored_price_data['fromPriceBeforeDiscount']) && !empty($stored_price_data['fromPriceBeforeDiscount'])) {
                 $original_price = 'R$ ' . number_format($stored_price_data['fromPriceBeforeDiscount'], 2, ',', '.');
             }
-            
-            // Update flags if they're available in stored data
-            if (isset($stored_price_data['flags']) && is_array($stored_price_data['flags'])) {
-                $flags = array_unique(array_merge($flags, $stored_price_data['flags']));
-                $has_free_cancellation = in_array('FREE_CANCELLATION', $flags);
-                $is_likely_to_sell_out = in_array('LIKELY_TO_SELL_OUT', $flags);
-                $is_special_offer = in_array('SPECIAL_OFFER', $flags);
-            }
+            // Removida chave extra aqui
         }
     }
+
+    // Always check for stored flags and merge them after checking API/price data
+    $stored_price_data = get_option('viator_product_' . $product_code . '_price'); // Re-fetch in case it wasn't fetched above
+    if ($stored_price_data && isset($stored_price_data['flags']) && is_array($stored_price_data['flags'])) {
+        $flags = array_unique(array_merge($flags, $stored_price_data['flags']));
+    }
+
+    // Set boolean flags based on the final $flags array
+    $has_free_cancellation = in_array('FREE_CANCELLATION', $flags);
+    $is_likely_to_sell_out = in_array('LIKELY_TO_SELL_OUT', $flags);
+    $is_special_offer = in_array('SPECIAL_OFFER', $flags);
     
     // Get duration
     $duration = 'Duração não disponível';
@@ -328,12 +332,6 @@ function viator_get_product_details($product_code) {
         }
     }
     
-    // Get flags
-    $flags = isset($product['flags']) ? $product['flags'] : [];
-    $has_free_cancellation = in_array('FREE_CANCELLATION', $flags);
-    $is_likely_to_sell_out = in_array('LIKELY_TO_SELL_OUT', $flags);
-    $is_special_offer = in_array('SPECIAL_OFFER', $flags);
-    
     // Get inclusions and exclusions
     $inclusions = isset($product['inclusions']) ? $product['inclusions'] : [];
     $exclusions = isset($product['exclusions']) ? $product['exclusions'] : [];
@@ -372,6 +370,22 @@ function viator_get_product_details($product_code) {
     
     // Get tags
     $tags = isset($product['tags']) ? $product['tags'] : [];
+
+    // Comentado para resolver erro de chave não correspondente
+    /*
+    error_log('--- Debugging Flags ---');
+    error_log('Product Code: ' . $product_code);
+    error_log('Flags Array: ' . print_r($flags, true));
+    error_log('Has Free Cancellation: ' . ($has_free_cancellation ? 'true' : 'false'));
+    error_log('Is Likely to Sell Out: ' . ($is_likely_to_sell_out ? 'true' : 'false'));
+    error_log('Is Special Offer: ' . ($is_special_offer ? 'true' : 'false'));
+    echo '<pre style="background: #eee; padding: 10px; border: 1px solid #ccc; margin: 10px 0; font-size: 12px; white-space: pre-wrap; word-wrap: break-word;">Debug Flags (Final Check):<br>';
+    echo 'Flags Array: '; var_dump($flags);
+    echo 'Has Free Cancellation: '; var_dump($has_free_cancellation);
+    echo 'Is Likely to Sell Out: '; var_dump($is_likely_to_sell_out);
+    echo 'Is Special Offer: '; var_dump($is_special_offer);
+    echo '</pre>';
+    */
     
     // Start HTML output
     ob_start();
@@ -399,6 +413,18 @@ function viator_get_product_details($product_code) {
                 <?php if (!empty($images)): ?>
                     <div class="viator-main-image">
                         <img src="<?php echo esc_url($images[0]); ?>" alt="<?php echo esc_attr($title); ?>">
+                        <!-- Flags/Badges fixos sobre a imagem principal -->
+                        <div class="viator-badge-container">
+                            <?php if ($has_free_cancellation): ?>
+                                <span class="viator-badge" data-type="free-cancellation">Cancelamento gratuito</span>
+                            <?php endif; ?>
+                            <?php if ($is_likely_to_sell_out): ?>
+                                <span class="viator-badge" data-type="sell-out">Geralmente se esgota</span>
+                            <?php endif; ?>
+                            <?php if ($is_special_offer): ?>
+                                <span class="viator-badge" data-type="special-offer">Oferta especial</span>
+                            <?php endif; ?>
+                        </div>
                     </div>
                     <?php if (count($images) > 1): ?>
                         <div class="viator-thumbnails">
@@ -451,18 +477,7 @@ function viator_get_product_details($product_code) {
                         <?php endif; ?>
                     </div>
     
-                    <!-- Flags/Badges -->
-                    <div class="viator-product-flags">
-                        <?php if ($has_free_cancellation): ?>
-                            <span class="viator-flag viator-flag-cancelamento">Cancelamento Gratuito</span>
-                        <?php endif; ?>
-                        <?php if ($is_likely_to_sell_out): ?>
-                            <span class="viator-flag viator-flag-esgotamento">Propenso a Esgotar</span>
-                        <?php endif; ?>
-                        <?php if ($is_special_offer): ?>
-                            <span class="viator-flag viator-flag-oferta">Oferta Especial</span>
-                        <?php endif; ?>
-                    </div>
+
     
                     <!-- Price Section -->
                     <div class="viator-product-price-section">
