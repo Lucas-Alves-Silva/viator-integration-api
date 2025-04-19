@@ -23,6 +23,7 @@
     border-radius: 8px;
     overflow: hidden;
     cursor: pointer; /* Add cursor pointer to indicate it's clickable */
+    position: relative; /* Necessário para posicionar os badges */
 }
 
 .viator-main-image img {
@@ -34,6 +35,39 @@
 
 .viator-main-image img:hover {
     transform: scale(1.02); /* Slight zoom effect on hover */
+}
+
+/* Estilos para os badges fixos sobre a imagem principal */
+.viator-main-image .viator-badge-container {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.viator-main-image .viator-badge {
+    display: inline-block;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    color: white;
+    text-align: center;
+}
+
+.viator-main-image .viator-badge[data-type="free-cancellation"] {
+    background-color: #04846b;
+}
+
+.viator-main-image .viator-badge[data-type="sell-out"] {
+    background-color: #E74C3C;
+}
+
+.viator-main-image .viator-badge[data-type="special-offer"] {
+    background-color: #ff8c00;
 }
 
 .viator-thumbnails {
