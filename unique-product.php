@@ -371,6 +371,241 @@ function viator_get_product_details($product_code) {
     // Get tags
     $tags = isset($product['tags']) ? $product['tags'] : [];
 
+    // --- INÍCIO DA BUSCA POR RECOMENDAÇÕES ---
+    $recommendations = [];
+    $api_key = get_option('viator_api_key'); // Ensure API key is available
+
+    if (!empty($api_key)) {
+        $recommendation_url = "https://api.sandbox.viator.com/partner/products/recommendations";
+        $recommendation_body = [
+            'productCodes' => [$product_code],
+            'recommendationTypes' => ['IS_SIMILAR_TO']
+        ];
+        $rec_response = wp_remote_post($recommendation_url, [
+            'headers' => [
+                'Accept' => 'application/json;version=2.0',
+                'Content-Type' => 'application/json;version=2.0',
+                'exp-api-key' => $api_key,
+                'Accept-Language' => 'pt-BR',
+            ],
+            'body' => json_encode($recommendation_body),
+            'timeout' => 20,
+        ]);
+
+        if (!is_wp_error($rec_response) && wp_remote_retrieve_response_code($rec_response) === 200) {
+            $rec_body = wp_remote_retrieve_body($rec_response);
+            $rec_data = json_decode($rec_body, true);
+
+            if (is_array($rec_data) && !empty($rec_data[0]['recommendations']['IS_SIMILAR_TO'])) {
+                $similar_codes = array_slice($rec_data[0]['recommendations']['IS_SIMILAR_TO'], 0, 6);
+
+                foreach ($similar_codes as $sim_code) {
+                    $sim_cache_key = 'viator_product_' . $sim_code . '_basic';
+                    $cached_rec = get_transient($sim_cache_key);
+                    $rec_item = null;
+
+                    if ($cached_rec) {
+                        $rec_item = $cached_rec;
+                    } else {
+                        // Fetch basic details if not cached
+                        $sim_url = "https://api.sandbox.viator.com/partner/products/{$sim_code}";
+                        $sim_resp = wp_remote_get($sim_url, [
+                            'headers' => [
+                                'Accept' => 'application/json;version=2.0',
+                                'Content-Type' => 'application/json;version=2.0',
+                                'exp-api-key' => $api_key,
+                                'Accept-Language' => 'pt-BR',
+                            ],
+                            'timeout' => 15,
+                        ]);
+
+                        if (!is_wp_error($sim_resp) && wp_remote_retrieve_response_code($sim_resp) === 200) {
+                            $sim_body = wp_remote_retrieve_body($sim_resp);
+                            $sim_prod = json_decode($sim_body, true);
+
+                            if (!empty($sim_prod) && isset($sim_prod['title'])) {
+                                $img_url = '';
+                                if (!empty($sim_prod['images']) && is_array($sim_prod['images'])) {
+                                    $best_variant = null;
+                                    foreach ($sim_prod['images'] as $img) {
+                                        if (!empty($img['variants']) && is_array($img['variants'])) {
+                                            usort($img['variants'], function($a, $b) {
+                                                $area_a = ($a['width'] ?? 0) * ($a['height'] ?? 0);
+                                                $area_b = ($b['width'] ?? 0) * ($b['height'] ?? 0);
+                                                return $area_b <=> $area_a;
+                                            });
+                                            foreach ($img['variants'] as $variant) {
+                                                if (($variant['width'] ?? 0) >= 300 && ($variant['height'] ?? 0) >= 200) {
+                                                    $best_variant = $variant;
+                                                    break;
+                                                }
+                                            }
+                                            if ($best_variant) break;
+                                            if (!$best_variant && !empty($img['variants'][0])) {
+                                                $best_variant = $img['variants'][0];
+                                            }
+                                        }
+                                    }
+                                    if ($best_variant && !empty($best_variant['url'])) {
+                                        $img_url = $best_variant['url'];
+                                    }
+                                }
+
+                                $rec_item = [
+                                    'productCode' => $sim_code,
+                                    'title' => $sim_prod['title'],
+                                    'image' => $img_url,
+                                    'destination' => isset($sim_prod['location']['address']['destination']) ? $sim_prod['location']['address']['destination'] : '',
+                                    'url' => home_url('/passeio/' . $sim_code . '/'), // Corrected URL format
+                                    // Initialize price/rating fields to be fetched later
+                                    'current_price_val' => null,
+                                    'original_price_val' => null,
+                                    'rating_avg' => 0,
+                                    'review_count' => 0
+                                ];
+                                // Cache basic data
+                                set_transient($sim_cache_key, $rec_item, DAY_IN_SECONDS);
+                            }
+                        } else {
+                            error_log("Erro ao buscar detalhes para recomendação {$sim_code}: " . (is_wp_error($sim_resp) ? $sim_resp->get_error_message() : wp_remote_retrieve_response_message($sim_resp)));
+                        }
+                    }
+
+                    // If we have basic item data (from cache or API), fetch price/rating from stored options
+                    if ($rec_item) {
+                        $rec_stored_data = get_option('viator_product_' . $sim_code . '_price');
+                        if ($rec_stored_data) {
+                            // Price
+                            if (isset($rec_stored_data['fromPrice']) && is_numeric($rec_stored_data['fromPrice'])) {
+                                $rec_item['current_price_val'] = $rec_stored_data['fromPrice'];
+                                if (isset($rec_stored_data['fromPriceBeforeDiscount']) && !empty($rec_stored_data['fromPriceBeforeDiscount']) && is_numeric($rec_stored_data['fromPriceBeforeDiscount'])) {
+                                    $rec_item['original_price_val'] = $rec_stored_data['fromPriceBeforeDiscount'];
+                                }
+                            }
+                            // Rating
+                            $rec_item['rating_avg'] = isset($rec_stored_data['rating']) ? floatval($rec_stored_data['rating']) : 0;
+                            $rec_item['review_count'] = isset($rec_stored_data['reviewCount']) ? intval($rec_stored_data['reviewCount']) : 0;
+                        }
+                        $recommendations[] = $rec_item; // Add the enhanced item to recommendations list
+                    }
+                }
+            }
+        } else {
+            error_log("Erro ao buscar recomendações para {$product_code}: " . (is_wp_error($rec_response) ? $rec_response->get_error_message() : wp_remote_retrieve_response_message($rec_response)));
+        }
+    }
+    $recommendations = [];
+    $recommendation_url = "https://api.sandbox.viator.com/partner/products/recommendations";
+    $recommendation_body = [
+        'productCodes' => [$product_code],
+        'recommendationTypes' => ['IS_SIMILAR_TO']
+    ];
+    $rec_response = wp_remote_post($recommendation_url, [
+        'headers' => [
+            'Accept' => 'application/json;version=2.0',
+            'Content-Type' => 'application/json;version=2.0',
+            'exp-api-key' => $api_key, // Reutiliza a chave API já obtida
+            'Accept-Language' => 'pt-BR',
+        ],
+        'body' => json_encode($recommendation_body),
+        'timeout' => 20, // Timeout um pouco maior para a requisição POST
+    ]);
+
+    if (!is_wp_error($rec_response) && wp_remote_retrieve_response_code($rec_response) === 200) {
+        $rec_body = wp_remote_retrieve_body($rec_response);
+        $rec_data = json_decode($rec_body, true);
+
+        // Verifica se a resposta é válida e se existem recomendações 'IS_SIMILAR_TO'
+        if (is_array($rec_data) && !empty($rec_data[0]['recommendations']['IS_SIMILAR_TO'])) {
+            // Pega os primeiros 6 códigos de produtos recomendados
+            $similar_codes = array_slice($rec_data[0]['recommendations']['IS_SIMILAR_TO'], 0, 6);
+
+            foreach ($similar_codes as $sim_code) {
+                // Tenta obter dados básicos do cache
+                $sim_cache_key = 'viator_product_' . $sim_code . '_basic';
+                $cached_rec = get_transient($sim_cache_key);
+
+                if ($cached_rec) {
+                    $recommendations[] = $cached_rec;
+                } else {
+                    // Se não estiver no cache, busca detalhes básicos do produto recomendado
+                    $sim_url = "https://api.sandbox.viator.com/partner/products/{$sim_code}";
+                    $sim_resp = wp_remote_get($sim_url, [
+                        'headers' => [
+                            'Accept' => 'application/json;version=2.0',
+                            'Content-Type' => 'application/json;version=2.0',
+                            'exp-api-key' => $api_key,
+                            'Accept-Language' => 'pt-BR',
+                        ],
+                        'timeout' => 15, // Timeout para buscar detalhes individuais
+                    ]);
+
+                    if (!is_wp_error($sim_resp) && wp_remote_retrieve_response_code($sim_resp) === 200) {
+                        $sim_body = wp_remote_retrieve_body($sim_resp);
+                        $sim_prod = json_decode($sim_body, true);
+
+                        if (!empty($sim_prod) && isset($sim_prod['title'])) {
+                            $img_url = '';
+                            // Lógica para encontrar a melhor imagem
+                            if (!empty($sim_prod['images']) && is_array($sim_prod['images'])) {
+                                $best_variant = null;
+                                foreach ($sim_prod['images'] as $img) {
+                                    if (!empty($img['variants']) && is_array($img['variants'])) {
+                                        // Ordena as variantes pela área (largura * altura) em ordem decrescente
+                                        usort($img['variants'], function($a, $b) {
+                                            $area_a = ($a['width'] ?? 0) * ($a['height'] ?? 0);
+                                            $area_b = ($b['width'] ?? 0) * ($b['height'] ?? 0);
+                                            return $area_b <=> $area_a; // Ordena do maior para o menor
+                                        });
+
+                                        // Tenta encontrar uma imagem com pelo menos 300x200
+                                        foreach ($img['variants'] as $variant) {
+                                            if (($variant['width'] ?? 0) >= 300 && ($variant['height'] ?? 0) >= 200) {
+                                                $best_variant = $variant;
+                                                break; // Encontrou uma boa imagem, sai do loop interno
+                                            }
+                                        }
+                                        // Se encontrou uma boa imagem, sai do loop externo também
+                                        if ($best_variant) break;
+
+                                        // Se não encontrou 300x200, pega a maior disponível (primeira após ordenar)
+                                        if (!$best_variant && !empty($img['variants'][0])) {
+                                            $best_variant = $img['variants'][0];
+                                            // Continua procurando em outras imagens, caso haja uma melhor
+                                        }
+                                    }
+                                }
+                                // Se encontrou alguma variante, pega a URL
+                                if ($best_variant && !empty($best_variant['url'])) {
+                                    $img_url = $best_variant['url'];
+                                }
+                            }
+
+                            $rec_item = [
+                                'productCode' => $sim_code,
+                                'title' => $sim_prod['title'],
+                                'price' => isset($sim_prod['pricing']['summary']['fromPrice']) ? $sim_prod['pricing']['summary']['fromPrice'] : 0,
+                                'image' => $img_url,
+                                'destination' => isset($sim_prod['location']['address']['destination']) ? $sim_prod['location']['address']['destination'] : '',
+                                'url' => esc_url(add_query_arg('product_code', $sim_code, home_url('/passeio/'))) // Gera a URL aqui
+                            ];
+                            $recommendations[] = $rec_item;
+                            // Armazena os dados básicos no cache por 1 dia
+                            set_transient($sim_cache_key, $rec_item, DAY_IN_SECONDS);
+                        }
+                    } else {
+                         // Opcional: Logar erro ao buscar detalhes do produto recomendado
+                         error_log("Erro ao buscar detalhes para recomendação {$sim_code}: " . (is_wp_error($sim_resp) ? $sim_resp->get_error_message() : wp_remote_retrieve_response_message($sim_resp)));
+                    }
+                }
+            }
+        }
+    } else {
+        // Opcional: Logar erro ao buscar recomendações
+        error_log("Erro ao buscar recomendações para {$product_code}: " . (is_wp_error($rec_response) ? $rec_response->get_error_message() : wp_remote_retrieve_response_message($rec_response)));
+    }
+    // --- FIM DA BUSCA POR RECOMENDAÇÕES ---
+
     // Comentado para resolver erro de chave não correspondente
     /*
     error_log('--- Debugging Flags ---');
@@ -998,13 +1233,86 @@ function viator_get_product_details($product_code) {
             
             <div class="viator-reviews-pagination"></div>
         </div>
+
+        <!-- Seção de Recomendações -->
+        <?php if (!empty($recommendations)): ?>
+        <div class="viator-recommendations">
+            <h3>Você também pode gostar</h3>
+            <div class="viator-recommendations-grid">
+                <?php foreach ($recommendations as $rec): ?>
+                <div class="viator-recommendation-card">
+                    <a href="<?php echo esc_url($rec['url']); ?>" target="_blank" rel="noopener noreferrer">
+                        <div class="viator-recommendation-image">
+                            <?php if (!empty($rec['image'])): ?>
+                            <img src="<?php echo esc_url($rec['image']); ?>" alt="<?php echo esc_attr($rec['title']); ?>" loading="lazy">
+                            <?php else: ?>
+                            <div class="viator-no-image"><span>Imagem não disponível</span></div>
+                            <?php endif; ?>
+                        </div>
+                        <div class="viator-recommendation-info">
+                            <h4><?php echo esc_html($rec['title']); ?></h4>
+
+                            <?php // Display Rating
+                            if ($rec['rating_avg'] > 0): 
+                                $stars_html = '';
+                                $full_stars = floor($rec['rating_avg']);
+                                $half_star = ($rec['rating_avg'] - $full_stars) >= 0.5;
+                                
+                                for ($i = 0; $i < $full_stars; $i++) {
+                                    $stars_html .= '<span class="star full-star">★</span>';
+                                }
+                                if ($half_star) {
+                                    $stars_html .= '<span class="star half-star">★</span>'; // Needs CSS for half star visual
+                                    $full_stars++;
+                                }
+                                $empty_stars = 5 - $full_stars;
+                                for ($i = 0; $i < $empty_stars; $i++) {
+                                    $stars_html .= '<span class="star empty-star">☆</span>';
+                                }
+                            ?>
+                            <div class="viator-recommendation-rating">
+                                <?php echo $stars_html; ?>
+                                <?php if ($rec['review_count'] > 0): ?>
+                                <span class="review-count">(<?php echo esc_html($rec['review_count']); ?>)</span>
+                                <?php endif; ?>
+                            </div>
+                            <?php endif; // end rating display ?>
+
+                            <?php // Display Price
+                            $rec_price_display = 'Preço sob consulta';
+                            $rec_original_price_display = '';
+                            if ($rec['current_price_val'] !== null) {
+                                $rec_price_display = 'R$ ' . number_format($rec['current_price_val'], 2, ',', '.');
+                                if ($rec['original_price_val'] !== null && $rec['original_price_val'] > $rec['current_price_val']) {
+                                    $rec_original_price_display = 'R$ ' . number_format($rec['original_price_val'], 2, ',', '.');
+                                } else {
+                                    // If no discount or original price is same/lower, display as 'A partir de'
+                                    $rec_price_display = 'A partir de ' . $rec_price_display;
+                                }
+                            }
+                            ?>
+                            <div class="viator-recommendation-price">
+                                <?php if (!empty($rec_original_price_display)): ?>
+                                    <span class="original-price"><?php echo esc_html($rec_original_price_display); ?></span>
+                                <?php endif; ?>
+                                <span class="current-price"><?php echo esc_html($rec_price_display); ?></span>
+                            </div>
+
+                        </div>
+                    </a>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+        <!-- Fim Seção de Recomendações -->
         
         <!-- Tags -->
         <?php if (!empty($tags)): ?>
             <div class="viator-tags">
                 <h2>Tags</h2>
                 <div class="viator-tag-list">
-                    <?php foreach ($tags as $tag): ?>
+                    <?php foreach ($tags as $tag): // Corrected loop variable ?>
                         <span class="viator-tag"><?php echo esc_html($tag); ?></span>
                     <?php endforeach; ?>
                 </div>
