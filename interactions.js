@@ -951,3 +951,160 @@ function setSearchDestination(destino) {
         searchInput.closest('form').submit();
     }
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar o carrossel de recomendações
+    initRecommendationsCarousel();
+});
+
+/**
+ * Inicializa o carrossel de recomendações
+ */
+function initRecommendationsCarousel() {
+    // Buscar os elementos do carrossel
+    const recommendationsGrid = document.querySelector('.viator-recommendations-grid');
+    const recommendationsSection = document.querySelector('.viator-recommendations');
+    
+    // Se não existirem os elementos, sair da função
+    if (!recommendationsGrid || !recommendationsSection) return;
+    
+    // Criar botões de navegação, se ainda não existirem
+    if (!document.querySelector('.viator-carousel-prev')) {
+        // Botão anterior
+        const prevButton = document.createElement('button');
+        prevButton.className = 'viator-carousel-control viator-carousel-prev';
+        prevButton.innerHTML = '&#10094;';
+        prevButton.setAttribute('aria-label', 'Anterior');
+        recommendationsSection.appendChild(prevButton);
+        
+        // Botão próximo
+        const nextButton = document.createElement('button');
+        nextButton.className = 'viator-carousel-control viator-carousel-next';
+        nextButton.innerHTML = '&#10095;';
+        nextButton.setAttribute('aria-label', 'Próximo');
+        recommendationsSection.appendChild(nextButton);
+        
+        // Adicionar event listeners aos botões
+        prevButton.addEventListener('click', () => {
+            scrollCarousel(-1);
+        });
+        
+        nextButton.addEventListener('click', () => {
+            scrollCarousel(1);
+        });
+    }
+    
+    /**
+     * Faz o scroll do carrossel na direção especificada
+     * @param {number} direction - Direção do scroll (-1 para esquerda, 1 para direita)
+     */
+    function scrollCarousel(direction) {
+        // Calcular a largura visível e a distância de scroll
+        const cardWidth = recommendationsGrid.querySelector('.viator-recommendation-card').offsetWidth;
+        const gap = 20; // gap entre os cards (definido no CSS)
+        const visibleCards = 2.5; // 2 completos e meio do 3º
+        const scrollAmount = direction * (cardWidth * visibleCards + gap * 2);
+        
+        // Animar o scroll
+        recommendationsGrid.scrollBy({
+            left: scrollAmount,
+            behavior: 'smooth'
+        });
+        
+        // Atualizar botões após a animação
+        setTimeout(updateNavigationButtons, 500);
+    }
+    
+    // Atualizar a visibilidade dos botões de navegação com base na posição do scroll
+    recommendationsGrid.addEventListener('scroll', updateNavigationButtons);
+    
+    // Verificar a visibilidade dos botões inicialmente
+    updateNavigationButtons();
+    
+    function updateNavigationButtons() {
+        const prevButton = document.querySelector('.viator-carousel-prev');
+        const nextButton = document.querySelector('.viator-carousel-next');
+        
+        if (!prevButton || !nextButton) return;
+        
+        // Verificar se há scroll para a esquerda
+        prevButton.style.display = recommendationsGrid.scrollLeft <= 5 ? 'none' : 'flex';
+        
+        // Verificar se há scroll para a direita
+        const maxScrollLeft = recommendationsGrid.scrollWidth - recommendationsGrid.clientWidth;
+        nextButton.style.display = recommendationsGrid.scrollLeft >= maxScrollLeft - 5 ? 'none' : 'flex';
+    }
+    
+    // Verificar se há cards suficientes para necessitar de navegação
+    function checkIfNavigationNeeded() {
+        const cards = recommendationsGrid.querySelectorAll('.viator-recommendation-card');
+        const containerWidth = recommendationsGrid.clientWidth;
+        const cardWidth = cards.length > 0 ? cards[0].offsetWidth : 0;
+        const gap = 20; // gap entre os cards (definido no CSS)
+        
+        // Se há menos de 4 cards ou todos cabem no container, esconder botões de navegação
+        if (cards.length < 4 || (cards.length * (cardWidth + gap) <= containerWidth)) {
+            const prevButton = document.querySelector('.viator-carousel-prev');
+            const nextButton = document.querySelector('.viator-carousel-next');
+            
+            if (prevButton) prevButton.style.display = 'none';
+            if (nextButton) nextButton.style.display = 'none';
+        }
+    }
+    
+    // Executar a verificação inicial
+    checkIfNavigationNeeded();
+    
+    // Reiniciar verificação ao redimensionar janela
+    window.addEventListener('resize', () => {
+        checkIfNavigationNeeded();
+        updateNavigationButtons();
+    });
+    
+    // Adicionar suporte a eventos de touch para dispositivos móveis
+    let touchStartX = 0;
+    let touchEndX = 0;
+    
+    recommendationsGrid.addEventListener('touchstart', function(e) {
+        touchStartX = e.changedTouches[0].screenX;
+    }, false);
+    
+    recommendationsGrid.addEventListener('touchend', function(e) {
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe();
+    }, false);
+    
+    function handleSwipe() {
+        const threshold = 50; // Mínimo de pixels para considerar como swipe
+        
+        if (touchStartX - touchEndX > threshold) {
+            // Swipe para a esquerda - avançar carrossel
+            scrollCarousel(1);
+        } else if (touchEndX - touchStartX > threshold) {
+            // Swipe para a direita - voltar carrossel
+            scrollCarousel(-1);
+        }
+    }
+}
+
+// Observador de mutação para reinicializar o carrossel quando o conteúdo for atualizado
+const carouselObserver = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+        if (mutation.type === 'childList' && 
+            (mutation.target.classList.contains('viator-recommendations-grid') || 
+             mutation.target.closest('.viator-recommendations'))) {
+            initRecommendationsCarousel();
+        }
+    });
+});
+
+// Iniciar observação do conteúdo da página
+document.addEventListener('DOMContentLoaded', function() {
+    const recommendationsSection = document.querySelector('.viator-recommendations');
+    if (recommendationsSection) {
+        carouselObserver.observe(recommendationsSection, {
+            childList: true,
+            subtree: true
+        });
+    }
+});

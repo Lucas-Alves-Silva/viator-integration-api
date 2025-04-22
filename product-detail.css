@@ -642,8 +642,9 @@
 /* --- Seção de Recomendações --- */
 .viator-recommendations {
     margin: 40px 0;
-    padding: 30px;
+    padding: 40px 50px; /* Aumentado para dar mais espaço para as setas */
     border-radius: 8px;
+    position: relative; /* Para posicionar as setas de navegação */
 }
 
 .viator-recommendations h3 {
@@ -655,55 +656,61 @@
 }
 
 .viator-recommendations-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Grid responsivo */
+    display: flex; /* Modificado para flex para permitir o scroll horizontal */
+    overflow-x: hidden; /* Esconde o overflow, mas permite scroll via botões */
+    scroll-behavior: smooth; /* Garante animação suave ao navegar */
     gap: 20px;
+    width: 100%;
+    position: relative;
+    padding: 10px 0; /* Espaço para sombra/efeitos */
+    -webkit-overflow-scrolling: touch; /* Suporte para melhor rolagem em iOS */
 }
 
+/* Cards de recomendação com o mesmo estilo dos cards da grid principal */
 .viator-recommendation-card {
-    background-color: #fff;
-    border-radius: 8px;
-    overflow: hidden; /* Garante que nada interno (como a imagem com hover) ultrapasse as bordas arredondadas */
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    flex: 0 0 calc(33.333% - 15px); /* 3 colunas, com a última parcialmente visível */
     display: flex;
     flex-direction: column;
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    scroll-snap-align: start; /* Para alinhamento quando rolado */
 }
 
 .viator-recommendation-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.12);
+    transform: translateY(-8px);
 }
 
+/* Links e estrutura interna do card */
 .viator-recommendation-card a {
     text-decoration: none;
     color: inherit;
     display: flex;
     flex-direction: column;
-    height: 100%; /* Faz o link preencher o card */
+    height: 100%;
 }
 
+/* Imagem do card com efeito de hover similar ao viator-grid */
 .viator-recommendation-image {
-    height: 180px;
-    background-color: #eee;
+    width: 100%;
+    height: 180px; /* Reduzido para dar mais espaço ao conteúdo */
+    overflow: hidden;
     position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden; /* Adicionado para garantir que a imagem não transborde */
 }
 
 .viator-recommendation-image img {
     width: 100%;
-    height: 100%;
+    height: 120%; /* Aumenta a altura da imagem para ter espaço para mover */
     object-fit: cover;
-    display: block;
-    transition: transform 0.3s ease; /* Adiciona transição suave ao zoom da imagem */
+    object-position: center top; /* Alinha ao topo */
+    transform: translateY(0); /* Posição inicial */
+    transition: transform 0.8s ease; /* Transição suave para o movimento vertical */
 }
 
-/* Efeito de zoom na imagem ao passar o mouse sobre o card */
 .viator-recommendation-card:hover .viator-recommendation-image img {
-    transform: scale(1.05);
+    transform: translateY(-20%); /* Move a imagem para cima no hover */
 }
 
 .viator-no-image {
@@ -717,43 +724,62 @@
     font-size: 14px;
 }
 
-/* Estilos para a seção de recomendações (Ajustes e Adições) */
+/* Conteúdo do card com estilos similares aos viator-card-content */
 .viator-recommendation-info {
-    padding: 15px;
+    padding: 15px; /* Reduzido para dar mais espaço ao conteúdo */
+    flex: 1;
     display: flex;
     flex-direction: column;
-    flex-grow: 1; /* Faz esta div crescer para preencher o espaço */
+    gap: 8px; /* Reduzido para aproximar os elementos */
+    justify-content: space-between;
 }
 
 .viator-recommendation-info h4 {
-    font-size: 16px; /* Ajuste conforme necessário */
+    font-size: 16px; /* Reduzido para melhorar UX */
     font-weight: 600;
     color: #333;
-    margin-bottom: 8px;
-    /* Removido min-height para permitir que o texto flua naturalmente */
-    line-height: 1.3; /* Melhora a legibilidade */
+    margin: 0;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2; /* Limita a 2 linhas */
+    line-clamp: 2; /* Propriedade padrão para compatibilidade futura */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    height: 2.6em; /* Altura fixa para 2 linhas */
 }
 
 .viator-recommendation-rating {
     font-size: 14px;
-    margin-bottom: 10px;
-    color: #ffc107; /* Cor padrão para estrelas */
+    color: #FFD700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap; /* Permite quebra em telas menores */
 }
 
-.viator-recommendation-rating .star {
-    /* Estilos básicos para estrelas */
+.viator-recommendation-rating .star,
+.viator-recommendation-rating .empty-star,
+.viator-recommendation-rating .half-star {
     display: inline-block;
 }
-.viator-recommendation-rating .empty-star {
-    color: #ccc; /* Cor para estrelas vazias */
+
+.viator-recommendation-rating .rating-value {
+    margin-left: 5px;
+    font-weight: 600;
+    color: #333;
 }
-/* Para meia estrela, você pode usar um ícone diferente ou pseudo-elementos com CSS mais avançado */
+
+.viator-recommendation-rating .empty-star {
+    color: #ccc;
+}
+
 .viator-recommendation-rating .half-star {
-     /* Exemplo básico: pode precisar de ajuste */
     position: relative;
     display: inline-block;
     color: #ffc107;
 }
+
 .viator-recommendation-rating .half-star::before {
     content: '★';
     position: absolute;
@@ -762,47 +788,137 @@
     width: 50%;
     overflow: hidden;
 }
-.viator-recommendation-rating .half-star::after {
-     content: '☆';
-     color: #ccc;
-}
 
+.viator-recommendation-rating .half-star::after {
+    content: '☆';
+    color: #ccc;
+}
 
 .viator-recommendation-rating .review-count {
     font-size: 13px;
     color: #666;
     margin-left: 5px;
+    white-space: nowrap;
 }
 
+/* Preço similar ao viator-card-price */
 .viator-recommendation-price {
-    font-size: 15px;
-    font-weight: 600;
-    color: #333; /* Cor base do preço */
-    margin-top: auto; /* Empurra o preço para baixo */
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+    font-size: 16px; /* Reduzido para melhorar UX */
+    margin-top: auto;
     line-height: 1.4;
+}
+
+.viator-recommendation-price .price-container {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    width: 100%;
+    flex-wrap: wrap;
 }
 
 .viator-recommendation-price .original-price {
     text-decoration: line-through;
-    color: #999; /* Cor mais clara para preço riscado */
-    font-size: 14px; /* Ligeiramente menor */
-    margin-right: 5px;
+    color: #999;
+    font-size: 14px;
     font-weight: 400;
+    flex-shrink: 1;
 }
 
 .viator-recommendation-price .current-price {
-    color: #04846b; /* Cor principal para o preço atual/final */
+    color: #E74C3C;
     font-weight: 600;
+    flex-shrink: 0;
+    margin-left: auto; /* Empurra para a extrema direita */
 }
 
-/* Ajustes responsivos para a grid de recomendações */
-@media (max-width: 600px) {
-    .viator-recommendations-grid {
-        grid-template-columns: 1fr; /* Uma coluna em telas pequenas */
+/* Controles de navegação */
+.viator-carousel-control {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 40px;
+    background-color: #fff;
+    border-radius: 50%;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 5;
+    transition: all 0.3s ease;
+    color: #04846b;
+    font-size: 22px;
+    border: none;
+    opacity: 0.9; /* Leve transparência para um visual mais suave */
+}
+
+.viator-carousel-control:hover {
+    background-color: #04846b;
+    color: #fff;
+    opacity: 1;
+}
+
+.viator-carousel-prev {
+    left: 3px; /* Ajustado para distanciar dos cards */
+}
+
+.viator-carousel-next {
+    right: 3px; /* Ajustado para distanciar dos cards */
+}
+
+/* Ajustes responsivos para o carrossel */
+@media (max-width: 1200px) {
+    .viator-recommendation-card {
+        flex: 0 0 calc(50% - 12px); /* 2 colunas em telas médias */
     }
-    /* Removido min-height de h4 aqui também, se aplicável */
+    
+    .viator-recommendations {
+        padding: 30px 40px; /* Reduz o padding nas telas menores */
+    }
 }
 
+@media (max-width: 900px) {
+    .viator-recommendation-card {
+        flex: 0 0 calc(50% - 10px); /* 2 colunas em telas pequenas */
+    }
+    
+    .viator-recommendations {
+        padding: 25px 35px; /* Reduz mais o padding */
+    }
+    
+    .viator-carousel-prev {
+        left: 5px;
+    }
+    
+    .viator-carousel-next {
+        right: 5px;
+    }
+}
+
+@media (max-width: 600px) {
+    .viator-recommendation-card {
+        flex: 0 0 calc(80% - 10px); /* 1 coluna quase completa em telas muito pequenas */
+    }
+    
+    .viator-recommendations {
+        padding: 20px 30px; /* Reduz ainda mais o padding */
+    }
+    
+    .viator-recommendation-info h4 {
+        font-size: 15px;
+    }
+    
+    .viator-carousel-control {
+        width: 35px;
+        height: 35px;
+        font-size: 18px;
+    }
+}
 
 /* Tags */
 .viator-tag-list {
@@ -817,17 +933,6 @@
     border-radius: 20px;
     font-size: 14px;
     color: #666;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-    .viator-product-container {
-        grid-template-columns: 1fr;
-    }
-
-    .viator-inclusions-exclusions {
-        grid-template-columns: 1fr;
-    }
 }
 
 /* --- Tooltip --- */
