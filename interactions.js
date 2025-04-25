@@ -1,4 +1,36 @@
+// Importar o Swiper e seus módulos
 document.addEventListener('DOMContentLoaded', function () {
+    // Inicializar o Swiper para as recomendações
+    if (document.querySelector('.viator-recommendations-slider')) {
+        new Swiper('.viator-recommendations-slider', {
+            slidesPerView: 3,
+            spaceBetween: 20,
+            loop: false,
+            navigation: {
+                nextEl: '.swiper-button-next',
+                prevEl: '.swiper-button-prev',
+            },
+            pagination: {
+                el: '.swiper-pagination',
+                clickable: true,
+            },
+            breakpoints: {
+                320: {
+                    slidesPerView: 1,
+                    spaceBetween: 10,
+                },
+                640: {
+                    slidesPerView: 2,
+                    spaceBetween: 15,
+                },
+                1024: {
+                    slidesPerView: 3,
+                    spaceBetween: 15,
+                }
+            }
+        });
+    }
+
     // Verificar se os elementos existem antes de tentar acessá-los
     const searchForm = document.getElementById('viator-search-form');
     const searchButton = searchForm ? document.getElementById('search-button') : null;

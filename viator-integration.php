@@ -95,9 +95,17 @@ function viator_enqueue_scripts() {
         '1.0'
     );
 
+    // Enqueue Swiper CSS
+    wp_enqueue_style('swiper-css', 'https://cdn.jsdelivr.net/npm/swiper@8/swiper-bundle.min.css');
+
     // Enqueue scripts
     wp_enqueue_script('ipgeolocation-api', 'https://api.ipgeolocation.io/javascript/ipgeolocation.js', array(), '1.0.0', true);
-    wp_enqueue_script('viator-interactions', $plugin_dir . 'interactions.js', array('jquery', 'ipgeolocation-api'), '1.0.0', true);
+    
+    // Enqueue Swiper JS
+    wp_enqueue_script('swiper-js', 'https://cdn.jsdelivr.net/npm/swiper@8/swiper-bundle.min.js', array('jquery'), '8.0.0', true);
+    
+    // Enqueue interactions.js with Swiper as dependency
+    wp_enqueue_script('viator-interactions', $plugin_dir . 'interactions.js', array('jquery', 'ipgeolocation-api', 'swiper-js'), '1.0.0', true);
 
     // Add JavaScript variables
     wp_localize_script('viator-interactions', 'viatorAjax', array(

@@ -111,6 +111,51 @@ add_shortcode('viator_product', 'viator_product_detail_shortcode');
 /**
  * Fetch and display product details from Viator API
  */
+function get_product_recommendations($product_code) {
+    $api_key = get_option('viator_api_key');
+    if (empty($api_key)) {
+        return [];
+    }
+
+    $url = "https://api.sandbox.viator.com/partner/products/recommendations";
+    $body = [
+        'productCodes' => [$product_code],
+        'recommendationTypes' => ['IS_SIMILAR_TO']
+    ];
+
+    $response = wp_remote_post($url, [
+        'headers' => [
+            'Accept'           => 'application/json;version=2.0',
+            'Content-Type'     => 'application/json;version=2.0',
+            'exp-api-key'      => $api_key,
+            'Accept-Language'  => 'pt-BR',
+        ],
+        'body'    => json_encode($body),
+        'timeout' => 120,
+    ]);
+
+    if (is_wp_error($response)) {
+        return [];
+    }
+
+    $body = wp_remote_retrieve_body($response);
+    $recommendations = json_decode($body, true);
+
+    if (empty($recommendations) || !is_array($recommendations)) {
+        return [];
+    }
+
+    // Extrair os códigos dos produtos recomendados
+    $recommended_products = [];
+    foreach ($recommendations as $recommendation) {
+        if (isset($recommendation['recommendations']['IS_SIMILAR_TO'])) {
+            $recommended_products = array_merge($recommended_products, $recommendation['recommendations']['IS_SIMILAR_TO']);
+        }
+    }
+
+    return array_unique($recommended_products);
+}
+
 function viator_get_product_details($product_code) {
     // Get API key from settings
     $api_key = get_option('viator_api_key');
@@ -999,6 +1044,122 @@ function viator_get_product_details($product_code) {
             <div class="viator-reviews-pagination"></div>
         </div>
         
+        <!-- Recomendações -->
+        <?php
+        $recommended_products = get_product_recommendations($product_code);
+        if (!empty($recommended_products)):
+            $api_key = get_option('viator_api_key');
+            $recommended_items = [];
+
+            foreach ($recommended_products as $rec_product_code) {
+                $url = "https://api.sandbox.viator.com/partner/products/{$rec_product_code}";
+                $response = wp_remote_get($url, [
+                    'headers' => [
+                        'Accept'           => 'application/json;version=2.0',
+                        'Content-Type'     => 'application/json;version=2.0',
+                        'exp-api-key'      => $api_key,
+                        'Accept-Language'  => 'pt-BR',
+                    ],
+                    'timeout' => 10,
+                ]);
+
+                if (!is_wp_error($response)) {
+                    $body = wp_remote_retrieve_body($response);
+                    $product = json_decode($body, true);
+
+                    if (!empty($product) && isset($product['title'])) {
+                                // Obter a imagem de melhor qualidade disponível
+                        $best_image_url = '';
+                        if (isset($product['images'][0]['variants']) && !empty($product['images'][0]['variants'])) {
+                            // Ordenar variantes por tamanho para garantir a melhor resolução
+                            $variants = $product['images'][0]['variants'];
+                            usort($variants, function($a, $b) {
+                                // Se largura e altura estiverem disponíveis, ordenar por área (largura * altura)
+                                if (isset($a['width']) && isset($a['height']) && isset($b['width']) && isset($b['height'])) {
+                                    return ($b['width'] * $b['height']) - ($a['width'] * $a['height']);
+                                }
+                                // Caso contrário, ordenar por posição no array (assumindo que índice maior = qualidade maior)
+                                return count($product['images'][0]['variants']) - array_search($a, $product['images'][0]['variants']) - array_search($b, $product['images'][0]['variants']);
+                            });
+                            
+                            $best_image_url = $variants[0]['url'];
+                        }
+                        
+                        $recommended_items[] = [
+                            'code' => $rec_product_code,
+                            'title' => $product['title'],
+                            'image' => $best_image_url,
+                            'price' => isset($product['pricing']['summary']['fromPrice']) ? $product['pricing']['summary']['fromPrice'] : null,
+                            'rating' => isset($product['reviews']['combinedAverageRating']) ? $product['reviews']['combinedAverageRating'] : 0,
+                            'reviews' => isset($product['reviews']['totalReviews']) ? $product['reviews']['totalReviews'] : 0
+                        ];
+
+                    }
+                }
+            }
+
+            if (!empty($recommended_items)):
+            ?>
+            <div class="viator-recommendations">
+                <h2>Você pode gostar</h2>
+                <div class="swiper-container viator-recommendations-slider">
+                    <div class="swiper-button-prev"></div>
+                    <div class="swiper-button-next"></div>
+                    <div class="swiper-wrapper">
+                        <?php foreach ($recommended_items as $item): ?>
+                            <div class="swiper-slide">
+                                <div class="viator-recommendation-card">
+                                    <a href="<?php echo esc_url(home_url('/passeio/' . $item['code'] . '/')); ?>" class="viator-recommendation-link" target="_blank">
+                                        <?php if (!empty($item['image'])): ?>
+                                            <div class="viator-recommendation-image">
+                                                <img src="<?php echo esc_url($item['image']); ?>" alt="<?php echo esc_attr($item['title']); ?>">
+                                            </div>
+                                        <?php endif; ?>
+                                        <div class="viator-recommendation-content">
+                                            <h3 class="viator-recommendation-title"><?php echo esc_html($item['title']); ?></h3>
+                                            <?php if ($item['rating'] > 0): ?>
+                                                <div class="viator-recommendation-rating">
+                                                    <div class="viator-stars">
+                                                        <?php
+                                                        $full_stars = floor($item['rating']);
+                                                        $half_star = ($item['rating'] - $full_stars) >= 0.5;
+                                                        $empty_stars = 5 - ceil($item['rating']);
+
+                                                        for ($i = 0; $i < $full_stars; $i++) {
+                                                            echo '<span class="star">★</span>';
+                                                        }
+                                                        if ($half_star) {
+                                                            echo '<span class="star">★</span>';
+                                                        }
+                                                        for ($i = 0; $i < $empty_stars; $i++) {
+                                                            echo '<span class="star" style="color: #ddd;">★</span>';
+                                                        }
+                                                        ?>
+                                                    </div>
+                                                    <span class="viator-recommendation-review-count">
+                                                        <?php echo $item['reviews']; ?> <?php echo $item['reviews'] == 1 ? 'avaliação' : 'avaliações'; ?>
+                                                    </span>
+                                                </div>
+                                            <?php endif; ?>
+                                            <?php if ($item['price']): ?>
+                                                <div class="viator-recommendation-price">
+                                                    A partir de R$ <?php echo number_format($item['price'], 2, ',', '.'); ?>
+                                                </div>
+                                            <?php endif; ?>
+                                        </div>
+                                    </a>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="swiper-pagination"></div>
+                </div>
+            </div>
+            <?php
+            endif;
+        endif;
+        ?>
+
         <!-- Tags -->
         <?php if (!empty($tags)): ?>
             <div class="viator-tags">
