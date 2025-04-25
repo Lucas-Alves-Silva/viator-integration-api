@@ -1117,30 +1117,28 @@ function viator_get_product_details($product_code) {
                                         <?php endif; ?>
                                         <div class="viator-recommendation-content">
                                             <h3 class="viator-recommendation-title"><?php echo esc_html($item['title']); ?></h3>
-                                            <?php if ($item['rating'] > 0): ?>
-                                                <div class="viator-recommendation-rating">
-                                                    <div class="viator-stars">
-                                                        <?php
-                                                        $full_stars = floor($item['rating']);
-                                                        $half_star = ($item['rating'] - $full_stars) >= 0.5;
-                                                        $empty_stars = 5 - ceil($item['rating']);
+                                            <div class="viator-recommendation-rating">
+                                                <div class="viator-stars">
+                                                    <?php
+                                                    $full_stars = floor($item['rating']);
+                                                    $half_star = ($item['rating'] - $full_stars) >= 0.5;
+                                                    $empty_stars = 5 - ceil($item['rating']);
 
-                                                        for ($i = 0; $i < $full_stars; $i++) {
-                                                            echo '<span class="star">★</span>';
-                                                        }
-                                                        if ($half_star) {
-                                                            echo '<span class="star">★</span>';
-                                                        }
-                                                        for ($i = 0; $i < $empty_stars; $i++) {
-                                                            echo '<span class="star" style="color: #ddd;">★</span>';
-                                                        }
-                                                        ?>
-                                                    </div>
-                                                    <span class="viator-recommendation-review-count">
-                                                        <?php echo $item['reviews']; ?> <?php echo $item['reviews'] == 1 ? 'avaliação' : 'avaliações'; ?>
-                                                    </span>
+                                                    for ($i = 0; $i < $full_stars; $i++) {
+                                                        echo '<span class="star">★</span>';
+                                                    }
+                                                    if ($half_star) {
+                                                        echo '<span class="star">★</span>';
+                                                    }
+                                                    for ($i = 0; $i < $empty_stars; $i++) {
+                                                        echo '<span class="star" style="color: #ddd;">★</span>';
+                                                    }
+                                                    ?>
                                                 </div>
-                                            <?php endif; ?>
+                                                <span class="viator-recommendation-review-count">
+                                                    <?php echo $item['reviews']; ?> <?php echo $item['reviews'] == 1 ? 'avaliação' : 'avaliações'; ?>
+                                                </span>
+                                            </div>
                                             <?php if ($item['price']): ?>
                                                 <div class="viator-recommendation-price">
                                                     A partir de R$ <?php echo number_format($item['price'], 2, ',', '.'); ?>
