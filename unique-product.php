@@ -1085,11 +1085,156 @@ function viator_get_product_details($product_code) {
                             $best_image_url = $variants[0]['url'];
                         }
                         
+                        // Obter o preço do produto
+                        $price = null;
+                        $original_price = null;
+                        
+                        // Primeiro tenta obter o preço da resposta da API
+                        if (isset($product['pricing']['summary']['fromPrice'])) {
+                            $price = $product['pricing']['summary']['fromPrice'];
+                            
+                            // Se for uma oferta especial, também obtém o preço original
+                            if (isset($product['pricing']['summary']['fromPriceBeforeDiscount'])) {
+                                $original_price = $product['pricing']['summary']['fromPriceBeforeDiscount'];
+                            }
+                            
+                            // Armazenar os dados de preço para uso futuro
+                            $price_data = [
+                                'fromPrice' => $price,
+                                'fromPriceBeforeDiscount' => $original_price,
+                                'flags' => isset($product['flags']) ? $product['flags'] : []
+                            ];
+                            update_option('viator_product_' . $rec_product_code . '_price', $price_data);
+                        }
+                        
+                        // Se não encontrar na API, tenta obter dos dados armazenados
+                        if ($price === null) {
+                            // Buscar preço dos dados armazenados
+                            $stored_price_data = get_option('viator_product_' . $rec_product_code . '_price');
+                            if ($stored_price_data && isset($stored_price_data['fromPrice'])) {
+                                $price = $stored_price_data['fromPrice'];
+                                
+                                // Se for uma oferta especial, também obtém o preço original
+                                if (isset($stored_price_data['fromPriceBeforeDiscount']) && !empty($stored_price_data['fromPriceBeforeDiscount'])) {
+                                    $original_price = $stored_price_data['fromPriceBeforeDiscount'];
+                                }
+                            }
+                        }
+                        
+                        // Se ainda não tiver preço, tenta buscar diretamente da API de disponibilidade
+                        if ($price === null) {
+                            // Fazer uma requisição para a API de disponibilidade para obter o preço
+                            $availability_url = "https://api.sandbox.viator.com/partner/availability/schedules";
+                            $today = date('Y-m-d');
+                            $next_year = date('Y-m-d', strtotime('+1 year'));
+                            
+                            $availability_body = [
+                                'productCodes' => [$rec_product_code],
+                                'fromDate' => $today,
+                                'toDate' => $next_year
+                            ];
+                            
+                            $availability_response = wp_remote_post($availability_url, [
+                                'headers' => [
+                                    'Accept'           => 'application/json;version=2.0',
+                                    'Content-Type'     => 'application/json;version=2.0',
+                                    'exp-api-key'      => $api_key,
+                                    'Accept-Language'  => 'pt-BR',
+                                ],
+                                'body'    => json_encode($availability_body),
+                                'timeout' => 10,
+                            ]);
+                            
+                            if (!is_wp_error($availability_response)) {
+                                $availability_body = wp_remote_retrieve_body($availability_response);
+                                $availability_data = json_decode($availability_body, true);
+                                
+                                if (!empty($availability_data) && isset($availability_data[0]['pricing']['summary']['fromPrice'])) {
+                                    $price = $availability_data[0]['pricing']['summary']['fromPrice'];
+                                    
+                                    // Se for uma oferta especial, também obtém o preço original
+                                    if (isset($availability_data[0]['pricing']['summary']['fromPriceBeforeDiscount'])) {
+                                        $original_price = $availability_data[0]['pricing']['summary']['fromPriceBeforeDiscount'];
+                                    }
+                                    
+                                    // Armazenar os dados de preço para uso futuro
+                                    $price_data = [
+                                        'fromPrice' => $price,
+                                        'fromPriceBeforeDiscount' => $original_price,
+                                        'flags' => isset($availability_data[0]['flags']) ? $availability_data[0]['flags'] : []
+                                    ];
+                                    update_option('viator_product_' . $rec_product_code . '_price', $price_data);
+                                }
+                            }
+                        }
+                        
+                        // Se ainda não tiver preço, tenta buscar usando o endpoint search/freetext
+                        if ($price === null) {
+                            $search_url = "https://api.sandbox.viator.com/partner/search/freetext";
+                            $search_body = [
+                                "searchTerm" => $rec_product_code,
+                                "productSorting" => ["sort" => "DEFAULT"],
+                                "productFiltering" => [
+                                    "dateRange" => [
+                                        "from" => date('Y-m-d'),
+                                        "to" => date('Y-m-d', strtotime('+1 year'))
+                                    ],
+                                    "price" => ["from" => 0, "to" => 5000],
+                                    "rating" => ["from" => 0, "to" => 5],
+                                    "includeAutomaticTranslations" => true
+                                ],
+                                "searchTypes" => [
+                                    ["searchType" => "PRODUCTS", "pagination" => ["start" => 1, "count" => 1]],
+                                ],
+                                "currency" => "BRL"
+                            ];
+                            
+                            $search_response = wp_remote_post($search_url, [
+                                'headers' => [
+                                    'Accept'           => 'application/json;version=2.0',
+                                    'Content-Type'     => 'application/json;version=2.0',
+                                    'exp-api-key'      => $api_key,
+                                    'Accept-Language'  => 'pt-BR',
+                                ],
+                                'body'    => json_encode($search_body),
+                                'timeout' => 10,
+                            ]);
+                            
+                            if (!is_wp_error($search_response)) {
+                                $search_body = wp_remote_retrieve_body($search_response);
+                                $search_data = json_decode($search_body, true);
+                                
+                                if (!empty($search_data) && isset($search_data['products']['results']) && !empty($search_data['products']['results'])) {
+                                    foreach ($search_data['products']['results'] as $result) {
+                                        if ($result['productCode'] === $rec_product_code && isset($result['pricing']['summary']['fromPrice'])) {
+                                            $price = $result['pricing']['summary']['fromPrice'];
+                                            
+                                            // Se for uma oferta especial, também obtém o preço original
+                                            if (isset($result['pricing']['summary']['fromPriceBeforeDiscount'])) {
+                                                $original_price = $result['pricing']['summary']['fromPriceBeforeDiscount'];
+                                            }
+                                            
+                                            // Armazenar os dados de preço para uso futuro
+                                            $price_data = [
+                                                'fromPrice' => $price,
+                                                'fromPriceBeforeDiscount' => $original_price,
+                                                'flags' => isset($result['flags']) ? $result['flags'] : []
+                                            ];
+                                            update_option('viator_product_' . $rec_product_code . '_price', $price_data);
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
                         $recommended_items[] = [
                             'code' => $rec_product_code,
                             'title' => $product['title'],
                             'image' => $best_image_url,
-                            'price' => isset($product['pricing']['summary']['fromPrice']) ? $product['pricing']['summary']['fromPrice'] : null,
+                            'price' => $price,
+                            'original_price' => $original_price,
+                            'is_special_offer' => ($original_price !== null && $original_price > $price),
                             'rating' => isset($product['reviews']['combinedAverageRating']) ? $product['reviews']['combinedAverageRating'] : 0,
                             'reviews' => isset($product['reviews']['totalReviews']) ? $product['reviews']['totalReviews'] : 0
                         ];
@@ -1139,11 +1284,17 @@ function viator_get_product_details($product_code) {
                                                     <?php echo $item['reviews']; ?> <?php echo $item['reviews'] == 1 ? 'avaliação' : 'avaliações'; ?>
                                                 </span>
                                             </div>
-                                            <?php if ($item['price']): ?>
-                                                <div class="viator-recommendation-price">
-                                                    A partir de R$ <?php echo number_format($item['price'], 2, ',', '.'); ?>
-                                                </div>
-                                            <?php endif; ?>
+                                            <div class="viator-recommendation-price">
+                                                <?php if (isset($item['price']) && $item['price'] !== null): ?>
+                                                    <?php if ($item['is_special_offer']): ?>
+                                                        <span class="viator-recommendation-original-price">R$ <?php echo number_format($item['original_price'], 2, ',', '.'); ?></span>
+                                                        <span class="viator-recommendation-special-offer">Oferta Especial</span><br>
+                                                    <?php endif; ?>
+                                                    <strong>A partir de R$ <?php echo number_format($item['price'], 2, ',', '.'); ?></strong>
+                                                <?php else: ?>
+                                                    <strong>Consulte disponibilidade</strong>
+                                                <?php endif; ?>
+                                            </div>
                                         </div>
                                     </a>
                                 </div>

@@ -712,8 +712,26 @@
 
 .viator-recommendation-price {
     font-size: 16px;
-    font-weight: 600;
     color: #04846b;
+}
+
+.viator-recommendation-original-price {
+    text-decoration: line-through;
+    color: #888;
+    font-size: 14px;
+    font-weight: normal;
+    margin-right: 8px;
+}
+
+.viator-recommendation-special-offer {
+    background-color: #ff8c00;
+    color: white;
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+    display: inline-block;
+    margin-left: 5px;
 }
 
 /* Swiper Navigation Buttons */
