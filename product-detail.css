@@ -637,7 +637,7 @@
     overflow: hidden;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     margin: 10px;
-    height: 100%;
+    height: 400px; /* Altura fixa para padronizar todos os cards */
     display: flex;
     flex-direction: column;
 }
@@ -659,6 +659,40 @@
     position: relative;
     padding-top: 66.67%;
     overflow: hidden;
+    flex: 0 0 auto; /* Impede que a imagem seja redimensionada */
+}
+
+/* Estilos para os badges nos cards de recomendação */
+.viator-recommendation-image .viator-badge-container {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.viator-recommendation-image .viator-badge {
+    display: inline-block;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    color: white;
+    text-align: center;
+}
+
+.viator-recommendation-image .viator-badge[data-type="free-cancellation"] {
+    background-color: #04846b;
+}
+
+.viator-recommendation-image .viator-badge[data-type="sell-out"] {
+    background-color: #E74C3C;
+}
+
+.viator-recommendation-image .viator-badge[data-type="special-offer"] {
+    background-color: #ff8c00;
 }
 
 .viator-recommendation-image img {
@@ -677,6 +711,9 @@
 
 .viator-recommendation-content {
     padding: 15px;
+    flex: 1 1 auto; /* Permite que o conteúdo ocupe o espaço disponível */
+    display: flex;
+    flex-direction: column;
 }
 
 .viator-recommendation-title {
@@ -691,6 +728,21 @@
     overflow: hidden;
     text-overflow: ellipsis;
     line-height: 1.4;
+    height: 45px; /* Altura fixa para o título */
+}
+
+.viator-recommendation-duration {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.viator-recommendation-duration i {
+    color: #04846b;
+    font-size: 14px;
 }
 
 .viator-recommendation-rating {
@@ -713,6 +765,8 @@
 .viator-recommendation-price {
     font-size: 16px;
     color: #04846b;
+    margin-top: auto; /* Empurra o preço para o final do card */
+    padding-top: 10px;
 }
 
 .viator-recommendation-original-price {

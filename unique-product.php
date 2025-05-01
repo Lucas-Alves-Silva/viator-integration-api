@@ -112,6 +112,11 @@ add_shortcode('viator_product', 'viator_product_detail_shortcode');
  * Fetch and display product details from Viator API
  */
 function get_product_recommendations($product_code) {
+    // Certifique-se de que o arquivo debug.php está incluído
+    if (!function_exists('viator_debug_log')) {
+        require_once plugin_dir_path(__FILE__) . 'debug.php';
+    }
+    
     $api_key = get_option('viator_api_key');
     if (empty($api_key)) {
         return [];
@@ -122,6 +127,10 @@ function get_product_recommendations($product_code) {
         'productCodes' => [$product_code],
         'recommendationTypes' => ['IS_SIMILAR_TO']
     ];
+
+    // Log de debug
+    viator_debug_log('Solicitação de recomendações para o produto:', $product_code);
+    viator_debug_log('Corpo da solicitação:', $body);
 
     $response = wp_remote_post($url, [
         'headers' => [
@@ -135,13 +144,18 @@ function get_product_recommendations($product_code) {
     ]);
 
     if (is_wp_error($response)) {
+        viator_debug_log('Erro ao buscar recomendações:', $response->get_error_message());
         return [];
     }
 
     $body = wp_remote_retrieve_body($response);
     $recommendations = json_decode($body, true);
 
+    // Log da resposta completa da API para debug
+    viator_debug_log('Resposta da API de recomendações para o produto ' . $product_code . ':', $recommendations);
+
     if (empty($recommendations) || !is_array($recommendations)) {
+        viator_debug_log('Nenhuma recomendação encontrada ou formato inválido para o produto:', $product_code);
         return [];
     }
 
@@ -153,7 +167,254 @@ function get_product_recommendations($product_code) {
         }
     }
 
-    return array_unique($recommended_products);
+    viator_debug_log('Produtos recomendados encontrados:', $recommended_products);
+
+    // Buscar detalhes dos produtos recomendados para obter informações de duração
+    $product_details = [];
+    $formatted_recommendations = [];
+    
+    foreach (array_slice(array_unique($recommended_products), 0, 5) as $rec_product_code) {
+        $product_url = "https://api.sandbox.viator.com/partner/products/{$rec_product_code}";
+        
+        viator_debug_log('Buscando detalhes do produto recomendado:', $rec_product_code);
+        
+        $product_response = wp_remote_get($product_url, [
+            'headers' => [
+                'Accept'           => 'application/json;version=2.0',
+                'Content-Type'     => 'application/json;version=2.0',
+                'exp-api-key'      => $api_key,
+                'Accept-Language'  => 'pt-BR',
+            ],
+            'timeout' => 30,
+        ]);
+        
+        if (!is_wp_error($product_response)) {
+            $product_body = wp_remote_retrieve_body($product_response);
+            $product_data = json_decode($product_body, true);
+            
+            if (!empty($product_data)) {
+                // Inicializa a duração formatada como não disponível
+                $formatted_duration = 'Duração não disponível';
+                
+                // Verifica se há informações de duração no produto
+                if (isset($product_data['duration'])) {
+                    viator_debug_log('Dados de duração do produto recomendado ' . $rec_product_code . ':', $product_data['duration']);
+                    
+                    // Captura e formata a duração do passeio usando a mesma lógica do viator-integration.php
+                    $duration_fixed = isset($product_data['duration']['fixedDurationInMinutes']) ? $product_data['duration']['fixedDurationInMinutes'] : null;
+                    $duration_from = isset($product_data['duration']['variableDurationFromMinutes']) ? $product_data['duration']['variableDurationFromMinutes'] : null;
+                    $duration_to = isset($product_data['duration']['variableDurationToMinutes']) ? $product_data['duration']['variableDurationToMinutes'] : null;
+                    $unstructured_duration = isset($product_data['duration']['unstructuredDuration']) ? $product_data['duration']['unstructuredDuration'] : null;
+
+                    if ($duration_fixed === 0) {
+                        // Caso específico para duração flexível
+                        $formatted_duration = 'Flexível';
+                    } elseif ($unstructured_duration !== null) {
+                        // Se tiver unstructuredDuration, usa o valor fornecido ou define como 1 hora
+                        $formatted_duration = !empty($unstructured_duration) ? $unstructured_duration : '1 hora';
+                    } elseif ($duration_fixed !== null) {
+                        if ($duration_fixed >= 1440) { // 24 horas = 1440 minutos
+                            $days = floor($duration_fixed / 1440); // Calcula os dias
+                            $remaining_minutes = $duration_fixed % 1440; // Minutos restantes
+                            $hours = floor($remaining_minutes / 60); // Horas restantes
+                            
+                            $formatted_duration = $days . ' dia' . ($days != 1 ? 's' : '');
+                            if ($hours > 0) {
+                                $formatted_duration .= ' e ' . $hours . ' hora' . ($hours != 1 ? 's' : '');
+                            }
+                        } elseif ($duration_fixed < 60) {
+                            $formatted_duration = $duration_fixed . ' minutos';
+                        } else {
+                            $hours = floor($duration_fixed / 60);
+                            $minutes = $duration_fixed % 60;
+                            $formatted_duration = $hours . ' hora' . ($hours != 1 ? 's' : '') . ($minutes > 0 ? ' e ' . $minutes . ' minuto' . ($minutes != 1 ? 's' : '') : '');
+                        }
+                    } elseif ($duration_from !== null && $duration_to !== null) {
+                        // Duração variável
+                        if ($duration_to >= 1440) {
+                            $days_from = floor($duration_from / 1440);
+                            $days_to = floor($duration_to / 1440);
+                            
+                            if ($days_from == $days_to) {
+                                $formatted_duration = $days_from . ' dia' . ($days_from != 1 ? 's' : '');
+                            } else {
+                                $formatted_duration = 'De ' . $days_from . ' a ' . $days_to . ' dia' . ($days_to != 1 ? 's' : '');
+                            }
+                        } elseif ($duration_to < 60) {
+                            // Ambos os valores em minutos - Formato simplificado
+                            if ($duration_from < 60 && $duration_to < 60) {
+                                $formatted_duration = 'De ' . $duration_from . ' a ' . $duration_to . ' minuto' . ($duration_to != 1 ? 's' : '');
+                            } else {
+                                $formatted_duration = 'De ' . $duration_from . ' minuto' . ($duration_from != 1 ? 's' : '') . 
+                                                ' a ' . $duration_to . ' minuto' . ($duration_to != 1 ? 's' : '');
+                            }
+                        } else {
+                            // Verifica se ambos os valores são múltiplos de 60 (sem minutos extras)
+                            $is_from_multiple_of_60 = ($duration_from % 60 === 0);
+                            $is_to_multiple_of_60 = ($duration_to % 60 === 0);
+
+                            if ($is_from_multiple_of_60 && $is_to_multiple_of_60) {
+                                // Exibe de forma simplificada (ex: "De 1 a 2 horas")
+                                $hours_from = floor($duration_from / 60);
+                                $hours_to = floor($duration_to / 60);
+                                $formatted_duration = 'De ' . $hours_from . ' a ' . $hours_to . ' hora' . ($hours_to != 1 ? 's' : '');
+                            } else {
+                                // Formata o valor inicial (duration_from)
+                                if ($duration_from < 60) {
+                                    $duration_from_formatted = $duration_from . ' minuto' . ($duration_from != 1 ? 's' : '');
+                                } else {
+                                    $hours_from = floor($duration_from / 60);
+                                    $minutes_from = $duration_from % 60;
+                                    $duration_from_formatted = $hours_from . ' hora' . ($hours_from != 1 ? 's' : '') . 
+                                        ($minutes_from > 0 ? ' e ' . $minutes_from . ' minuto' . ($minutes_from != 1 ? 's' : '') : '');
+                                }
+
+                                // Formata o valor final (duration_to)
+                                if ($duration_to < 60) {
+                                    $duration_to_formatted = $duration_to . ' minuto' . ($duration_to != 1 ? 's' : '');
+                                } else {
+                                    $hours_to = floor($duration_to / 60);
+                                    $minutes_to = $duration_to % 60;
+                                    $duration_to_formatted = $hours_to . ' hora' . ($hours_to != 1 ? 's' : '') . 
+                                        ($minutes_to > 0 ? ' e ' . $minutes_to . ' minuto' . ($minutes_to != 1 ? 's' : '') : '');
+                                }
+
+                                // Combina os valores formatados
+                                $formatted_duration = 'De ' . $duration_from_formatted . ' a ' . $duration_to_formatted;
+                            }
+                        }
+                    } else {
+                        // Duração não disponível
+                        $formatted_duration = 'Duração não disponível';
+                    }
+                    
+                    // Detalhes adicionais sobre os campos específicos de duração para debug
+                    $duration_fields = [
+                        'fixedDurationInMinutes' => isset($product_data['duration']['fixedDurationInMinutes']) ? $product_data['duration']['fixedDurationInMinutes'] : 'não definido',
+                        'variableDurationFromMinutes' => isset($product_data['duration']['variableDurationFromMinutes']) ? $product_data['duration']['variableDurationFromMinutes'] : 'não definido',
+                        'variableDurationToMinutes' => isset($product_data['duration']['variableDurationToMinutes']) ? $product_data['duration']['variableDurationToMinutes'] : 'não definido',
+                        'unstructuredDuration' => isset($product_data['duration']['unstructuredDuration']) ? $product_data['duration']['unstructuredDuration'] : 'não definido'
+                    ];
+                    
+                    viator_debug_log('Campos de duração detalhados para o produto ' . $rec_product_code . ':', $duration_fields);
+                    viator_debug_log('Duração formatada para o produto ' . $rec_product_code . ':', $formatted_duration);
+                } else {
+                    // Verifica se há informações de duração no itinerário
+                    if (isset($product_data['itinerary']) && isset($product_data['itinerary']['duration'])) {
+                        // Captura e formata a duração do passeio usando a mesma lógica do viator-integration.php
+                        $duration_fixed = isset($product_data['itinerary']['duration']['fixedDurationInMinutes']) ? $product_data['itinerary']['duration']['fixedDurationInMinutes'] : null;
+                        $duration_from = isset($product_data['itinerary']['duration']['variableDurationFromMinutes']) ? $product_data['itinerary']['duration']['variableDurationFromMinutes'] : null;
+                        $duration_to = isset($product_data['itinerary']['duration']['variableDurationToMinutes']) ? $product_data['itinerary']['duration']['variableDurationToMinutes'] : null;
+                        $unstructured_duration = isset($product_data['itinerary']['duration']['unstructuredDuration']) ? $product_data['itinerary']['duration']['unstructuredDuration'] : null;
+
+                        if ($duration_fixed === 0) {
+                            // Caso específico para duração flexível
+                            $formatted_duration = 'Flexível';
+                        } elseif ($unstructured_duration !== null) {
+                            // Se tiver unstructuredDuration, usa o valor fornecido ou define como 1 hora
+                            $formatted_duration = !empty($unstructured_duration) ? $unstructured_duration : '1 hora';
+                        } elseif ($duration_fixed !== null) {
+                            if ($duration_fixed >= 1440) { // 24 horas = 1440 minutos
+                                $days = floor($duration_fixed / 1440); // Calcula os dias
+                                $remaining_minutes = $duration_fixed % 1440; // Minutos restantes
+                                $hours = floor($remaining_minutes / 60); // Horas restantes
+                                
+                                $formatted_duration = $days . ' dia' . ($days != 1 ? 's' : '');
+                                if ($hours > 0) {
+                                    $formatted_duration .= ' e ' . $hours . ' hora' . ($hours != 1 ? 's' : '');
+                                }
+                            } elseif ($duration_fixed < 60) {
+                                $formatted_duration = $duration_fixed . ' minutos';
+                            } else {
+                                $hours = floor($duration_fixed / 60);
+                                $minutes = $duration_fixed % 60;
+                                $formatted_duration = $hours . ' hora' . ($hours != 1 ? 's' : '') . ($minutes > 0 ? ' e ' . $minutes . ' minuto' . ($minutes != 1 ? 's' : '') : '');
+                            }
+                        } elseif ($duration_from !== null && $duration_to !== null) {
+                            // Duração variável
+                            if ($duration_to >= 1440) {
+                                $days_from = floor($duration_from / 1440);
+                                $days_to = floor($duration_to / 1440);
+                                
+                                if ($days_from == $days_to) {
+                                    $formatted_duration = $days_from . ' dia' . ($days_from != 1 ? 's' : '');
+                                } else {
+                                    $formatted_duration = 'De ' . $days_from . ' a ' . $days_to . ' dia' . ($days_to != 1 ? 's' : '');
+                                }
+                            } elseif ($duration_to < 60) {
+                                // Ambos os valores em minutos - Formato simplificado
+                                if ($duration_from < 60 && $duration_to < 60) {
+                                    $formatted_duration = 'De ' . $duration_from . ' a ' . $duration_to . ' minuto' . ($duration_to != 1 ? 's' : '');
+                                } else {
+                                    $formatted_duration = 'De ' . $duration_from . ' minuto' . ($duration_from != 1 ? 's' : '') . 
+                                                    ' a ' . $duration_to . ' minuto' . ($duration_to != 1 ? 's' : '');
+                                }
+                            } else {
+                                // Verifica se ambos os valores são múltiplos de 60 (sem minutos extras)
+                                $is_from_multiple_of_60 = ($duration_from % 60 === 0);
+                                $is_to_multiple_of_60 = ($duration_to % 60 === 0);
+
+                                if ($is_from_multiple_of_60 && $is_to_multiple_of_60) {
+                                    // Exibe de forma simplificada (ex: "De 1 a 2 horas")
+                                    $hours_from = floor($duration_from / 60);
+                                    $hours_to = floor($duration_to / 60);
+                                    $formatted_duration = 'De ' . $hours_from . ' a ' . $hours_to . ' hora' . ($hours_to != 1 ? 's' : '');
+                                } else {
+                                    // Formata o valor inicial (duration_from)
+                                    if ($duration_from < 60) {
+                                        $duration_from_formatted = $duration_from . ' minuto' . ($duration_from != 1 ? 's' : '');
+                                    } else {
+                                        $hours_from = floor($duration_from / 60);
+                                        $minutes_from = $duration_from % 60;
+                                        $duration_from_formatted = $hours_from . ' hora' . ($hours_from != 1 ? 's' : '') . 
+                                            ($minutes_from > 0 ? ' e ' . $minutes_from . ' minuto' . ($minutes_from != 1 ? 's' : '') : '');
+                                    }
+
+                                    // Formata o valor final (duration_to)
+                                    if ($duration_to < 60) {
+                                        $duration_to_formatted = $duration_to . ' minuto' . ($duration_to != 1 ? 's' : '');
+                                    } else {
+                                        $hours_to = floor($duration_to / 60);
+                                        $minutes_to = $duration_to % 60;
+                                        $duration_to_formatted = $hours_to . ' hora' . ($hours_to != 1 ? 's' : '') . 
+                                            ($minutes_to > 0 ? ' e ' . $minutes_to . ' minuto' . ($minutes_to != 1 ? 's' : '') : '');
+                                    }
+
+                                    // Combina os valores formatados
+                                    $formatted_duration = 'De ' . $duration_from_formatted . ' a ' . $duration_to_formatted;
+                                }
+                            }
+                        } else {
+                            // Duração não disponível
+                            $formatted_duration = 'Duração não disponível';
+                        }
+                        
+                        viator_debug_log('Duração encontrada no itinerário para o produto ' . $rec_product_code . ':', $formatted_duration);
+                    } else {
+                        viator_debug_log('Produto ' . $rec_product_code . ' não possui dados de duração');
+                    }
+                }
+                
+                // Armazena os detalhes do produto e a duração formatada
+                // Armazenar as flags do produto para uso posterior
+                $flags = isset($product_data['flags']) ? $product_data['flags'] : [];
+                
+                $product_details[$rec_product_code] = $product_data;
+                $formatted_recommendations[$rec_product_code] = [
+                    'product_code' => $rec_product_code,
+                    'duration' => $formatted_duration,
+                    'title' => isset($product_data['title']) ? $product_data['title'] : '',
+                    'flags' => $flags // Adicionar as flags aos dados do produto recomendado
+                ];
+            } else {
+                viator_debug_log('Resposta vazia ou inválida para o produto:', $rec_product_code);
+            }
+        } else {
+            viator_debug_log('Erro ao buscar detalhes do produto ' . $rec_product_code . ':', $product_response->get_error_message());
+        }
+    }
+
+    return $formatted_recommendations;
 }
 
 function viator_get_product_details($product_code) {
@@ -538,7 +799,7 @@ function viator_get_product_details($product_code) {
                 <div class="viator-quick-info">
                     <div class="viator-info-item">
                         <span class="viator-info-label">Duração:</span>
-                        <span class="viator-info-value"><?php echo esc_html($duration); ?></span>
+                        <span class="viator-info-value"><?php echo esc_html($duration); ?> (aprox.)</span>
                     </div>
                     <?php if (!empty($timezone)): ?>
                         <div class="viator-info-item">
@@ -1046,10 +1307,11 @@ function viator_get_product_details($product_code) {
         
         <!-- Recomendações -->
         <?php
-        $recommended_products = get_product_recommendations($product_code);
-        if (!empty($recommended_products)):
+        $recommended_products_data = get_product_recommendations($product_code);
+        if (!empty($recommended_products_data)):
             $api_key = get_option('viator_api_key');
             $recommended_items = [];
+            $recommended_products = array_keys($recommended_products_data); // Obter apenas os códigos dos produtos para compatibilidade
 
             foreach ($recommended_products as $rec_product_code) {
                 $url = "https://api.sandbox.viator.com/partner/products/{$rec_product_code}";
@@ -1228,6 +1490,144 @@ function viator_get_product_details($product_code) {
                             }
                         }
                         
+                        // Buscar informações detalhadas do produto para obter a duração (com cache)
+                        $duration = '';
+                        $formatted_duration = '';
+                        $duration_cache_key = 'viator_product_' . $rec_product_code . '_duration';
+                        $formatted_duration_cache_key = 'viator_product_' . $rec_product_code . '_formatted_duration';
+                        $cached_duration = get_transient($duration_cache_key);
+                        $cached_formatted_duration = get_transient($formatted_duration_cache_key);
+                        
+                        if ($cached_formatted_duration !== false) {
+                            // Usar duração formatada em cache se disponível
+                            $formatted_duration = $cached_formatted_duration;
+                        } elseif ($cached_duration !== false) {
+                            // Usar duração em cache e formatá-la
+                            $duration = $cached_duration;
+                            
+                            // Formatar a duração
+                            if (isset($duration['fixedDurationInMinutes'])) {
+                                $minutes = $duration['fixedDurationInMinutes'];
+                                if ($minutes >= 1440) { // 24 hours or more
+                                    $days = floor($minutes / 1440);
+                                    $remaining_minutes = $minutes % 1440;
+                                    $hours = floor($remaining_minutes / 60);
+                                    
+                                    $formatted_duration = $days . ' dia' . ($days != 1 ? 's' : '');
+                                    if ($hours > 0) {
+                                        $formatted_duration .= ' e ' . $hours . ' hora' . ($hours != 1 ? 's' : '');
+                                    }
+                                } elseif ($minutes < 60) {
+                                    $formatted_duration = $minutes . ' minutos';
+                                } else {
+                                    $hours = floor($minutes / 60);
+                                    $remaining_minutes = $minutes % 60;
+                                    $formatted_duration = $hours . ' hora' . ($hours != 1 ? 's' : '') . 
+                                                ($remaining_minutes > 0 ? ' e ' . $remaining_minutes . ' minuto' . ($remaining_minutes != 1 ? 's' : '') : '');
+                                }
+                                
+                                // Armazenar a duração formatada em cache
+                                set_transient($formatted_duration_cache_key, $formatted_duration, 7 * DAY_IN_SECONDS);
+                            }
+                        } else {
+                            // Buscar da API se não estiver em cache
+                            $product_detail_url = 'https://api.sandbox.viator.com/partner/products/' . $rec_product_code;
+                            $product_detail_response = wp_remote_get($product_detail_url, [
+                                'headers' => [
+                                    'Accept-Language' => 'pt-BR',
+                                    'Accept' => 'application/json;version=2.0',
+                                    'exp-api-key' => $api_key
+                                ],
+                                'timeout' => 10
+                            ]);
+                            
+                            if (!is_wp_error($product_detail_response)) {
+                                $product_detail_body = wp_remote_retrieve_body($product_detail_response);
+                                $product_detail_data = json_decode($product_detail_body, true);
+                                
+                                if (!empty($product_detail_data) && isset($product_detail_data['duration'])) {
+                                    $duration = $product_detail_data['duration'];
+                                    // Armazenar em cache por 7 dias
+                                    set_transient($duration_cache_key, $duration, 7 * DAY_IN_SECONDS);
+                                    
+                                    // Formatar a duração
+                                    if (isset($duration['fixedDurationInMinutes'])) {
+                                        $minutes = $duration['fixedDurationInMinutes'];
+                                        if ($minutes >= 1440) { // 24 hours or more
+                                            $days = floor($minutes / 1440);
+                                            $remaining_minutes = $minutes % 1440;
+                                            $hours = floor($remaining_minutes / 60);
+                                            
+                                            $formatted_duration = $days . ' dia' . ($days != 1 ? 's' : '');
+                                            if ($hours > 0) {
+                                                $formatted_duration .= ' e ' . $hours . ' hora' . ($hours != 1 ? 's' : '');
+                                            }
+                                        } elseif ($minutes < 60) {
+                                            $formatted_duration = $minutes . ' minutos';
+                                        } else {
+                                            $hours = floor($minutes / 60);
+                                            $remaining_minutes = $minutes % 60;
+                                            $formatted_duration = $hours . ' hora' . ($hours != 1 ? 's' : '') . 
+                                                        ($remaining_minutes > 0 ? ' e ' . $remaining_minutes . ' minuto' . ($remaining_minutes != 1 ? 's' : '') : '');
+                                        }
+                                        
+                                        // Armazenar a duração formatada em cache
+                                        set_transient($formatted_duration_cache_key, $formatted_duration, 7 * DAY_IN_SECONDS);
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Usar a duração formatada da função get_product_recommendations se disponível
+                        $rec_formatted_duration = $formatted_duration; // Valor padrão
+                        if (isset($recommended_products_data[$rec_product_code]) && 
+                            isset($recommended_products_data[$rec_product_code]['duration'])) {
+                            $rec_formatted_duration = $recommended_products_data[$rec_product_code]['duration'];
+                        }
+                        
+                        // Obter as flags do produto
+                        $flags = [];
+                        
+                        // Verificar se as flags estão disponíveis diretamente na resposta da API
+                        if (isset($product['flags']) && is_array($product['flags'])) {
+                            $flags = $product['flags'];
+                        }
+                        
+                        // Se não encontrou flags na resposta direta, verificar nos dados de preço armazenados
+                        if (empty($flags)) {
+                            $stored_price_data = get_option('viator_product_' . $rec_product_code . '_price');
+                            if ($stored_price_data && isset($stored_price_data['flags']) && is_array($stored_price_data['flags'])) {
+                                $flags = $stored_price_data['flags'];
+                            }
+                        }
+                        
+                        // Se ainda não encontrou flags, fazer uma requisição específica para obter detalhes do produto
+                        if (empty($flags)) {
+                            $product_detail_url = 'https://api.sandbox.viator.com/partner/products/' . $rec_product_code;
+                            $product_detail_response = wp_remote_get($product_detail_url, [
+                                'headers' => [
+                                    'Accept-Language' => 'pt-BR',
+                                    'Accept' => 'application/json;version=2.0',
+                                    'exp-api-key' => $api_key
+                                ],
+                                'timeout' => 10
+                            ]);
+                            
+                            if (!is_wp_error($product_detail_response)) {
+                                $product_detail_body = wp_remote_retrieve_body($product_detail_response);
+                                $product_detail_data = json_decode($product_detail_body, true);
+                                
+                                if (!empty($product_detail_data) && isset($product_detail_data['flags'])) {
+                                    $flags = $product_detail_data['flags'];
+                                    
+                                    // Atualizar os dados armazenados com as flags
+                                    $stored_price_data = get_option('viator_product_' . $rec_product_code . '_price', []);
+                                    $stored_price_data['flags'] = $flags;
+                                    update_option('viator_product_' . $rec_product_code . '_price', $stored_price_data);
+                                }
+                            }
+                        }
+                        
                         $recommended_items[] = [
                             'code' => $rec_product_code,
                             'title' => $product['title'],
@@ -1236,7 +1636,10 @@ function viator_get_product_details($product_code) {
                             'original_price' => $original_price,
                             'is_special_offer' => ($original_price !== null && $original_price > $price),
                             'rating' => isset($product['reviews']['combinedAverageRating']) ? $product['reviews']['combinedAverageRating'] : 0,
-                            'reviews' => isset($product['reviews']['totalReviews']) ? $product['reviews']['totalReviews'] : 0
+                            'reviews' => isset($product['reviews']['totalReviews']) ? $product['reviews']['totalReviews'] : 0,
+                            'duration' => $duration,
+                            'formatted_duration' => $rec_formatted_duration,
+                            'flags' => $flags // Adicionar as flags aos dados do item
                         ];
 
                     }
@@ -1258,10 +1661,29 @@ function viator_get_product_details($product_code) {
                                         <?php if (!empty($item['image'])): ?>
                                             <div class="viator-recommendation-image">
                                                 <img src="<?php echo esc_url($item['image']); ?>" alt="<?php echo esc_attr($item['title']); ?>">
+                                                <div class="viator-badge-container">
+                                                    <?php 
+                                                    // Processar flags - exibindo apenas LIKELY_TO_SELL_OUT e FREE_CANCELLATION
+                                                    // A flag SPECIAL_OFFER já está sendo exibida de outra forma
+                                                    if (isset($item['flags']) && is_array($item['flags'])) {
+                                                        if (in_array('LIKELY_TO_SELL_OUT', $item['flags'])) {
+                                                            echo '<span class="viator-badge" data-type="sell-out">Geralmente se esgota</span>';
+                                                        }
+                                                        if (in_array('FREE_CANCELLATION', $item['flags'])) {
+                                                            echo '<span class="viator-badge" data-type="free-cancellation">Cancelamento gratuito</span>';
+                                                        }
+                                                    }
+                                                    ?>
+                                                </div>
                                             </div>
                                         <?php endif; ?>
                                         <div class="viator-recommendation-content">
                                             <h3 class="viator-recommendation-title"><?php echo esc_html($item['title']); ?></h3>
+                                            <?php if (!empty($item['formatted_duration'])): ?>
+                                            <div class="viator-recommendation-duration">
+                                            <img loading="lazy" decoding="async" src="https://img.icons8.com/?size=100&amp;id=82767&amp;format=png&amp;color=000000" alt="Duração" title="Duração aproximada" width="15" height="15"> <?php echo esc_html($item['formatted_duration']); ?> <span>(aprox.)</span>
+                                            </div>
+                                            <?php endif; ?>
                                             <div class="viator-recommendation-rating">
                                                 <div class="viator-stars">
                                                     <?php
