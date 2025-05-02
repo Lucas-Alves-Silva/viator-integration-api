@@ -949,3 +949,24 @@
     opacity: 1; /* Torna opaco */
     transform: translateX(-50%) translateY(0); /* Move para a posição final (animação) */
   }
+
+  /* Botão de Verificar Disponibilidade */
+  .button-check-availability {
+    background-color: #0b1543; /* Azul vibrante (cor primária comum, boa para turismo) */
+    color: #fff; /* Texto branco para contraste */
+    border: none; /* Remove a borda padrão */
+    border-radius: 8px; /* Bordas mais arredondadas */
+    padding: 10px 15px; /* Mais espaçamento interno */
+    margin-top: 15px; /* Espaçamento acima do botão */;
+    cursor: pointer; /* Indica que é clicável */
+    font-weight: bold; /* Peso leve para destacar */;
+    width: 100%; /* Ocupa toda a largura disponível */;
+  }
+
+  .button-check-availability:hover {
+    background-color: #081030; /* Um pouco mais escuro para o hover */
+  }
+
+  .button-check-availability:focus {
+    background-color: #081030; /* Um pouco mais escuro para o hover */
+  }

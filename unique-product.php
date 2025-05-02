@@ -863,6 +863,9 @@ function viator_get_product_details($product_code) {
                         </div>
                     <?php endif; ?>
                 </div>
+                
+                <!-- Botão de Verificar Disponibilidade -->
+                <button class="button-check-availability">Verificar Disponibilidade</button>
             </div>
         </div>
     
