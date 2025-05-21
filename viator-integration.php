@@ -585,12 +585,17 @@ function viator_get_search_results($searchTerm) {
     </div>'; // Fechar div.viator-filters
 
     // Header com total e ordenação
-    $output .= '<div class="viator-results-container">';
-    $output .= '<div class="viator-header">';
-    $output .= '<div class="viator-header-info">';
-    $output .= '<span class="viator-header-cancel"><img src="https://img.icons8.com/?size=100&id=82742&format=png&color=000000" alt="Ícone" width="15" height="15"> Cancelamento grátis até 24 horas antes do início da experiência (horário local)</span>';
-    $output .= '<p class="viator-total">' . $formatted_total . ' resultados</p>';
-    $output .= '</div>';
+    $output .= '<div class="viator-results-container">
+                <div class="viator-header">
+                <div class="viator-header-info">
+                <span class="viator-header-cancel"><img src="https://img.icons8.com/?size=100&id=82742&format=png&color=000000" alt="Ícone" width="15" height="15"> Cancelamento grátis até 24 horas antes do início da experiência (horário local)</span>
+                <div class="viator-header-info-filter">
+                <button class="viator-mobile-filter-button" id="mobile-filter-button">
+                    <span class="filter-icon"><img width="25" height="25" src="https://img.icons8.com/ios-filled/50/sorting-options.png" alt="sorting-options"/></span>
+                    <span class="filter-text">Filtros</span>
+                </button>
+                <p class="viator-total">' . $formatted_total . ' resultados</p>
+    </div>';
     
     // Select de ordenação
     $current_sort = isset($_GET['viator_sort']) ? $_GET['viator_sort'] : 'DEFAULT';

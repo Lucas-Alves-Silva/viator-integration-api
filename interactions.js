@@ -1,5 +1,72 @@
 // Importar o Swiper e seus módulos
 document.addEventListener('DOMContentLoaded', function () {
+    // Inicializar o botão de filtros móveis
+    initializeMobileFilterButton();
+    
+    // Função para inicializar o botão de filtros móveis
+    function initializeMobileFilterButton() {
+        const mobileFilterButton = document.getElementById('mobile-filter-button');
+        if (mobileFilterButton) {
+            // Remover event listeners antigos para evitar duplicação
+            mobileFilterButton.replaceWith(mobileFilterButton.cloneNode(true));
+            
+            // Obter a referência atualizada após a clonagem
+            const updatedMobileFilterButton = document.getElementById('mobile-filter-button');
+            
+            updatedMobileFilterButton.addEventListener('click', function() {
+                const filters = document.querySelector('.viator-filters');
+                if (filters) {
+                    filters.classList.toggle('active');
+                    
+                    // Adicionar botão de fechar dentro dos filtros se não existir
+                    if (!document.querySelector('.viator-filters-close')) {
+                        const closeButton = document.createElement('button');
+                        closeButton.className = 'viator-filters-close';
+                        closeButton.innerHTML = '×';
+                        closeButton.style.position = 'absolute';
+                        closeButton.style.top = '10px';
+                        closeButton.style.right = '10px';
+                        closeButton.style.background = 'none';
+                        closeButton.style.border = 'none';
+                        closeButton.style.fontSize = '24px';
+                        closeButton.style.cursor = 'pointer';
+                        closeButton.style.color = '#333';
+                        
+                        closeButton.addEventListener('click', function() {
+                            filters.classList.remove('active');
+                        });
+                        
+                        filters.appendChild(closeButton);
+                    }
+                }
+            });
+        }
+    }
+    
+    // Expor a função globalmente para poder ser chamada após atualizações AJAX
+    window.initializeMobileFilterButton = initializeMobileFilterButton;
+    
+    // Adicionar elementos para o modal de filtros e o efeito de carregamento
+    if (document.querySelector('.viator-content-wrapper')) {
+        
+        // Adicionar efeito de carregamento
+        const loadingEffect = document.createElement('div');
+        loadingEffect.className = 'viator-loading-effect';
+        document.body.appendChild(loadingEffect);
+    }
+    
+    // Função para mostrar efeito de carregamento
+    function showLoadingEffect() {
+        const loadingEffect = document.querySelector('.viator-loading-effect');
+        if (loadingEffect) {
+            loadingEffect.classList.add('active');
+            setTimeout(() => {
+                loadingEffect.classList.remove('active');
+            }, 1500);
+        }
+    }
+    
+    
     // Inicializar o Swiper para as recomendações
     if (document.querySelector('.viator-recommendations-slider')) {
         new Swiper('.viator-recommendations-slider', {
@@ -137,7 +204,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 window.history.pushState({}, '', `${url.pathname}?${params.toString()}`);
                 document.getElementById('viator-results').innerHTML = html;
                 document.getElementById('viator-results').scrollIntoView({ behavior: 'smooth' });
-                reinitializeDatePicker();
+                if (typeof reinitializeDatePicker === 'function') {
+                    reinitializeDatePicker();
+                }
+                if (typeof reinitializeDurationFilter === 'function') {
+                    reinitializeDurationFilter();
+                }
+                if (typeof window.initializeMobileFilterButton === 'function') {
+                    window.initializeMobileFilterButton();
+                }
             })
             .catch(error => {
                 console.error('Erro:', error);
@@ -151,7 +226,9 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
             // Inicializar os filtros de duração
-            reinitializeDurationFilter();
+            if (typeof reinitializeDurationFilter === 'function') {
+                reinitializeDurationFilter();
+            }
 
     function initializeDatePicker() {
         const dateSelector = document.querySelector('.viator-date-selector');
@@ -295,6 +372,17 @@ document.addEventListener('DOMContentLoaded', function () {
                     .then(html => {
                         window.history.pushState({}, '', `${url.pathname}?${params.toString()}`);
                         document.getElementById('viator-results').innerHTML = html;
+                        
+                        // Reinicializar componentes interativos
+                        if (typeof reinitializeDatePicker === 'function') {
+                            reinitializeDatePicker();
+                        }
+                        if (typeof reinitializeDurationFilter === 'function') {
+                            reinitializeDurationFilter();
+                        }
+                        if (typeof window.initializeMobileFilterButton === 'function') {
+                            window.initializeMobileFilterButton();
+                        }
                     })
                     .catch(error => {
                         console.error('Erro:', error);
@@ -311,6 +399,12 @@ document.addEventListener('DOMContentLoaded', function () {
                         dateSelector.querySelector('span').textContent = selectedDateRange.display;
                         
                         document.querySelector('.viator-grid').style.opacity = '0.5';
+                        
+                        // Mostrar efeito de carregamento em dispositivos móveis
+                        const loadingEffect = document.querySelector('.viator-loading-effect');
+                        if (loadingEffect && window.innerWidth <= 768) {
+                            loadingEffect.classList.add('active');
+                        }
                         
                         let url = new URL(window.location.href);
                         let params = new URLSearchParams(url.search);
@@ -344,6 +438,12 @@ document.addEventListener('DOMContentLoaded', function () {
                         })
                         .finally(() => {
                             document.querySelector('.viator-grid').style.opacity = '1';
+                            
+                            // Remover efeito de carregamento em dispositivos móveis
+                            const loadingEffect = document.querySelector('.viator-loading-effect');
+                            if (loadingEffect) {
+                                loadingEffect.classList.remove('active');
+                            }
                         });
                     }
                 });
@@ -395,6 +495,10 @@ document.addEventListener('DOMContentLoaded', function () {
             if (mutation.type === 'childList' && mutation.target.id === 'viator-results') {
                 reinitializeDatePicker();
                 reinitializeDurationFilter();
+                // Reinicializar o botão de filtros móveis após atualização AJAX
+                if (typeof window.initializeMobileFilterButton === 'function') {
+                    window.initializeMobileFilterButton();
+                }
             }
         });
     });
@@ -411,6 +515,12 @@ document.addEventListener('DOMContentLoaded', function () {
 function updateSort(value) {
     // Mostrar indicador de carregamento
     document.querySelector('.viator-grid').style.opacity = '0.5';
+    
+    // Mostrar efeito de carregamento em dispositivos móveis
+    const loadingEffect = document.querySelector('.viator-loading-effect');
+    if (loadingEffect && window.innerWidth <= 768) {
+        loadingEffect.classList.add('active');
+    }
     
     // Pegar a URL atual e parâmetros
     let url = new URL(window.location.href);
@@ -452,8 +562,16 @@ function updateSort(value) {
         // Atualizar o conteúdo
         document.getElementById('viator-results').innerHTML = html;
         
-        // Reinicializar o datepicker após atualizar o conteúdo
-        reinitializeDatePicker();
+        // Reinicializar componentes interativos após atualizar o conteúdo
+        if (typeof reinitializeDatePicker === 'function') {
+            reinitializeDatePicker();
+        }
+        if (typeof reinitializeDurationFilter === 'function') {
+            reinitializeDurationFilter();
+        }
+        if (typeof window.initializeMobileFilterButton === 'function') {
+            window.initializeMobileFilterButton();
+        }
     })
     .catch(error => {
         console.error('Erro:', error);
@@ -462,6 +580,12 @@ function updateSort(value) {
     })
     .finally(() => {
         document.querySelector('.viator-grid').style.opacity = '1';
+        
+        // Remover efeito de carregamento em dispositivos móveis
+        const loadingEffect = document.querySelector('.viator-loading-effect');
+        if (loadingEffect) {
+            loadingEffect.classList.remove('active');
+        }
     });
 }
 
@@ -479,6 +603,17 @@ function reinitializeDurationFilter() {
                 gridElement.style.opacity = '0.5';
             }
 
+            // Mostrar efeito de carregamento em dispositivos móveis
+            const loadingEffect = document.querySelector('.viator-loading-effect');
+            if (loadingEffect && window.innerWidth <= 768) {
+                loadingEffect.classList.add('active');
+                
+                // Remover efeito após um tempo
+                setTimeout(() => {
+                    loadingEffect.classList.remove('active');
+                }, 1500);
+            }
+            
             // Pegar a URL atual e parâmetros
             let url = new URL(window.location.href);
             let params = new URLSearchParams(url.search);
@@ -489,52 +624,91 @@ function reinitializeDurationFilter() {
             const dateStart = params.get('viator_date_start');
             const dateEnd = params.get('viator_date_end');
 
-            // Fazer requisição AJAX
+            // Criar o objeto de parâmetros para a requisição
+            const requestParams = {
+                action: 'viator_update_filter',
+                viator_query: searchTerm,
+                viator_sort: params.get('viator_sort') || 'DEFAULT',
+                viator_page: page,
+                viator_date_start: dateStart || '',
+                viator_date_end: dateEnd || '',
+                duration_filter: selectedFilter,
+                nonce: viatorAjax.nonce
+            };
+
+            // Atualizar a URL antes da requisição AJAX
+            const newUrl = new URL(window.location);
+            if (selectedFilter) {
+                newUrl.searchParams.set('duration_filter', selectedFilter);
+            } else {
+                newUrl.searchParams.delete('duration_filter');
+            }
+            
+            history.replaceState({}, '', newUrl);
+
+            // Criar um controlador de aborto para gerenciar o timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos de timeout
+
+            // Fazer requisição AJAX com sinal de aborto
             fetch(viatorAjax.ajaxurl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
-                body: new URLSearchParams({
-                    action: 'viator_update_filter',
-                    viator_query: searchTerm,
-                    viator_sort: params.get('viator_sort') || 'DEFAULT',
-                    viator_page: page,
-                    viator_date_start: dateStart || '',
-                    viator_date_end: dateEnd || '',
-                    duration_filter: selectedFilter,
-                    nonce: viatorAjax.nonce
-                }),
+                body: new URLSearchParams(requestParams),
+                signal: controller.signal
             })
-            .then(response => response.text())
+            .then(response => {
+                clearTimeout(timeoutId); // Limpar o timeout se a resposta chegar
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.text();
+            })
             .then(html => {
-                // Atualizar o conteúdo
-                document.getElementById('viator-results').innerHTML = html;
-                
-                // Atualizar a URL corretamente
-                const newUrl = new URL(window.location);
-                if (selectedFilter) {
-                    newUrl.searchParams.set('duration_filter', selectedFilter);
-                } else {
-                    newUrl.searchParams.delete('duration_filter');
+                // Check if HTML is valid before processing
+                if (html.trim() === '0' || !html.trim()) {
+                    throw new Error('Resposta inválida do servidor (AJAX retornou 0 ou vazio)');
                 }
                 
-                history.replaceState({}, '', newUrl);
+                // Atualizar o conteúdo
+                const resultsElement = document.getElementById('viator-results');
+                if (resultsElement) {
+                    resultsElement.innerHTML = html;
+                }
                 
                 // Sincronizar radio buttons
                 document.querySelectorAll('input[name="duration_filter"]').forEach(radio => {
                     radio.checked = (radio.value === selectedFilter);
                 });
                 
-                reinitializeDatePicker();
-                reinitializeDurationFilter(); // Re-attach event listeners
+                // Reinitialize components after content update
+                if (typeof reinitializeDatePicker === 'function') {
+                    reinitializeDatePicker();
+                }
+                if (typeof reinitializeDurationFilter === 'function') {
+                    reinitializeDurationFilter();
+                }
+                if (typeof window.initializeMobileFilterButton === 'function') {
+                    window.initializeMobileFilterButton();
+                }
             })
             .catch(error => {
-                console.error('Erro:', error);
-                if (gridElement) gridElement.style.opacity = '1';
+                console.error('Erro ao atualizar filtro de duração:', error);
+                // Se for um erro de aborto (timeout), não fazer nada especial
+                if (error.name === 'AbortError') {
+                    console.log('A requisição foi cancelada por timeout ou pelo usuário');
+                }
             })
             .finally(() => {
+                // Restaurar a opacidade do grid
                 if (gridElement) gridElement.style.opacity = '1';
+                
+                // Garantir que o efeito de carregamento seja removido
+                if (loadingEffect) {
+                    loadingEffect.classList.remove('active');
+                }
             });
         });
     });

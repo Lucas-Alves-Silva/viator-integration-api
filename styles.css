@@ -506,6 +506,37 @@
     color: #04846b;
 }
 
+/* Botão de filtros para dispositivos móveis */
+.viator-mobile-filter-button {
+    display: none; /* Oculto por padrão, será exibido apenas em dispositivos móveis */
+    padding: 12px 20px;
+    background: #fff;
+    color: #2D2D2D;
+    border: 1px solid #cccccc;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.3s ease, transform 0.3s ease;
+    margin: 15px auto;
+    width: 100%;
+    max-width: 160px;
+    text-align: center;
+    font-family: var(--font-primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    align-items: center;
+    justify-content: center;
+}
+
+.viator-mobile-filter-button:hover {
+    background: linear-gradient(135deg, #0056b3, #003f7f);
+    transform: translateY(-2px);
+}
+
+.viator-mobile-filter-button .filter-icon {
+    margin-right: 8px;
+}
+
 /* Responsive Styles */
 @media (max-width: 768px) {
     .viator-product-main {
@@ -527,6 +558,50 @@
     .viator-tab-button {
         padding: 10px 15px;
         font-size: 14px;
+    }
+    
+    /* Exibir o botão de filtros em dispositivos móveis */
+    .viator-mobile-filter-button {
+        display: flex;
+    }
+    
+    /* Ocultar a sidebar de filtros por padrão em dispositivos móveis */
+    .viator-filters {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: white;
+        z-index: 1000;
+        padding: 20px;
+        overflow-y: auto;
+    }
+    
+    /* Classe para exibir os filtros quando o botão for clicado */
+    .viator-filters.active {
+        display: block;
+        animation: slideIn 0.3s ease-out;
+    }
+    
+    /* Botão de fechar para os filtros móveis */
+    .viator-filters-close {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        background: none;
+        border: none;
+        font-size: 24px;
+        color: #333;
+        cursor: pointer;
+        z-index: 1001;
+    }
+    
+    /* Animação para o slide-in dos filtros */
+    @keyframes slideIn {
+        from { transform: translateX(-100%); }
+        to { transform: translateX(0); }
     }
 }
 
@@ -975,14 +1050,14 @@
         .viator-total {
             text-align: center;
             margin: 20px 0;
-            font-weight: 600;
             color: #333;
-            font-size: 1.1em;
+            font-size: 1em;
         }
 
         /* Estilo para o header e o select de ordenação */
         .viator-header {
             display: flex;
+            flex-direction: column;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
@@ -1107,6 +1182,69 @@
                 align-items: center;
                 gap: 10px;
             }
+            
+            /* Ajustes para layout responsivo */
+            .viator-content-wrapper {
+                flex-direction: column;
+                padding: 15px;
+            }
+            
+            /* Esconder a sidebar de filtros em mobile */
+            .viator-filters {
+                display: none;
+            }
+            
+            /* Mostrar o botão de filtros em mobile */
+            .viator-filters-button {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+            }
+            
+            /* Ajustes para o grid em mobile */
+            .viator-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            /* Efeito de carregamento para mobile */
+            .viator-loading-effect {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 3px;
+                background: linear-gradient(90deg, #04846b, #04c4a1);
+                z-index: 1001;
+                animation: loading-progress 1.5s ease-in-out infinite;
+                transform-origin: left;
+                display: none;
+            }
+            
+            .viator-loading-effect.active {
+                display: block;
+            }
+            
+            @keyframes loading-progress {
+                0% { transform: scaleX(0); }
+                50% { transform: scaleX(0.5); }
+                100% { transform: scaleX(1); }
+            }
+            
+            /* Ajustes para o modal de filtros em mobile */
+            .viator-filters-modal .viator-date-filter {
+                border-radius: 0;
+            }
+            
+            /* Ajustes para o formulário de busca em mobile */
+            #viator-search-form {
+                flex-direction: column;
+                padding: 20px 15px;
+            }
+            
+            #viator-search-form button {
+                margin-top: 10px;
+            }
         }
 
 /* Container principal que envolve filtros e grid */
@@ -1117,6 +1255,7 @@
     margin: 0 auto;
     padding: 20px 40px;
     justify-content: center; /* Centraliza o conteúdo horizontalmente */
+    position: relative; /* Para posicionamento do botão de filtros mobile */
 }
 
 /* Container dos resultados */
@@ -1134,6 +1273,119 @@
     border-radius: 10px;
     background: #fdfdfd;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Botão de filtros para mobile */
+.viator-filters-button {
+    display: none; /* Escondido por padrão, visível apenas em mobile */
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #04846b;
+    color: white;
+    border: none;
+    border-radius: 50px;
+    padding: 12px 20px;
+    font-family: var(--font-primary);
+    font-size: 16px;
+    font-weight: 500;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    z-index: 100;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.viator-filters-button:hover {
+    background: #036b56;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+}
+
+/* Overlay para o modal de filtros */
+.viator-filters-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+/* Estilo para o modal de filtros */
+.viator-filters-modal {
+    display: none;
+    position: fixed;
+    bottom: -100%;
+    left: 0;
+    width: 100%;
+    max-height: 80vh;
+    background: #fff;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    transition: bottom 0.4s ease;
+    overflow-y: auto;
+    padding-bottom: 30px;
+}
+
+/* Estilos adicionais para o conteúdo do modal */
+.viator-filters-modal .viator-filters {
+    padding: 15px;
+    margin: 0;
+}
+
+.viator-filters-modal .viator-duration-filter {
+    padding: 15px;
+}
+
+.viator-filters-modal .viator-duration-options {
+    margin-top: 15px;
+}
+
+.viator-filters-modal .viator-duration-option {
+    margin-bottom: 12px;
+    padding: 10px;
+    border-radius: 8px;
+    background-color: #f9f9f9;
+}
+
+/* Cabeçalho do modal de filtros */
+.viator-filters-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.viator-filters-modal-header h3 {
+    margin: 0;
+    font-family: var(--font-primary);
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+}
+
+.viator-filters-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #666;
+    cursor: pointer;
+}
+
+/* Classe para quando o modal está ativo */
+.viator-filters-modal.active {
+    bottom: 0;
+}
+
+.viator-filters-overlay.active {
+    display: block;
+    opacity: 1;
 }
 
 /* Ajuste do grid para acomodar a sidebar */
@@ -1221,6 +1473,21 @@
     .viator-results-container {
         max-width: 100%;
     }
+
+    #viator-results {
+        margin: 0px auto 0;
+    }
+
+    .filter-icon {
+        display: flex;
+    }
+
+    .viator-header-info-filter {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+    }
 }
 
 @media (max-width: 768px) {
@@ -1230,6 +1497,21 @@
     }
 
     .viator-filters {
+        width: 100%;
+    }
+
+    #viator-results {
+        margin: 0px auto 0;
+    }
+
+    .filter-icon {
+        display: flex;
+    }
+
+    .viator-header-info-filter {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
         width: 100%;
     }
 }
