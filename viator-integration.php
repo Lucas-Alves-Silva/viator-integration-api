@@ -928,65 +928,14 @@ function viator_get_search_results($searchTerm) {
     // Fechar grid
     $output .= '</div>';
 
-// Paginação
-if ($total_pages > 1) {
-    $output .= '<div class="viator-pagination">';
-    
-    // Link para a página anterior
-    if ($page > 1) {
-        $prev_url = add_query_arg([
-            'viator_page' => $page - 1,
-            'viator_query' => $searchTerm,
-            'viator_sort' => $current_sort,
-            'viator_date_start' => isset($_GET['viator_date_start']) ? $_GET['viator_date_start'] : '',
-            'viator_date_end' => isset($_GET['viator_date_end']) ? $_GET['viator_date_end'] : '',
-            'duration_filter' => isset($_GET['duration_filter']) ? $_GET['duration_filter'] : '',
-            'min_price' => isset($_GET['min_price']) ? $_GET['min_price'] : '',
-            'max_price' => isset($_GET['max_price']) ? $_GET['max_price'] : '',
-            'rating_filter' => isset($_GET['rating_filter']) ? $_GET['rating_filter'] : ''
-        ]);
-        $prev_arrow = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/></svg>';
-        $output .= '<a class="viator-pagination-arrow" href="' . esc_url($prev_url) . '">' . $prev_arrow . '</a>';
-    }
-
-    // Gerar links das páginas com ellipsis
-    $adjacent = 2;
-    $pages = array();
-
-    // Sempre mostra a primeira página
-    $pages[] = 1;
-
-    // Calcula páginas adjacentes
-    $start = max(2, $page - $adjacent);
-    $end = min($total_pages - 1, $page + $adjacent);
-
-    // Adiciona ellipsis se necessário antes das páginas intermediárias
-    if ($start > 2) {
-        $pages[] = '...';
-    }
-
-    // Páginas intermediárias
-    for ($i = $start; $i <= $end; $i++) {
-        $pages[] = $i;
-    }
-
-    // Adiciona ellipsis se necessário após as páginas intermediárias
-    if ($end < $total_pages - 1) {
-        $pages[] = '...';
-    }
-
-    // Sempre mostra a última página se houver mais de uma
+    // Adicionando paginação
     if ($total_pages > 1) {
-        $pages[] = $total_pages;
-    }
-
-    // Loop para gerar os links ou ellipsis
-    foreach ($pages as $page_num) {
-        if ($page_num === '...') {
-            $output .= '<span class="viator-pagination-ellipsis">...</span>';
-        } else {
-            $url = add_query_arg([
-                'viator_page' => $page_num,
+        $output .= '<div class="viator-pagination">';
+        
+        // Link para a página anterior
+        if ($page > 1) {
+            $prev_url = add_query_arg([
+                'viator_page' => $page - 1,
                 'viator_query' => $searchTerm,
                 'viator_sort' => $current_sort,
                 'viator_date_start' => isset($_GET['viator_date_start']) ? $_GET['viator_date_start'] : '',
@@ -996,30 +945,104 @@ if ($total_pages > 1) {
                 'max_price' => isset($_GET['max_price']) ? $_GET['max_price'] : '',
                 'rating_filter' => isset($_GET['rating_filter']) ? $_GET['rating_filter'] : ''
             ]);
-            $active_class = ($page_num == $page) ? ' active' : '';
-            $output .= '<a class="viator-pagination-btn' . $active_class . '" href="' . esc_url($url) . '">' . $page_num . '</a>';
+            $prev_arrow = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/></svg>';
+            $output .= '<a class="viator-pagination-arrow" href="' . esc_url($prev_url) . '" data-page="' . ($page - 1) . '">' . $prev_arrow . '</a>';
         }
-    }
 
-    // Link para a próxima página
-    if ($page < $total_pages) {
-        $next_url = add_query_arg([
-            'viator_page' => $page + 1,
-            'viator_query' => $searchTerm,
-            'viator_sort' => $current_sort,
-            'viator_date_start' => isset($_GET['viator_date_start']) ? $_GET['viator_date_start'] : '',
-            'viator_date_end' => isset($_GET['viator_date_end']) ? $_GET['viator_date_end'] : '',
-            'duration_filter' => isset($_GET['duration_filter']) ? $_GET['duration_filter'] : '',
-            'min_price' => isset($_GET['min_price']) ? $_GET['min_price'] : '',
-            'max_price' => isset($_GET['max_price']) ? $_GET['max_price'] : '',
-            'rating_filter' => isset($_GET['rating_filter']) ? $_GET['rating_filter'] : ''
-        ]);
-        $next_arrow = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/></svg>';
-        $output .= '<a class="viator-pagination-arrow" href="' . esc_url($next_url) . '">' . $next_arrow . '</a>';
-    }
+        // Gerar links das páginas com ellipsis
+        $adjacent = 2;
+        $pages = array();
 
-    $output .= '</div>';
-}
+        // Sempre mostra a primeira página
+        $pages[] = 1;
+
+        // Calcula páginas adjacentes
+        $start = max(2, $page - $adjacent);
+        $end = min($total_pages - 1, $page + $adjacent);
+
+        // Adiciona ellipsis se necessário antes das páginas intermediárias
+        if ($start > 2) {
+            $pages[] = '...';
+        }
+
+        // Páginas intermediárias
+        for ($i = $start; $i <= $end; $i++) {
+            $pages[] = $i;
+        }
+
+        // Adiciona ellipsis se necessário após as páginas intermediárias
+        if ($end < $total_pages - 1) {
+            $pages[] = '...';
+        }
+
+        // Sempre mostra a última página se houver mais de uma
+        if ($total_pages > 1) {
+            $pages[] = $total_pages;
+        }
+
+        // Loop para gerar os links ou ellipsis
+        foreach ($pages as $page_num) {
+            if ($page_num === '...') {
+                $output .= '<span class="viator-pagination-ellipsis">...</span>';
+            } else {
+                // Coletar todos os parâmetros de filtro para cada link de paginação
+                $pagination_params = [
+                    'viator_page' => $page_num,
+                    'viator_query' => $searchTerm,
+                    'viator_sort' => $current_sort
+                ];
+                
+                // Adicionar parâmetros de data se existirem
+                if (isset($_GET['viator_date_start']) && !empty($_GET['viator_date_start'])) {
+                    $pagination_params['viator_date_start'] = $_GET['viator_date_start'];
+                }
+                if (isset($_GET['viator_date_end']) && !empty($_GET['viator_date_end'])) {
+                    $pagination_params['viator_date_end'] = $_GET['viator_date_end'];
+                }
+                
+                // Adicionar filtro de duração se existir
+                if (isset($_GET['duration_filter']) && !empty($_GET['duration_filter'])) {
+                    $pagination_params['duration_filter'] = $_GET['duration_filter'];
+                }
+                
+                // Adicionar filtros de preço se existirem
+                if (isset($_GET['min_price']) && $_GET['min_price'] !== '') {
+                    $pagination_params['min_price'] = $_GET['min_price'];
+                }
+                if (isset($_GET['max_price']) && $_GET['max_price'] !== '') {
+                    $pagination_params['max_price'] = $_GET['max_price'];
+                }
+                
+                // Adicionar filtro de avaliação se existir
+                if (isset($_GET['rating_filter']) && !empty($_GET['rating_filter'])) {
+                    $pagination_params['rating_filter'] = $_GET['rating_filter'];
+                }
+                
+                $url = add_query_arg($pagination_params);
+                $active_class = ($page_num == $page) ? ' active' : '';
+                $output .= '<a class="viator-pagination-btn' . $active_class . '" href="' . esc_url($url) . '" data-page="' . $page_num . '">' . $page_num . '</a>';
+            }
+        }
+
+        // Link para a próxima página
+        if ($page < $total_pages) {
+            $next_url = add_query_arg([
+                'viator_page' => $page + 1,
+                'viator_query' => $searchTerm,
+                'viator_sort' => $current_sort,
+                'viator_date_start' => isset($_GET['viator_date_start']) ? $_GET['viator_date_start'] : '',
+                'viator_date_end' => isset($_GET['viator_date_end']) ? $_GET['viator_date_end'] : '',
+                'duration_filter' => isset($_GET['duration_filter']) ? $_GET['duration_filter'] : '',
+                'min_price' => isset($_GET['min_price']) ? $_GET['min_price'] : '',
+                'max_price' => isset($_GET['max_price']) ? $_GET['max_price'] : '',
+                'rating_filter' => isset($_GET['rating_filter']) ? $_GET['rating_filter'] : ''
+            ]);
+            $next_arrow = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/></svg>';
+            $output .= '<a class="viator-pagination-arrow" href="' . esc_url($next_url) . '" data-page="' . ($page + 1) . '">' . $next_arrow . '</a>';
+        }
+
+        $output .= '</div>';
+    }
 
     $output .= '</div>'; // Fecha viator-results-container
     $output .= '</div>'; // Fecha viator-content-wrapper
