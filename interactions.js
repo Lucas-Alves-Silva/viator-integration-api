@@ -476,6 +476,9 @@ document.addEventListener('DOMContentLoaded', function () {
     // Inicializar o filtro de preço
     initializePriceSlider();
 
+    // Inicializar o filtro de avaliação
+    initializeRatingFilter();
+
     // Função para reinicializar o datepicker
     function reinitializeDatePicker() {
         const dateSelector = document.querySelector('.viator-date-selector');
@@ -514,6 +517,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 reinitializeDatePicker();
                 reinitializeDurationFilter();
                 reinitializePriceSlider();
+                reinitializeRatingFilter();
                 // Reinicializar o botão de filtros móveis após atualização AJAX
                 if (typeof window.initializeMobileFilterButton === 'function') {
                     window.initializeMobileFilterButton();
@@ -1334,4 +1338,104 @@ function initializePriceSlider() {
 // Função para reinicializar o filtro de preço (para ser chamada após AJAX)
 function reinitializePriceSlider() {
     initializePriceSlider();
+}
+
+// Função para inicializar o filtro de avaliação
+function initializeRatingFilter() {
+    const ratingInputs = document.querySelectorAll('input[name="rating_filter"]');
+    if (!ratingInputs.length) return;
+    
+    ratingInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            // Mostrar indicador de carregamento
+            const gridElement = document.querySelector('.viator-grid');
+            if (gridElement) {
+                gridElement.style.opacity = '0.5';
+            }
+
+            // Mostrar efeito de carregamento em dispositivos móveis
+            const loadingEffect = document.querySelector('.viator-loading-effect');
+            if (loadingEffect && window.innerWidth <= 768) {
+                loadingEffect.classList.add('active');
+            }
+            
+            // Pegar a URL atual e parâmetros
+            let url = new URL(window.location.href);
+            let params = new URLSearchParams(url.search);
+            
+            // Pegar os parâmetros necessários
+            const searchTerm = params.get('viator_query');
+            const sortValue = params.get('viator_sort') || 'DEFAULT';
+            const dateStart = params.get('viator_date_start');
+            const dateEnd = params.get('viator_date_end');
+            const durationFilter = params.get('duration_filter');
+            const minPrice = params.get('min_price');
+            const maxPrice = params.get('max_price');
+            const ratingValue = this.value; // O valor selecionado do rating
+            
+            // Atualizar a URL
+            const newUrl = new URL(window.location);
+            newUrl.searchParams.set('rating_filter', ratingValue);
+            newUrl.searchParams.set('viator_page', '1'); // Resetar para a primeira página
+            history.replaceState({}, '', newUrl);
+            
+            // Fazer requisição AJAX
+            fetch(viatorAjax.ajaxurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    action: 'viator_update_filter',
+                    viator_query: searchTerm,
+                    viator_sort: sortValue,
+                    viator_page: '1', // Sempre ir para a página 1 ao mudar o filtro
+                    viator_date_start: dateStart || '',
+                    viator_date_end: dateEnd || '',
+                    duration_filter: durationFilter || '',
+                    min_price: minPrice || '',
+                    max_price: maxPrice || '',
+                    rating_filter: ratingValue,
+                    nonce: viatorAjax.nonce
+                })
+            })
+            .then(response => response.text())
+            .then(html => {
+                if (html.trim() === '0' || !html.trim()) {
+                    throw new Error('Resposta inválida do servidor');
+                }
+                
+                document.getElementById('viator-results').innerHTML = html;
+                
+                // Reinicializar componentes
+                if (typeof reinitializeDatePicker === 'function') {
+                    reinitializeDatePicker();
+                }
+                if (typeof reinitializeDurationFilter === 'function') {
+                    reinitializeDurationFilter();
+                }
+                if (typeof reinitializePriceSlider === 'function') {
+                    reinitializePriceSlider();
+                }
+                if (typeof reinitializeRatingFilter === 'function') {
+                    reinitializeRatingFilter();
+                }
+                if (typeof window.initializeMobileFilterButton === 'function') {
+                    window.initializeMobileFilterButton();
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+            })
+            .finally(() => {
+                if (gridElement) gridElement.style.opacity = '1';
+                if (loadingEffect) loadingEffect.classList.remove('active');
+            });
+        });
+    });
+}
+
+// Função para reinicializar o filtro de avaliação após AJAX
+function reinitializeRatingFilter() {
+    initializeRatingFilter();
 }

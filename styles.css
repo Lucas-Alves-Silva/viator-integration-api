@@ -2013,28 +2013,206 @@
     }
 }
 
-/* Remover estilos anteriores que não se aplicam mais */
-.viator-price-slider-inputs {
-    /* display: flex; */ /* Removido ou ajustado */
-    /* flex-direction: column; */
-    /* gap: 15px; */
+/* Estilos para o filtro de avaliação */
+.viator-rating-filter {
+    padding: 20px 10px 15px 10px;
+    width: 90%;
+    margin-left: auto;
+    margin-right: auto;
+    border-bottom: 1px solid #ccc;
+    position: relative;
 }
 
-.viator-price-input-group {
-    /* display: flex; */ /* Removido ou ajustado */
-    /* flex-direction: column; */
-    /* gap: 8px; */
+.viator-rating-filter h3 {
+    font-family: var(--font-primary);
+    font-size: 18px;
+    color: #333;
+    margin-bottom: 20px;
+    margin-top: 0;
 }
 
-.viator-price-input-group label {
-   /* font-weight: bold; */ /* Estilos de label não são mais usados diretamente como antes */
-   /* font-size: 14px; */
-   /* color: #555; */
+.viator-rating-options {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
 }
 
-.viator-price-input-group span {
-    /* font-size: 14px; */ /* Agora tratado por .viator-price-values */
-    /* color: #0073aa; */
-    /* font-weight: 500; */
-    /* margin-bottom: 5px; */
+.viator-rating-option {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-family: var(--font-primary);
+    font-size: 16px;
+}
+
+.viator-rating-option input[type="radio"] {
+    margin-right: 10px;
+    cursor: pointer;
+}
+
+.viator-rating-stars {
+    display: inline-flex;
+    align-items: center;
+    height: 1em;
+    line-height: 1;
+    color: #00b67a; /* Cor verde para as estrelas */
+    letter-spacing: 2px;
+    font-size: 20px;
+    margin-top: 0; /* Evitar margem que possa desalinhar */
+    margin-bottom: 0; /* Evitar margem que possa desalinhar */
+    padding: 0; /* Evitar padding que possa desalinhar */
+}
+
+.viator-rating-stars .star-full,
+.viator-rating-stars .star-empty,
+.viator-rating-stars .star-half-container {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 1em;
+    line-height: 1;
+    margin: 0;
+    padding: 0;
+    vertical-align: middle; /* Usar middle para melhor alinhamento */
+}
+
+.viator-rating-stars .star-full {
+    color: #00b67a; /* Estrela cheia */
+}
+
+.viator-rating-stars .star-empty {
+    color: #ddd; /* Estrela vazia */
+}
+
+.viator-rating-stars .star-half-container {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1em;
+    height: 1em;
+    margin: 0;
+    padding: 0;
+    vertical-align: middle;
+    line-height: 1;
+}
+
+.viator-rating-stars .star-half-full {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0.5em; /* Metade da largura */
+    height: 1em;
+    overflow: hidden; /* Corta no meio */
+    color: #00b67a; /* Cor verde para a parte preenchida */
+    z-index: 2; /* Acima da estrela vazia */
+    line-height: 1;
+    font-size: inherit;
+    margin: 0;
+    padding: 0;
+}
+
+.viator-rating-stars .star-half-empty {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1em;
+    height: 1em;
+    color: #ddd; /* Cor cinza para a parte não preenchida */
+    z-index: 1; /* Abaixo da estrela cheia */
+    line-height: 1;
+    font-size: inherit;
+    margin: 0;
+    padding: 0;
+}
+
+/* Garantir que todas as estrelas tenham o mesmo alinhamento vertical */
+.viator-rating-stars .star-full,
+.viator-rating-stars .star-half-container,
+.viator-rating-stars .star-empty {
+    vertical-align: middle;
+    line-height: 1;
+    display: inline-block;
+}
+
+/* Cria a parte cinza (fundo) da estrela */
+.viator-rating-stars .star-half::after {
+    content: '★';
+    position: absolute;
+    top: 0;
+    left: 0;
+    color: #ddd;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+/* Cria a parte verde (frente) da estrela - apenas metade */
+.viator-rating-stars .star-half::before {
+    content: '★';
+    position: absolute;
+    top: 0;
+    left: 0;
+    color: #00b67a;
+    width: 0.5em; /* Exatamente metade da largura */
+    height: 100%;
+    overflow: hidden; /* Corta no meio */
+    z-index: 2; /* Coloca acima da parte cinza */
+}
+
+.viator-rating-stars .star-empty {
+    color: #ddd; /* Estrela vazia */
+}
+
+.viator-rating-text {
+    font-size: 16px;
+    color: #333;
+}
+
+/* Estilo específico para cada nível de avaliação */
+.viator-rating-stars.rating-45 .star-half:before {
+    width: 50%;
+}
+
+.viator-rating-stars.rating-40 .star-empty {
+    color: #ddd;
+}
+
+.viator-rating-stars.rating-30 .star-empty {
+    color: #ddd;
+}
+
+/* Ajustes responsivos */
+@media (max-width: 768px) {
+    .viator-rating-filter h3 {
+        font-size: 16px;
+    }
+    
+    .viator-rating-options {
+        gap: 12px;
+    }
+    
+    .viator-rating-option {
+        font-size: 14px;
+    }
+    
+    .viator-rating-stars {
+        font-size: 18px;
+    }
+    
+    .viator-rating-text {
+        font-size: 14px;
+    }
+}
+
+/* Remover os estilos antigos da meia estrela */
+.viator-rating-stars .star-half {
+    /* Estes estilos não são mais necessários */
+    display: none;
+}
+
+.viator-rating-stars .star-half::before,
+.viator-rating-stars .star-half::after {
+    /* Estes estilos não são mais necessários */
+    content: none;
 }

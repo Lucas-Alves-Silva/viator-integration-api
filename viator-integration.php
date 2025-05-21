@@ -262,6 +262,9 @@ function viator_get_search_results($searchTerm) {
     $min_price_param = isset($_GET['min_price']) ? intval($_GET['min_price']) : 0;
     $max_price_param = isset($_GET['max_price']) ? intval($_GET['max_price']) : 5000;
 
+    // Ler o parâmetro de avaliação
+    $rating_param = isset($_GET['rating_filter']) ? floatval($_GET['rating_filter']) : 0;
+
     // Corpo da requisição JSON
     $body_data = [ // Primeiro crie o array
         "searchTerm" => $searchTerm,
@@ -276,7 +279,7 @@ function viator_get_search_results($searchTerm) {
                 "to" => $max_price_param
             ],
             "rating" => [
-                "from" => 0,
+                "from" => $rating_param,
                 "to" => 5
             ],
             "durationInMinutes" => !empty($duration_filter) ? $duration_filter[0] : null,
@@ -620,6 +623,52 @@ function viator_get_search_results($searchTerm) {
     </div>';
     // Fim do filtro de preço
 
+    // Adicionar o filtro de avaliação
+    $current_rating = isset($_GET['rating_filter']) ? sanitize_text_field($_GET['rating_filter']) : '';
+    
+    $output .= '<div class="viator-rating-filter">
+        <h3>Avaliação</h3>
+        <div class="viator-rating-options">
+            <label class="viator-rating-option">
+                <input type="radio" name="rating_filter" value="4.5" ' . checked($current_rating, '4.5', false) . '>
+                <span class="viator-rating-stars rating-45">
+                    <span class="star-full">★</span>
+                    <span class="star-full">★</span>
+                    <span class="star-full">★</span>
+                    <span class="star-full">★</span>
+                    <span class="star-half-container">
+                        <span class="star-half-full">★</span>
+                        <span class="star-half-empty">★</span>
+                    </span>
+                </span>
+                <span class="viator-rating-text"> e acima</span>
+            </label>
+            <label class="viator-rating-option">
+                <input type="radio" name="rating_filter" value="4.0" ' . checked($current_rating, '4.0', false) . '>
+                <span class="viator-rating-stars rating-40">
+                    <span class="star-full">★</span>
+                    <span class="star-full">★</span>
+                    <span class="star-full">★</span>
+                    <span class="star-full">★</span>
+                    <span class="star-empty">★</span>
+                </span>
+                <span class="viator-rating-text"> e acima</span>
+            </label>
+            <label class="viator-rating-option">
+                <input type="radio" name="rating_filter" value="3.0" ' . checked($current_rating, '3.0', false) . '>
+                <span class="viator-rating-stars rating-30">
+                    <span class="star-full">★</span>
+                    <span class="star-full">★</span>
+                    <span class="star-full">★</span>
+                    <span class="star-empty">★</span>
+                    <span class="star-empty">★</span>
+                </span>
+                <span class="viator-rating-text"> e acima</span>
+            </label>
+        </div>
+    </div>';
+    // Fim do filtro de avaliação
+
     $output .= '</div>'; // Fechar div.viator-filters
 
     // Header com total e ordenação
@@ -893,7 +942,8 @@ if ($total_pages > 1) {
             'viator_date_end' => isset($_GET['viator_date_end']) ? $_GET['viator_date_end'] : '',
             'duration_filter' => isset($_GET['duration_filter']) ? $_GET['duration_filter'] : '',
             'min_price' => isset($_GET['min_price']) ? $_GET['min_price'] : '',
-            'max_price' => isset($_GET['max_price']) ? $_GET['max_price'] : ''
+            'max_price' => isset($_GET['max_price']) ? $_GET['max_price'] : '',
+            'rating_filter' => isset($_GET['rating_filter']) ? $_GET['rating_filter'] : ''
         ]);
         $prev_arrow = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/></svg>';
         $output .= '<a class="viator-pagination-arrow" href="' . esc_url($prev_url) . '">' . $prev_arrow . '</a>';
@@ -943,7 +993,8 @@ if ($total_pages > 1) {
                 'viator_date_end' => isset($_GET['viator_date_end']) ? $_GET['viator_date_end'] : '',
                 'duration_filter' => isset($_GET['duration_filter']) ? $_GET['duration_filter'] : '',
                 'min_price' => isset($_GET['min_price']) ? $_GET['min_price'] : '',
-                'max_price' => isset($_GET['max_price']) ? $_GET['max_price'] : ''
+                'max_price' => isset($_GET['max_price']) ? $_GET['max_price'] : '',
+                'rating_filter' => isset($_GET['rating_filter']) ? $_GET['rating_filter'] : ''
             ]);
             $active_class = ($page_num == $page) ? ' active' : '';
             $output .= '<a class="viator-pagination-btn' . $active_class . '" href="' . esc_url($url) . '">' . $page_num . '</a>';
@@ -960,7 +1011,8 @@ if ($total_pages > 1) {
             'viator_date_end' => isset($_GET['viator_date_end']) ? $_GET['viator_date_end'] : '',
             'duration_filter' => isset($_GET['duration_filter']) ? $_GET['duration_filter'] : '',
             'min_price' => isset($_GET['min_price']) ? $_GET['min_price'] : '',
-            'max_price' => isset($_GET['max_price']) ? $_GET['max_price'] : ''
+            'max_price' => isset($_GET['max_price']) ? $_GET['max_price'] : '',
+            'rating_filter' => isset($_GET['rating_filter']) ? $_GET['rating_filter'] : ''
         ]);
         $next_arrow = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/></svg>';
         $output .= '<a class="viator-pagination-arrow" href="' . esc_url($next_url) . '">' . $next_arrow . '</a>';
@@ -1018,6 +1070,13 @@ function viator_ajax_update_sort() {
         $_GET['max_price'] = sanitize_text_field($_POST['max_price']);
     }
     
+    // Processar filtro de avaliação
+    if (isset($_POST['rating_filter']) && !empty($_POST['rating_filter'])) {
+        $_GET['rating_filter'] = sanitize_text_field($_POST['rating_filter']);
+    } else {
+        unset($_GET['rating_filter']);
+    }
+    
     // Debug dos parâmetros para solução de problemas
     viator_debug_log('Sort AJAX Params Recebidos:', $_POST);
     viator_debug_log('Sort AJAX Params Processados:', $_GET);
@@ -1051,14 +1110,14 @@ function viator_ajax_update_filter() {
     $_GET['viator_date_start'] = isset($_POST['viator_date_start']) ? sanitize_text_field($_POST['viator_date_start']) : '';
     $_GET['viator_date_end'] = isset($_POST['viator_date_end']) ? sanitize_text_field($_POST['viator_date_end']) : '';
     
-    // Adicionando o filtro de duração
+    // Processar filtro de duração
     if (isset($_POST['duration_filter']) && !empty($_POST['duration_filter'])) {
         $_GET['duration_filter'] = sanitize_text_field($_POST['duration_filter']);
     } else {
         unset($_GET['duration_filter']);
     }
 
-    // Processar explicitamente os filtros de preço
+    // Processar filtros de preço
     // Limpamos para garantir que valores vazios não interferem
     unset($_GET['min_price']);
     unset($_GET['max_price']);
@@ -1071,6 +1130,13 @@ function viator_ajax_update_filter() {
     // Verificamos se max_price está definido e não é vazio
     if (isset($_POST['max_price']) && $_POST['max_price'] !== '') {
         $_GET['max_price'] = sanitize_text_field($_POST['max_price']);
+    }
+
+    // Processar filtro de avaliação
+    if (isset($_POST['rating_filter']) && !empty($_POST['rating_filter'])) {
+        $_GET['rating_filter'] = sanitize_text_field($_POST['rating_filter']);
+    } else {
+        unset($_GET['rating_filter']);
     }
 
     // Debug dos parâmetros recebidos para solução de problemas
