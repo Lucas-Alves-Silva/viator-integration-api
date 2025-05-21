@@ -171,13 +171,25 @@ document.addEventListener('DOMContentLoaded', function () {
             const params = new URLSearchParams(url.search);
             const currentParams = new URLSearchParams(window.location.search);
 
-            // Manter os parâmetros de data
+            // Manter os parâmetros de data, duração e preço
             const dateStart = currentParams.get('viator_date_start');
             const dateEnd = currentParams.get('viator_date_end');
+            const durationFilter = currentParams.get('duration_filter');
+            const minPrice = currentParams.get('min_price');
+            const maxPrice = currentParams.get('max_price');
             
             if (dateStart && dateEnd) {
                 params.set('viator_date_start', dateStart);
                 params.set('viator_date_end', dateEnd);
+            }
+            if (durationFilter) {
+                params.set('duration_filter', durationFilter);
+            }
+            if (minPrice) {
+                params.set('min_price', minPrice);
+            }
+            if (maxPrice) {
+                params.set('max_price', maxPrice);
             }
 
             // Fazer requisição AJAX com todos os parâmetros necessários
@@ -193,6 +205,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     viator_page: params.get('viator_page'),
                     viator_date_start: dateStart || '',
                     viator_date_end: dateEnd || '',
+                    duration_filter: durationFilter || '',
+                    min_price: minPrice || '',
+                    max_price: maxPrice || '',
                     nonce: viatorAjax.nonce
                 })
             })
@@ -458,6 +473,9 @@ document.addEventListener('DOMContentLoaded', function () {
     // Inicializar o datepicker
     let flatpickrInstance = initializeDatePicker();
 
+    // Inicializar o filtro de preço
+    initializePriceSlider();
+
     // Função para reinicializar o datepicker
     function reinitializeDatePicker() {
         const dateSelector = document.querySelector('.viator-date-selector');
@@ -495,6 +513,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (mutation.type === 'childList' && mutation.target.id === 'viator-results') {
                 reinitializeDatePicker();
                 reinitializeDurationFilter();
+                reinitializePriceSlider();
                 // Reinicializar o botão de filtros móveis após atualização AJAX
                 if (typeof window.initializeMobileFilterButton === 'function') {
                     window.initializeMobileFilterButton();
@@ -531,6 +550,9 @@ function updateSort(value) {
     const page = params.get('viator_page') || '1';
     const dateStart = params.get('viator_date_start');
     const dateEnd = params.get('viator_date_end');
+    const durationFilter = params.get('duration_filter');
+    const minPrice = params.get('min_price');
+    const maxPrice = params.get('max_price');
     
     // Fazer requisição AJAX
     fetch(viatorAjax.ajaxurl, {
@@ -545,6 +567,9 @@ function updateSort(value) {
             viator_page: page,
             viator_date_start: dateStart || '',
             viator_date_end: dateEnd || '',
+            duration_filter: durationFilter || '',
+            min_price: minPrice || '',
+            max_price: maxPrice || '',
             nonce: viatorAjax.nonce
         })
     })
@@ -623,6 +648,8 @@ function reinitializeDurationFilter() {
             const page = params.get('viator_page') || '1';
             const dateStart = params.get('viator_date_start');
             const dateEnd = params.get('viator_date_end');
+            const minPrice = params.get('min_price');
+            const maxPrice = params.get('max_price');
 
             // Criar o objeto de parâmetros para a requisição
             const requestParams = {
@@ -633,6 +660,8 @@ function reinitializeDurationFilter() {
                 viator_date_start: dateStart || '',
                 viator_date_end: dateEnd || '',
                 duration_filter: selectedFilter,
+                min_price: minPrice || '',
+                max_price: maxPrice || '',
                 nonce: viatorAjax.nonce
             };
 
@@ -1156,4 +1185,153 @@ function setSearchDestination(destino) {
         searchInput.value = destino;
         searchInput.closest('form').submit();
     }
+}
+
+// Função para inicializar o slider de preço
+function initializePriceSlider() {
+    const minPriceSlider = document.getElementById('min_price_slider');
+    const maxPriceSlider = document.getElementById('max_price_slider');
+    const minPriceDisplay = document.getElementById('min_price_display');
+    const maxPriceDisplay = document.getElementById('max_price_display');
+    const minPriceHidden = document.getElementById('min_price_hidden');
+    const maxPriceHidden = document.getElementById('max_price_hidden');
+
+    if (!minPriceSlider || !maxPriceSlider || !minPriceDisplay || !maxPriceDisplay || !minPriceHidden || !maxPriceHidden) {
+        return;
+    }
+
+    // Função para atualizar os filtros
+    let debounceTimer;
+    function triggerPriceFilterUpdate() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            const gridElement = document.querySelector('.viator-grid');
+            if (gridElement) {
+                gridElement.style.opacity = '0.5';
+            }
+
+            const loadingEffect = document.querySelector('.viator-loading-effect');
+            if (loadingEffect && window.innerWidth <= 768) {
+                loadingEffect.classList.add('active');
+            }
+
+            let url = new URL(window.location.href);
+            let params = new URLSearchParams(url.search);
+
+            const searchTerm = params.get('viator_query');
+            const page = '1'; // Resetar para a primeira página ao aplicar filtro
+            const dateStart = params.get('viator_date_start');
+            const dateEnd = params.get('viator_date_end');
+            const durationFilter = params.get('duration_filter');
+            // Usar os valores dos campos hidden para min_price e max_price, pois eles são atualizados em tempo real pelos sliders
+            const currentMinPrice = document.getElementById('min_price_hidden').value;
+            const currentMaxPrice = document.getElementById('max_price_hidden').value;
+
+            const requestParams = {
+                action: 'viator_update_filter',
+                viator_query: searchTerm,
+                viator_sort: params.get('viator_sort') || 'DEFAULT',
+                viator_page: page,
+                viator_date_start: dateStart || '',
+                viator_date_end: dateEnd || '',
+                duration_filter: durationFilter || '',
+                min_price: currentMinPrice,
+                max_price: currentMaxPrice,
+                nonce: viatorAjax.nonce
+            };
+
+            const newUrl = new URL(window.location);
+            newUrl.searchParams.set('min_price', currentMinPrice);
+            newUrl.searchParams.set('max_price', currentMaxPrice);
+            newUrl.searchParams.set('viator_page', page); // Garantir que a página seja 1
+            history.replaceState({}, '', newUrl);
+
+            fetch(viatorAjax.ajaxurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams(requestParams)
+            })
+            .then(response => response.text())
+            .then(html => {
+                if (html.trim() === '0' || !html.trim()) {
+                    throw new Error('Resposta inválida do servidor (AJAX retornou 0 ou vazio)');
+                }
+                document.getElementById('viator-results').innerHTML = html;
+                // Sincronizar sliders e displays com os valores da URL após a atualização
+                const updatedParams = new URLSearchParams(window.location.search);
+                const newMinPrice = updatedParams.get('min_price') || '0';
+                const newMaxPrice = updatedParams.get('max_price') || '5000';
+
+                minPriceSlider.value = newMinPrice;
+                minPriceDisplay.textContent = `R$ ${newMinPrice}`;
+                minPriceHidden.value = newMinPrice;
+
+                maxPriceSlider.value = newMaxPrice;
+                maxPriceDisplay.textContent = `R$ ${newMaxPrice}`;
+                maxPriceHidden.value = newMaxPrice;
+
+                if (typeof reinitializeDatePicker === 'function') reinitializeDatePicker();
+                if (typeof reinitializeDurationFilter === 'function') reinitializeDurationFilter();
+                if (typeof window.initializeMobileFilterButton === 'function') window.initializeMobileFilterButton();
+                // Não chamar reinitializePriceSlider() aqui para evitar loop
+            })
+            .catch(error => {
+                console.error('Erro ao atualizar filtro de preço:', error);
+            })
+            .finally(() => {
+                if (gridElement) gridElement.style.opacity = '1';
+                if (loadingEffect) loadingEffect.classList.remove('active');
+            });
+        }, 750); // Debounce de 750ms
+    }
+
+    minPriceSlider.addEventListener('input', function() {
+        let minValue = parseInt(minPriceSlider.value);
+        let maxValue = parseInt(maxPriceSlider.value);
+        if (minValue > maxValue - 50) { // Garantir um intervalo mínimo
+            minValue = maxValue - 50;
+            if (minValue < 0) minValue = 0;
+            minPriceSlider.value = minValue;
+        }
+        minPriceDisplay.textContent = `R$ ${minValue}`;
+        minPriceHidden.value = minValue;
+        triggerPriceFilterUpdate();
+    });
+
+    maxPriceSlider.addEventListener('input', function() {
+        let minValue = parseInt(minPriceSlider.value);
+        let maxValue = parseInt(maxPriceSlider.value);
+        if (maxValue < minValue + 50) { // Garantir um intervalo mínimo
+            maxValue = minValue + 50;
+            if (maxValue > 5000) maxValue = 5000;
+            maxPriceSlider.value = maxValue;
+        }
+        maxPriceDisplay.textContent = `R$ ${maxValue}`;
+        maxPriceHidden.value = maxValue;
+        triggerPriceFilterUpdate();
+    });
+
+    // Ajustar os valores iniciais dos displays e hidden fields com base nos parâmetros da URL, se existirem
+    const currentParams = new URLSearchParams(window.location.search);
+    const initialMinPrice = currentParams.get('min_price');
+    const initialMaxPrice = currentParams.get('max_price');
+
+    if (initialMinPrice !== null) {
+        minPriceSlider.value = initialMinPrice;
+        minPriceDisplay.textContent = `R$ ${initialMinPrice}`;
+        minPriceHidden.value = initialMinPrice;
+    }
+
+    if (initialMaxPrice !== null) {
+        maxPriceSlider.value = initialMaxPrice;
+        maxPriceDisplay.textContent = `R$ ${initialMaxPrice}`;
+        maxPriceHidden.value = initialMaxPrice;
+    }
+}
+
+// Função para reinicializar o filtro de preço (para ser chamada após AJAX)
+function reinitializePriceSlider() {
+    initializePriceSlider();
 }

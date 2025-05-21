@@ -1267,7 +1267,7 @@
 /* Sidebar de filtros */
 .viator-filters {
     width: 300px;
-    height: 500px;
+    height: 100%;
     flex-shrink: 0;
     border: 1px solid #ccc;
     border-radius: 10px;
@@ -1871,4 +1871,170 @@
 .viator-duration-filter input[type="checkbox"]:checked + label {
     color: #04846b !important; /* Cor verde do projeto quando marcada */
     font-weight: bold !important; /* Negrito quando marcada */
+}
+
+/* Estilos para o filtro de faixa de preço */
+.viator-price-filter {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 20px 10px 15px 10px; /* Consistente com duration-filter */
+    background-color: transparent; /* Remover fundo específico se duration-filter não tiver */
+    border: none; /* Remover borda específica se duration-filter não tiver */
+    border-bottom: 1px solid #ccc; /* Manter borda inferior como duration-filter */
+    width: 90%;
+    margin-left: auto;
+    margin-right: auto;
+    position: relative; /* Para o posicionamento dos sliders */
+}
+
+.viator-price-filter h3 {
+    font-family: var(--font-primary);
+    font-size: 18px;
+    color: #333;
+    margin-bottom: 25px; /* Aumentar espaço abaixo do título */
+    margin-top: 0;
+    padding-bottom: 0; /* Remover padding se não houver borda no h3 */
+    border-bottom: none; /* Remover borda do h3 se não for padrão */
+}
+
+.viator-price-slider-container {
+    position: relative;
+    height: 50px; /* Altura para acomodar os sliders e os valores */
+    margin-bottom: 10px;
+}
+
+.viator-price-values {
+    display: flex;
+    justify-content: space-between;
+    position: absolute;
+    top: -25px; /* Posicionar acima da barra do slider */
+    left: 0;
+    right: 0;
+    font-family: var(--font-primary);
+    font-size: 14px;
+    color: #555;
+}
+
+#min_price_display,
+#max_price_display {
+    font-weight: 500;
+}
+
+.viator-price-sliders {
+    position: relative;
+    width: 100%;
+    margin-top: 10px; /* Espaço para os valores acima */
+}
+
+.viator-price-sliders input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent; /* Fundo transparente para a barra */
+    cursor: pointer;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    margin: 0; /* Remover margens padrão */
+    pointer-events: none; /* Desabilitar eventos no range em si */
+}
+
+/* Estilização da barra do slider - a ser sobreposta */
+.viator-price-sliders::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 4px; /* Altura da barra preta */
+    background-color: #000; /* Cor da barra */
+    border-radius: 2px;
+    transform: translateY(-50%);
+    z-index: 1; /* Atrás dos thumbs */
+}
+
+.viator-price-sliders input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px; /* Tamanho do controle */
+    height: 20px; /* Tamanho do controle */
+    background: #fff; /* Cor do controle */
+    border-radius: 50%;
+    border: 2px solid #000; /* Borda preta no controle */
+    cursor: pointer;
+    margin-top: -8px; /* Ajuste vertical para centralizar o thumb na barra */
+    position: relative;
+    z-index: 2; /* Acima da barra */
+    pointer-events: auto; /* Habilitar eventos no thumb */
+}
+
+.viator-price-sliders input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    background: #fff;
+    border-radius: 50%;
+    border: 2px solid #000;
+    cursor: pointer;
+    position: relative;
+    z-index: 2;
+    pointer-events: auto;
+}
+
+/* Ocultar as barras padrão dos inputs range */
+.viator-price-sliders input[type="range"]::-webkit-slider-runnable-track {
+    background: transparent;
+    border: none;
+}
+
+.viator-price-sliders input[type="range"]::-moz-range-track {
+    background: transparent;
+    border: none;
+}
+
+/* Ajustes para responsividade, se necessário */
+@media (max-width: 768px) {
+    .viator-price-filter h3 {
+        font-size: 16px;
+        margin-bottom: 20px;
+    }
+    .viator-price-values {
+        font-size: 13px;
+        top: -20px;
+    }
+    .viator-price-sliders input[type="range"]::-webkit-slider-thumb {
+        width: 18px;
+        height: 18px;
+        margin-top: -7px;
+    }
+    .viator-price-sliders input[type="range"]::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+    }
+}
+
+/* Remover estilos anteriores que não se aplicam mais */
+.viator-price-slider-inputs {
+    /* display: flex; */ /* Removido ou ajustado */
+    /* flex-direction: column; */
+    /* gap: 15px; */
+}
+
+.viator-price-input-group {
+    /* display: flex; */ /* Removido ou ajustado */
+    /* flex-direction: column; */
+    /* gap: 8px; */
+}
+
+.viator-price-input-group label {
+   /* font-weight: bold; */ /* Estilos de label não são mais usados diretamente como antes */
+   /* font-size: 14px; */
+   /* color: #555; */
+}
+
+.viator-price-input-group span {
+    /* font-size: 14px; */ /* Agora tratado por .viator-price-values */
+    /* color: #0073aa; */
+    /* font-weight: 500; */
+    /* margin-bottom: 5px; */
 }

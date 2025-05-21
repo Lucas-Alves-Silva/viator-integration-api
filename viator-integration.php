@@ -227,7 +227,19 @@ function viator_get_search_results($searchTerm) {
     
     if (!empty($duration_filters)) {
         foreach ($duration_filters as $filter) {
-            list($min, $max) = explode('-', $filter);
+            // Verificar se $filter é uma string válida e contém o delimitador '-'
+            if (!is_string($filter) || strpos($filter, '-') === false) {
+                continue; // Pular este filtro se não estiver no formato correto
+            }
+            
+            $parts = explode('-', $filter);
+            // Verificar se temos pelo menos dois elementos após explode
+            if (count($parts) < 2) {
+                continue; // Pular este filtro se não tiver pelo menos min e max
+            }
+            
+            $min = $parts[0];
+            $max = $parts[1]; // Pode ser vazio para "Mais de três dias"
             
             if ($max === '') {
                 // Para "Mais de três dias"
@@ -246,6 +258,10 @@ function viator_get_search_results($searchTerm) {
     // Usar diretamente as condições sem processamento adicional
     $duration_filter = !empty($duration_conditions) ? $duration_conditions : null;
 
+    // Ler os parâmetros de preço
+    $min_price_param = isset($_GET['min_price']) ? intval($_GET['min_price']) : 0;
+    $max_price_param = isset($_GET['max_price']) ? intval($_GET['max_price']) : 5000;
+
     // Corpo da requisição JSON
     $body_data = [ // Primeiro crie o array
         "searchTerm" => $searchTerm,
@@ -256,8 +272,8 @@ function viator_get_search_results($searchTerm) {
                 "to" => $date_to
             ],
             "price" => [
-                "from" => 0,
-                "to" => 5000
+                "from" => $min_price_param,
+                "to" => $max_price_param
             ],
             "rating" => [
                 "from" => 0,
@@ -581,8 +597,30 @@ function viator_get_search_results($searchTerm) {
         $output .= "<label><input type='radio' name='duration_filter' value='$value' $checked> $label</label><br>";
     }
 
-    $output .= '</div>
-    </div>'; // Fechar div.viator-filters
+    $output .= '</div>';
+
+    // Adicionando o filtro de preço
+    $current_min_price = isset($_GET['min_price']) ? intval($_GET['min_price']) : 0;
+    $current_max_price = isset($_GET['max_price']) ? intval($_GET['max_price']) : 5000; // Definir um máximo padrão alto
+
+    $output .= '<div class="viator-price-filter">
+        <h3>Faixa de Preço</h3>
+        <div class="viator-price-slider-container">
+            <div class="viator-price-values">
+                <span id="min_price_display">R$ ' . $current_min_price . '</span>
+                <span id="max_price_display">R$ ' . $current_max_price . ($current_max_price >= 5000 ? '+' : '') . '</span>
+            </div>
+            <div class="viator-price-sliders">
+                <input type="range" id="min_price_slider" name="min_price_slider" min="0" max="5000" value="' . $current_min_price . '" step="10">
+                <input type="range" id="max_price_slider" name="max_price_slider" min="0" max="5000" value="' . $current_max_price . '" step="10">
+            </div>
+        </div>
+        <input type="hidden" name="min_price" id="min_price_hidden" value="' . $current_min_price . '">
+        <input type="hidden" name="max_price" id="max_price_hidden" value="' . $current_max_price . '">
+    </div>';
+    // Fim do filtro de preço
+
+    $output .= '</div>'; // Fechar div.viator-filters
 
     // Header com total e ordenação
     $output .= '<div class="viator-results-container">
@@ -852,7 +890,10 @@ if ($total_pages > 1) {
             'viator_query' => $searchTerm,
             'viator_sort' => $current_sort,
             'viator_date_start' => isset($_GET['viator_date_start']) ? $_GET['viator_date_start'] : '',
-            'viator_date_end' => isset($_GET['viator_date_end']) ? $_GET['viator_date_end'] : ''
+            'viator_date_end' => isset($_GET['viator_date_end']) ? $_GET['viator_date_end'] : '',
+            'duration_filter' => isset($_GET['duration_filter']) ? $_GET['duration_filter'] : '',
+            'min_price' => isset($_GET['min_price']) ? $_GET['min_price'] : '',
+            'max_price' => isset($_GET['max_price']) ? $_GET['max_price'] : ''
         ]);
         $prev_arrow = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/></svg>';
         $output .= '<a class="viator-pagination-arrow" href="' . esc_url($prev_url) . '">' . $prev_arrow . '</a>';
@@ -899,7 +940,10 @@ if ($total_pages > 1) {
                 'viator_query' => $searchTerm,
                 'viator_sort' => $current_sort,
                 'viator_date_start' => isset($_GET['viator_date_start']) ? $_GET['viator_date_start'] : '',
-                'viator_date_end' => isset($_GET['viator_date_end']) ? $_GET['viator_date_end'] : ''
+                'viator_date_end' => isset($_GET['viator_date_end']) ? $_GET['viator_date_end'] : '',
+                'duration_filter' => isset($_GET['duration_filter']) ? $_GET['duration_filter'] : '',
+                'min_price' => isset($_GET['min_price']) ? $_GET['min_price'] : '',
+                'max_price' => isset($_GET['max_price']) ? $_GET['max_price'] : ''
             ]);
             $active_class = ($page_num == $page) ? ' active' : '';
             $output .= '<a class="viator-pagination-btn' . $active_class . '" href="' . esc_url($url) . '">' . $page_num . '</a>';
@@ -913,7 +957,10 @@ if ($total_pages > 1) {
             'viator_query' => $searchTerm,
             'viator_sort' => $current_sort,
             'viator_date_start' => isset($_GET['viator_date_start']) ? $_GET['viator_date_start'] : '',
-            'viator_date_end' => isset($_GET['viator_date_end']) ? $_GET['viator_date_end'] : ''
+            'viator_date_end' => isset($_GET['viator_date_end']) ? $_GET['viator_date_end'] : '',
+            'duration_filter' => isset($_GET['duration_filter']) ? $_GET['duration_filter'] : '',
+            'min_price' => isset($_GET['min_price']) ? $_GET['min_price'] : '',
+            'max_price' => isset($_GET['max_price']) ? $_GET['max_price'] : ''
         ]);
         $next_arrow = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/></svg>';
         $output .= '<a class="viator-pagination-arrow" href="' . esc_url($next_url) . '">' . $next_arrow . '</a>';
@@ -948,6 +995,32 @@ function viator_ajax_update_sort() {
     $_GET['viator_page'] = isset($_POST['viator_page']) ? intval($_POST['viator_page']) : 1;
     $_GET['viator_date_start'] = isset($_POST['viator_date_start']) ? sanitize_text_field($_POST['viator_date_start']) : '';
     $_GET['viator_date_end'] = isset($_POST['viator_date_end']) ? sanitize_text_field($_POST['viator_date_end']) : '';
+    
+    // Processar filtro de duração
+    if (isset($_POST['duration_filter']) && !empty($_POST['duration_filter'])) {
+        $_GET['duration_filter'] = sanitize_text_field($_POST['duration_filter']);
+    } else {
+        unset($_GET['duration_filter']);
+    }
+
+    // Processar filtros de preço
+    // Limpar para garantir que valores vazios não interferem
+    unset($_GET['min_price']);
+    unset($_GET['max_price']);
+    
+    // Processar min_price
+    if (isset($_POST['min_price']) && $_POST['min_price'] !== '') {
+        $_GET['min_price'] = sanitize_text_field($_POST['min_price']);
+    }
+    
+    // Processar max_price
+    if (isset($_POST['max_price']) && $_POST['max_price'] !== '') {
+        $_GET['max_price'] = sanitize_text_field($_POST['max_price']);
+    }
+    
+    // Debug dos parâmetros para solução de problemas
+    viator_debug_log('Sort AJAX Params Recebidos:', $_POST);
+    viator_debug_log('Sort AJAX Params Processados:', $_GET);
     
     // Obter os resultados
     $results = viator_get_search_results($search_term);
@@ -985,15 +1058,28 @@ function viator_ajax_update_filter() {
         unset($_GET['duration_filter']);
     }
 
-    // Debug: Verifique os parâmetros recebidos
-    // error_log('Parâmetros recebidos: ' . print_r($_GET, true));
+    // Processar explicitamente os filtros de preço
+    // Limpamos para garantir que valores vazios não interferem
+    unset($_GET['min_price']);
+    unset($_GET['max_price']);
+    
+    // Verificamos se min_price está definido e não é vazio
+    if (isset($_POST['min_price']) && $_POST['min_price'] !== '') {
+        $_GET['min_price'] = sanitize_text_field($_POST['min_price']);
+    }
+    
+    // Verificamos se max_price está definido e não é vazio
+    if (isset($_POST['max_price']) && $_POST['max_price'] !== '') {
+        $_GET['max_price'] = sanitize_text_field($_POST['max_price']);
+    }
+
+    // Debug dos parâmetros recebidos para solução de problemas
+    viator_debug_log('AJAX Parâmetros recebidos:', $_POST);
+    viator_debug_log('AJAX Parâmetros processados:', $_GET);
 
     // Obter os resultados
     $results = viator_get_search_results($search_term);
     
-    // Debug: Verifique os resultados
-    // error_log('Resultados: ' . print_r($results, true));
-
     // Verificar se os resultados são válidos
     if (empty($results)) {
         wp_send_json_error(['message' => 'Nenhum resultado encontrado']);
