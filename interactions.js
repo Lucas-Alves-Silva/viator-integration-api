@@ -53,19 +53,48 @@ document.addEventListener('DOMContentLoaded', function () {
         const loadingEffect = document.createElement('div');
         loadingEffect.className = 'viator-loading-effect';
         document.body.appendChild(loadingEffect);
+        
+        // Adicionar efeito de pulso para o grid
+        const gridElement = document.querySelector('.viator-grid');
+        if (gridElement) {
+            const pulseLoading = document.createElement('div');
+            pulseLoading.className = 'viator-pulse-loading';
+            
+            // Adicionar 3 círculos para o efeito de pulso
+            for (let i = 0; i < 3; i++) {
+                const circle = document.createElement('span');
+                pulseLoading.appendChild(circle);
+            }
+            
+            gridElement.appendChild(pulseLoading);
+        }
     }
     
     // Função para mostrar efeito de carregamento
     function showLoadingEffect() {
         const loadingEffect = document.querySelector('.viator-loading-effect');
+        const gridElement = document.querySelector('.viator-grid');
+        
         if (loadingEffect) {
             loadingEffect.classList.add('active');
-            setTimeout(() => {
-                loadingEffect.classList.remove('active');
-            }, 1500);
         }
+        
+        if (gridElement) {
+            gridElement.classList.add('loading');
+        }
+        
+        setTimeout(() => {
+            if (loadingEffect) {
+                loadingEffect.classList.remove('active');
+            }
+            if (gridElement) {
+                gridElement.classList.remove('loading');
+            }
+        }, 1500);
     }
     
+    // Expor a função globalmente
+    window.showLoadingEffect = showLoadingEffect;
     
     // Inicializar o Swiper para as recomendações
     if (document.querySelector('.viator-recommendations-slider')) {
@@ -164,11 +193,15 @@ document.addEventListener('DOMContentLoaded', function () {
             const link = e.target.closest('a');
             if (!link) return;
 
-            document.querySelector('.viator-grid').style.opacity = '0.5';
+            const gridElement = document.querySelector('.viator-grid');
+            if (gridElement) {
+                gridElement.style.opacity = '0.5';
+                gridElement.classList.add('loading');
+            }
             
             // Mostrar efeito de carregamento em dispositivos móveis
             const loadingEffect = document.querySelector('.viator-loading-effect');
-            if (loadingEffect && window.innerWidth <= 768) {
+            if (loadingEffect) {
                 loadingEffect.classList.add('active');
             }
 
@@ -269,7 +302,11 @@ document.addEventListener('DOMContentLoaded', function () {
             })
             .finally(() => {
                 // Remover estado de carregamento
-                document.querySelector('.viator-grid').style.opacity = '1';
+                const gridElement = document.querySelector('.viator-grid');
+                if (gridElement) {
+                    gridElement.style.opacity = '1';
+                    gridElement.classList.remove('loading');
+                }
                 if (loadingEffect) {
                     loadingEffect.classList.remove('active');
                 }
@@ -411,7 +448,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     const ratingFilter = params.get('rating_filter') || '';
                     
                     // Mostrar indicador de carregamento
-                    document.querySelector('.viator-grid').style.opacity = '0.5';
+                    const gridElement = document.querySelector('.viator-grid');
+                    if (gridElement) {
+                        gridElement.style.opacity = '0.5';
+                        gridElement.classList.add('loading');
+                    }
                     
                     // Atualizar a URL
                     const newUrl = new URL(window.location);
@@ -475,7 +516,11 @@ document.addEventListener('DOMContentLoaded', function () {
                         console.error('Erro ao reiniciar datas:', error);
                     })
                     .finally(() => {
-                        document.querySelector('.viator-grid').style.opacity = '1';
+                        const gridElement = document.querySelector('.viator-grid');
+                        if (gridElement) {
+                            gridElement.style.opacity = '1';
+                            gridElement.classList.remove('loading');
+                        }
                     });
                 });
                 
@@ -484,17 +529,48 @@ document.addEventListener('DOMContentLoaded', function () {
                         instance.close();
                         dateSelector.querySelector('span').textContent = selectedDateRange.display;
                         
-                        document.querySelector('.viator-grid').style.opacity = '0.5';
+                        const gridElement = document.querySelector('.viator-grid');
+                        if (gridElement) {
+                            gridElement.style.opacity = '0.5';
+                            gridElement.classList.add('loading');
+                        }
                         
-                        // Mostrar efeito de carregamento em dispositivos móveis
+                        // Mostrar efeito de carregamento
                         const loadingEffect = document.querySelector('.viator-loading-effect');
-                        if (loadingEffect && window.innerWidth <= 768) {
+                        if (loadingEffect) {
                             loadingEffect.classList.add('active');
                         }
                         
                         let url = new URL(window.location.href);
                         let params = new URLSearchParams(url.search);
                         
+                        // Obter todos os parâmetros de filtro atuais
+                        const searchTerm = params.get('viator_query');
+                        const sortValue = params.get('viator_sort') || 'DEFAULT';
+                        const durationFilter = params.get('duration_filter') || '';
+                        const minPrice = params.get('min_price') || '';
+                        const maxPrice = params.get('max_price') || '';
+                        const ratingFilter = params.get('rating_filter') || '';
+                        
+                        // Verificar se as datas são válidas antes de enviar
+                        if (!selectedDateRange.start || !selectedDateRange.end) {
+                            console.error('Datas inválidas');
+                            
+                            // Remover os efeitos de carregamento
+                            if (gridElement) {
+                                gridElement.style.opacity = '1';
+                                gridElement.classList.remove('loading');
+                            }
+                            if (loadingEffect) {
+                                loadingEffect.classList.remove('active');
+                            }
+                            return;
+                        }
+                        
+                        // Log para debug
+                        console.log('Enviando datas:', selectedDateRange.start, selectedDateRange.end);
+                        
+                        // Fazer requisição AJAX com todos os parâmetros
                         fetch(viatorAjax.ajaxurl, {
                             method: 'POST',
                             headers: {
@@ -502,30 +578,83 @@ document.addEventListener('DOMContentLoaded', function () {
                             },
                             body: new URLSearchParams({
                                 action: 'viator_update_filter',
-                                viator_query: params.get('viator_query'),
-                                viator_sort: params.get('viator_sort') || 'DEFAULT',
+                                viator_query: searchTerm,
+                                viator_sort: sortValue,
                                 viator_page: '1',
                                 viator_date_start: selectedDateRange.start,
                                 viator_date_end: selectedDateRange.end,
+                                duration_filter: durationFilter,
+                                min_price: minPrice,
+                                max_price: maxPrice,
+                                rating_filter: ratingFilter,
                                 nonce: viatorAjax.nonce
                             })
                         })
                         .then(response => response.text())
                         .then(html => {
+                            if (html.trim() === '0' || !html.trim()) {
+                                throw new Error('Resposta inválida do servidor');
+                            }
+                            
+                            // Atualizar a URL com todos os parâmetros
                             params.set('viator_date_start', selectedDateRange.start);
                             params.set('viator_date_end', selectedDateRange.end);
+                            params.set('viator_page', '1');
+                            
+                            if (sortValue !== 'DEFAULT') {
+                                params.set('viator_sort', sortValue);
+                            }
+                            if (durationFilter) {
+                                params.set('duration_filter', durationFilter);
+                            }
+                            if (minPrice) {
+                                params.set('min_price', minPrice);
+                            }
+                            if (maxPrice) {
+                                params.set('max_price', maxPrice);
+                            }
+                            if (ratingFilter) {
+                                params.set('rating_filter', ratingFilter);
+                            }
+                            
                             window.history.pushState({}, '', `${url.pathname}?${params.toString()}`);
                             
                             document.getElementById('viator-results').innerHTML = html;
+                            
+                            // Rolar suavemente para o topo dos resultados
+                            document.getElementById('viator-results').scrollIntoView({
+                                behavior: 'smooth',
+                                block: 'start'
+                            });
+                            
+                            // Reinicializar todos os componentes interativos
+                            if (typeof reinitializeDatePicker === 'function') {
+                                reinitializeDatePicker();
+                            }
+                            if (typeof reinitializeDurationFilter === 'function') {
+                                reinitializeDurationFilter();
+                            }
+                            if (typeof reinitializePriceSlider === 'function') {
+                                reinitializePriceSlider();
+                            }
+                            if (typeof reinitializeRatingFilter === 'function') {
+                                reinitializeRatingFilter();
+                            }
+                            if (typeof window.initializeMobileFilterButton === 'function') {
+                                window.initializeMobileFilterButton();
+                            }
                         })
                         .catch(error => {
-                            console.error('Erro:', error);
-                            window.location.reload();
+                            console.error('Erro ao atualizar datas:', error);
                         })
                         .finally(() => {
-                            document.querySelector('.viator-grid').style.opacity = '1';
+                            const gridElement = document.querySelector('.viator-grid');
+                            if (gridElement) {
+                                gridElement.style.opacity = '1';
+                                gridElement.classList.remove('loading');
+                            }
                             
-                            // Remover efeito de carregamento em dispositivos móveis
+                            // Remover efeito de carregamento
                             const loadingEffect = document.querySelector('.viator-loading-effect');
                             if (loadingEffect) {
                                 loadingEffect.classList.remove('active');
@@ -562,20 +691,36 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Se houver datas salvas, atualizar o texto do seletor
         if (savedStartDate && savedEndDate) {
-            const startDate = new Date(savedStartDate + 'T12:00:00'); // Adicionar horário para evitar problemas de fuso
-            const endDate = new Date(savedEndDate + 'T12:00:00');
-            
-            const formatDate = (date) => {
-                const day = date.getDate();
-                const month = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][date.getMonth()];
-                return `${day} de ${month}`;
-            };
+            try {
+                // Adicionar horário para evitar problemas de fuso
+                const startDate = new Date(savedStartDate + 'T12:00:00');
+                const endDate = new Date(savedEndDate + 'T12:00:00');
+                
+                // Verificar se as datas são válidas
+                if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+                    throw new Error('Datas inválidas');
+                }
+                
+                const formatDate = (date) => {
+                    const day = date.getDate();
+                    const month = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][date.getMonth()];
+                    return `${day} de ${month}`;
+                };
 
-            const displayText = savedStartDate === savedEndDate 
-                ? formatDate(startDate)
-                : `${formatDate(startDate)} - ${formatDate(endDate)}`;
-            
-            dateSelector.querySelector('span').textContent = displayText;
+                const displayText = savedStartDate === savedEndDate 
+                    ? formatDate(startDate)
+                    : `${formatDate(startDate)} - ${formatDate(endDate)}`;
+                
+                dateSelector.querySelector('span').textContent = displayText;
+                
+                console.log('DatePicker reinicializado com datas:', savedStartDate, savedEndDate);
+            } catch (error) {
+                console.error('Erro ao processar datas salvas:', error);
+                dateSelector.querySelector('span').textContent = 'Escolher data';
+            }
+        } else {
+            // Resetar para o texto padrão se não houver datas salvas
+            dateSelector.querySelector('span').textContent = 'Escolher data';
         }
 
         return initializeDatePicker();
@@ -608,11 +753,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
 function updateSort(value) {
     // Mostrar indicador de carregamento
-    document.querySelector('.viator-grid').style.opacity = '0.5';
+    const gridElement = document.querySelector('.viator-grid');
+    if (gridElement) {
+        gridElement.style.opacity = '0.5';
+        gridElement.classList.add('loading');
+    }
     
     // Mostrar efeito de carregamento em dispositivos móveis
     const loadingEffect = document.querySelector('.viator-loading-effect');
-    if (loadingEffect && window.innerWidth <= 768) {
+    if (loadingEffect) {
         loadingEffect.classList.add('active');
     }
     
@@ -700,7 +849,11 @@ function updateSort(value) {
     })
     .finally(() => {
         // Remover estado de carregamento
-        document.querySelector('.viator-grid').style.opacity = '1';
+        const gridElement = document.querySelector('.viator-grid');
+        if (gridElement) {
+            gridElement.style.opacity = '1';
+            gridElement.classList.remove('loading');
+        }
         if (loadingEffect) {
             loadingEffect.classList.remove('active');
         }
@@ -719,11 +872,12 @@ function reinitializeDurationFilter() {
             const gridElement = document.querySelector('.viator-grid');
             if (gridElement) {
                 gridElement.style.opacity = '0.5';
+                gridElement.classList.add('loading');
             }
 
             // Mostrar efeito de carregamento em dispositivos móveis
             const loadingEffect = document.querySelector('.viator-loading-effect');
-            if (loadingEffect && window.innerWidth <= 768) {
+            if (loadingEffect) {
                 loadingEffect.classList.add('active');
             }
             
@@ -806,7 +960,11 @@ function reinitializeDurationFilter() {
                 console.error('Erro ao atualizar filtro de duração:', error);
             })
             .finally(() => {
-                if (gridElement) gridElement.style.opacity = '1';
+                const gridElement = document.querySelector('.viator-grid');
+                if (gridElement) {
+                    gridElement.style.opacity = '1';
+                    gridElement.classList.remove('loading');
+                }
                 if (loadingEffect) loadingEffect.classList.remove('active');
             });
         });
@@ -1278,10 +1436,11 @@ function initializePriceSlider() {
             const gridElement = document.querySelector('.viator-grid');
             if (gridElement) {
                 gridElement.style.opacity = '0.5';
+                gridElement.classList.add('loading');
             }
 
             const loadingEffect = document.querySelector('.viator-loading-effect');
-            if (loadingEffect && window.innerWidth <= 768) {
+            if (loadingEffect) {
                 loadingEffect.classList.add('active');
             }
 
@@ -1378,7 +1537,11 @@ function initializePriceSlider() {
                 console.error('Erro ao atualizar filtro de preço:', error);
             })
             .finally(() => {
-                if (gridElement) gridElement.style.opacity = '1';
+                const gridElement = document.querySelector('.viator-grid');
+                if (gridElement) {
+                    gridElement.style.opacity = '1';
+                    gridElement.classList.remove('loading');
+                }
                 if (loadingEffect) loadingEffect.classList.remove('active');
             });
         }, 750); // Debounce de 750ms
@@ -1444,11 +1607,12 @@ function initializeRatingFilter() {
             const gridElement = document.querySelector('.viator-grid');
             if (gridElement) {
                 gridElement.style.opacity = '0.5';
+                gridElement.classList.add('loading');
             }
 
             // Mostrar efeito de carregamento em dispositivos móveis
             const loadingEffect = document.querySelector('.viator-loading-effect');
-            if (loadingEffect && window.innerWidth <= 768) {
+            if (loadingEffect) {
                 loadingEffect.classList.add('active');
             }
             
@@ -1535,7 +1699,11 @@ function initializeRatingFilter() {
                 console.error('Erro ao atualizar filtro de avaliação:', error);
             })
             .finally(() => {
-                if (gridElement) gridElement.style.opacity = '1';
+                const gridElement = document.querySelector('.viator-grid');
+                if (gridElement) {
+                    gridElement.style.opacity = '1';
+                    gridElement.classList.remove('loading');
+                }
                 if (loadingEffect) loadingEffect.classList.remove('active');
             });
         });

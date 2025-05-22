@@ -214,11 +214,33 @@ function viator_get_search_results($searchTerm) {
     $date_end = isset($_GET['viator_date_end']) ? $_GET['viator_date_end'] : '';
     
     if (!empty($date_start) && !empty($date_end)) {
-        $date_from = $date_start;
-        $date_to = date('Y-m-d', strtotime($date_end . ' +1 day')); // Adiciona um dia para incluir o último dia
+        // Validar formato das datas (YYYY-MM-DD)
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_start) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_end)) {
+            // Usar as datas selecionadas pelo usuário
+            $date_from = $date_start;
+            
+            // Adiciona um dia ao date_end para incluir o último dia nas buscas
+            // Isso é necessário porque a API considera exclusivo o último dia
+            $date_to = date('Y-m-d', strtotime($date_end . ' +1 day'));
+            
+            // Verificar se a data final é menor que a inicial (improvável, mas possível)
+            if (strtotime($date_to) <= strtotime($date_from)) {
+                // Se acontecer, corrigir definindo data final como inicial + 1 dia
+                $date_to = date('Y-m-d', strtotime($date_from . ' +1 day'));
+            }
+            
+            viator_debug_log('Datas selecionadas pelo usuário:', "De $date_from até $date_to");
+        } else {
+            // Formato inválido, usar padrão
+            $date_from = date('Y-m-d');
+            $date_to = date('Y-m-d', strtotime('+1 year'));
+            viator_debug_log('Formato de data inválido, usando padrão:', "De $date_from até $date_to");
+        }
     } else {
+        // Se não houver datas selecionadas, usar período padrão (hoje até 1 ano)
         $date_from = date('Y-m-d');
         $date_to = date('Y-m-d', strtotime('+1 year'));
+        viator_debug_log('Usando período padrão:', "De $date_from até $date_to");
     }
 
     // Verificar se há um intervalo de duração selecionado
@@ -745,6 +767,11 @@ function viator_get_search_results($searchTerm) {
 
     // Iniciar grid de cards
     $output .= '<div class="viator-grid">';
+    
+    // Adicionar elemento para efeito de carregamento
+    $output .= '<div class="viator-pulse-loading">';
+    $output .= '<span></span><span></span><span></span>';
+    $output .= '</div>';
 
     foreach ($data['products']['results'] as $tour) {
         // Pegar a imagem de melhor qualidade
@@ -1126,12 +1153,33 @@ add_action('wp_ajax_nopriv_viator_update_filter', 'viator_ajax_update_filter');
 function viator_ajax_update_filter() {
     check_ajax_referer('viator_sort_nonce', 'nonce');
     
+    // Verificar e sanitizar o termo de busca
     $search_term = isset($_POST['viator_query']) ? sanitize_text_field($_POST['viator_query']) : '';
+    if (empty($search_term)) {
+        wp_send_json_error(['message' => 'Termo de busca não fornecido']);
+        wp_die();
+    }
+    
+    // Configurar os parâmetros GET para a função de busca
     $_GET['viator_query'] = $search_term;
+    
+    // Processar parâmetro de ordenação
     $_GET['viator_sort'] = isset($_POST['viator_sort']) ? sanitize_text_field($_POST['viator_sort']) : 'DEFAULT';
+    
+    // Processar paginação
     $_GET['viator_page'] = isset($_POST['viator_page']) ? intval($_POST['viator_page']) : 1;
+    
+    // Processar datas
     $_GET['viator_date_start'] = isset($_POST['viator_date_start']) ? sanitize_text_field($_POST['viator_date_start']) : '';
     $_GET['viator_date_end'] = isset($_POST['viator_date_end']) ? sanitize_text_field($_POST['viator_date_end']) : '';
+    
+    // Validar formato das datas
+    if (!empty($_GET['viator_date_start']) && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['viator_date_start'])) {
+        $_GET['viator_date_start'] = '';
+    }
+    if (!empty($_GET['viator_date_end']) && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['viator_date_end'])) {
+        $_GET['viator_date_end'] = '';
+    }
     
     // Processar filtro de duração
     if (isset($_POST['duration_filter']) && !empty($_POST['duration_filter'])) {
@@ -1145,24 +1193,24 @@ function viator_ajax_update_filter() {
     unset($_GET['min_price']);
     unset($_GET['max_price']);
     
-    // Verificamos se min_price está definido e não é vazio
+    // Processar min_price
     if (isset($_POST['min_price']) && $_POST['min_price'] !== '') {
-        $_GET['min_price'] = sanitize_text_field($_POST['min_price']);
+        $_GET['min_price'] = intval($_POST['min_price']);
     }
     
-    // Verificamos se max_price está definido e não é vazio
+    // Processar max_price
     if (isset($_POST['max_price']) && $_POST['max_price'] !== '') {
-        $_GET['max_price'] = sanitize_text_field($_POST['max_price']);
+        $_GET['max_price'] = intval($_POST['max_price']);
     }
-
+    
     // Processar filtro de avaliação
     if (isset($_POST['rating_filter']) && !empty($_POST['rating_filter'])) {
         $_GET['rating_filter'] = sanitize_text_field($_POST['rating_filter']);
     } else {
         unset($_GET['rating_filter']);
     }
-
-    // Debug dos parâmetros recebidos para solução de problemas
+    
+    // Debug dos parâmetros para solução de problemas
     viator_debug_log('AJAX Parâmetros recebidos:', $_POST);
     viator_debug_log('AJAX Parâmetros processados:', $_GET);
 
