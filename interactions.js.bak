@@ -228,12 +228,6 @@ document.addEventListener('DOMContentLoaded', function () {
             
             // Filtro de avaliação
             const ratingFilter = params.get('rating_filter') || currentParams.get('rating_filter') || '';
-            
-            // Obter os filtros especiais ativos dos checkboxes marcados
-            const specialFilters = [];
-            document.querySelectorAll('input[name="special_filter[]"]:checked').forEach(checkbox => {
-                specialFilters.push(checkbox.value);
-            });
 
             // Preparar os parâmetros para a requisição AJAX
             const requestParams = {
@@ -250,13 +244,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 nonce: viatorAjax.nonce
             };
             
-            // Adicionar parâmetros de special_filter
-            if (specialFilters.length > 0) {
-                specialFilters.forEach((value, index) => {
-                    requestParams[`special_filter[${index}]`] = value;
-                });
-            }
-            
             // Atualizar a URL no navegador
             const newUrl = new URL(window.location);
             newUrl.searchParams.set('viator_page', pageNumber);
@@ -268,14 +255,6 @@ document.addEventListener('DOMContentLoaded', function () {
             if (minPrice) newUrl.searchParams.set('min_price', minPrice);
             if (maxPrice) newUrl.searchParams.set('max_price', maxPrice);
             if (ratingFilter) newUrl.searchParams.set('rating_filter', ratingFilter);
-            
-            // Limpar parâmetros existentes de special_filter para evitar duplicatas na URL
-            newUrl.searchParams.delete('special_filter[]');
-            
-            // Adicionar valores atualizados de special_filter
-            specialFilters.forEach(value => {
-                newUrl.searchParams.append('special_filter[]', value);
-            });
             
             history.replaceState({}, '', newUrl);
 
@@ -314,15 +293,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (typeof reinitializeRatingFilter === 'function') {
                     reinitializeRatingFilter();
                 }
-                
-                // Garantir que os filtros especiais sejam sincronizados corretamente
-                // Importante: chamar isso após o HTML ter sido atualizado
-                setTimeout(() => {
-                    if (typeof reinitializeSpecialsFilter === 'function') {
-                        reinitializeSpecialsFilter();
-                    }
-                }, 100);
-                
+                if (typeof reinitializeSpecialsFilter === 'function') {
+                    reinitializeSpecialsFilter();
+                }
                 if (typeof reinitializeClearAllButton === 'function') {
                     reinitializeClearAllButton();
                 }
@@ -480,12 +453,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     const maxPrice = params.get('max_price') || '';
                     const ratingFilter = params.get('rating_filter') || '';
                     
-                    // Obter os filtros especiais ativos
-                    const specialFilters = [];
-                    document.querySelectorAll('input[name="special_filter[]"]:checked').forEach(checkbox => {
-                        specialFilters.push(checkbox.value);
-                    });
-                    
                     // Mostrar indicador de carregamento
                     const gridElement = document.querySelector('.viator-grid');
                     if (gridElement) {
@@ -498,38 +465,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     newUrl.searchParams.delete('viator_date_start');
                     newUrl.searchParams.delete('viator_date_end');
                     newUrl.searchParams.set('viator_page', '1');
-                    
-                    // Limpar parâmetros existentes de special_filter para evitar duplicatas na URL
-                    newUrl.searchParams.delete('special_filter[]');
-                    
-                    // Adicionar valores atualizados de special_filter
-                    specialFilters.forEach(value => {
-                        newUrl.searchParams.append('special_filter[]', value);
-                    });
-                    
                     history.replaceState({}, '', newUrl);
-                    
-                    // Preparar os parâmetros para a requisição AJAX
-                    const requestParams = {
-                        action: 'viator_update_filter',
-                        viator_query: searchTerm,
-                        viator_sort: sortValue,
-                        viator_page: '1',
-                        viator_date_start: '',
-                        viator_date_end: '',
-                        duration_filter: durationFilter,
-                        min_price: minPrice,
-                        max_price: maxPrice,
-                        rating_filter: ratingFilter,
-                        nonce: viatorAjax.nonce
-                    };
-                    
-                    // Adicionar parâmetros de special_filter
-                    if (specialFilters.length > 0) {
-                        specialFilters.forEach((value, index) => {
-                            requestParams[`special_filter[${index}]`] = value;
-                        });
-                    }
                     
                     // Fazer requisição AJAX
                     fetch(viatorAjax.ajaxurl, {
@@ -537,7 +473,19 @@ document.addEventListener('DOMContentLoaded', function () {
                         headers: {
                             'Content-Type': 'application/x-www-form-urlencoded',
                         },
-                        body: new URLSearchParams(requestParams)
+                        body: new URLSearchParams({
+                            action: 'viator_update_filter',
+                            viator_query: searchTerm,
+                            viator_sort: sortValue,
+                            viator_page: '1',
+                            viator_date_start: '',
+                            viator_date_end: '',
+                            duration_filter: durationFilter,
+                            min_price: minPrice,
+                            max_price: maxPrice,
+                            rating_filter: ratingFilter,
+                            nonce: viatorAjax.nonce
+                        })
                     })
                     .then(response => response.text())
                     .then(html => {
@@ -566,15 +514,9 @@ document.addEventListener('DOMContentLoaded', function () {
                         if (typeof reinitializeRatingFilter === 'function') {
                             reinitializeRatingFilter();
                         }
-                        
-                        // Garantir que os filtros especiais sejam sincronizados corretamente
-                        // Importante: chamar isso após o HTML ter sido atualizado
-                        setTimeout(() => {
-                            if (typeof reinitializeSpecialsFilter === 'function') {
-                                reinitializeSpecialsFilter();
-                            }
-                        }, 100);
-                        
+                        if (typeof reinitializeSpecialsFilter === 'function') {
+                            reinitializeSpecialsFilter();
+                        }
                         if (typeof reinitializeClearAllButton === 'function') {
                             reinitializeClearAllButton();
                         }
@@ -622,12 +564,6 @@ document.addEventListener('DOMContentLoaded', function () {
                         const maxPrice = params.get('max_price') || '';
                         const ratingFilter = params.get('rating_filter') || '';
                         
-                        // Obter os filtros especiais ativos
-                        const specialFilters = [];
-                        document.querySelectorAll('input[name="special_filter[]"]:checked').forEach(checkbox => {
-                            specialFilters.push(checkbox.value);
-                        });
-                        
                         // Verificar se as datas são válidas antes de enviar
                         if (!selectedDateRange.start || !selectedDateRange.end) {
                             console.error('Datas inválidas');
@@ -646,35 +582,25 @@ document.addEventListener('DOMContentLoaded', function () {
                         // Log para debug
                         console.log('Enviando datas:', selectedDateRange.start, selectedDateRange.end);
                         
-                        // Preparar os parâmetros para a requisição AJAX
-                        const requestParams = {
-                            action: 'viator_update_filter',
-                            viator_query: searchTerm,
-                            viator_sort: sortValue,
-                            viator_page: '1',
-                            viator_date_start: selectedDateRange.start,
-                            viator_date_end: selectedDateRange.end,
-                            duration_filter: durationFilter,
-                            min_price: minPrice,
-                            max_price: maxPrice,
-                            rating_filter: ratingFilter,
-                            nonce: viatorAjax.nonce
-                        };
-                        
-                        // Adicionar parâmetros de special_filter
-                        if (specialFilters.length > 0) {
-                            specialFilters.forEach((value, index) => {
-                                requestParams[`special_filter[${index}]`] = value;
-                            });
-                        }
-                        
                         // Fazer requisição AJAX com todos os parâmetros
                         fetch(viatorAjax.ajaxurl, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/x-www-form-urlencoded',
                             },
-                            body: new URLSearchParams(requestParams)
+                            body: new URLSearchParams({
+                                action: 'viator_update_filter',
+                                viator_query: searchTerm,
+                                viator_sort: sortValue,
+                                viator_page: '1',
+                                viator_date_start: selectedDateRange.start,
+                                viator_date_end: selectedDateRange.end,
+                                duration_filter: durationFilter,
+                                min_price: minPrice,
+                                max_price: maxPrice,
+                                rating_filter: ratingFilter,
+                                nonce: viatorAjax.nonce
+                            })
                         })
                         .then(response => response.text())
                         .then(html => {
@@ -703,14 +629,6 @@ document.addEventListener('DOMContentLoaded', function () {
                                 params.set('rating_filter', ratingFilter);
                             }
                             
-                            // Limpar parâmetros existentes de special_filter para evitar duplicatas na URL
-                            url.searchParams.delete('special_filter[]');
-                            
-                            // Adicionar valores atualizados de special_filter à URL
-                            specialFilters.forEach(value => {
-                                params.append('special_filter[]', value);
-                            });
-                            
                             window.history.pushState({}, '', `${url.pathname}?${params.toString()}`);
                             
                             document.getElementById('viator-results').innerHTML = html;
@@ -734,15 +652,9 @@ document.addEventListener('DOMContentLoaded', function () {
                             if (typeof reinitializeRatingFilter === 'function') {
                                 reinitializeRatingFilter();
                             }
-                            
-                            // Garantir que os filtros especiais sejam sincronizados corretamente
-                            // Importante: chamar isso após o HTML ter sido atualizado
-                            setTimeout(() => {
-                                if (typeof reinitializeSpecialsFilter === 'function') {
-                                    reinitializeSpecialsFilter();
-                                }
-                            }, 100);
-                            
+                            if (typeof reinitializeSpecialsFilter === 'function') {
+                                reinitializeSpecialsFilter();
+                            }
                             if (typeof reinitializeClearAllButton === 'function') {
                                 reinitializeClearAllButton();
                             }
@@ -892,14 +804,6 @@ function updateSort(value) {
     const maxPrice = params.get('max_price') || '';
     const ratingFilter = params.get('rating_filter') || '';
     
-    // Obter os filtros especiais ativos dos checkboxes marcados
-    const specialFilters = [];
-    document.querySelectorAll('input[name="special_filter[]"]:checked').forEach(checkbox => {
-        specialFilters.push(checkbox.value);
-    });
-    
-    console.log('Filtros especiais ativos antes da ordenação:', specialFilters);
-    
     // Atualizar a URL com o novo valor de ordenação
     const newUrl = new URL(window.location);
     newUrl.searchParams.set('viator_sort', value);
@@ -913,39 +817,7 @@ function updateSort(value) {
     if (maxPrice) newUrl.searchParams.set('max_price', maxPrice);
     if (ratingFilter) newUrl.searchParams.set('rating_filter', ratingFilter);
     
-    // Limpar parâmetros existentes de special_filter para evitar duplicatas na URL
-    newUrl.searchParams.delete('special_filter[]');
-    
-    // Adicionar valores atualizados de special_filter
-    specialFilters.forEach(value => {
-        newUrl.searchParams.append('special_filter[]', value);
-    });
-    
     history.replaceState({}, '', newUrl);
-    
-    // Preparar os parâmetros para a requisição AJAX
-    const requestParams = {
-        action: 'viator_update_sort',
-        viator_query: searchTerm,
-        viator_sort: value,
-        viator_page: '1', // Resetar para a primeira página
-        viator_date_start: dateStart,
-        viator_date_end: dateEnd,
-        duration_filter: durationFilter,
-        min_price: minPrice,
-        max_price: maxPrice,
-        rating_filter: ratingFilter,
-        nonce: viatorAjax.nonce
-    };
-    
-    // Adicionar parâmetros de special_filter
-    if (specialFilters.length > 0) {
-        specialFilters.forEach((value, index) => {
-            requestParams[`special_filter[${index}]`] = value;
-        });
-    }
-    
-    console.log('Parâmetros da requisição de ordenação:', requestParams);
     
     // Fazer requisição AJAX
     fetch(viatorAjax.ajaxurl, {
@@ -953,7 +825,19 @@ function updateSort(value) {
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: new URLSearchParams(requestParams)
+        body: new URLSearchParams({
+            action: 'viator_update_sort',
+            viator_query: searchTerm,
+            viator_sort: value,
+            viator_page: '1', // Resetar para a primeira página
+            viator_date_start: dateStart,
+            viator_date_end: dateEnd,
+            duration_filter: durationFilter,
+            min_price: minPrice,
+            max_price: maxPrice,
+            rating_filter: ratingFilter,
+            nonce: viatorAjax.nonce
+        })
     })
     .then(response => response.text())
     .then(html => {
@@ -982,31 +866,9 @@ function updateSort(value) {
         if (typeof reinitializeRatingFilter === 'function') {
             reinitializeRatingFilter();
         }
-        
-        // Garantir que os filtros especiais sejam sincronizados corretamente
-        // Importante: chamar isso após o HTML ter sido atualizado e com um pequeno atraso
-        setTimeout(() => {
-            if (typeof reinitializeSpecialsFilter === 'function') {
-                reinitializeSpecialsFilter();
-                
-                // Verificar se os filtros especiais foram realmente aplicados
-                const updatedCheckboxes = document.querySelectorAll('input[name="special_filter[]"]:checked');
-                const updatedFilters = Array.from(updatedCheckboxes).map(cb => cb.value);
-                console.log('Filtros especiais após atualização:', updatedFilters);
-                
-                // Se os filtros não foram aplicados corretamente, tentar novamente
-                if (specialFilters.length > 0 && updatedFilters.length === 0) {
-                    console.log('Tentando reaplicar filtros especiais...');
-                    specialFilters.forEach(value => {
-                        const checkbox = document.querySelector(`input[name="special_filter[]"][value="${value}"]`);
-                        if (checkbox) {
-                            checkbox.checked = true;
-                        }
-                    });
-                }
-            }
-        }, 300);
-        
+        if (typeof reinitializeSpecialsFilter === 'function') {
+            reinitializeSpecialsFilter();
+        }
         if (typeof reinitializeClearAllButton === 'function') {
             reinitializeClearAllButton();
         }
@@ -1064,12 +926,6 @@ function reinitializeDurationFilter() {
             const maxPrice = params.get('max_price') || '';
             const ratingFilter = params.get('rating_filter') || '';
             
-            // Obter os filtros especiais ativos
-            const specialFilters = [];
-            document.querySelectorAll('input[name="special_filter[]"]:checked').forEach(checkbox => {
-                specialFilters.push(checkbox.value);
-            });
-            
             // Atualizar a URL
             const newUrl = new URL(window.location);
             newUrl.searchParams.set('duration_filter', selectedFilter);
@@ -1082,37 +938,7 @@ function reinitializeDurationFilter() {
             if (maxPrice) newUrl.searchParams.set('max_price', maxPrice);
             if (ratingFilter) newUrl.searchParams.set('rating_filter', ratingFilter);
             
-            // Limpar parâmetros existentes de special_filter para evitar duplicatas na URL
-            newUrl.searchParams.delete('special_filter[]');
-            
-            // Adicionar valores atualizados de special_filter
-            specialFilters.forEach(value => {
-                newUrl.searchParams.append('special_filter[]', value);
-            });
-            
             history.replaceState({}, '', newUrl);
-            
-            // Preparar os parâmetros para a requisição AJAX
-            const requestParams = {
-                action: 'viator_update_filter',
-                viator_query: searchTerm,
-                viator_sort: sortValue,
-                viator_page: '1', // Sempre ir para a página 1 ao mudar o filtro
-                viator_date_start: dateStart,
-                viator_date_end: dateEnd,
-                duration_filter: selectedFilter,
-                min_price: minPrice,
-                max_price: maxPrice,
-                rating_filter: ratingFilter,
-                nonce: viatorAjax.nonce
-            };
-            
-            // Adicionar parâmetros de special_filter
-            if (specialFilters.length > 0) {
-                specialFilters.forEach((value, index) => {
-                    requestParams[`special_filter[${index}]`] = value;
-                });
-            }
             
             // Fazer requisição AJAX
             fetch(viatorAjax.ajaxurl, {
@@ -1120,7 +946,19 @@ function reinitializeDurationFilter() {
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
-                body: new URLSearchParams(requestParams)
+                body: new URLSearchParams({
+                    action: 'viator_update_filter',
+                    viator_query: searchTerm,
+                    viator_sort: sortValue,
+                    viator_page: '1', // Sempre ir para a página 1 ao mudar o filtro
+                    viator_date_start: dateStart,
+                    viator_date_end: dateEnd,
+                    duration_filter: selectedFilter,
+                    min_price: minPrice,
+                    max_price: maxPrice,
+                    rating_filter: ratingFilter,
+                    nonce: viatorAjax.nonce
+                })
             })
             .then(response => response.text())
             .then(html => {
@@ -1146,15 +984,9 @@ function reinitializeDurationFilter() {
                 if (typeof reinitializeRatingFilter === 'function') {
                     reinitializeRatingFilter();
                 }
-                
-                // Garantir que os filtros especiais sejam sincronizados corretamente
-                // Importante: chamar isso após o HTML ter sido atualizado
-                setTimeout(() => {
-                    if (typeof reinitializeSpecialsFilter === 'function') {
-                        reinitializeSpecialsFilter();
-                    }
-                }, 100);
-                
+                if (typeof reinitializeSpecialsFilter === 'function') {
+                    reinitializeSpecialsFilter();
+                }
                 if (typeof reinitializeClearAllButton === 'function') {
                     reinitializeClearAllButton();
                 }
@@ -1226,7 +1058,6 @@ function getLocationName(latitude, longitude) {
             });
     });
 }
-
 function getLocationByIP() {
     return new Promise((resolve) => {
         // Check if we have cached location data
@@ -1278,7 +1109,207 @@ function getLocationByIP() {
             });
     });
 }
+function updateNearbySuggestion() {
+    const nearbySuggestion = document.querySelector('.viator-nearby-suggestion');
+    const suggestionText = nearbySuggestion?.querySelector('span:last-child');
+    const errorMessage = document.querySelector('.viator-error-message');
+    
+    // Hide suggestion by default
+    if (nearbySuggestion) {
+        nearbySuggestion.style.display = 'none';
+    }
 
+    if (nearbySuggestion && suggestionText) {
+        nearbySuggestion.addEventListener('click', function() {
+            if (suggestionText.textContent !== 'Obtendo localização...') {
+                const locationText = suggestionText.textContent;
+                if (locationText) {
+                    const searchInput = document.querySelector('input[name="viator_query"]');
+                    if (searchInput && searchButton) {
+                        searchInput.value = locationText;
+                        nearbySuggestion.style.display = 'none';
+                        // Apply loading animation
+                        searchButton.disabled = true;
+                        searchText.innerHTML = 'Pesquisando<div class="bouncy-loader"><span></span><span></span><span></span></div>';
+                        searchIcon.innerHTML = '✈️';
+                        searchIcon.classList.add('airplane-icon');
+                        // Submit the form
+                        document.querySelector('#viator-search-form').submit();
+                    }
+                }
+            }
+        });
+
+        if ('geolocation' in navigator) {
+            nearbySuggestion.style.display = 'flex';
+            suggestionText.textContent = 'Obtendo localização...';
+            
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    getLocationName(position.coords.latitude, position.coords.longitude)
+                        .then(locationName => {
+                            if (locationName) {
+                                suggestionText.textContent = locationName;
+                                nearbySuggestion.style.cursor = 'pointer';
+                            } else {
+                                // Fallback to IP-based geolocation
+                                getLocationByIP().then(ipLocation => {
+                                    if (ipLocation) {
+                                        suggestionText.textContent = ipLocation;
+                                        nearbySuggestion.style.cursor = 'pointer';
+                                    } else {
+                                        nearbySuggestion.style.display = 'none';
+                                    }
+                                });
+                            }
+                        })
+                        .catch(() => {
+                            // Fallback to IP-based geolocation
+                            getLocationByIP().then(ipLocation => {
+                                if (ipLocation) {
+                                    suggestionText.textContent = ipLocation;
+                                    nearbySuggestion.style.cursor = 'pointer';
+                                } else {
+                                    nearbySuggestion.style.display = 'none';
+                                }
+                            });
+                        });
+                },
+                error => {
+                    console.error('Geolocation error:', error);
+                    // Fallback to IP-based geolocation
+                    getLocationByIP().then(ipLocation => {
+                        if (ipLocation) {
+                            suggestionText.textContent = ipLocation;
+                            nearbySuggestion.style.cursor = 'pointer';
+                        } else {
+                            nearbySuggestion.style.display = 'none';
+                        }
+                    });
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
+        } else {
+            // Browser doesn't support geolocation, try IP-based geolocation
+            getLocationByIP().then(ipLocation => {
+                if (ipLocation) {
+                    suggestionText.textContent = ipLocation;
+                    nearbySuggestion.style.cursor = 'pointer';
+                    nearbySuggestion.style.display = 'flex';
+                    if (errorMessage) errorMessage.textContent = '';
+                } else {
+                    nearbySuggestion.style.display = 'none';
+                    if (errorMessage) errorMessage.textContent = 'Seu navegador não suporta geolocalização.';
+                }
+            });
+        }
+    }
+}
+
+function getLocationName(latitude, longitude) {
+    return new Promise((resolve, reject) => {
+        // Check if we have cached location data
+        const cachedData = localStorage.getItem('viatorLocationCache');
+        if (cachedData) {
+            const { location, timestamp, lat, lon } = JSON.parse(cachedData);
+            const now = new Date().getTime();
+            const oneHour = 60 * 60 * 1000; // 1 hour in milliseconds
+
+            // If cache is less than 1 hour old and coordinates are close enough, use it
+            if (now - timestamp < oneHour && 
+                Math.abs(lat - latitude) < 0.01 && 
+                Math.abs(lon - longitude) < 0.01) {
+                return resolve(location);
+            }
+        }
+
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&accept-language=pt-BR`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.address) {
+                    const city = data.address.city || data.address.town || data.address.village;
+                    const state = data.address.state;
+                    if (city && state) {
+                        const location = `${city}, ${state}`;
+                        // Cache the location data with current timestamp and coordinates
+                        localStorage.setItem('viatorLocationCache', JSON.stringify({
+                            location: location,
+                            timestamp: new Date().getTime(),
+                            lat: latitude,
+                            lon: longitude
+                        }));
+                        resolve(location);
+                        return;
+                    }
+                }
+                reject(new Error('Location not found'));
+            })
+            .catch(error => {
+                console.error('Error fetching location:', error);
+                reject(error);
+            });
+    });
+}
+function getLocationByIP() {
+    return new Promise((resolve) => {
+        // Check if we have cached location data
+        const cachedData = localStorage.getItem('viatorLocationCache');
+        if (cachedData) {
+            const { location, timestamp } = JSON.parse(cachedData);
+            const now = new Date().getTime();
+            const threeHours = 3 * 60 * 60 * 1000; // 3 horas em millisegundos
+
+            // Se o cache tiver menos de 3 horas, execute isso
+            if (now - timestamp < threeHours) {
+                return resolve(location);
+            }
+        }
+
+        const API_KEY = '545988903dc94379913912dc88a2da1a';
+        const API_URL = `https://api.ipgeolocation.io/ipgeo?apiKey=${API_KEY}&fields=city,state_prov,country_name`;
+
+        fetch(API_URL)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('IP Geolocation Resposta:', data);
+                
+                if (data.message) {
+                    throw new Error(data.message);
+                }
+
+                if (data.city && data.state_prov) {
+                    const location = `${data.city}, ${data.state_prov}${data.country_name ? ', ' + data.country_name : ''}`;
+                    console.log('Localização encontrada:', location);
+                    // Cache the location data with current timestamp
+                    localStorage.setItem('viatorLocationCache', JSON.stringify({
+                        location: location,
+                        timestamp: new Date().getTime()
+                    }));
+                    resolve(location);
+                    return;
+                }
+                throw new Error('Localização não encontrada');
+            })
+            .catch(error => {
+                console.error('Erro ao buscar localização por IP:', error);
+                resolve(null);
+            });
+    });
+}
 function updateNearbySuggestion() {
     const nearbySuggestion = document.querySelector('.viator-nearby-suggestion');
     const suggestionText = nearbySuggestion?.querySelector('span:last-child');
@@ -1464,12 +1495,6 @@ function initializePriceSlider() {
             // Usar os valores dos campos hidden para min_price e max_price, pois eles são atualizados em tempo real pelos sliders
             const currentMinPrice = document.getElementById('min_price_hidden').value;
             const currentMaxPrice = document.getElementById('max_price_hidden').value;
-            
-            // Obter os filtros especiais ativos
-            const specialFilters = [];
-            document.querySelectorAll('input[name="special_filter[]"]:checked').forEach(checkbox => {
-                specialFilters.push(checkbox.value);
-            });
 
             // Atualizar a URL
             const newUrl = new URL(window.location);
@@ -1483,37 +1508,7 @@ function initializePriceSlider() {
             if (durationFilter) newUrl.searchParams.set('duration_filter', durationFilter);
             if (ratingFilter) newUrl.searchParams.set('rating_filter', ratingFilter);
             
-            // Limpar parâmetros existentes de special_filter para evitar duplicatas na URL
-            newUrl.searchParams.delete('special_filter[]');
-            
-            // Adicionar valores atualizados de special_filter
-            specialFilters.forEach(value => {
-                newUrl.searchParams.append('special_filter[]', value);
-            });
-            
             history.replaceState({}, '', newUrl);
-
-            // Preparar os parâmetros para a requisição AJAX
-            const requestParams = {
-                action: 'viator_update_filter',
-                viator_query: searchTerm,
-                viator_sort: sortValue,
-                viator_page: '1', // Resetar para a primeira página
-                viator_date_start: dateStart,
-                viator_date_end: dateEnd,
-                duration_filter: durationFilter,
-                min_price: currentMinPrice,
-                max_price: currentMaxPrice,
-                rating_filter: ratingFilter,
-                nonce: viatorAjax.nonce
-            };
-            
-            // Adicionar parâmetros de special_filter
-            if (specialFilters.length > 0) {
-                specialFilters.forEach((value, index) => {
-                    requestParams[`special_filter[${index}]`] = value;
-                });
-            }
 
             // Fazer requisição AJAX
             fetch(viatorAjax.ajaxurl, {
@@ -1521,7 +1516,19 @@ function initializePriceSlider() {
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
-                body: new URLSearchParams(requestParams)
+                body: new URLSearchParams({
+                    action: 'viator_update_filter',
+                    viator_query: searchTerm,
+                    viator_sort: sortValue,
+                    viator_page: '1', // Resetar para a primeira página
+                    viator_date_start: dateStart,
+                    viator_date_end: dateEnd,
+                    duration_filter: durationFilter,
+                    min_price: currentMinPrice,
+                    max_price: currentMaxPrice,
+                    rating_filter: ratingFilter,
+                    nonce: viatorAjax.nonce
+                })
             })
             .then(response => response.text())
             .then(html => {
@@ -1638,153 +1645,137 @@ function initializeRatingFilter() {
     const ratingInputs = document.querySelectorAll('input[name="rating_filter"]');
     if (!ratingInputs.length) return;
     
+    let debounceTimer;
+    
     ratingInputs.forEach(input => {
+        // Verificar se já tem listener para evitar duplicação
+        if (input.getAttribute('data-has-listener') === 'true') return;
+        
+        // Marcar como tendo listener
+        input.setAttribute('data-has-listener', 'true');
+        
         input.addEventListener('change', function() {
-            // Mostrar indicador de carregamento
-            const gridElement = document.querySelector('.viator-grid');
-            if (gridElement) {
-                gridElement.style.opacity = '0.5';
-                gridElement.classList.add('loading');
-            }
-
-            // Mostrar efeito de carregamento em dispositivos móveis
-            const loadingEffect = document.querySelector('.viator-loading-effect');
-            if (loadingEffect) {
-                loadingEffect.classList.add('active');
-            }
-            
-            // Pegar a URL atual e parâmetros
-            let url = new URL(window.location.href);
-            let params = new URLSearchParams(url.search);
-            
-            // Pegar os parâmetros necessários
-            const searchTerm = params.get('viator_query');
-            const sortValue = params.get('viator_sort') || 'DEFAULT';
-            const dateStart = params.get('viator_date_start') || '';
-            const dateEnd = params.get('viator_date_end') || '';
-            const durationFilter = params.get('duration_filter') || '';
-            const minPrice = params.get('min_price') || '';
-            const maxPrice = params.get('max_price') || '';
-            const ratingValue = this.value; // O valor selecionado do rating
-            
-            // Obter os filtros especiais ativos
-            const specialFilters = [];
-            document.querySelectorAll('input[name="special_filter[]"]:checked').forEach(checkbox => {
-                specialFilters.push(checkbox.value);
-            });
-            
-            // Atualizar a URL
-            const newUrl = new URL(window.location);
-            newUrl.searchParams.set('rating_filter', ratingValue);
-            newUrl.searchParams.set('viator_page', '1'); // Resetar para a primeira página
-            
-            // Garantir que os outros filtros sejam mantidos na URL
-            if (dateStart) newUrl.searchParams.set('viator_date_start', dateStart);
-            if (dateEnd) newUrl.searchParams.set('viator_date_end', dateEnd);
-            if (durationFilter) newUrl.searchParams.set('duration_filter', durationFilter);
-            if (minPrice) newUrl.searchParams.set('min_price', minPrice);
-            if (maxPrice) newUrl.searchParams.set('max_price', maxPrice);
-            
-            // Limpar parâmetros existentes de special_filter para evitar duplicatas na URL
-            newUrl.searchParams.delete('special_filter[]');
-            
-            // Adicionar valores atualizados de special_filter
-            specialFilters.forEach(value => {
-                newUrl.searchParams.append('special_filter[]', value);
-            });
-            
-            history.replaceState({}, '', newUrl);
-            
-            // Preparar os parâmetros para a requisição AJAX
-            const requestParams = {
-                action: 'viator_update_filter',
-                viator_query: searchTerm,
-                viator_sort: sortValue,
-                viator_page: '1', // Sempre ir para a página 1 ao mudar o filtro
-                viator_date_start: dateStart,
-                viator_date_end: dateEnd,
-                duration_filter: durationFilter,
-                min_price: minPrice,
-                max_price: maxPrice,
-                rating_filter: ratingValue,
-                nonce: viatorAjax.nonce
-            };
-            
-            // Adicionar parâmetros de special_filter
-            if (specialFilters.length > 0) {
-                specialFilters.forEach((value, index) => {
-                    requestParams[`special_filter[${index}]`] = value;
-                });
-            }
-            
-            // Fazer requisição AJAX
-            fetch(viatorAjax.ajaxurl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: new URLSearchParams(requestParams)
-            })
-            .then(response => response.text())
-            .then(html => {
-                if (html.trim() === '0' || !html.trim()) {
-                    throw new Error('Resposta inválida do servidor');
-                }
-                
-                document.getElementById('viator-results').innerHTML = html;
-                
-                // Rolar suavemente para o topo dos resultados
-                document.getElementById('viator-results').scrollIntoView({ 
-                    behavior: 'smooth', 
-                    block: 'start' 
-                });
-                
-                // Reinicializar componentes
-                if (typeof reinitializeDatePicker === 'function') {
-                    reinitializeDatePicker();
-                }
-                if (typeof reinitializeDurationFilter === 'function') {
-                    reinitializeDurationFilter();
-                }
-                if (typeof reinitializePriceSlider === 'function') {
-                    reinitializePriceSlider();
-                }
-                if (typeof reinitializeRatingFilter === 'function') {
-                    reinitializeRatingFilter();
-                }
-                
-                // Garantir que os filtros especiais sejam sincronizados corretamente
-                // Importante: chamar isso após o HTML ter sido atualizado
-                setTimeout(() => {
-                    if (typeof reinitializeSpecialsFilter === 'function') {
-                        reinitializeSpecialsFilter();
-                    }
-                }, 100);
-                
-                if (typeof reinitializeClearAllButton === 'function') {
-                    reinitializeClearAllButton();
-                }
-                if (typeof window.initializeMobileFilterButton === 'function') {
-                    window.initializeMobileFilterButton();
-                }
-            })
-            .catch(error => {
-                console.error('Erro ao atualizar filtro de avaliação:', error);
-            })
-            .finally(() => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                // Mostrar indicador de carregamento
                 const gridElement = document.querySelector('.viator-grid');
                 if (gridElement) {
-                    gridElement.style.opacity = '1';
-                    gridElement.classList.remove('loading');
+                    gridElement.style.opacity = '0.5';
+                    gridElement.classList.add('loading');
                 }
-                if (loadingEffect) loadingEffect.classList.remove('active');
-            });
+
+                // Mostrar efeito de carregamento em dispositivos móveis
+                const loadingEffect = document.querySelector('.viator-loading-effect');
+                if (loadingEffect) {
+                    loadingEffect.classList.add('active');
+                }
+                
+                // Pegar a URL atual e parâmetros
+                let url = new URL(window.location.href);
+                let params = new URLSearchParams(url.search);
+                
+                // Pegar os parâmetros necessários
+                const searchTerm = params.get('viator_query');
+                const sortValue = params.get('viator_sort') || 'DEFAULT';
+                const dateStart = params.get('viator_date_start') || '';
+                const dateEnd = params.get('viator_date_end') || '';
+                const durationFilter = params.get('duration_filter') || '';
+                const minPrice = params.get('min_price') || '';
+                const maxPrice = params.get('max_price') || '';
+                const ratingValue = this.value; // O valor selecionado do rating
+                
+                // Atualizar a URL
+                const newUrl = new URL(window.location);
+                newUrl.searchParams.set('rating_filter', ratingValue);
+                newUrl.searchParams.set('viator_page', '1'); // Resetar para a primeira página
+                
+                // Garantir que os outros filtros sejam mantidos na URL
+                if (dateStart) newUrl.searchParams.set('viator_date_start', dateStart);
+                if (dateEnd) newUrl.searchParams.set('viator_date_end', dateEnd);
+                if (durationFilter) newUrl.searchParams.set('duration_filter', durationFilter);
+                if (minPrice) newUrl.searchParams.set('min_price', minPrice);
+                if (maxPrice) newUrl.searchParams.set('max_price', maxPrice);
+                
+                history.replaceState({}, '', newUrl);
+                
+                // Fazer requisição AJAX
+                fetch(viatorAjax.ajaxurl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        action: 'viator_update_filter',
+                        viator_query: searchTerm,
+                        viator_sort: sortValue,
+                        viator_page: '1', // Sempre ir para a página 1 ao mudar o filtro
+                        viator_date_start: dateStart,
+                        viator_date_end: dateEnd,
+                        duration_filter: durationFilter,
+                        min_price: minPrice,
+                        max_price: maxPrice,
+                        rating_filter: ratingValue,
+                        nonce: viatorAjax.nonce
+                    })
+                })
+                .then(response => response.text())
+                .then(html => {
+                    if (html.trim() === '0' || !html.trim()) {
+                        throw new Error('Resposta inválida do servidor');
+                    }
+                    
+                    document.getElementById('viator-results').innerHTML = html;
+                    
+                    // Rolar suavemente para o topo dos resultados
+                    document.getElementById('viator-results').scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'start' 
+                    });
+                    
+                    // Reinicializar componentes
+                    if (typeof reinitializeDatePicker === 'function') {
+                        reinitializeDatePicker();
+                    }
+                    if (typeof reinitializeDurationFilter === 'function') {
+                        reinitializeDurationFilter();
+                    }
+                    if (typeof reinitializePriceSlider === 'function') {
+                        reinitializePriceSlider();
+                    }
+                    if (typeof reinitializeClearAllButton === 'function') {
+                        reinitializeClearAllButton();
+                    }
+                    if (typeof window.initializeMobileFilterButton === 'function') {
+                        window.initializeMobileFilterButton();
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao atualizar filtro de avaliação:', error);
+                })
+                .finally(() => {
+                    const gridElement = document.querySelector('.viator-grid');
+                    if (gridElement) {
+                        gridElement.style.opacity = '1';
+                        gridElement.classList.remove('loading');
+                    }
+                    if (loadingEffect) loadingEffect.classList.remove('active');
+                });
+            }, 750); // Debounce de 750ms
         });
     });
 }
 
 // Função para reinicializar o filtro de avaliação após AJAX
 function reinitializeRatingFilter() {
+    // Apenas inicializar se não existirem inputs já com event listeners
+    const ratingInputs = document.querySelectorAll('input[name="rating_filter"]');
+    if (!ratingInputs.length) return;
+    
+    // Verificar se já existe um event listener
+    const hasEventListener = ratingInputs[0].getAttribute('data-has-listener');
+    if (hasEventListener === 'true') return;
+    
+    // Agora inicializar os filtros
     initializeRatingFilter();
 }
 
@@ -1793,12 +1784,18 @@ function initializeSpecialsFilter() {
     const specialCheckboxes = document.querySelectorAll('input[name="special_filter[]"]');
     if (!specialCheckboxes.length) return;
     
-    let debounceTimer; // Variável para o debounce
-
+    let debounceTimer;
+    
     specialCheckboxes.forEach(checkbox => {
+        // Verificar se já tem listener para evitar duplicação
+        if (checkbox.getAttribute('data-has-listener') === 'true') return;
+        
+        // Marcar como tendo listener
+        checkbox.setAttribute('data-has-listener', 'true');
+        
         checkbox.addEventListener('change', function() {
-            clearTimeout(debounceTimer); // Limpar o timer anterior
-            debounceTimer = setTimeout(() => { // Configurar um novo timer
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
                 // Mostrar indicador de carregamento
                 const gridElement = document.querySelector('.viator-grid');
                 if (gridElement) {
@@ -1830,24 +1827,30 @@ function initializeSpecialsFilter() {
                 const specialFilters = [];
                 document.querySelectorAll('input[name="special_filter[]"]:checked').forEach(el => {
                     specialFilters.push(el.value);
-                    // console.log('Filtro especial selecionado:', el.value); // Removido ou comentado para produção
+                    console.log('Filtro especial selecionado:', el.value);
+                });
+                
+                // Limpar parâmetros existentes de special_filter
+                params.delete('special_filter[]');
+                
+                // Adicionar parâmetros atualizados à URL
+                specialFilters.forEach(value => {
+                    params.append('special_filter[]', value);
                 });
                 
                 // Atualizar a URL com todos os parâmetros
                 const newUrl = new URL(window.location);
                 
-                // Limpar parâmetros existentes de special_filter para evitar duplicatas na URL
+                // Limpar parâmetros existentes
                 newUrl.searchParams.delete('special_filter[]');
                 
-                // Adicionar valores atualizados de special_filter
+                // Adicionar valores atualizados
                 specialFilters.forEach(value => {
                     newUrl.searchParams.append('special_filter[]', value);
                 });
                 
                 // Garantir que os outros filtros sejam mantidos na URL
                 newUrl.searchParams.set('viator_page', '1'); // Resetar para a primeira página
-                if (searchTerm) newUrl.searchParams.set('viator_query', searchTerm);
-                if (sortValue) newUrl.searchParams.set('viator_sort', sortValue);
                 if (dateStart) newUrl.searchParams.set('viator_date_start', dateStart);
                 if (dateEnd) newUrl.searchParams.set('viator_date_end', dateEnd);
                 if (durationFilter) newUrl.searchParams.set('duration_filter', durationFilter);
@@ -1874,14 +1877,14 @@ function initializeSpecialsFilter() {
                 
                 // Adicionar parâmetros de special_filter
                 if (specialFilters.length > 0) {
-                    // console.log('Enviando filtros especiais:', specialFilters); // Removido ou comentado para produção
+                    console.log('Enviando filtros especiais:', specialFilters);
                     specialFilters.forEach((value, index) => {
                         requestData[`special_filter[${index}]`] = value;
-                        // console.log(`special_filter[${index}] =`, value); // Removido ou comentado para produção
+                        console.log(`special_filter[${index}] =`, value);
                     });
                 }
                 
-                // console.log('Dados da requisição AJAX (Specials):', requestData); // Removido ou comentado para produção
+                console.log('Dados da requisição AJAX:', requestData);
                 
                 // Fazer requisição AJAX
                 fetch(viatorAjax.ajaxurl, {
@@ -1894,11 +1897,12 @@ function initializeSpecialsFilter() {
                 .then(response => response.text())
                 .then(html => {
                     if (html.trim() === '0' || !html.trim()) {
-                        throw new Error('Resposta inválida do servidor (Specials)');
+                        throw new Error('Resposta inválida do servidor');
                     }
                     
                     document.getElementById('viator-results').innerHTML = html;
                     
+                    // Rolar suavemente para o topo dos resultados
                     document.getElementById('viator-results').scrollIntoView({ 
                         behavior: 'smooth', 
                         block: 'start' 
@@ -1917,15 +1921,6 @@ function initializeSpecialsFilter() {
                     if (typeof reinitializeRatingFilter === 'function') {
                         reinitializeRatingFilter();
                     }
-                    
-                    // Garantir que os filtros especiais sejam sincronizados corretamente
-                    // Importante: chamar isso após o HTML ter sido atualizado
-                    setTimeout(() => {
-                        if (typeof reinitializeSpecialsFilter === 'function') {
-                            reinitializeSpecialsFilter();
-                        }
-                    }, 100);
-                    
                     if (typeof reinitializeClearAllButton === 'function') {
                         reinitializeClearAllButton();
                     }
@@ -1937,15 +1932,15 @@ function initializeSpecialsFilter() {
                     console.error('Erro ao atualizar filtro de especiais:', error);
                 })
                 .finally(() => {
-                    const gridElementFinally = document.querySelector('.viator-grid');
-                    if (gridElementFinally) {
-                        gridElementFinally.style.opacity = '1';
-                        gridElementFinally.classList.remove('loading');
+                    const gridElement = document.querySelector('.viator-grid');
+                    if (gridElement) {
+                        gridElement.style.opacity = '1';
+                        gridElement.classList.remove('loading');
                     }
                     
-                    const loadingEffectFinally = document.querySelector('.viator-loading-effect');
-                    if (loadingEffectFinally) {
-                        loadingEffectFinally.classList.remove('active');
+                    const loadingEffect = document.querySelector('.viator-loading-effect');
+                    if (loadingEffect) {
+                        loadingEffect.classList.remove('active');
                     }
                 });
             }, 750); // Debounce de 750ms
@@ -1955,64 +1950,20 @@ function initializeSpecialsFilter() {
 
 // Função para reinicializar o filtro de especiais após AJAX
 function reinitializeSpecialsFilter() {
-    // Primeiro, obter os filtros especiais da URL
-    const url = new URL(window.location.href);
-    const params = new URLSearchParams(url.search);
-    let specialFiltersFromUrl = [];
-    
-    // Verificar diferentes formatos possíveis de parâmetros na URL
-    // 1. Verificar 'special_filter[]'
-    if (url.searchParams.has('special_filter[]')) {
-        const values = url.searchParams.getAll('special_filter[]');
-        specialFiltersFromUrl = specialFiltersFromUrl.concat(values);
-    }
-    
-    // 2. Verificar 'special_filter'
-    if (params.has('special_filter')) {
-        // Pode ser um array ou um único valor
-        const values = params.getAll('special_filter');
-        values.forEach(value => {
-            // Se for um array serializado como string
-            if (value.startsWith('[') && value.endsWith(']')) {
-                try {
-                    const parsedValues = JSON.parse(value);
-                    if (Array.isArray(parsedValues)) {
-                        specialFiltersFromUrl = specialFiltersFromUrl.concat(parsedValues);
-                    }
-                } catch (e) {
-                    // Não é um JSON válido, tratar como string normal
-                    specialFiltersFromUrl.push(value);
-                }
-            } else {
-                specialFiltersFromUrl.push(value);
-            }
-        });
-    }
-    
-    // 3. Verificar parâmetros indexados como 'special_filter[0]', 'special_filter[1]', etc.
-    for (let i = 0; i < 10; i++) { // Limite arbitrário de 10 para evitar loop infinito
-        const indexedParam = `special_filter[${i}]`;
-        if (params.has(indexedParam)) {
-            specialFiltersFromUrl.push(params.get(indexedParam));
-        } else {
-            // Se não encontrar um índice, podemos parar de procurar
-            break;
-        }
-    }
-    
-    // Remover duplicatas
-    specialFiltersFromUrl = [...new Set(specialFiltersFromUrl)];
-    
-    console.log('Filtros especiais encontrados na URL:', specialFiltersFromUrl);
-    
-    // Marcar os checkboxes correspondentes
+    // Apenas inicializar se não existirem checkboxes já com event listeners
     const specialCheckboxes = document.querySelectorAll('input[name="special_filter[]"]');
+    if (!specialCheckboxes.length) return;
+    
+    // Verificar se já existe um event listener
+    const hasEventListener = specialCheckboxes[0].getAttribute('data-has-listener');
+    if (hasEventListener === 'true') return;
+    
+    // Marcar os checkboxes como já tendo event listeners
     specialCheckboxes.forEach(checkbox => {
-        // Verificar se o valor do checkbox está nos filtros da URL
-        checkbox.checked = specialFiltersFromUrl.includes(checkbox.value);
+        checkbox.setAttribute('data-has-listener', 'true');
     });
     
-    // Adicionar event listeners para os checkboxes
+    // Agora inicializar os filtros
     initializeSpecialsFilter();
 }
 
@@ -2136,15 +2087,9 @@ function initializeClearAllButton() {
             if (typeof reinitializeRatingFilter === 'function') {
                 reinitializeRatingFilter();
             }
-            
-            // Garantir que os filtros especiais sejam sincronizados corretamente
-            // Importante: chamar isso após o HTML ter sido atualizado
-            setTimeout(() => {
-                if (typeof reinitializeSpecialsFilter === 'function') {
-                    reinitializeSpecialsFilter();
-                }
-            }, 100);
-            
+            if (typeof reinitializeSpecialsFilter === 'function') {
+                reinitializeSpecialsFilter();
+            }
             if (typeof reinitializeClearAllButton === 'function') {
                 reinitializeClearAllButton();
             }
