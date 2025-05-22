@@ -313,8 +313,57 @@ function viator_get_search_results($searchTerm) {
         "currency" => "BRL"
     ];
 
+    // Adicionar filtros especiais, se existirem
+    if (isset($_GET['special_filter']) && is_array($_GET['special_filter']) && !empty($_GET['special_filter'])) {
+        $special_filters = $_GET['special_filter'];
+        viator_debug_log('Filtros especiais encontrados:', $special_filters);
+        
+        // Mapear valores para os parâmetros da API
+        foreach ($special_filters as $filter) {
+            viator_debug_log('Processando filtro especial:', $filter);
+            switch ($filter) {
+                case 'free_cancellation':
+                    // Adicionar filtro para Cancelamento Gratuito
+                    $body_data['productFiltering']['flags'] = isset($body_data['productFiltering']['flags']) ? 
+                        array_merge($body_data['productFiltering']['flags'], ['FREE_CANCELLATION']) : 
+                        ['FREE_CANCELLATION'];
+                    viator_debug_log('Adicionado filtro FREE_CANCELLATION para Cancelamento Gratuito', $filter);
+                    break;
+                case 'likely_to_sell_out':
+                    // Adicionar filtro para Prestes a Esgotar
+                    $body_data['productFiltering']['flags'] = isset($body_data['productFiltering']['flags']) ? 
+                        array_merge($body_data['productFiltering']['flags'], ['LIKELY_TO_SELL_OUT']) : 
+                        ['LIKELY_TO_SELL_OUT'];
+                    viator_debug_log('Adicionado filtro LIKELY_TO_SELL_OUT para Prestes a Esgotar', $filter);
+                    break;
+                case 'skip_the_line':
+                    // Adicionar filtro para Fura-Fila
+                    $body_data['productFiltering']['flags'] = isset($body_data['productFiltering']['flags']) ? 
+                        array_merge($body_data['productFiltering']['flags'], ['SKIP_THE_LINE']) : 
+                        ['SKIP_THE_LINE'];
+                    viator_debug_log('Adicionado filtro SKIP_THE_LINE para Fura-Fila', $filter);
+                    break;
+                case 'private_tour':
+                    // Adicionar filtro para Tour Privado
+                    $body_data['productFiltering']['flags'] = isset($body_data['productFiltering']['flags']) ? 
+                        array_merge($body_data['productFiltering']['flags'], ['PRIVATE_TOUR']) : 
+                        ['PRIVATE_TOUR'];
+                    viator_debug_log('Adicionado filtro PRIVATE_TOUR para Tour Privado', $filter);
+                    break;
+                case 'new_on_viator':
+                    // Adicionar filtro para Novo no Viator
+                    $body_data['productFiltering']['flags'] = isset($body_data['productFiltering']['flags']) ? 
+                        array_merge($body_data['productFiltering']['flags'], ['NEW_ON_VIATOR']) : 
+                        ['NEW_ON_VIATOR'];
+                    viator_debug_log('Adicionado filtro NEW_ON_VIATOR para Novo no Viator', $filter);
+                    break;
+            }
+        }
+    }
+
     $body = json_encode($body_data);
     viator_debug_log('Request Body:', $body);
+    viator_debug_log('Filtros enviados à API:', isset($body_data['productFiltering']['flags']) ? $body_data['productFiltering']['flags'] : 'Nenhum filtro');
 
     // Enviar a requisição POST para a API
     $response = wp_remote_post($url, [
@@ -645,53 +694,99 @@ function viator_get_search_results($searchTerm) {
     </div>';
     // Fim do filtro de preço
 
-    // Adicionar o filtro de avaliação
-    $current_rating = isset($_GET['rating_filter']) ? sanitize_text_field($_GET['rating_filter']) : '';
+    // Adicionar o filtro de Avaliação
+    $is_ajax_request = wp_doing_ajax(); // Definir a variável, mas não vamos usá-la para condicionar a exibição dos filtros
     
-    $output .= '<div class="viator-rating-filter">
-        <h3>Avaliação</h3>
-        <div class="viator-rating-options">
-            <label class="viator-rating-option">
-                <input type="radio" name="rating_filter" value="4.5" ' . checked($current_rating, '4.5', false) . '>
-                <span class="viator-rating-stars rating-45">
-                    <span class="star-full">★</span>
-                    <span class="star-full">★</span>
-                    <span class="star-full">★</span>
-                    <span class="star-full">★</span>
-                    <span class="star-half-container">
-                        <span class="star-half-full">★</span>
-                        <span class="star-half-empty">★</span>
-                    </span>
-                </span>
-                <span class="viator-rating-text"> e acima</span>
-            </label>
-            <label class="viator-rating-option">
-                <input type="radio" name="rating_filter" value="4.0" ' . checked($current_rating, '4.0', false) . '>
-                <span class="viator-rating-stars rating-40">
-                    <span class="star-full">★</span>
-                    <span class="star-full">★</span>
-                    <span class="star-full">★</span>
-                    <span class="star-full">★</span>
-                    <span class="star-empty">★</span>
-                </span>
-                <span class="viator-rating-text"> e acima</span>
-            </label>
-            <label class="viator-rating-option">
-                <input type="radio" name="rating_filter" value="3.0" ' . checked($current_rating, '3.0', false) . '>
-                <span class="viator-rating-stars rating-30">
-                    <span class="star-full">★</span>
-                    <span class="star-full">★</span>
-                    <span class="star-full">★</span>
-                    <span class="star-empty">★</span>
-                    <span class="star-empty">★</span>
-                </span>
-                <span class="viator-rating-text"> e acima</span>
-            </label>
-        </div>
-    </div>';
-    // Fim do filtro de avaliação
+    $output .= '<div class="viator-rating-filter">';
+    $output .= '<h3>Avaliação</h3>';
+    $output .= '<div class="viator-rating-options">';
+    
+    // Rating 4.5+
+    $rating_checked_45 = isset($_GET['rating_filter']) && $_GET['rating_filter'] == '4.5' ? 'checked' : '';
+    $output .= '<label class="viator-rating-option">';
+    $output .= '<input type="radio" name="rating_filter" value="4.5" ' . $rating_checked_45 . '>';
+    $output .= '<div class="viator-rating-stars rating-45">';
+    $output .= '<span class="star-full">★</span><span class="star-full">★</span><span class="star-full">★</span><span class="star-full">★</span>';
+    $output .= '<div class="star-half-container"><span class="star-half-full">★</span><span class="star-half-empty">★</span></div>';
+    $output .= '</div>';
+    $output .= '<span class="viator-rating-text">4.5+</span>';
+    $output .= '</label>';
+    
+    // Rating 4.0+
+    $rating_checked_4 = isset($_GET['rating_filter']) && $_GET['rating_filter'] == '4.0' ? 'checked' : '';
+    $output .= '<label class="viator-rating-option">';
+    $output .= '<input type="radio" name="rating_filter" value="4.0" ' . $rating_checked_4 . '>';
+    $output .= '<div class="viator-rating-stars rating-40">';
+    $output .= '<span class="star-full">★</span><span class="star-full">★</span><span class="star-full">★</span><span class="star-full">★</span>';
+    $output .= '<span class="star-empty">★</span>';
+    $output .= '</div>';
+    $output .= '<span class="viator-rating-text">4.0+</span>';
+    $output .= '</label>';
+    
+    // Rating 3.0+
+    $rating_checked_3 = isset($_GET['rating_filter']) && $_GET['rating_filter'] == '3.0' ? 'checked' : '';
+    $output .= '<label class="viator-rating-option">';
+    $output .= '<input type="radio" name="rating_filter" value="3.0" ' . $rating_checked_3 . '>';
+    $output .= '<div class="viator-rating-stars rating-30">';
+    $output .= '<span class="star-full">★</span><span class="star-full">★</span><span class="star-full">★</span>';
+    $output .= '<span class="star-empty">★</span><span class="star-empty">★</span>';
+    $output .= '</div>';
+    $output .= '<span class="viator-rating-text">3.0+</span>';
+    $output .= '</label>';
+    
+    $output .= '</div>'; // Fechando viator-rating-options
+    $output .= '</div>'; // Fechando viator-rating-filter
+    
+    // Adicionar o filtro de Especiais
+    $output .= '<div class="viator-specials-filter">';
+    $output .= '<h3>Especiais</h3>';
+    $output .= '<div class="viator-specials-options">';
+    
+    // Opção: Cancelamento Gratuito
+    $free_cancel_checked = isset($_GET['special_filter']) && in_array('free_cancellation', (array)$_GET['special_filter']) ? 'checked' : '';
+    $output .= '<label class="viator-special-option">';
+    $output .= '<input type="checkbox" name="special_filter[]" value="free_cancellation" ' . $free_cancel_checked . '>';
+    $output .= '<span class="viator-special-text">Cancelamento Gratuito</span>';
+    $output .= '</label>';
+    
+    // Opção: Prestes a Esgotar
+    $sell_out_checked = isset($_GET['special_filter']) && in_array('likely_to_sell_out', (array)$_GET['special_filter']) ? 'checked' : '';
+    $output .= '<label class="viator-special-option">';
+    $output .= '<input type="checkbox" name="special_filter[]" value="likely_to_sell_out" ' . $sell_out_checked . '>';
+    $output .= '<span class="viator-special-text">Prestes a Esgotar</span>';
+    $output .= '</label>';
+    
+    // Opção: Fura-Fila
+    $skip_line_checked = isset($_GET['special_filter']) && in_array('skip_the_line', (array)$_GET['special_filter']) ? 'checked' : '';
+    $output .= '<label class="viator-special-option">';
+    $output .= '<input type="checkbox" name="special_filter[]" value="skip_the_line" ' . $skip_line_checked . '>';
+    $output .= '<span class="viator-special-text">Fura-Fila</span>';
+    $output .= '</label>';
+    
+    // Opção: Tour Privado
+    $private_checked = isset($_GET['special_filter']) && in_array('private_tour', (array)$_GET['special_filter']) ? 'checked' : '';
+    $output .= '<label class="viator-special-option">';
+    $output .= '<input type="checkbox" name="special_filter[]" value="private_tour" ' . $private_checked . '>';
+    $output .= '<span class="viator-special-text">Tour Privado</span>';
+    $output .= '</label>';
+    
+    // Opção: Novo no Viator
+    $new_checked = isset($_GET['special_filter']) && in_array('new_on_viator', (array)$_GET['special_filter']) ? 'checked' : '';
+    $output .= '<label class="viator-special-option">';
+    $output .= '<input type="checkbox" name="special_filter[]" value="new_on_viator" ' . $new_checked . '>';
+    $output .= '<span class="viator-special-text">Novo no Viator</span>';
+    $output .= '</label>';
+    
+    $output .= '</div>'; // Fechando viator-specials-options
+    $output .= '</div>'; // Fechando viator-specials-filter
+    
+    // Botão de Limpar tudo
+    $output .= '<div class="viator-clear-filters">';
+    $output .= '<button type="button" id="clear-all-filters" class="viator-clear-all-btn">Limpar tudo</button>';
+    $output .= '</div>';
 
-    $output .= '</div>'; // Fechar div.viator-filters
+    // Fechar a sidebar de filtros
+    $output .= '</div>'; // Fechando viator-filters
 
     // Header com total e ordenação
     $output .= '<div class="viator-results-container">
@@ -1208,6 +1303,31 @@ function viator_ajax_update_filter() {
         $_GET['rating_filter'] = sanitize_text_field($_POST['rating_filter']);
     } else {
         unset($_GET['rating_filter']);
+    }
+    
+    // Processar filtros especiais
+    unset($_GET['special_filter']);
+    
+    // Se existirem filtros especiais no POST, processá-los
+    if (isset($_POST['special_filter']) && is_array($_POST['special_filter'])) {
+        $_GET['special_filter'] = [];
+        foreach ($_POST['special_filter'] as $value) {
+            $_GET['special_filter'][] = sanitize_text_field($value);
+            viator_debug_log('Filtro especial recebido via POST array:', $value);
+        }
+    } elseif (isset($_POST['special_filter']) && !is_array($_POST['special_filter'])) {
+        // Se for um único valor (não array)
+        $_GET['special_filter'] = [sanitize_text_field($_POST['special_filter'])];
+        viator_debug_log('Filtro especial recebido via POST único valor:', $_POST['special_filter']);
+    }
+    
+    // Verificar se existem os parâmetros indexed special_filter (para compatibilidade com jQuery serialize)
+    for ($i = 0; isset($_POST["special_filter[$i]"]); $i++) {
+        if (!isset($_GET['special_filter'])) {
+            $_GET['special_filter'] = [];
+        }
+        $_GET['special_filter'][] = sanitize_text_field($_POST["special_filter[$i]"]);
+        viator_debug_log('Filtro especial recebido via POST indexed:', $_POST["special_filter[$i]"]);
     }
     
     // Debug dos parâmetros para solução de problemas

@@ -2326,3 +2326,90 @@
     50% { transform: scaleX(0.5); }
     100% { transform: scaleX(1); }
 }
+
+/* Estilo para o filtro de Especiais */
+.viator-specials-filter {
+    padding: 20px 10px 15px 10px;
+    width: 90%;
+    margin-left: auto;
+    margin-right: auto;
+    border-bottom: 1px solid #ccc;
+    position: relative;
+}
+
+.viator-specials-filter h3 {
+    font-family: var(--font-primary);
+    font-size: 18px;
+    color: #333;
+    margin-bottom: 15px;
+    margin-top: 0;
+}
+
+.viator-specials-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.viator-special-option {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-family: var(--font-primary);
+    font-size: 14px;
+    color: #333;
+    padding: 2px 0;
+}
+
+.viator-special-option input[type="checkbox"] {
+    margin-right: 8px;
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+    accent-color: #04846b;
+}
+
+.viator-special-option:hover .viator-special-text {
+    color: #04846b;
+}
+
+.viator-special-option input[type="checkbox"]:checked + .viator-special-text {
+    color: #04846b;
+    font-weight: 500;
+}
+
+/* Botão de Limpar tudo */
+.viator-clear-filters {
+    padding: 20px 10px 15px 10px;
+    width: 90%;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center;
+}
+
+.viator-clear-all-btn {
+    background-color: #fff;
+    color: #04846b;
+    border: 2px solid #04846b;
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-family: var(--font-primary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: 100%;
+    max-width: 200px;
+}
+
+.viator-clear-all-btn:hover {
+    background-color: #04846b;
+    color: #fff;
+}
+
+/* Ajuste responsivo para o filtro de Especiais */
+@media (max-width: 768px) {
+    .viator-special-option {
+        font-size: 14px;
+    }
+}
