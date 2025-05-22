@@ -753,14 +753,14 @@ function viator_get_search_results($searchTerm) {
     $sell_out_checked = isset($_GET['special_filter']) && in_array('likely_to_sell_out', (array)$_GET['special_filter']) ? 'checked' : '';
     $output .= '<label class="viator-special-option">';
     $output .= '<input type="checkbox" name="special_filter[]" value="likely_to_sell_out" ' . $sell_out_checked . '>';
-    $output .= '<span class="viator-special-text">Prestes a Esgotar</span>';
+    $output .= '<span class="viator-special-text">Geralmente se esgota</span>';
     $output .= '</label>';
     
     // Opção: Fura-Fila
     $skip_line_checked = isset($_GET['special_filter']) && in_array('skip_the_line', (array)$_GET['special_filter']) ? 'checked' : '';
     $output .= '<label class="viator-special-option">';
     $output .= '<input type="checkbox" name="special_filter[]" value="skip_the_line" ' . $skip_line_checked . '>';
-    $output .= '<span class="viator-special-text">Fura-Fila</span>';
+    $output .= '<span class="viator-special-text">Evitar fila</span>';
     $output .= '</label>';
     
     // Opção: Tour Privado

@@ -2388,9 +2388,9 @@
 }
 
 .viator-clear-all-btn {
-    background-color: #fff;
-    color: #04846b;
-    border: 2px solid #04846b;
+    background-color: #04846b !important;
+    color: #ffffff !important;
+    border: 2px solid #04846b !important;
     border-radius: 6px;
     padding: 10px 20px;
     font-family: var(--font-primary);
@@ -2403,8 +2403,9 @@
 }
 
 .viator-clear-all-btn:hover {
-    background-color: #04846b;
-    color: #fff;
+    background-color: #037961 !important;
+    color: #ffffff !important;
+    border: 2px solid #037961 !important;
 }
 
 /* Ajuste responsivo para o filtro de Especiais */
