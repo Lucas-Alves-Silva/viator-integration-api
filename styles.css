@@ -1267,13 +1267,17 @@
 /* Sidebar de filtros */
 .viator-filters {
     width: 300px;
-    height: 100%;
+    /* height: 100%; */ /* Removido para altura automática baseada no conteúdo */
     flex-shrink: 0;
     border: 1px solid #ccc;
     border-radius: 10px;
     background: #fdfdfd;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    position: relative; /* Torna .viator-filters um container de posicionamento */
+    position: sticky;
+    top: 20px;
+    align-self: flex-start;
+    /* max-height: calc(100vh - 40px); */ /* Removido */
+    /* overflow-y: auto; */ /* Removido */
 }
 
 /* Botão de filtros para mobile */

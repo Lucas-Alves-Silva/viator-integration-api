@@ -193,6 +193,20 @@ document.addEventListener('DOMContentLoaded', function () {
             const link = e.target.closest('a');
             if (!link) return;
 
+            // --- INÍCIO DA MODIFICAÇÃO: Atualizar estado visual do botão clicado imediatamente ---
+            const paginationButtons = document.querySelectorAll('.viator-pagination-btn');
+            paginationButtons.forEach(btn => btn.classList.remove('active'));
+
+            // Se o clique foi diretamente em um botão de número
+            if (link.classList.contains('viator-pagination-btn')) {
+                link.classList.add('active');
+            } else if (link.classList.contains('viator-pagination-arrow')) {
+                // Se for uma seta, precisamos determinar qual botão numérico se tornará ativo
+                // Isso já é tratado pela atualização do HTML, então aqui apenas garantimos que nenhum outro fique ativo erroneamente
+                // A lógica principal de marcar o botão correto após o carregamento do HTML ainda é importante
+            }
+            // --- FIM DA MODIFICAÇÃO ---
+
             const gridElement = document.querySelector('.viator-grid');
             if (gridElement) {
                 addCustomLoader(gridElement);
@@ -866,6 +880,89 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     // Adicionar chamada inicial para o estado do botão
     updateClearAllButtonState();
+
+    const STICKY_TOP_OFFSET = 20; // px, deve corresponder ao CSS .viator-filters top
+    const STICKY_BOTTOM_MARGIN = 20; // px, margem inferior desejada quando o final da sidebar está visível
+    let lastKnownScrollY = window.scrollY;
+
+    function adjustDynamicStickySidebar() {
+        const sidebar = document.querySelector('.viator-filters');
+
+        // Só executa em desktop (ex: largura >= 769px) e se a sidebar existir
+        if (!sidebar || window.innerWidth < 769) {
+            if (sidebar) {
+                sidebar.style.transition = 'top 0.2s ease-out'; // Adiciona transição suave para reset
+                sidebar.style.top = `${STICKY_TOP_OFFSET}px`; // Reset para o padrão
+            }
+            return;
+        }
+
+        const sidebarHeight = sidebar.offsetHeight;
+        const viewportHeight = window.innerHeight;
+
+        // Aplicar transição para suavizar a mudança de 'top'
+        sidebar.style.transition = 'top 0.2s ease-out';
+
+        if (sidebarHeight > viewportHeight) {
+            const currentScrollY = window.scrollY;
+            const scrollDirection = currentScrollY > lastKnownScrollY ? 'down' : 'up';
+            lastKnownScrollY = currentScrollY <= 0 ? 0 : currentScrollY; // Evitar valores negativos no topo da página
+
+            const sidebarRect = sidebar.getBoundingClientRect();
+
+            // Se estamos rolando para baixo e a sidebar está (ou deveria estar) grudada no topo da viewport
+            if (scrollDirection === 'down' && sidebarRect.top <= STICKY_TOP_OFFSET + 5 /* tolerância */) {
+                const targetTopToShowBottom = viewportHeight - sidebarHeight - STICKY_BOTTOM_MARGIN;
+                sidebar.style.top = `${targetTopToShowBottom}px`;
+            }
+            // Se estamos rolando para cima 
+            else if (scrollDirection === 'up') {
+                // Verifica se a sidebar está atualmente posicionada como se seu fundo estivesse visível
+                const expectedTopWhenBottomIsShown = viewportHeight - sidebarHeight - STICKY_BOTTOM_MARGIN;
+                const currentActualTop = parseFloat(sidebar.style.top || STICKY_TOP_OFFSET);
+
+                // Se o topo atual é o de "fundo visível" (com tolerância), OU se o topo real da sidebar está abaixo do STICKY_TOP_OFFSET
+                if (Math.abs(currentActualTop - expectedTopWhenBottomIsShown) < 5 || sidebarRect.top < STICKY_TOP_OFFSET - 5) {
+                     sidebar.style.top = `${STICKY_TOP_OFFSET}px`;
+                }
+            }
+        } else {
+            // Se a sidebar não for mais alta que a viewport, usar o top padrão
+            sidebar.style.top = `${STICKY_TOP_OFFSET}px`;
+        }
+    }
+
+    // Throttled scroll handler usando requestAnimationFrame
+    let scrollAFTimeout;
+    function throttledAdjustDynamicStickySidebar() {
+        if (scrollAFTimeout) {
+            window.cancelAnimationFrame(scrollAFTimeout);
+        }
+        scrollAFTimeout = window.requestAnimationFrame(adjustDynamicStickySidebar);
+    }
+
+    // Inicializar e adicionar listeners para a sidebar dinâmica
+    if (window.innerWidth >= 769) {
+        window.addEventListener('scroll', throttledAdjustDynamicStickySidebar, { passive: true });
+        // Chamar uma vez no load com um pequeno atraso para garantir que o offsetHeight da sidebar esteja correto
+        setTimeout(adjustDynamicStickySidebar, 250); 
+    }
+
+    window.addEventListener('resize', () => {
+        lastKnownScrollY = window.scrollY; // Resetar no resize para evitar comportamento estranho inicial
+        if (window.innerWidth >= 769) {
+            window.removeEventListener('scroll', throttledAdjustDynamicStickySidebar); // Remover antigo para evitar duplicação
+            window.addEventListener('scroll', throttledAdjustDynamicStickySidebar, { passive: true });
+            setTimeout(adjustDynamicStickySidebar, 250); // Reavaliar no resize
+        } else {
+            window.removeEventListener('scroll', throttledAdjustDynamicStickySidebar);
+            const sidebar = document.querySelector('.viator-filters');
+            if (sidebar) {
+                sidebar.style.transition = 'top 0.2s ease-out';
+                sidebar.style.top = `${STICKY_TOP_OFFSET}px`; // Reset ao sair do modo desktop
+            }
+        }
+    });
 });
 
 function updateSort(value) {
