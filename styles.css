@@ -1411,7 +1411,7 @@
 .viator-date-filter {
     display: flex;
     flex-direction: column;
-    background: #04846b;
+    background: #0056b3;
     padding: 20px;
     border-radius: 10px 10px 0 0;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -1563,14 +1563,14 @@
 
 /* Botão Aplicar do Flatpickr */
 .flatpickr-button.apply {
-    background-color: #008768 !important;
-    border: 1px solid #008768 !important;
+    background-color: #007BFF !important;
+    border: 1px solid #007BFF !important;
     color: white !important;
 }
 
 .flatpickr-button.apply:hover {
-    background-color: #006b53 !important;
-    border-color: #006b53 !important;
+    background-color: #0056b3 !important;
+    border-color: #0056b3 !important;
 }
 
 /* Garantir que o seletor de data não tenha estilos indesejados */
@@ -1581,7 +1581,7 @@
 
 .viator-date-selector:hover,
 .viator-date-selector:focus {
-    border-color: #008768 !important;
+    border-color: #007BFF !important;
     box-shadow: none !important;
     outline: none !important;
 }
@@ -1596,8 +1596,8 @@
 .flatpickr-day.selected,
 .flatpickr-day.selected:hover,
 .flatpickr-day.selected:focus {
-    background: #04846b !important;
-    border-color: #04846b !important;
+    background: #007BFF !important;
+    border-color: #007BFF !important;
     color: #ffffff !important;
     font-weight: 500 !important;
 }
@@ -1605,17 +1605,17 @@
 /* Hover nos dias */
 .flatpickr-day:hover {
     background: #f5f5f5 !important;
-    border-color: #04846b !important;
+    border-color: #007BFF !important;
 }
 
 /* Dia atual */
 .flatpickr-day.today {
-    border-color: #04846b !important;
+    border-color: #007BFF !important;
 }
 
 .flatpickr-day.today:hover {
     background: #f5f5f5 !important;
-    color: #04846b !important;
+    color: #007BFF !important;
 }
 
 /* Dias desabilitados */
@@ -1680,8 +1680,8 @@
 .flatpickr-day.selected.startRange,
 .flatpickr-day.startRange.startRange,
 .flatpickr-day.endRange.endRange {
-    background: #04846b !important;
-    border-color: #04846b !important;
+    background: #007BFF !important;
+    border-color: #007BFF !important;
     color: #fff !important;
 }
 
@@ -1949,8 +1949,8 @@
     top: 50%;
     left: 0;
     right: 0;
-    height: 4px; /* Altura da barra preta */
-    background-color: #000; /* Cor da barra */
+    height: 2px; /* Altura da barra preta */
+    background-color: #0056b3; /* Cor da barra */
     border-radius: 2px;
     transform: translateY(-50%);
     z-index: 1; /* Atrás dos thumbs */
@@ -1963,7 +1963,7 @@
     height: 20px; /* Tamanho do controle */
     background: #fff; /* Cor do controle */
     border-radius: 50%;
-    border: 2px solid #000; /* Borda preta no controle */
+    border: 2px solid #000; /* Borda no controle */
     cursor: pointer;
     margin-top: -8px; /* Ajuste vertical para centralizar o thumb na barra */
     position: relative;
@@ -2368,15 +2368,15 @@
     cursor: pointer;
     width: 16px;
     height: 16px;
-    accent-color: #04846b;
+    accent-color: #0056b3;
 }
 
 .viator-special-option:hover .viator-special-text {
-    color: #04846b;
+    color: #0056b3;
 }
 
 .viator-special-option input[type="checkbox"]:checked + .viator-special-text {
-    color: #04846b;
+    color: #0056b3;
     font-weight: 500;
 }
 
@@ -2390,9 +2390,9 @@
 }
 
 .viator-clear-all-btn {
-    background-color: #04846b !important;
-    color: #ffffff !important;
-    border: 2px solid #04846b !important;
+    background-color: #007bff00 !important;
+    color: #414141 !important;
+    border: 1px solid #414141 !important;
     border-radius: 6px;
     padding: 10px 20px;
     font-family: var(--font-primary);
@@ -2405,9 +2405,9 @@
 }
 
 .viator-clear-all-btn:hover {
-    background-color: #037961 !important;
+    background-color: #0056b3 !important;
     color: #ffffff !important;
-    border: 2px solid #037961 !important;
+    border: 1px solid #0056b3 !important;
 }
 
 /* Ajuste responsivo para o filtro de Especiais */
