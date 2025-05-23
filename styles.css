@@ -2390,9 +2390,9 @@
 }
 
 .viator-clear-all-btn {
-    background-color: #007bff00 !important;
-    color: #414141 !important;
-    border: 1px solid #414141 !important;
+    background-color: transparent !important;
+    color: #007BFF !important;
+    border: 1px solid #007BFF !important;
     border-radius: 6px;
     padding: 10px 20px;
     font-family: var(--font-primary);
@@ -2402,12 +2402,29 @@
     transition: all 0.3s ease;
     width: 100%;
     max-width: 200px;
+    opacity: 1; /* Padrão para habilitado */
 }
 
 .viator-clear-all-btn:hover {
     background-color: #0056b3 !important;
     color: #ffffff !important;
-    border: 1px solid #0056b3 !important;
+    border-color: #0056b3 !important;
+}
+
+.viator-clear-all-btn:disabled,
+.viator-clear-all-btn[disabled] {
+    background-color: transparent !important; /* Usar !important para garantir a sobreposição */
+    color: #a0a0a0 !important;
+    border-color: #cccccc !important;
+    cursor: not-allowed !important;
+    opacity: 0.7 !important;
+}
+
+.viator-clear-all-btn:disabled:hover,
+.viator-clear-all-btn[disabled]:hover {
+    background-color: transparent !important; /* Manter estilos de desabilitado no hover */
+    color: #a0a0a0 !important;
+    border-color: #cccccc !important;
 }
 
 /* Ajuste responsivo para o filtro de Especiais */

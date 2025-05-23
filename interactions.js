@@ -329,6 +329,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (typeof window.initializeMobileFilterButton === 'function') {
                     window.initializeMobileFilterButton();
                 }
+                updateClearAllButtonState(); // Atualizar estado do botão
             })
             .catch(error => {
                 console.error('Erro ao processar paginação:', error);
@@ -579,6 +580,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         if (typeof window.initializeMobileFilterButton === 'function') {
                             window.initializeMobileFilterButton();
                         }
+                        updateClearAllButtonState(); // Atualizar estado do botão
                     })
                     .catch(error => {
                         console.error('Erro ao reiniciar datas:', error);
@@ -746,6 +748,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             if (typeof window.initializeMobileFilterButton === 'function') {
                                 window.initializeMobileFilterButton();
                             }
+                            updateClearAllButtonState(); // Atualizar estado do botão
                         })
                         .catch(error => {
                             console.error('Erro ao atualizar datas:', error);
@@ -786,6 +789,7 @@ document.addEventListener('DOMContentLoaded', function () {
     
     // Inicializar o botão de limpar tudo
     initializeClearAllButton();
+    updateClearAllButtonState(); // Adicionado para estado inicial
 
     // Função para reinicializar o datepicker
     function reinitializeDatePicker() {
@@ -848,6 +852,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (typeof window.initializeMobileFilterButton === 'function') {
                     window.initializeMobileFilterButton();
                 }
+                updateClearAllButtonState(); // <- Adicionado aqui
             }
         });
     });
@@ -859,6 +864,8 @@ document.addEventListener('DOMContentLoaded', function () {
             subtree: true
         });
     }
+    // Adicionar chamada inicial para o estado do botão
+    updateClearAllButtonState();
 });
 
 function updateSort(value) {
@@ -1011,6 +1018,7 @@ function updateSort(value) {
         if (typeof window.initializeMobileFilterButton === 'function') {
             window.initializeMobileFilterButton();
         }
+        updateClearAllButtonState(); // Atualizar estado do botão
     })
     .catch(error => {
         console.error('Erro ao atualizar ordenação:', error);
@@ -1161,6 +1169,7 @@ function reinitializeDurationFilter() {
                 if (typeof window.initializeMobileFilterButton === 'function') {
                     window.initializeMobileFilterButton();
                 }
+                updateClearAllButtonState(); // Atualizar estado do botão
             })
             .catch(error => {
                 console.error('Erro ao atualizar filtro de duração:', error);
@@ -1174,6 +1183,8 @@ function reinitializeDurationFilter() {
             });
         });
     });
+    // Adicionar chamada para o estado do botão quando o filtro é reinicializado
+    updateClearAllButtonState();
 }
 
 function getLocationName(latitude, longitude) {
@@ -1568,6 +1579,7 @@ function initializePriceSlider() {
                 if (typeof window.initializeMobileFilterButton === 'function') {
                     window.initializeMobileFilterButton();
                 }
+                updateClearAllButtonState(); // Atualizar estado do botão
             })
             .catch(error => {
                 console.error('Erro ao atualizar filtro de preço:', error);
@@ -1629,6 +1641,7 @@ function initializePriceSlider() {
 // Função para reinicializar o filtro de preço (para ser chamada após AJAX)
 function reinitializePriceSlider() {
     initializePriceSlider();
+    updateClearAllButtonState(); // Atualizar estado do botão
 }
 
 // Função para inicializar o filtro de avaliação
@@ -1765,6 +1778,7 @@ function initializeRatingFilter() {
                 if (typeof window.initializeMobileFilterButton === 'function') {
                     window.initializeMobileFilterButton();
                 }
+                updateClearAllButtonState(); // Atualizar estado do botão
             })
             .catch(error => {
                 console.error('Erro ao atualizar filtro de avaliação:', error);
@@ -1778,11 +1792,14 @@ function initializeRatingFilter() {
             });
         });
     });
+    // Adicionar chamada para o estado do botão após inicialização
+    updateClearAllButtonState();
 }
 
 // Função para reinicializar o filtro de avaliação após AJAX
 function reinitializeRatingFilter() {
     initializeRatingFilter();
+    updateClearAllButtonState(); // Atualizar estado do botão
 }
 
 // Função para inicializar o filtro de especiais
@@ -1929,6 +1946,7 @@ function initializeSpecialsFilter() {
                     if (typeof window.initializeMobileFilterButton === 'function') {
                         window.initializeMobileFilterButton();
                     }
+                    updateClearAllButtonState(); // Atualizar estado do botão
                 })
                 .catch(error => {
                     console.error('Erro ao atualizar filtro de especiais:', error);
@@ -1947,6 +1965,8 @@ function initializeSpecialsFilter() {
             }, 750); // Debounce de 750ms
         });
     });
+    // Adicionar chamada para o estado do botão após inicialização
+    updateClearAllButtonState();
 }
 
 // Função para reinicializar o filtro de especiais após AJAX
@@ -2009,14 +2029,14 @@ function reinitializeSpecialsFilter() {
     });
     
     // Adicionar event listeners para os checkboxes
-    initializeSpecialsFilter();
+    initializeSpecialsFilter(); // Esta chamada já inclui updateClearAllButtonState()
 }
 
 // Função para inicializar o botão de limpar tudo
 function initializeClearAllButton() {
     const clearAllButton = document.getElementById('clear-all-filters');
     if (!clearAllButton) return;
-    
+
     clearAllButton.addEventListener('click', function() {
         // Mostrar indicador de carregamento
         const gridElement = document.querySelector('.viator-grid');
@@ -2147,6 +2167,7 @@ function initializeClearAllButton() {
             if (typeof window.initializeMobileFilterButton === 'function') {
                 window.initializeMobileFilterButton();
             }
+            updateClearAllButtonState(); // Atualizar estado do botão
         })
         .catch(error => {
             console.error('Erro ao limpar todos os filtros:', error);
@@ -2163,11 +2184,14 @@ function initializeClearAllButton() {
             }
         });
     });
+    // Adicionar chamada para o estado do botão após inicialização
+    updateClearAllButtonState();
 }
 
 // Função para reinicializar o botão de limpar tudo após AJAX
 function reinitializeClearAllButton() {
     initializeClearAllButton();
+    updateClearAllButtonState(); // Assegurar que o estado é atualizado
 }
 
 let scrollHandler = null; // Variável para guardar a referência do event listener
@@ -2272,5 +2296,39 @@ function removeCustomLoader(parentElement) {
     if (scrollHandler) {
         window.removeEventListener('scroll', scrollHandler);
         scrollHandler = null;
+    }
+}
+
+// Função para verificar se algum filtro está ativo
+function areFiltersActive() {
+    const params = new URLSearchParams(window.location.search);
+    // Lista de parâmetros que indicam um filtro ativo (exceto busca, ordenação e página)
+    const filterParams = [
+        'viator_date_start', 'viator_date_end', 'duration_filter',
+        'min_price', 'max_price', 'rating_filter', 'special_filter[]'
+    ];
+
+    for (const param of filterParams) {
+        if (param === 'special_filter[]') {
+            if (params.getAll('special_filter[]').length > 0) return true;
+        } else if (params.has(param) && params.get(param) !== '' && params.get(param) !== null) {
+            // Considerar filtros de preço padrão como não ativos se forem os valores default
+            if (param === 'min_price' && params.get(param) === '0') continue;
+            if (param === 'max_price' && params.get(param) === '5000') continue; // Ajuste se o máximo padrão for diferente
+            return true;
+        }
+    }
+    return false;
+}
+
+// Função para atualizar o estado do botão Limpar Tudo
+function updateClearAllButtonState() {
+    const clearAllButton = document.getElementById('clear-all-filters');
+    if (clearAllButton) {
+        if (areFiltersActive()) {
+            clearAllButton.disabled = false;
+        } else {
+            clearAllButton.disabled = true;
+        }
     }
 }
