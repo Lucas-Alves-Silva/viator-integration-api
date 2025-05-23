@@ -117,6 +117,13 @@ function viator_enqueue_scripts() {
     wp_enqueue_style('flatpickr', 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css');
     wp_enqueue_script('flatpickr', 'https://cdn.jsdelivr.net/npm/flatpickr', array(), null, true);
     wp_enqueue_script('flatpickr-pt', 'https://npmcdn.com/flatpickr/dist/l10n/pt.js', array('flatpickr'), null, true);
+
+    // Enqueue Ionicons
+    wp_enqueue_script('ionicons-module', 'https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js', array(), null, true);
+    wp_enqueue_script('ionicons-nomodule', 'https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js', array(), null, true);
+
+    // Enqueue DotLottie Player
+    wp_enqueue_script('dotlottie-player', 'https://unpkg.com/@dotlottie/player-component@2.7.12/dist/dotlottie-player.mjs', array(), null, true);
 }
 add_action('wp_enqueue_scripts', 'viator_enqueue_scripts');
 
@@ -774,7 +781,7 @@ function viator_get_search_results($searchTerm) {
     $new_checked = isset($_GET['special_filter']) && in_array('new_on_viator', (array)$_GET['special_filter']) ? 'checked' : '';
     $output .= '<label class="viator-special-option">';
     $output .= '<input type="checkbox" name="special_filter[]" value="new_on_viator" ' . $new_checked . '>';
-    $output .= '<span class="viator-special-text">Novo no Viator</span>';
+    $output .= '<span class="viator-special-text">Novidade na Viator</span>';
     $output .= '</label>';
     
     $output .= '</div>'; // Fechando viator-specials-options
@@ -862,11 +869,6 @@ function viator_get_search_results($searchTerm) {
 
     // Iniciar grid de cards
     $output .= '<div class="viator-grid">';
-    
-    // Adicionar elemento para efeito de carregamento
-    $output .= '<div class="viator-pulse-loading">';
-    $output .= '<span></span><span></span><span></span>';
-    $output .= '</div>';
 
     foreach ($data['products']['results'] as $tour) {
         // Pegar a imagem de melhor qualidade
@@ -1248,8 +1250,8 @@ function viator_ajax_update_sort() {
     }
     
     // Debug dos parâmetros para solução de problemas
-    viator_debug_log('Sort AJAX Params Recebidos:', $_POST);
-    viator_debug_log('Sort AJAX Params Processados:', $_GET);
+    viator_debug_log('Sort AJAX Parâmetros recebidos:', $_POST);
+    viator_debug_log('Sort AJAX Parâmetros processados:', $_GET);
     
     // Obter os resultados
     $results = viator_get_search_results($search_term);
@@ -1371,3 +1373,19 @@ function viator_ajax_update_filter() {
     echo $results;
     wp_die();
 }
+
+// Adicionar atributos type="module" e nomodule para scripts específicos
+function add_ionicons_script_attributes($tag, $handle, $src) {
+    if ('ionicons-module' === $handle) {
+        $tag = '<script type="module" src="' . esc_url($src) . '"></script>';
+    }
+    if ('ionicons-nomodule' === $handle) {
+        $tag = '<script nomodule src="' . esc_url($src) . '"></script>';
+    }
+    // Adicionar type="module" para o dotlottie-player
+    if ('dotlottie-player' === $handle) {
+        $tag = '<script type="module" src="' . esc_url($src) . '"></script>';
+    }
+    return $tag;
+}
+add_filter('script_loader_tag', 'add_ionicons_script_attributes', 10, 3);

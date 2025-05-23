@@ -195,8 +195,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const gridElement = document.querySelector('.viator-grid');
             if (gridElement) {
+                addCustomLoader(gridElement);
                 gridElement.style.opacity = '0.5';
-                gridElement.classList.add('loading');
             }
             
             // Mostrar efeito de carregamento em dispositivos móveis
@@ -334,11 +334,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 console.error('Erro ao processar paginação:', error);
             })
             .finally(() => {
-                // Remover estado de carregamento
-                const gridElement = document.querySelector('.viator-grid');
                 if (gridElement) {
+                    removeCustomLoader(gridElement);
                     gridElement.style.opacity = '1';
-                    gridElement.classList.remove('loading');
                 }
                 if (loadingEffect) {
                     loadingEffect.classList.remove('active');
@@ -489,8 +487,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     // Mostrar indicador de carregamento
                     const gridElement = document.querySelector('.viator-grid');
                     if (gridElement) {
+                        addCustomLoader(gridElement);
                         gridElement.style.opacity = '0.5';
-                        gridElement.classList.add('loading');
                     }
                     
                     // Atualizar a URL
@@ -586,10 +584,9 @@ document.addEventListener('DOMContentLoaded', function () {
                         console.error('Erro ao reiniciar datas:', error);
                     })
                     .finally(() => {
-                        const gridElement = document.querySelector('.viator-grid');
                         if (gridElement) {
+                            removeCustomLoader(gridElement);
                             gridElement.style.opacity = '1';
-                            gridElement.classList.remove('loading');
                         }
                     });
                 });
@@ -601,8 +598,8 @@ document.addEventListener('DOMContentLoaded', function () {
                         
                         const gridElement = document.querySelector('.viator-grid');
                         if (gridElement) {
+                            addCustomLoader(gridElement);
                             gridElement.style.opacity = '0.5';
-                            gridElement.classList.add('loading');
                         }
                         
                         // Mostrar efeito de carregamento
@@ -754,10 +751,9 @@ document.addEventListener('DOMContentLoaded', function () {
                             console.error('Erro ao atualizar datas:', error);
                         })
                         .finally(() => {
-                            const gridElement = document.querySelector('.viator-grid');
                             if (gridElement) {
+                                removeCustomLoader(gridElement);
                                 gridElement.style.opacity = '1';
-                                gridElement.classList.remove('loading');
                             }
                             
                             // Remover efeito de carregamento
@@ -866,18 +862,20 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 function updateSort(value) {
-    // Mostrar indicador de carregamento
     const gridElement = document.querySelector('.viator-grid');
     if (gridElement) {
+        addCustomLoader(gridElement); // Adiciona o novo loader
         gridElement.style.opacity = '0.5';
-        gridElement.classList.add('loading');
+        // gridElement.classList.add('loading'); // A classe loading agora só controla o overlay e a exibição do loader container
     }
     
-    // Mostrar efeito de carregamento em dispositivos móveis
+    // Remover manipulação do .viator-loading-effect antigo
+    /*
     const loadingEffect = document.querySelector('.viator-loading-effect');
     if (loadingEffect) {
         loadingEffect.classList.add('active');
     }
+    */
     
     // Pegar a URL atual e parâmetros
     let url = new URL(window.location.href);
@@ -1018,15 +1016,17 @@ function updateSort(value) {
         console.error('Erro ao atualizar ordenação:', error);
     })
     .finally(() => {
-        // Remover estado de carregamento
-        const gridElement = document.querySelector('.viator-grid');
         if (gridElement) {
+            removeCustomLoader(gridElement); // Remove o novo loader
             gridElement.style.opacity = '1';
-            gridElement.classList.remove('loading');
+            // gridElement.classList.remove('loading');
         }
+        // Remover manipulação do .viator-loading-effect antigo
+        /*
         if (loadingEffect) {
             loadingEffect.classList.remove('active');
         }
+        */
     });
 }
 
@@ -1041,8 +1041,8 @@ function reinitializeDurationFilter() {
             // Mostrar indicador de carregamento
             const gridElement = document.querySelector('.viator-grid');
             if (gridElement) {
+                addCustomLoader(gridElement);
                 gridElement.style.opacity = '0.5';
-                gridElement.classList.add('loading');
             }
 
             // Mostrar efeito de carregamento em dispositivos móveis
@@ -1166,10 +1166,9 @@ function reinitializeDurationFilter() {
                 console.error('Erro ao atualizar filtro de duração:', error);
             })
             .finally(() => {
-                const gridElement = document.querySelector('.viator-grid');
                 if (gridElement) {
+                    removeCustomLoader(gridElement);
                     gridElement.style.opacity = '1';
-                    gridElement.classList.remove('loading');
                 }
                 if (loadingEffect) loadingEffect.classList.remove('active');
             });
@@ -1442,8 +1441,8 @@ function initializePriceSlider() {
         debounceTimer = setTimeout(() => {
             const gridElement = document.querySelector('.viator-grid');
             if (gridElement) {
+                addCustomLoader(gridElement);
                 gridElement.style.opacity = '0.5';
-                gridElement.classList.add('loading');
             }
 
             const loadingEffect = document.querySelector('.viator-loading-effect');
@@ -1574,10 +1573,9 @@ function initializePriceSlider() {
                 console.error('Erro ao atualizar filtro de preço:', error);
             })
             .finally(() => {
-                const gridElement = document.querySelector('.viator-grid');
                 if (gridElement) {
+                    removeCustomLoader(gridElement);
                     gridElement.style.opacity = '1';
-                    gridElement.classList.remove('loading');
                 }
                 if (loadingEffect) loadingEffect.classList.remove('active');
             });
@@ -1643,8 +1641,8 @@ function initializeRatingFilter() {
             // Mostrar indicador de carregamento
             const gridElement = document.querySelector('.viator-grid');
             if (gridElement) {
+                addCustomLoader(gridElement);
                 gridElement.style.opacity = '0.5';
-                gridElement.classList.add('loading');
             }
 
             // Mostrar efeito de carregamento em dispositivos móveis
@@ -1772,10 +1770,9 @@ function initializeRatingFilter() {
                 console.error('Erro ao atualizar filtro de avaliação:', error);
             })
             .finally(() => {
-                const gridElement = document.querySelector('.viator-grid');
                 if (gridElement) {
+                    removeCustomLoader(gridElement);
                     gridElement.style.opacity = '1';
-                    gridElement.classList.remove('loading');
                 }
                 if (loadingEffect) loadingEffect.classList.remove('active');
             });
@@ -1802,8 +1799,8 @@ function initializeSpecialsFilter() {
                 // Mostrar indicador de carregamento
                 const gridElement = document.querySelector('.viator-grid');
                 if (gridElement) {
+                    addCustomLoader(gridElement);
                     gridElement.style.opacity = '0.5';
-                    gridElement.classList.add('loading');
                 }
 
                 // Mostrar efeito de carregamento
@@ -1937,10 +1934,9 @@ function initializeSpecialsFilter() {
                     console.error('Erro ao atualizar filtro de especiais:', error);
                 })
                 .finally(() => {
-                    const gridElementFinally = document.querySelector('.viator-grid');
-                    if (gridElementFinally) {
-                        gridElementFinally.style.opacity = '1';
-                        gridElementFinally.classList.remove('loading');
+                    if (gridElement) {
+                        removeCustomLoader(gridElement);
+                        gridElement.style.opacity = '1';
                     }
                     
                     const loadingEffectFinally = document.querySelector('.viator-loading-effect');
@@ -2025,8 +2021,8 @@ function initializeClearAllButton() {
         // Mostrar indicador de carregamento
         const gridElement = document.querySelector('.viator-grid');
         if (gridElement) {
+            addCustomLoader(gridElement);
             gridElement.style.opacity = '0.5';
-            gridElement.classList.add('loading');
         }
 
         // Mostrar efeito de carregamento
@@ -2156,10 +2152,9 @@ function initializeClearAllButton() {
             console.error('Erro ao limpar todos os filtros:', error);
         })
         .finally(() => {
-            const gridElement = document.querySelector('.viator-grid');
             if (gridElement) {
+                removeCustomLoader(gridElement);
                 gridElement.style.opacity = '1';
-                gridElement.classList.remove('loading');
             }
             
             const loadingEffect = document.querySelector('.viator-loading-effect');
@@ -2173,4 +2168,109 @@ function initializeClearAllButton() {
 // Função para reinicializar o botão de limpar tudo após AJAX
 function reinitializeClearAllButton() {
     initializeClearAllButton();
+}
+
+let scrollHandler = null; // Variável para guardar a referência do event listener
+
+function adjustLoaderPosition() {
+    const gridElement = document.querySelector('.viator-grid.loading');
+    const loaderContainer = gridElement ? gridElement.querySelector('.viator-custom-loader-container') : null;
+
+    if (!gridElement || !loaderContainer) {
+        if (scrollHandler) {
+            window.removeEventListener('scroll', scrollHandler);
+            scrollHandler = null;
+        }
+        return;
+    }
+
+    const gridRect = gridElement.getBoundingClientRect();
+    const loaderRect = loaderContainer.getBoundingClientRect(); // O loader já tem width/height
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+
+    // Tenta centralizar na viewport
+    let newTop = (viewportHeight - loaderRect.height) / 2;
+    let newLeft = (viewportWidth - loaderRect.width) / 2;
+
+    // Limitar ao topo do grid
+    // A posição 'fixed' do loader é relativa à viewport.
+    // gridRect.top é a posição do topo do grid em relação à viewport.
+    if (newTop < gridRect.top) {
+        newTop = gridRect.top;
+    }
+    // Limitar à base do grid
+    // gridRect.bottom é a posição da base do grid em relação à viewport.
+    // Se a base do loader (newTop + loaderRect.height) for passar da base do grid,
+    // ajustamos newTop para que a base do loader alinhe com a base do grid.
+    if (newTop + loaderRect.height > gridRect.bottom) {
+        newTop = gridRect.bottom - loaderRect.height;
+    }
+
+    // Limitar à esquerda do grid
+    if (newLeft < gridRect.left) {
+        newLeft = gridRect.left;
+    }
+    // Limitar à direita do grid
+    if (newLeft + loaderRect.width > gridRect.right) {
+        newLeft = gridRect.right - loaderRect.width;
+    }
+
+    // Se o grid estiver completamente fora da tela (acima ou abaixo), 
+    // pode ser melhor esconder o loader ou fixá-lo no topo/base visível do grid.
+    // Para simplificar, vamos apenas garantir que ele não saia da viewport quando o grid sai.
+    if (gridRect.bottom < 0 || gridRect.top > viewportHeight) { 
+        // Grid fora da tela, talvez esconder o loader?
+        // loaderContainer.style.display = 'none'; // Opção
+        // Por ora, vamos deixar como está, mas ele pode ficar "flutuando" no limite.
+    } else {
+        // loaderContainer.style.display = 'block';
+    }
+
+    loaderContainer.style.top = `${newTop}px`;
+    loaderContainer.style.left = `${newLeft}px`;
+    loaderContainer.style.transform = 'none'; // Remover transform se estivermos usando top/left diretamente
+}
+
+function addCustomLoader(parentElement) {
+    if (!parentElement) return;
+    removeCustomLoader(parentElement); // Remove loader antigo e seu listener de scroll
+
+    const loaderContainer = document.createElement('div');
+    loaderContainer.className = 'viator-custom-loader-container';
+
+    const dotLottiePlayer = document.createElement('dotlottie-player');
+    dotLottiePlayer.setAttribute('src', 'https://lottie.host/d5c00c3c-219a-4652-8b83-2d1f314a689e/9fZQP05oWC.lottie');
+    dotLottiePlayer.setAttribute('background', 'transparent');
+    dotLottiePlayer.setAttribute('speed', '1');
+    dotLottiePlayer.setAttribute('style', 'width: 300px; height: 300px;');
+    dotLottiePlayer.setAttribute('loop', '');
+    dotLottiePlayer.setAttribute('autoplay', '');
+
+    loaderContainer.appendChild(dotLottiePlayer);
+    parentElement.appendChild(loaderContainer);
+    parentElement.classList.add('loading');
+
+    // Pequeno delay para garantir que o DOM esteja atualizado e os estilos aplicados
+    setTimeout(() => {
+        adjustLoaderPosition(); // Posição inicial
+        if (!scrollHandler) {
+            scrollHandler = adjustLoaderPosition; // Atribui a função diretamente
+            window.addEventListener('scroll', scrollHandler, { passive: true });
+        }
+    }, 50); 
+}
+
+function removeCustomLoader(parentElement) {
+    if (!parentElement) return;
+    const loaderContainer = parentElement.querySelector('.viator-custom-loader-container');
+    if (loaderContainer) {
+        parentElement.removeChild(loaderContainer);
+    }
+    parentElement.classList.remove('loading');
+
+    if (scrollHandler) {
+        window.removeEventListener('scroll', scrollHandler);
+        scrollHandler = null;
+    }
 }
