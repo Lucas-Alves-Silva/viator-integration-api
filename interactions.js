@@ -145,22 +145,31 @@ document.addEventListener('DOMContentLoaded', function () {
         searchForm.addEventListener('submit', function(event) {
             event.preventDefault();
             
+            const currentErrorMessageElement = document.querySelector('.viator-error-message');
+
             if (!searchInput || !searchInput.value.trim()) {
                 // Add visual feedback for empty input
                 searchInput.classList.add('error');
-                const errorMessage = document.querySelector('.viator-error-message');
-                if (errorMessage) {
-                    errorMessage.textContent = 'Por favor, insira um destino';
-                    errorMessage.classList.remove('searching');
+                if (currentErrorMessageElement) {
+                    currentErrorMessageElement.textContent = 'Por favor, insira um destino';
+                    currentErrorMessageElement.classList.remove('searching');
                 }
                 return;
             }
 
             // Remove error state if input is valid
             searchInput.classList.remove('error');
-            const errorMessage = document.querySelector('.viator-error-message');
-            if (errorMessage) {
-                errorMessage.textContent = '';
+
+            if (currentErrorMessageElement) {
+                // Verifica se a mensagem de timeout específica está presente
+                if (currentErrorMessageElement.textContent.includes("OPS! Aguarde um instante e tente novamente.")) {
+                    currentErrorMessageElement.textContent = "Buscando novamente... Por favor, aguarde!";
+                    currentErrorMessageElement.classList.add('searching'); // Adiciona classe para estilo de "buscando"
+                } else {
+                    // Limpa qualquer outra mensagem de erro anterior se não for a de timeout
+                    currentErrorMessageElement.textContent = '';
+                    currentErrorMessageElement.classList.remove('searching');
+                }
             }
 
             // Update interface for search
