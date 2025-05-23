@@ -1273,6 +1273,7 @@
     border-radius: 10px;
     background: #fdfdfd;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    position: relative; /* Torna .viator-filters um container de posicionamento */
 }
 
 /* Botão de filtros para mobile */
@@ -2252,17 +2253,17 @@
 
 .viator-pulse-loading {
     position: absolute;
-    top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%);
+    transform: translateX(-50%);
+    display: none; /* Escondido por padrão */
     z-index: 12;
     width: 70px;
     height: 70px;
-    display: none;
 }
 
 .viator-grid.loading .viator-pulse-loading {
-    display: block;
+    display: flex; /* Mostra quando .loading está ativo */
+    top: 100px; /* Ajuste esta valor conforme necessário para alinhar abaixo do .viator-filters */
 }
 
 .viator-pulse-loading span {
