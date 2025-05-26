@@ -457,6 +457,30 @@ function viator_get_search_results($searchTerm) {
     viator_debug_log('Resposta da API:', $data);
     viator_debug_log('Parâmetros recebidos:', $_GET);
 
+    // Verificar se há filtros especiais selecionados para filtrar os resultados localmente
+    $special_filters_to_check = [];
+    if (isset($_GET['special_filter']) && is_array($_GET['special_filter']) && !empty($_GET['special_filter'])) {
+        foreach ($_GET['special_filter'] as $filter) {
+            switch ($filter) {
+                case 'free_cancellation':
+                    $special_filters_to_check[] = 'FREE_CANCELLATION';
+                    break;
+                case 'likely_to_sell_out':
+                    $special_filters_to_check[] = 'LIKELY_TO_SELL_OUT';
+                    break;
+                case 'skip_the_line':
+                    $special_filters_to_check[] = 'SKIP_THE_LINE';
+                    break;
+                case 'private_tour':
+                    $special_filters_to_check[] = 'PRIVATE_TOUR';
+                    break;
+                case 'new_on_viator':
+                    $special_filters_to_check[] = 'NEW_ON_VIATOR';
+                    break;
+            }
+        }
+    }
+
     // Verificar se há produtos na resposta
     if (empty($data['products']) || $data['products']['totalCount'] === 0) {
         // Embaralhar e pegar 6 destinos aleatórios
@@ -512,6 +536,90 @@ function viator_get_search_results($searchTerm) {
         $output .= '</div></div>';
         viator_debug_log('Nenhum resultado encontrado para a busca:', $_GET['viator_query']);
         return $output;
+    }
+    
+    // Filtrar produtos que não têm as flags selecionadas
+    if (!empty($special_filters_to_check) && !empty($data['products']['results'])) {
+        $filtered_results = [];
+        foreach ($data['products']['results'] as $tour) {
+            $flags = isset($tour['flags']) ? $tour['flags'] : [];
+            $should_include = true;
+            
+            // Verificar se o produto tem TODAS as flags selecionadas
+            foreach ($special_filters_to_check as $required_flag) {
+                if (!in_array($required_flag, $flags)) {
+                    $should_include = false;
+                    break;
+                }
+            }
+            
+            if ($should_include) {
+                $filtered_results[] = $tour;
+            }
+        }
+        
+        // Atualizar os resultados com apenas os produtos filtrados
+        $data['products']['results'] = $filtered_results;
+        
+        // Atualizar o total de produtos
+        $data['products']['totalCount'] = count($filtered_results);
+        
+        // Se não houver resultados após a filtragem, mostrar mensagem de "nenhum produto encontrado"
+        if (empty($filtered_results)) {
+            // Embaralhar e pegar 6 destinos aleatórios
+            shuffle($destinos_sugeridos);
+            $destinos_aleatorios = array_slice($destinos_sugeridos, 0, 6);
+
+            $output = '<script>
+            window.addEventListener("load", function() {
+                setTimeout(function() {
+                    const errorMessage = document.querySelector(".viator-error-message");
+                    if (errorMessage) {
+                        const startPosition = window.pageYOffset;
+                        const targetPosition = errorMessage.getBoundingClientRect().top + window.pageYOffset - 50;
+                        const distance = targetPosition - startPosition;
+                        const duration = 2500; // Increased duration for smoother animation
+
+                        function easeOutCubic(t) {
+                            return 1 - Math.pow(1 - t, 3);
+                        }
+
+                        let startTime = null;
+                        function animate(currentTime) {
+                            if (!startTime) startTime = currentTime;
+                            const timeElapsed = currentTime - startTime;
+                            const progress = Math.min(timeElapsed / duration, 1);
+
+                            window.scrollTo(0, startPosition + (distance * easeOutCubic(progress)));
+
+                            if (progress < 1) {
+                                requestAnimationFrame(animate);
+                            }
+                        }
+
+                        requestAnimationFrame(animate);
+                    }
+                }, 800); // Increased delay for better timing
+            });
+            </script>';
+            $output .= '<div class="viator-content-wrapper">';
+            $output .= '<div class="viator-results-container">';
+            $output .= '<p class="viator-error-message">Nenhum passeio encontrado com os filtros selecionados para "' . esc_html($_GET['viator_query']) . '".</p>';
+            
+            // Adiciona sugestões de destinos
+            $output .= '<div class="viator-suggestions">';
+            $output .= '<p>Que tal experimentar um destes destinos populares?</p>';
+            $output .= '<div class="viator-suggestions-grid">';
+            
+            foreach ($destinos_aleatorios as $destino) {
+                $output .= '<button class="viator-suggestion-btn" onclick="setSearchDestination(\'' . esc_attr($destino) . '\')">🌍 ' . esc_html($destino) . '</button>';
+            }
+            
+            $output .= '</div></div>';
+            $output .= '</div></div>';
+            viator_debug_log('Nenhum resultado encontrado após a filtragem local para a busca:', $_GET['viator_query']);
+            return $output;
+        }
     }
 
     viator_debug_log('Resultados:', $results);
