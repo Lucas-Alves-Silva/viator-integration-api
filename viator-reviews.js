@@ -251,7 +251,7 @@ jQuery(document).ready(function($) {
         isLoading = true;
         // Show loading state only if the list is currently empty
         if (allReviews.length === 0) {
-            $reviewsList.html('<div class="viator-reviews-loading">Carregando avaliações...</div>');
+            $reviewsList.html('<div class="viator-reviews-loading">' + (viatorReviewsData.translations.loading_reviews || 'Carregando avaliações...') + '</div>');
         }
         $pagination.addClass('loading'); // Adiciona um estado de loading na paginação
 
@@ -291,8 +291,7 @@ jQuery(document).ready(function($) {
                 } else {
                     // Se for a primeira carga e falhar
                     if (allReviews.length === 0) {
-                         $reviewsList.html('<div class="viator-no-reviews">Não foi possível carregar as avaliações. ' +
-                                     (response.data.message || 'Tente novamente mais tarde.') + '</div>');
+                         $reviewsList.html('<div class="viator-no-reviews">' + (viatorReviewsData.translations.reviews_load_error_generic || 'Erro ao carregar avaliações.') + ' ' + (viatorReviewsData.translations.try_again_later || 'Tente novamente mais tarde.') + '</div>');
                     }
                     // TODO: Adicionar feedback visual na paginação em caso de erro?
                 }
@@ -300,7 +299,7 @@ jQuery(document).ready(function($) {
             error: function() {
                  // Se for a primeira carga e falhar
                  if (allReviews.length === 0) {
-                    $reviewsList.html('<div class="viator-no-reviews">Erro ao carregar avaliações. Tente novamente mais tarde.</div>');
+                    $reviewsList.html('<div class="viator-no-reviews">' + (viatorReviewsData.translations.reviews_load_error_generic || 'Erro ao carregar avaliações.') + ' ' + (viatorReviewsData.translations.try_again_later || 'Tente novamente mais tarde.') + '</div>');
                  }
                  // TODO: Adicionar feedback visual na paginação em caso de erro?
             },
@@ -325,7 +324,7 @@ jQuery(document).ready(function($) {
 
         // Check if there are reviews
         if (!allReviews || allReviews.length === 0) {
-            $reviewsList.html('<div class="viator-no-reviews">Nenhuma avaliação encontrada para esta classificação.</div>');
+            $reviewsList.html('<div class="viator-no-reviews">' + (viatorReviewsData.translations.no_reviews_found || 'Nenhuma avaliação encontrada para esta classificação.') + '</div>');
             $pagination.empty();
             return;
         }
@@ -338,7 +337,7 @@ jQuery(document).ready(function($) {
 
         // Se por algum motivo não houver avaliações para a página atual (pode acontecer se totalReviews for impreciso inicialmente)
         if (currentPageReviews.length === 0 && allReviews.length > 0) {
-             $reviewsList.html('<div class="viator-no-reviews">Não há mais avaliações para exibir nesta página.</div>');
+             $reviewsList.html('<div class="viator-no-reviews">' + (viatorReviewsData.translations.no_more_reviews || 'Não há mais avaliações para exibir nesta página.') + '</div>');
         } else {
             // Display each review for current page only
             currentPageReviews.forEach(function(review) {
@@ -423,7 +422,7 @@ jQuery(document).ready(function($) {
         return `
             <div class="viator-review-item">
                 <div class="viator-review-header">
-                    <div class="viator-review-author">${review.userName || review.authorName || 'Viajante anônimo'}</div>
+                    <div class="viator-review-author">${review.userName || review.authorName || (viatorReviewsData.translations.anonymous_traveler || 'Viajante anônimo')}</div>
                     <div class="viator-review-date">${formattedDate}</div>
                 </div>
                 <div class="viator-review-rating">${starsHtml}</div>

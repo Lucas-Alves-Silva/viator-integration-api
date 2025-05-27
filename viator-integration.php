@@ -51,6 +51,8 @@ add_action('admin_menu', 'viator_admin_menu');
 // Register settings
 function viator_register_settings() {
     register_setting('viator_settings', 'viator_api_key');
+    register_setting('viator_settings', 'viator_language');
+    register_setting('viator_settings', 'viator_currency');
 }
 add_action('admin_init', 'viator_register_settings');
 
@@ -73,7 +75,29 @@ function viator_settings_page() {
                                value="<?php echo esc_attr(get_option('viator_api_key')); ?>" 
                                class="regular-text"
                                required>
-                        <p class="description">Insira sua chave API aqui.</p>
+                        <p class="description">Insira sua chave API da Viator aqui.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">Idioma</th>
+                    <td>
+                        <select name="viator_language" id="viator_language">
+                            <option value="pt-BR" <?php selected(get_option('viator_language', 'pt-BR'), 'pt-BR'); ?>>Português do Brasil</option>
+                            <option value="en-US" <?php selected(get_option('viator_language', 'pt-BR'), 'en-US'); ?>>English (US)</option>
+                            <option value="es-ES" <?php selected(get_option('viator_language', 'pt-BR'), 'es-ES'); ?>>Español</option>
+                        </select>
+                        <p class="description">Selecione o idioma para exibição dos produtos e traduções automáticas.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">Moeda</th>
+                    <td>
+                        <select name="viator_currency" id="viator_currency">
+                            <option value="BRL" <?php selected(get_option('viator_currency', 'BRL'), 'BRL'); ?>>Real Brasileiro (BRL)</option>
+                            <option value="USD" <?php selected(get_option('viator_currency', 'BRL'), 'USD'); ?>>Dólar Americano (USD)</option>
+                            <option value="EUR" <?php selected(get_option('viator_currency', 'BRL'), 'EUR'); ?>>Euro (EUR)</option>
+                        </select>
+                        <p class="description">Selecione a moeda para exibição dos preços dos produtos.</p>
                     </td>
                 </tr>
             </table>
@@ -116,7 +140,52 @@ function viator_enqueue_scripts() {
     // Add Flatpickr
     wp_enqueue_style('flatpickr', 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css');
     wp_enqueue_script('flatpickr', 'https://cdn.jsdelivr.net/npm/flatpickr', array(), null, true);
-    wp_enqueue_script('flatpickr-pt', 'https://npmcdn.com/flatpickr/dist/l10n/pt.js', array('flatpickr'), null, true);
+    
+    // Carregar localização do Flatpickr baseada no idioma configurado
+    $locale_settings = viator_get_locale_settings();
+    $flatpickr_locale = '';
+    
+    if ($locale_settings['language'] === 'pt-BR') {
+        wp_enqueue_script('flatpickr-pt', 'https://npmcdn.com/flatpickr/dist/l10n/pt.js', array('flatpickr'), null, true);
+        $flatpickr_locale = 'pt';
+    } elseif ($locale_settings['language'] === 'es-ES') {
+        wp_enqueue_script('flatpickr-es', 'https://npmcdn.com/flatpickr/dist/l10n/es.js', array('flatpickr'), null, true);
+        $flatpickr_locale = 'es';
+    }
+    // Para inglês (en-US), não precisamos carregar localização adicional, pois é o padrão
+
+    // Add currency symbol and translations for JavaScript
+    wp_localize_script('viator-interactions', 'viatorConfig', array(
+        'currencySymbol' => $locale_settings['currency_symbol'],
+        'language' => $locale_settings['language'],
+        'flatpickrLocale' => $flatpickr_locale,
+        'translations' => array(
+            'search_button' => viator_t('search_button'),
+            'search_placeholder' => viator_t('search_placeholder'),
+            'search_nearby' => viator_t('search_nearby'),
+            'clear_all' => viator_t('clear_all'),
+            'filters' => viator_t('filters'),
+            'searching' => viator_t('searching'),
+            'reset_button' => viator_t('reset_button'),
+            'apply_button' => viator_t('apply_button'),
+            'choose_date' => viator_t('choose_date'),
+            'duration_approx_short' => viator_t('duration_approx_short'),
+            'date_connector' => viator_t('date_connector'),
+            'months_short' => [
+                viator_t('jan_short'), viator_t('feb_short'), viator_t('mar_short'),
+                viator_t('apr_short'), viator_t('may_short'), viator_t('jun_short'),
+                viator_t('jul_short'), viator_t('aug_short'), viator_t('sep_short'),
+                viator_t('oct_short'), viator_t('nov_short'), viator_t('dec_short')
+            ],
+        )
+    ));
+    
+    // Adicionar script inline para definir o atributo de idioma no body
+    wp_add_inline_script('viator-interactions', "
+        document.addEventListener('DOMContentLoaded', function() {
+            document.body.setAttribute('data-viator-lang', '{$locale_settings['language']}');
+        });
+    ");
 
     // Enqueue Ionicons
     wp_enqueue_script('ionicons-module', 'https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js', array(), null, true);
@@ -151,14 +220,14 @@ function viator_search_form() {
     ?>
     <form method="GET" action="<?php echo esc_url(get_permalink()); ?>" id="viator-search-form" autocomplete="off">
         <div class="viator-search-wrapper">
-            <input type="text" name="viator_query" autocomplete="off" placeholder="🌍 Aonde você quer ir?" value="<?php echo esc_attr($searchTerm); ?>" required>
+            <input type="text" name="viator_query" autocomplete="off" placeholder="<?php echo esc_attr(viator_t('search_placeholder')); ?>" value="<?php echo esc_attr($searchTerm); ?>" required>
             <div class="viator-nearby-suggestion" style="display: none;">
                 <span class="location-icon"><img src="https://img.icons8.com/?size=100&id=3009BI6rABJa&format=png&color=04846B" alt="Ícone" width="15" height="15"></span>
-                <span>Nos arredores</span>
+                <span><?php echo esc_html(viator_t('search_nearby')); ?></span>
             </div>
         </div>
         <button type="submit" id="search-button">
-            <span id="search-text">Pesquisar</span>
+            <span id="search-text"><?php echo esc_html(viator_t('search_button')); ?></span>
             <span id="search-icon">🔍</span>
         </button>
     </form>
@@ -178,8 +247,11 @@ function viator_search_form() {
 function viator_get_search_results($searchTerm) {
     $api_key = get_option('viator_api_key');
     if (empty($api_key)) {
-        return '<p class="error">Por favor, configure sua chave API da Viator nas configurações do WordPress.</p>';
+        return '<p class="error">' . esc_html(viator_t('error_api_key')) . '</p>';
     }
+    
+    // Obter configurações de idioma e moeda
+    $locale_settings = viator_get_locale_settings();
     
     $url = "https://api.sandbox.viator.com/partner/search/freetext";
 
@@ -317,7 +389,7 @@ function viator_get_search_results($searchTerm) {
         "searchTypes" => [
             ["searchType" => "PRODUCTS", "pagination" => ["start" => $start, "count" => $per_page]],
         ],
-        "currency" => "BRL"
+        "currency" => $locale_settings['currency']
     ];
 
     // Adicionar filtros especiais, se existirem
@@ -378,7 +450,7 @@ function viator_get_search_results($searchTerm) {
             'Accept'           => 'application/json;version=2.0',
             'Content-Type'     => 'application/json;version=2.0',
             'exp-api-key'      => $api_key,
-            'Accept-Language'  => 'pt-BR',
+            'Accept-Language'  => $locale_settings['language'],
         ],
         'body'    => $body,
         'timeout' => 120,
@@ -388,7 +460,7 @@ function viator_get_search_results($searchTerm) {
     if (is_wp_error($response)) {
         $output = '<div class="viator-content-wrapper">';
         $output .= '<div class="viator-results-container">';
-        $output .= '<p class="viator-error-message">OPS! Aguarde um instante e tente novamente.</p>';
+        $output .= '<p class="viator-error-message">' . esc_html(viator_t('error_try_again')) . '</p>';
         $output .= '</div></div>';
         return $output;
     }
@@ -521,11 +593,11 @@ function viator_get_search_results($searchTerm) {
         </script>';
         $output .= '<div class="viator-content-wrapper">';
         $output .= '<div class="viator-results-container">';
-        $output .= '<p class="viator-error-message">Nenhum passeio encontrado para "' . esc_html($_GET['viator_query']) . '".</p>';
+        $output .= '<p class="viator-error-message">' . esc_html(viator_t('no_tours_found')) . ' "' . esc_html($_GET['viator_query']) . '".</p>';
         
         // Adiciona sugestões de destinos
         $output .= '<div class="viator-suggestions">';
-        $output .= '<p>Que tal experimentar um destes destinos populares?</p>';
+        $output .= '<p>' . esc_html(viator_t('try_popular_destinations')) . '</p>';
         $output .= '<div class="viator-suggestions-grid">';
         
         foreach ($destinos_aleatorios as $destino) {
@@ -604,11 +676,11 @@ function viator_get_search_results($searchTerm) {
             </script>';
             $output .= '<div class="viator-content-wrapper">';
             $output .= '<div class="viator-results-container">';
-            $output .= '<p class="viator-error-message">Nenhum passeio encontrado com os filtros selecionados para "' . esc_html($_GET['viator_query']) . '".</p>';
+            $output .= '<p class="viator-error-message">' . esc_html(viator_t('no_tours_found_filters')) . ' "' . esc_html($_GET['viator_query']) . '".</p>';
             
             // Adiciona sugestões de destinos
             $output .= '<div class="viator-suggestions">';
-            $output .= '<p>Que tal experimentar um destes destinos populares?</p>';
+            $output .= '<p>' . esc_html(viator_t('try_popular_destinations')) . '</p>';
             $output .= '<div class="viator-suggestions-grid">';
             
             foreach ($destinos_aleatorios as $destino) {
@@ -758,24 +830,24 @@ function viator_get_search_results($searchTerm) {
     // Sidebar de filtros
     $output .= '<div class="viator-filters">
         <div class="viator-date-filter">
-            <h3>Quando você pretende viajar?</h3>
+            <h3>' . esc_html(viator_t('when_travel')) . '</h3>
             <button type="button" class="viator-date-selector">
                 <b>📅</b>
-                <span>Escolher data</span>
+                <span>' . esc_html(viator_t('choose_date')) . '</span>
             </button>
         </div>';
 
     // Adicionando o filtro de duração
     $output .= '<div class="viator-duration-filter">
-        <h3>Duração</h3>';
+        <h3>' . esc_html(viator_t('duration')) . '</h3>';
 
     // Opções de filtro com valores corretos
     $duration_options = [
-        '0-60' => 'Até uma hora',
-        '60-240' => '1 a 4 horas',
-        '240-1440' => '4 horas a 1 dia',
-        '1440-4320' => '1 a 3 dias',
-        '4320-' => 'Mais de três dias'
+        '0-60' => viator_t('up_to_one_hour'),
+        '60-240' => viator_t('one_to_four_hours'),
+        '240-1440' => viator_t('four_hours_to_one_day'),
+        '1440-4320' => viator_t('one_to_three_days'),
+        '4320-' => viator_t('more_than_three_days')
     ];
 
     // Verificar filtros ativos
@@ -793,11 +865,11 @@ function viator_get_search_results($searchTerm) {
     $current_max_price = isset($_GET['max_price']) ? intval($_GET['max_price']) : 5000; // Definir um máximo padrão alto
 
     $output .= '<div class="viator-price-filter">
-        <h3>Faixa de Preço</h3>
+        <h3>' . esc_html(viator_t('price_range')) . '</h3>
         <div class="viator-price-slider-container">
             <div class="viator-price-values">
-                <span id="min_price_display">R$ ' . $current_min_price . '</span>
-                <span id="max_price_display">R$ ' . $current_max_price . ($current_max_price >= 5000 ? '+' : '') . '</span>
+                <span id="min_price_display">' . $locale_settings['currency_symbol'] . ' ' . $current_min_price . '</span>
+                <span id="max_price_display">' . $locale_settings['currency_symbol'] . ' ' . $current_max_price . ($current_max_price >= 5000 ? '+' : '') . '</span>
             </div>
             <div class="viator-price-sliders">
                 <input type="range" id="min_price_slider" name="min_price_slider" min="0" max="5000" value="' . $current_min_price . '" step="10">
@@ -813,7 +885,7 @@ function viator_get_search_results($searchTerm) {
     $is_ajax_request = wp_doing_ajax(); // Definir a variável, mas não vamos usá-la para condicionar a exibição dos filtros
     
     $output .= '<div class="viator-rating-filter">';
-    $output .= '<h3>Avaliação</h3>';
+    $output .= '<h3>' . esc_html(viator_t('rating')) . '</h3>';
     $output .= '<div class="viator-rating-options">';
     
     // Rating 4.5+
@@ -854,42 +926,42 @@ function viator_get_search_results($searchTerm) {
     
     // Adicionar o filtro de Especiais
     $output .= '<div class="viator-specials-filter">';
-    $output .= '<h3>Especiais</h3>';
+    $output .= '<h3>' . esc_html(viator_t('specials')) . '</h3>';
     $output .= '<div class="viator-specials-options">';
     
     // Opção: Cancelamento Gratuito
     $free_cancel_checked = isset($_GET['special_filter']) && in_array('free_cancellation', (array)$_GET['special_filter']) ? 'checked' : '';
     $output .= '<label class="viator-special-option">';
     $output .= '<input type="checkbox" name="special_filter[]" value="free_cancellation" ' . $free_cancel_checked . '>';
-    $output .= '<span class="viator-special-text">Cancelamento Gratuito</span>';
+    $output .= '<span class="viator-special-text">' . esc_html(viator_t('free_cancellation')) . '</span>';
     $output .= '</label>';
     
     // Opção: Prestes a Esgotar
     $sell_out_checked = isset($_GET['special_filter']) && in_array('likely_to_sell_out', (array)$_GET['special_filter']) ? 'checked' : '';
     $output .= '<label class="viator-special-option">';
     $output .= '<input type="checkbox" name="special_filter[]" value="likely_to_sell_out" ' . $sell_out_checked . '>';
-    $output .= '<span class="viator-special-text">Geralmente se esgota</span>';
+    $output .= '<span class="viator-special-text">' . esc_html(viator_t('likely_to_sell_out')) . '</span>';
     $output .= '</label>';
     
     // Opção: Fura-Fila
     $skip_line_checked = isset($_GET['special_filter']) && in_array('skip_the_line', (array)$_GET['special_filter']) ? 'checked' : '';
     $output .= '<label class="viator-special-option">';
     $output .= '<input type="checkbox" name="special_filter[]" value="skip_the_line" ' . $skip_line_checked . '>';
-    $output .= '<span class="viator-special-text">Evitar fila</span>';
+    $output .= '<span class="viator-special-text">' . esc_html(viator_t('skip_the_line')) . '</span>';
     $output .= '</label>';
     
     // Opção: Tour Privado
     $private_checked = isset($_GET['special_filter']) && in_array('private_tour', (array)$_GET['special_filter']) ? 'checked' : '';
     $output .= '<label class="viator-special-option">';
     $output .= '<input type="checkbox" name="special_filter[]" value="private_tour" ' . $private_checked . '>';
-    $output .= '<span class="viator-special-text">Tour Privado</span>';
+    $output .= '<span class="viator-special-text">' . esc_html(viator_t('private_tour')) . '</span>';
     $output .= '</label>';
     
     // Opção: Novo no Viator
     $new_checked = isset($_GET['special_filter']) && in_array('new_on_viator', (array)$_GET['special_filter']) ? 'checked' : '';
     $output .= '<label class="viator-special-option">';
     $output .= '<input type="checkbox" name="special_filter[]" value="new_on_viator" ' . $new_checked . '>';
-    $output .= '<span class="viator-special-text">Novidade na Viator</span>';
+    $output .= '<span class="viator-special-text">' . esc_html(viator_t('new_on_viator')) . '</span>';
     $output .= '</label>';
     
     $output .= '</div>'; // Fechando viator-specials-options
@@ -897,7 +969,7 @@ function viator_get_search_results($searchTerm) {
     
     // Botão de Limpar tudo
     $output .= '<div class="viator-clear-filters">';
-    $output .= '<button type="button" id="clear-all-filters" class="viator-clear-all-btn">Limpar tudo</button>';
+    $output .= '<button type="button" id="clear-all-filters" class="viator-clear-all-btn">' . esc_html(viator_t('clear_all')) . '</button>';
     $output .= '</div>';
 
     // Fechar a sidebar de filtros
@@ -907,26 +979,26 @@ function viator_get_search_results($searchTerm) {
     $output .= '<div class="viator-results-container">
                 <div class="viator-header">
                 <div class="viator-header-info">
-                <span class="viator-header-cancel"><img src="https://img.icons8.com/?size=100&id=82742&format=png&color=000000" alt="Ícone" width="15" height="15"> Cancelamento grátis até 24 horas antes do início da experiência (horário local)</span>
+                <span class="viator-header-cancel"><img src="https://img.icons8.com/?size=100&id=82742&format=png&color=000000" alt="Ícone" width="15" height="15"> ' . esc_html(viator_t('free_cancellation_note')) . '</span>
                 <div class="viator-header-info-filter">
                 <button class="viator-mobile-filter-button" id="mobile-filter-button">
                     <span class="filter-icon"><img width="25" height="25" src="https://img.icons8.com/ios-filled/50/sorting-options.png" alt="sorting-options"/></span>
-                    <span class="filter-text">Filtros</span>
+                    <span class="filter-text">' . esc_html(viator_t('filters')) . '</span>
                 </button>
-                <p class="viator-total">' . $formatted_total . ' resultados</p>
+                <p class="viator-total">' . $formatted_total . ' ' . esc_html(viator_t('results')) . '</p>
     </div>';
     
     // Select de ordenação
     $current_sort = isset($_GET['viator_sort']) ? $_GET['viator_sort'] : 'DEFAULT';
     $output .= '<div class="viator-sort">
         <select name="viator_sort" id="viator-sort" onchange="updateSort(this.value)">
-            <option value="DEFAULT"' . selected($current_sort, 'DEFAULT', false) . '>Em destaque</option>
-            <option value="REVIEW_AVG_RATING"' . selected($current_sort, 'REVIEW_AVG_RATING', false) . '>Melhor avaliados</option>
-            <option value="PRICE_ASC"' . selected($current_sort, 'PRICE_ASC', false) . '>Preço (menor para maior)</option>
-            <option value="PRICE_DESC"' . selected($current_sort, 'PRICE_DESC', false) . '>Preço (maior para menor)</option>
-            <option value="DURATION_ASC"' . selected($current_sort, 'DURATION_ASC', false) . '>Duração (crescente)</option>
-            <option value="DURATION_DESC"' . selected($current_sort, 'DURATION_DESC', false) . '>Duração (decrescente)</option>
-            <option value="DATE_ADDED_DESC"' . selected($current_sort, 'DATE_ADDED_DESC', false) . '>Novidade na Viator</option>
+            <option value="DEFAULT"' . selected($current_sort, 'DEFAULT', false) . '>' . esc_html(viator_t('featured')) . '</option>
+            <option value="REVIEW_AVG_RATING"' . selected($current_sort, 'REVIEW_AVG_RATING', false) . '>' . esc_html(viator_t('best_rated')) . '</option>
+            <option value="PRICE_ASC"' . selected($current_sort, 'PRICE_ASC', false) . '>' . esc_html(viator_t('price_low_to_high')) . '</option>
+            <option value="PRICE_DESC"' . selected($current_sort, 'PRICE_DESC', false) . '>' . esc_html(viator_t('price_high_to_low')) . '</option>
+            <option value="DURATION_ASC"' . selected($current_sort, 'DURATION_ASC', false) . '>' . esc_html(viator_t('duration_ascending')) . '</option>
+            <option value="DURATION_DESC"' . selected($current_sort, 'DURATION_DESC', false) . '>' . esc_html(viator_t('duration_descending')) . '</option>
+            <option value="DATE_ADDED_DESC"' . selected($current_sort, 'DATE_ADDED_DESC', false) . '>' . esc_html(viator_t('newest_on_viator')) . '</option>
         </select>
     </div>';
     $output .= '</div>';
@@ -972,7 +1044,7 @@ function viator_get_search_results($searchTerm) {
     // Output the curiosities div
     $output .= '<div class="viator-curiosities">
         <span><img src="https://img.icons8.com/?size=100&id=ulD4laUCmfyE&format=png&color=000000" alt="Ícone"> 
-        <strong>Você sabia?</strong> ' . esc_html($extract) . '</span>
+        <strong>' . esc_html(viator_t('did_you_know')) . '</strong> ' . esc_html($extract) . '</span>
     </div>';
 
     // Iniciar grid de cards
@@ -985,108 +1057,28 @@ function viator_get_search_results($searchTerm) {
         // Pegar os dados principais
         $title = esc_html($tour['title']);
         $description = esc_html($tour['description']);
-        $price = isset($tour['pricing']['summary']['fromPrice']) ? 'R$ ' . number_format($tour['pricing']['summary']['fromPrice'], 2, ',', '.') : 'Preço não disponível';
+        $price = isset($tour['pricing']['summary']['fromPrice']) ? $locale_settings['currency_symbol'] . ' ' . number_format($tour['pricing']['summary']['fromPrice'], 2, ',', '.') : viator_t('price_not_available');
     
         // Captura a média de avaliações
-        $rating = isset($tour['reviews']['combinedAverageRating']) ? number_format($tour['reviews']['combinedAverageRating'], 1) . '⭐' : 'Sem avaliações';
+        $rating = isset($tour['reviews']['combinedAverageRating']) ? number_format($tour['reviews']['combinedAverageRating'], 1) . '⭐' : viator_t('no_reviews');
     
         // Captura o total de avaliações e ajusta para singular/plural
         $total_reviews = isset($tour['reviews']['totalReviews']) ? $tour['reviews']['totalReviews'] : 0;
         if ($total_reviews == 0) {
             $rating_count = ''; // Não exibe nada se não houver avaliações
         } elseif ($total_reviews == 1) {
-            $rating_count = '(1 avaliação)';
+            $rating_count = '(1 ' . viator_t('review') . ')';
         } else {
-            $rating_count = '(' . $total_reviews . ' avaliações)';
+            $rating_count = '(' . $total_reviews . ' ' . viator_t('reviews') . ')';
         }
         
-        // Captura e formata a duração do passeio
+        // Captura e formata a duração do passeio usando a função de tradução
         $duration_fixed = isset($tour['duration']['fixedDurationInMinutes']) ? $tour['duration']['fixedDurationInMinutes'] : null;
         $duration_from = isset($tour['duration']['variableDurationFromMinutes']) ? $tour['duration']['variableDurationFromMinutes'] : null;
         $duration_to = isset($tour['duration']['variableDurationToMinutes']) ? $tour['duration']['variableDurationToMinutes'] : null;
         $unstructured_duration = isset($tour['duration']['unstructuredDuration']) ? $tour['duration']['unstructuredDuration'] : null;
 
-        if ($duration_fixed === 0) {
-            // Caso específico para duração flexível
-            $duration = 'Flexível';
-        } elseif ($unstructured_duration !== null) {
-            // Se tiver unstructuredDuration, define como 1 hora
-            $duration = '1 hora';
-        } elseif ($duration_fixed !== null) {
-            if ($duration_fixed >= 1440) { // 24 horas = 1440 minutos
-                $days = floor($duration_fixed / 1440); // Calcula os dias
-                $remaining_minutes = $duration_fixed % 1440; // Minutos restantes
-                $hours = floor($remaining_minutes / 60); // Horas restantes
-                
-                $duration = $days . ' dia' . ($days != 1 ? 's' : '');
-                if ($hours > 0) {
-                    $duration .= ' e ' . $hours . ' hora' . ($hours != 1 ? 's' : '');
-                }
-            } elseif ($duration_fixed < 60) {
-                $duration = $duration_fixed . ' minutos';
-            } else {
-                $hours = floor($duration_fixed / 60);
-                $minutes = $duration_fixed % 60;
-                $duration = $hours . ' hora' . ($hours != 1 ? 's' : '') . ($minutes > 0 ? ' e ' . $minutes . ' minuto' . ($minutes != 1 ? 's' : '') : '');
-            }
-        } elseif ($duration_from !== null && $duration_to !== null) {
-            // Duração variável
-            if ($duration_to >= 1440) {
-                $days_from = floor($duration_from / 1440);
-                $days_to = floor($duration_to / 1440);
-                
-                if ($days_from == $days_to) {
-                    $duration = $days_from . ' dia' . ($days_from != 1 ? 's' : '');
-                } else {
-                    $duration = 'De ' . $days_from . ' a ' . $days_to . ' dia' . ($days_to != 1 ? 's' : '');
-                }
-            } elseif ($duration_to < 60) {
-                // Ambos os valores em minutos - Formato simplificado
-                if ($duration_from < 60 && $duration_to < 60) {
-                    $duration = 'De ' . $duration_from . ' a ' . $duration_to . ' minuto' . ($duration_to != 1 ? 's' : '');
-                } else {
-                    $duration = 'De ' . $duration_from . ' minuto' . ($duration_from != 1 ? 's' : '') . 
-                               ' a ' . $duration_to . ' minuto' . ($duration_to != 1 ? 's' : '');
-                }
-            } else {
-                // Verifica se ambos os valores são múltiplos de 60 (sem minutos extras)
-                $is_from_multiple_of_60 = ($duration_from % 60 === 0);
-                $is_to_multiple_of_60 = ($duration_to % 60 === 0);
-
-                if ($is_from_multiple_of_60 && $is_to_multiple_of_60) {
-                    // Exibe de forma simplificada (ex: "De 1 a 2 horas")
-                    $hours_from = floor($duration_from / 60);
-                    $hours_to = floor($duration_to / 60);
-                    $duration = 'De ' . $hours_from . ' a ' . $hours_to . ' hora' . ($hours_to != 1 ? 's' : '');
-                } else {
-                    // Formata o valor inicial (duration_from)
-                    if ($duration_from < 60) {
-                        $duration_from_formatted = $duration_from . ' minuto' . ($duration_from != 1 ? 's' : '');
-                    } else {
-                        $hours_from = floor($duration_from / 60);
-                        $minutes_from = $duration_from % 60;
-                        $duration_from_formatted = $hours_from . ' hora' . ($hours_from != 1 ? 's' : '') . 
-                            ($minutes_from > 0 ? ' e ' . $minutes_from . ' minuto' . ($minutes_from != 1 ? 's' : '') : '');
-                    }
-
-                    // Formata o valor final (duration_to)
-                    if ($duration_to < 60) {
-                        $duration_to_formatted = $duration_to . ' minuto' . ($duration_to != 1 ? 's' : '');
-                    } else {
-                        $hours_to = floor($duration_to / 60);
-                        $minutes_to = $duration_to % 60;
-                        $duration_to_formatted = $hours_to . ' hora' . ($hours_to != 1 ? 's' : '') . 
-                            ($minutes_to > 0 ? ' e ' . $minutes_to . ' minuto' . ($minutes_to != 1 ? 's' : '') : '');
-                    }
-
-                    // Combina os valores formatados
-                    $duration = 'De ' . $duration_from_formatted . ' a ' . $duration_to_formatted;
-                }
-            }
-        } else {
-            // Duração não disponível
-            $duration = 'Duração não disponível';
-        }
+        $duration = viator_format_duration($duration_fixed, $duration_from, $duration_to, $unstructured_duration);
         
         $flags = isset($tour['flags']) ? $tour['flags'] : []; // Flags
         $url = esc_url($tour['productUrl']);
@@ -1094,10 +1086,10 @@ function viator_get_search_results($searchTerm) {
         // Processar flags
         $flag_output = '';
         if (in_array('LIKELY_TO_SELL_OUT', $flags)) {
-            $flag_output .= '<span class="viator-badge" data-type="sell-out">Geralmente se esgota</span>';
+            $flag_output .= '<span class="viator-badge" data-type="sell-out">' . esc_html(viator_t('likely_to_sell_out_badge')) . '</span>';
         }
         if (in_array('SPECIAL_OFFER', $flags)) {
-            $flag_output .= '<span class="viator-badge" data-type="special-offer">Oferta especial</span>';
+            $flag_output .= '<span class="viator-badge" data-type="special-offer">' . esc_html(viator_t('special_offer_badge')) . '</span>';
         }
     
         // Processar preços
@@ -1106,11 +1098,11 @@ function viator_get_search_results($searchTerm) {
             // Se for oferta especial e tiver preço com desconto
             $original_price = number_format($tour['pricing']['summary']['fromPriceBeforeDiscount'], 2, ',', '.');
             $discounted_price = number_format($tour['pricing']['summary']['fromPrice'], 2, ',', '.');
-            $price_html = '<span class="viator-original-price">R$ ' . $original_price . '</span> <span class="viator-discount-price">R$ ' . $discounted_price . '</span>';
+            $price_html = '<span class="viator-original-price">' . $locale_settings['currency_symbol'] . ' ' . $original_price . '</span> <span class="viator-discount-price">' . $locale_settings['currency_symbol'] . ' ' . $discounted_price . '</span>';
         } else {
             // Preço normal sem desconto
             $price = isset($tour['pricing']['summary']['fromPrice']) ? number_format($tour['pricing']['summary']['fromPrice'], 2, ',', '.') : '0,00';
-            $price_html = '<strong>R$ ' . $price . '</strong>';
+            $price_html = '<strong>' . $locale_settings['currency_symbol'] . ' ' . $price . '</strong>';
         }
     
         // Criar o card
@@ -1130,12 +1122,12 @@ function viator_get_search_results($searchTerm) {
                 <p>' . substr($description, 0, 120) . '...</p>';
 
         if (in_array('FREE_CANCELLATION', $flags)) {
-            $output .= '<p class="viator-card-duration"><img src="https://img.icons8.com/?size=100&id=85097&format=png&color=04846b" alt="Cancelamento gratuito" title="Política de cancelamento" width="15" height="15"> Cancelamento gratuito</p>';
+            $output .= '<p class="viator-card-duration"><img src="https://img.icons8.com/?size=100&id=85097&format=png&color=04846b" alt="Cancelamento gratuito" title="Política de cancelamento" width="15" height="15"> ' . esc_html(viator_t('free_cancellation_badge')) . '</p>';
         }
 
-        $output .= '<p class="viator-card-duration"><img src="https://img.icons8.com/?size=100&id=82767&format=png&color=000000" alt="Duração" title="Duração aproximada" width="15" height="15"> ' . $duration . '</p>
-                <p class="viator-card-price"><img src="https://img.icons8.com/?size=100&id=ZXJaNFNjWGZF&format=png&color=000000" alt="Preço" width="15" height="15"> a partir de ' . $price_html . '</p>                
-                <a href="' . esc_url(home_url('/passeio/' . $tour['productCode'] . '/')) . '" target="_blank" rel="noopener noreferrer">Ver detalhes</a>';
+        $output .= '<p class="viator-card-duration"><img src="https://img.icons8.com/?size=100&id=82767&format=png&color=000000" alt="Duração" title="Duração aproximada" width="15" height="15"> ' . esc_html($duration) . '</p>
+                <p class="viator-card-price"><img src="https://img.icons8.com/?size=100&id=ZXJaNFNjWGZF&format=png&color=000000" alt="Preço" width="15" height="15"> ' . esc_html(viator_t('from_price')) . ' ' . $price_html . '</p>                
+                <a href="' . esc_url(home_url('/passeio/' . $tour['productCode'] . '/')) . '" target="_blank" rel="noopener noreferrer">' . esc_html(viator_t('see_details')) . '</a>';
                 
                 // Armazenar informações de preço e duração para uso na página de detalhes do produto
                 $product_data = array(
@@ -1497,3 +1489,645 @@ function add_ionicons_script_attributes($tag, $handle, $src) {
     return $tag;
 }
 add_filter('script_loader_tag', 'add_ionicons_script_attributes', 10, 3);
+
+// Função para obter o símbolo da moeda
+function viator_get_currency_symbol($currency_code = null) {
+    if (!$currency_code) {
+        $currency_code = get_option('viator_currency', 'BRL');
+    }
+    
+    $currency_symbols = [
+        'BRL' => 'R$',
+        'USD' => '$',
+        'EUR' => '€'
+    ];
+    
+    return isset($currency_symbols[$currency_code]) ? $currency_symbols[$currency_code] : $currency_code;
+}
+
+// Função para obter configurações de idioma e moeda
+function viator_get_locale_settings() {
+    return [
+        'language' => get_option('viator_language', 'pt-BR'),
+        'currency' => get_option('viator_currency', 'BRL'),
+        'currency_symbol' => viator_get_currency_symbol()
+    ];
+}
+
+// Sistema de tradução completo
+function viator_get_translation($key, $language = null) {
+    if (!$language) {
+        $language = get_option('viator_language', 'pt-BR');
+    }
+    
+    $translations = [
+        'pt-BR' => [
+            // Formulário de busca
+            'search_placeholder' => '🌍 Aonde você quer ir?',
+            'search_button' => 'Pesquisar',
+            'search_nearby' => 'Nos arredores',
+            
+            // Filtros
+            'when_travel' => 'Quando você pretende viajar?',
+            'choose_date' => 'Escolher data',
+            'duration' => 'Duração',
+            'up_to_one_hour' => 'Até uma hora',
+            'one_to_four_hours' => '1 a 4 horas',
+            'four_hours_to_one_day' => '4 horas a 1 dia',
+            'one_to_three_days' => '1 a 3 dias',
+            'more_than_three_days' => 'Mais de três dias',
+            'price_range' => 'Faixa de Preço',
+            'rating' => 'Avaliação',
+            'specials' => 'Especiais',
+            'free_cancellation' => 'Cancelamento Gratuito',
+            'likely_to_sell_out' => 'Geralmente se esgota',
+            'skip_the_line' => 'Evitar fila',
+            'private_tour' => 'Tour Privado',
+            'new_on_viator' => 'Novidade na Viator',
+            'clear_all' => 'Limpar tudo',
+            'filters' => 'Filtros',
+            
+            // Ordenação
+            'featured' => 'Em destaque',
+            'best_rated' => 'Melhor avaliados',
+            'price_low_to_high' => 'Preço (menor para maior)',
+            'price_high_to_low' => 'Preço (maior para menor)',
+            'duration_ascending' => 'Duração (crescente)',
+            'duration_descending' => 'Duração (decrescente)',
+            'newest_on_viator' => 'Novidade na Viator',
+            
+            // Resultados
+            'results' => 'resultados',
+            'no_tours_found' => 'Nenhum passeio encontrado para',
+            'no_tours_found_filters' => 'Nenhum passeio encontrado com os filtros selecionados para',
+            'try_popular_destinations' => 'Que tal experimentar um destes destinos populares?',
+            'did_you_know' => 'Você sabia?',
+            'free_cancellation_note' => 'Cancelamento grátis até 24 horas antes do início da experiência (horário local)',
+            
+            // Cards de produto
+            'duration_approx' => 'Duração aproximada',
+            'from_price' => 'a partir de',
+            'see_details' => 'Ver detalhes',
+            'price_not_available' => 'Preço não disponível',
+            'no_reviews' => 'Sem avaliações',
+            'review' => 'avaliação',
+            'reviews' => 'avaliações',
+            'special_offer' => 'Oferta especial',
+            
+            // Badges
+            'free_cancellation_badge' => 'Cancelamento gratuito',
+            'likely_to_sell_out_badge' => 'Geralmente se esgota',
+            'special_offer_badge' => 'Oferta especial',
+            
+            // Duração
+            'duration_not_available' => 'Duração não disponível',
+            'flexible' => 'Flexível',
+            'minute' => 'minuto',
+            'minutes' => 'minutos',
+            'hour' => 'hora',
+            'hours' => 'horas',
+            'day' => 'dia',
+            'days' => 'dias',
+            'and' => 'e',
+            'from' => 'De',
+            'to' => 'a',
+            
+            // Página de produto
+            'home' => 'Home',
+            'product_code' => 'Código do passeio/serviço',
+            'description' => 'Descrição',
+            'included' => 'O que está incluído',
+            'not_included' => 'O que não está incluído',
+            'additional_info' => 'Informações Adicionais',
+            'cancellation_policy' => 'Política de Cancelamento',
+            'available_languages' => 'Idiomas Disponíveis',
+            'check_availability' => 'Verificar Disponibilidade',
+            'price_per_person' => '*Preço por pessoa',
+            'location' => 'Localização',
+            'timezone' => 'Fuso Horário',
+            'logistics_info' => 'Informações Logísticas',
+            'special_instructions' => 'Instruções Especiais',
+            'you_might_like' => 'Você pode gostar',
+            'tags' => 'Tags',
+            'consult_availability' => 'Consulte disponibilidade',
+            
+            // Avaliações
+            'reviews_title' => 'Avaliações',
+            'all_reviews' => 'Todas',
+            'stars' => 'estrelas',
+            'star' => 'estrela',
+            'most_recent' => 'Mais recentes',
+            'highest_rating' => 'Melhor avaliação',
+            'most_helpful' => 'Mais úteis',
+            'all_languages' => '(todos idiomas)',
+            'loading_reviews' => 'Carregando avaliações...',
+            
+            // Elementos adicionais da interface
+            'additional_info' => 'Informações Adicionais',
+            'tooltip_support' => 'Cite este código ao falar com o suporte ao cliente.',
+            'searching' => 'Buscando...',
+            'reset_button' => 'Redefinir',
+            'apply_button' => 'Aplicar',
+            'duration_approx_short' => '(aprox.)',
+            'date_connector' => 'de',
+            
+            // Meses abreviados
+            'jan_short' => 'Jan', 'feb_short' => 'Fev', 'mar_short' => 'Mar',
+            'apr_short' => 'Abr', 'may_short' => 'Mai', 'jun_short' => 'Jun',
+            'jul_short' => 'Jul', 'aug_short' => 'Ago', 'sep_short' => 'Set',
+            'oct_short' => 'Out', 'nov_short' => 'Nov', 'dec_short' => 'Dez',
+            
+            // Erros
+            'error_api_key' => 'Por favor, configure sua chave API da Viator nas configurações do WordPress.',
+            'error_try_again' => 'OPS! Aguarde um instante e tente novamente.',
+            'error_product_not_found' => 'Produto não encontrado ou indisponível.',
+            'error_fetch_details' => 'Erro ao buscar detalhes do produto. Por favor, tente novamente mais tarde.',
+            'product_code_not_provided' => 'Código do passeio/serviço não fornecido.',
+            
+            // Tipos de informações adicionais
+            'stroller_accessible' => 'Acessível para Carrinhos de Bebê',
+            'pets_welcome' => 'Animais de Serviço Permitidos',
+            'public_transportation_nearby' => 'Transporte Público Próximo',
+            'physical_easy' => 'Adequado para Todos os Níveis de Condicionamento Físico',
+            'physical_medium' => 'Nível Médio de Atividade Física',
+            'physical_moderate' => 'Nível Moderado de Atividade Física',
+            'physical_strenuous' => 'Nível Intenso de Atividade Física',
+            'wheelchair_accessible' => 'Acessível para Cadeirantes',
+            'surfaces_wheelchair_accessible' => 'Superfícies acessíveis para cadeira de rodas',
+            'transportation_wheelchair_accessible' => 'Transporte acessível para cadeira de rodas',
+            'infant_friendly' => 'Adequado para Bebês',
+            'infant_seats_available' => 'Assentos para Bebês Disponíveis',
+            'kid_friendly' => 'Adequado para Crianças',
+            'senior_friendly' => 'Adequado para Idosos',
+            'infants_must_sit_on_laps' => 'Crianças pequenas no colo',
+            'no_pregnant' => 'Não recomendado para grávidas',
+            'no_heart_problems' => 'Não recomendado para cardíacos',
+            'no_back_problems' => 'Não recomendado para problemas de coluna',
+            'health_other' => 'Saúde e outros',
+            'pickup_available' => 'Serviço de Transporte Disponível',
+            'shopping_opportunity' => 'Oportunidade de Compras',
+            'vegetarian_option' => 'Opção Vegetariana Disponível',
+            'skip_the_line_info' => 'Acesso Sem Fila',
+            'private_tour_info' => 'Tour Privado',
+            'group_tour' => 'Tour em Grupo',
+            'other_info' => 'Outros',
+            
+            // Tipos de serviços de idioma
+            'guide_service' => 'Guia Presencial',
+            'written_service' => 'Guia Escrito',
+            'audio_service' => 'Áudio Guia',
+            
+            // Avaliações - traduções para o JavaScript
+            'reviews_load_error' => 'No se pudieron cargar las reseñas.',
+            'reviews_load_error_generic' => 'Error al cargar reseñas.',
+            'try_again_later' => 'Inténtelo de nuevo más tarde.',
+            'no_reviews_found_rating' => 'No se encontraron reseñas para esta calificación.',
+            'no_more_reviews_page' => 'No hay más reseñas para mostrar en esta página.',
+            'anonymous_traveler' => 'Viajero Anónimo',
+        ],
+        'en-US' => [
+            // Search form
+            'search_placeholder' => '🌍 Where do you want to go?',
+            'search_button' => 'Search',
+            'search_nearby' => 'Nearby',
+            
+            // Filters
+            'when_travel' => 'When do you plan to travel?',
+            'choose_date' => 'Choose date',
+            'duration' => 'Duration',
+            'up_to_one_hour' => 'Up to 1 hour',
+            'one_to_four_hours' => '1 to 4 hours',
+            'four_hours_to_one_day' => '4 hours to 1 day',
+            'one_to_three_days' => '1 to 3 days',
+            'more_than_three_days' => 'More than 3 days',
+            'price_range' => 'Price Range',
+            'rating' => 'Rating',
+            'specials' => 'Specials',
+            'free_cancellation' => 'Free Cancellation',
+            'likely_to_sell_out' => 'Likely to Sell Out',
+            'skip_the_line' => 'Skip the Line',
+            'private_tour' => 'Private Tour',
+            'new_on_viator' => 'New on Viator',
+            'clear_all' => 'Clear all',
+            'filters' => 'Filters',
+            
+            // Sorting
+            'featured' => 'Featured',
+            'best_rated' => 'Best Rated',
+            'price_low_to_high' => 'Price (Low to High)',
+            'price_high_to_low' => 'Price (High to Low)',
+            'duration_ascending' => 'Duration (Ascending)',
+            'duration_descending' => 'Duration (Descending)',
+            'newest_on_viator' => 'New on Viator',
+            
+            // Results
+            'results' => 'results',
+            'no_tours_found' => 'No tours found for',
+            'no_tours_found_filters' => 'No tours found with selected filters for',
+            'try_popular_destinations' => 'How about trying one of these popular destinations?',
+            'did_you_know' => 'Did you know?',
+            'free_cancellation_note' => 'Free cancellation up to 24 hours before the experience starts (local time)',
+            
+            // Product cards
+            'duration_approx' => '(approx.)',
+            'from_price' => 'from',
+            'see_details' => 'See details',
+            'price_not_available' => 'Price not available',
+            'no_reviews' => 'No reviews',
+            'review' => 'review',
+            'reviews' => 'reviews',
+            'special_offer' => 'Special offer',
+            
+            // Badges
+            'free_cancellation_badge' => 'Free cancellation',
+            'likely_to_sell_out_badge' => 'Likely to sell out',
+            'special_offer_badge' => 'Special offer',
+            
+            // Duration
+            'duration_not_available' => 'Duration not available',
+            'flexible' => 'Flexible',
+            'minute' => 'minute',
+            'minutes' => 'minutes',
+            'hour' => 'hour',
+            'hours' => 'hours',
+            'day' => 'day',
+            'days' => 'days',
+            'and' => 'and',
+            'from' => 'From',
+            'to' => 'to',
+            'duration_approx' => 'Approximate duration',
+            
+            // Avaliações - traduções para o JavaScript
+            'reviews_load_error' => 'Failed to load reviews.',
+            'reviews_load_error_generic' => 'Error loading reviews.',
+            'try_again_later' => 'Please try again later.',
+            'no_reviews_found_rating' => 'No reviews found for this rating.',
+            'no_more_reviews_page' => 'No more reviews to display on this page.',
+            'anonymous_traveler' => 'Anonymous Traveler',
+            
+            // Product page
+            'home' => 'Home',
+            'product_code' => 'Tour/Service Code',
+            'description' => 'Description',
+            'included' => 'What\'s Included',
+            'not_included' => 'What\'s Not Included',
+            'additional_info' => 'Additional Information',
+            'cancellation_policy' => 'Cancellation Policy',
+            'available_languages' => 'Available Languages',
+            'check_availability' => 'Check Availability',
+            'price_per_person' => '*Price per person',
+            'location' => 'Location',
+            'timezone' => 'Timezone',
+            'logistics_info' => 'Logistics Information',
+            'special_instructions' => 'Special Instructions',
+            'you_might_like' => 'You might like',
+            'tags' => 'Tags',
+            'consult_availability' => 'Check availability',
+            
+            // Reviews
+            'reviews_title' => 'Reviews',
+            'all_reviews' => 'All',
+            'stars' => 'stars',
+            'star' => 'star',
+            'most_recent' => 'Most Recent',
+            'highest_rating' => 'Highest Rating',
+            'most_helpful' => 'Most Helpful',
+            'all_languages' => '(all languages)',
+            'loading_reviews' => 'Loading reviews...',
+            
+            // Additional interface elements
+            'additional_info' => 'Additional Information',
+            'tooltip_support' => 'Quote this code when contacting customer support.',
+            'searching' => 'Searching...',
+            'reset_button' => 'Reset',
+            'apply_button' => 'Apply',
+            'duration_approx_short' => '(approx.)',
+            'date_connector' => '', // Em inglês não usa conector
+            
+            // Meses abreviados
+            'jan_short' => 'Jan', 'feb_short' => 'Feb', 'mar_short' => 'Mar',
+            'apr_short' => 'Apr', 'may_short' => 'May', 'jun_short' => 'Jun',
+            'jul_short' => 'Jul', 'aug_short' => 'Aug', 'sep_short' => 'Sep',
+            'oct_short' => 'Oct', 'nov_short' => 'Nov', 'dec_short' => 'Dec',
+            
+            // Errors
+            'error_api_key' => 'Please configure your Viator API key in WordPress settings.',
+            'error_try_again' => 'OOPS! Please wait a moment and try again.',
+            'error_product_not_found' => 'Product not found or unavailable.',
+            'error_fetch_details' => 'Error fetching product details. Please try again later.',
+            'product_code_not_provided' => 'Tour/Service code not provided.',
+            
+            // Tipos de informações adicionais
+            'stroller_accessible' => 'Stroller Accessible',
+            'pets_welcome' => 'Pets Welcome',
+            'public_transportation_nearby' => 'Public Transportation Nearby',
+            'physical_easy' => 'Physically Easy',
+            'physical_medium' => 'Medium Physical Activity',
+            'physical_moderate' => 'Moderate Physical Activity',
+            'physical_strenuous' => 'Intense Physical Activity',
+            'wheelchair_accessible' => 'Wheelchair Accessible',
+            'surfaces_wheelchair_accessible' => 'Surfaces Wheelchair Accessible',
+            'transportation_wheelchair_accessible' => 'Transportation Wheelchair Accessible',
+            'infant_friendly' => 'Infant Friendly',
+            'infant_seats_available' => 'Infant Seats Available',
+            'kid_friendly' => 'Kid Friendly',
+            'senior_friendly' => 'Senior Friendly',
+            'infants_must_sit_on_laps' => 'Infants Must Sit on Laps',
+            'no_pregnant' => 'Not Recommended for Pregnant Women',
+            'no_heart_problems' => 'Not Recommended for Heart Patients',
+            'no_back_problems' => 'Not Recommended for Back Problems',
+            'health_other' => 'Health and Other',
+            'pickup_available' => 'Pickup Available',
+            'shopping_opportunity' => 'Shopping Opportunity',
+            'vegetarian_option' => 'Vegetarian Option',
+            'skip_the_line_info' => 'Skip the Line',
+            'private_tour_info' => 'Private Tour',
+            'group_tour' => 'Group Tour',
+            'other_info' => 'Other',
+            
+            // Tipos de serviços de idioma
+            'guide_service' => 'Guided Service',
+            'written_service' => 'Written Guide',
+            'audio_service' => 'Audio Guide',
+            
+            // Avaliações - traduções para o JavaScript
+            'reviews_load_error' => 'Failed to load reviews.',
+            'reviews_load_error_generic' => 'Error loading reviews.',
+            'try_again_later' => 'Please try again later.',
+            'no_reviews_found_rating' => 'No reviews found for this rating.',
+            'no_more_reviews_page' => 'No more reviews to display on this page.',
+            'anonymous_traveler' => 'Anonymous Traveler',
+        ],
+        'es-ES' => [
+            // Formulario de búsqueda
+            'search_placeholder' => '🌍 ¿Dónde quieres ir?',
+            'search_button' => 'Buscar',
+            'search_nearby' => 'Cerca',
+            
+            // Filtros
+            'when_travel' => '¿Cuándo planeas viajar?',
+            'choose_date' => 'Elegir fecha',
+            'duration' => 'Duración',
+            'up_to_one_hour' => 'Hasta 1 hora',
+            'one_to_four_hours' => '1 a 4 horas',
+            'four_hours_to_one_day' => '4 horas a 1 día',
+            'one_to_three_days' => '1 a 3 días',
+            'more_than_three_days' => 'Más de 3 días',
+            'price_range' => 'Rango de Precio',
+            'rating' => 'Calificación',
+            'specials' => 'Especiales',
+            'free_cancellation' => 'Cancelación Gratuita',
+            'likely_to_sell_out' => 'Probablemente se Agote',
+            'skip_the_line' => 'Evitar la Cola',
+            'private_tour' => 'Tour Privado',
+            'new_on_viator' => 'Nuevo en Viator',
+            'clear_all' => 'Limpiar todo',
+            'filters' => 'Filtros',
+            
+            // Ordenación
+            'featured' => 'Destacados',
+            'best_rated' => 'Mejor Calificados',
+            'price_low_to_high' => 'Precio (Menor a Mayor)',
+            'price_high_to_low' => 'Precio (Mayor a Menor)',
+            'duration_ascending' => 'Duración (Ascendente)',
+            'duration_descending' => 'Duración (Descendente)',
+            'newest_on_viator' => 'Nuevo en Viator',
+            
+            // Resultados
+            'results' => 'resultados',
+            'no_tours_found' => 'No se encontraron tours para',
+            'no_tours_found_filters' => 'No se encontraron tours con los filtros seleccionados para',
+            'try_popular_destinations' => '¿Qué tal probar uno de estos destinos populares?',
+            'did_you_know' => '¿Sabías que?',
+            'free_cancellation_note' => 'Cancelación gratuita hasta 24 horas antes del inicio de la experiencia (hora local)',
+            
+            // Tarjetas de producto
+            'duration_approx' => '(aprox.)',
+            'from_price' => 'desde',
+            'see_details' => 'Ver detalles',
+            'price_not_available' => 'Precio no disponible',
+            'no_reviews' => 'Sin reseñas',
+            'review' => 'reseña',
+            'reviews' => 'reseñas',
+            'special_offer' => 'Oferta especial',
+            
+            // Distintivos
+            'free_cancellation_badge' => 'Cancelación gratuita',
+            'likely_to_sell_out_badge' => 'Probablemente se agote',
+            'special_offer_badge' => 'Oferta especial',
+            
+            // Duración
+            'duration_not_available' => 'Duración no disponible',
+            'flexible' => 'Flexible',
+            'minute' => 'minuto',
+            'minutes' => 'minutos',
+            'hour' => 'hora',
+            'hours' => 'horas',
+            'day' => 'día',
+            'days' => 'días',
+            'and' => 'y',
+            'from' => 'De',
+            'to' => 'a',
+            'duration_approx' => 'Duración aproximada',
+            
+            // Avaliações - traduções para o JavaScript
+            'reviews_load_error' => 'Não foi possível carregar as avaliações.',
+            'reviews_load_error_generic' => 'Erro ao carregar avaliações.',
+            'try_again_later' => 'Tente novamente mais tarde.',
+            'no_reviews_found_rating' => 'Nenhuma avaliação encontrada para esta classificação.',
+            'no_more_reviews_page' => 'Não há mais avaliações para exibir nesta página.',
+            'anonymous_traveler' => 'Viajante anônimo',
+            
+            // Product page
+            'home' => 'Inicio',
+            'product_code' => 'Código del Tour/Servicio',
+            'description' => 'Descripción',
+            'included' => 'Qué está Incluido',
+            'not_included' => 'Qué no está Incluido',
+            'additional_info' => 'Información Adicional',
+            'cancellation_policy' => 'Política de Cancelación',
+            'available_languages' => 'Idiomas Disponibles',
+            'check_availability' => 'Verificar Disponibilidad',
+            'price_per_person' => '*Precio por persona',
+            'location' => 'Ubicación',
+            'timezone' => 'Zona Horaria',
+            'logistics_info' => 'Información Logística',
+            'special_instructions' => 'Instrucciones Especiales',
+            'you_might_like' => 'Te puede gustar',
+            'tags' => 'Etiquetas',
+            'consult_availability' => 'Consultar disponibilidad',
+            
+            // Reseñas
+            'reviews_title' => 'Reseñas',
+            'all_reviews' => 'Todas',
+            'stars' => 'estrellas',
+            'star' => 'estrella',
+            'most_recent' => 'Más Recientes',
+            'highest_rating' => 'Mejor Calificación',
+            'most_helpful' => 'Más Útiles',
+            'all_languages' => '(todos los idiomas)',
+            'loading_reviews' => 'Cargando reseñas...',
+            
+            // Elementos adicionales de la interfaz
+            'additional_info' => 'Información Adicional',
+            'tooltip_support' => 'Cite este código al contactar con el servicio de atención al cliente.',
+            'searching' => 'Buscando...',
+            'reset_button' => 'Restablecer',
+            'apply_button' => 'Aplicar',
+            'duration_approx_short' => '(aprox.)',
+            'date_connector' => 'de',
+            
+            // Meses abreviados
+            'jan_short' => 'Ene', 'feb_short' => 'Feb', 'mar_short' => 'Mar',
+            'apr_short' => 'Abr', 'may_short' => 'May', 'jun_short' => 'Jun',
+            'jul_short' => 'Jul', 'aug_short' => 'Ago', 'sep_short' => 'Sep',
+            'oct_short' => 'Oct', 'nov_short' => 'Nov', 'dec_short' => 'Dic',
+            
+            // Errores
+            'error_api_key' => 'Por favor, configure su clave API de Viator en la configuración de WordPress.',
+            'error_try_again' => '¡UPS! Espere un momento e intente nuevamente.',
+            'error_product_not_found' => 'Producto no encontrado o no disponible.',
+            'error_fetch_details' => 'Error al obtener detalles del producto. Por favor, inténtelo de nuevo más tarde.',
+            'product_code_not_provided' => 'Código del tour/servicio no proporcionado.',
+            
+            // Tipos de informações adicionais
+            'stroller_accessible' => 'Acessível para Carrinhos de Bebê',
+            'pets_welcome' => 'Animais de Serviço Permitidos',
+            'public_transportation_nearby' => 'Transporte Público Próximo',
+            'physical_easy' => 'Adequado para Todos os Níveis de Condicionamento Físico',
+            'physical_medium' => 'Nível Médio de Atividade Física',
+            'physical_moderate' => 'Nível Moderado de Atividade Física',
+            'physical_strenuous' => 'Nível Intenso de Atividade Física',
+            'wheelchair_accessible' => 'Acessível para Cadeirantes',
+            'surfaces_wheelchair_accessible' => 'Superfícies acessíveis para cadeira de rodas',
+            'transportation_wheelchair_accessible' => 'Transporte acessível para cadeira de rodas',
+            'infant_friendly' => 'Adequado para Bebês',
+            'infant_seats_available' => 'Assentos para Bebês Disponíveis',
+            'kid_friendly' => 'Adequado para Crianças',
+            'senior_friendly' => 'Adequado para Idosos',
+            'infants_must_sit_on_laps' => 'Crianças pequenas no colo',
+            'no_pregnant' => 'Não recomendado para grávidas',
+            'no_heart_problems' => 'Não recomendado para cardíacos',
+            'no_back_problems' => 'Não recomendado para problemas de coluna',
+            'health_other' => 'Saúde e outros',
+            'pickup_available' => 'Serviço de Transporte Disponível',
+            'shopping_opportunity' => 'Oportunidade de Compras',
+            'vegetarian_option' => 'Opção Vegetariana Disponível',
+            'skip_the_line_info' => 'Acesso Sem Fila',
+            'private_tour_info' => 'Tour Privado',
+            'group_tour' => 'Tour em Grupo',
+            'other_info' => 'Outros',
+            
+            // Tipos de serviços de idioma
+            'guide_service' => 'Guia Presencial',
+            'written_service' => 'Guia Escrito',
+            'audio_service' => 'Áudio Guia',
+            
+            // Avaliações - traduções para o JavaScript
+            'reviews_load_error' => 'Não foi possível carregar as avaliações.',
+            'reviews_load_error_generic' => 'Erro ao carregar avaliações.',
+            'try_again_later' => 'Tente novamente mais tarde.',
+            'no_reviews_found_rating' => 'Nenhuma avaliação encontrada para esta classificação.',
+            'no_more_reviews_page' => 'Não há mais avaliações para exibir nesta página.',
+            'anonymous_traveler' => 'Viajante anônimo',
+        ]
+    ];
+    
+    // Fallback para idiomas não suportados - usar inglês
+    if (!isset($translations[$language])) {
+        $language = 'en-US';
+    }
+    
+    return isset($translations[$language][$key]) ? $translations[$language][$key] : $key;
+}
+
+// Função auxiliar para obter traduções
+function viator_t($key, $language = null) {
+    return viator_get_translation($key, $language);
+}
+
+// Função para formatar duração com traduções
+function viator_format_duration($duration_fixed, $duration_from = null, $duration_to = null, $unstructured_duration = null) {
+    if ($duration_fixed === 0) {
+        return viator_t('flexible');
+    } elseif ($unstructured_duration !== null) {
+        return !empty($unstructured_duration) ? $unstructured_duration : '1 ' . viator_t('hour');
+    } elseif ($duration_fixed !== null) {
+        if ($duration_fixed >= 1440) { // 24 horas = 1440 minutos
+            $days = floor($duration_fixed / 1440);
+            $remaining_minutes = $duration_fixed % 1440;
+            $hours = floor($remaining_minutes / 60);
+            
+            $duration = $days . ' ' . ($days != 1 ? viator_t('days') : viator_t('day'));
+            if ($hours > 0) {
+                $duration .= ' ' . viator_t('and') . ' ' . $hours . ' ' . ($hours != 1 ? viator_t('hours') : viator_t('hour'));
+            }
+            return $duration;
+        } elseif ($duration_fixed < 60) {
+            return $duration_fixed . ' ' . viator_t('minutes');
+        } else {
+            $hours = floor($duration_fixed / 60);
+            $minutes = $duration_fixed % 60;
+            $duration = $hours . ' ' . ($hours != 1 ? viator_t('hours') : viator_t('hour'));
+            if ($minutes > 0) {
+                $duration .= ' ' . viator_t('and') . ' ' . $minutes . ' ' . ($minutes != 1 ? viator_t('minutes') : viator_t('minute'));
+            }
+            return $duration;
+        }
+    } elseif ($duration_from !== null && $duration_to !== null) {
+        // Duração variável
+        if ($duration_to >= 1440) {
+            $days_from = floor($duration_from / 1440);
+            $days_to = floor($duration_to / 1440);
+            
+            if ($days_from == $days_to) {
+                return $days_from . ' ' . ($days_from != 1 ? viator_t('days') : viator_t('day'));
+            } else {
+                return viator_t('from') . ' ' . $days_from . ' ' . viator_t('to') . ' ' . $days_to . ' ' . ($days_to != 1 ? viator_t('days') : viator_t('day'));
+            }
+        } elseif ($duration_to < 60) {
+            if ($duration_from < 60 && $duration_to < 60) {
+                return viator_t('from') . ' ' . $duration_from . ' ' . viator_t('to') . ' ' . $duration_to . ' ' . ($duration_to != 1 ? viator_t('minutes') : viator_t('minute'));
+            } else {
+                return viator_t('from') . ' ' . $duration_from . ' ' . ($duration_from != 1 ? viator_t('minutes') : viator_t('minute')) . 
+                       ' ' . viator_t('to') . ' ' . $duration_to . ' ' . ($duration_to != 1 ? viator_t('minutes') : viator_t('minute'));
+            }
+        } else {
+            $is_from_multiple_of_60 = ($duration_from % 60 === 0);
+            $is_to_multiple_of_60 = ($duration_to % 60 === 0);
+
+            if ($is_from_multiple_of_60 && $is_to_multiple_of_60) {
+                $hours_from = floor($duration_from / 60);
+                $hours_to = floor($duration_to / 60);
+                return viator_t('from') . ' ' . $hours_from . ' ' . viator_t('to') . ' ' . $hours_to . ' ' . ($hours_to != 1 ? viator_t('hours') : viator_t('hour'));
+            } else {
+                // Formatação complexa para horas e minutos
+                if ($duration_from < 60) {
+                    $duration_from_formatted = $duration_from . ' ' . ($duration_from != 1 ? viator_t('minutes') : viator_t('minute'));
+                } else {
+                    $hours_from = floor($duration_from / 60);
+                    $minutes_from = $duration_from % 60;
+                    $duration_from_formatted = $hours_from . ' ' . ($hours_from != 1 ? viator_t('hours') : viator_t('hour'));
+                    if ($minutes_from > 0) {
+                        $duration_from_formatted .= ' ' . viator_t('and') . ' ' . $minutes_from . ' ' . ($minutes_from != 1 ? viator_t('minutes') : viator_t('minute'));
+                    }
+                }
+
+                if ($duration_to < 60) {
+                    $duration_to_formatted = $duration_to . ' ' . ($duration_to != 1 ? viator_t('minutes') : viator_t('minute'));
+                } else {
+                    $hours_to = floor($duration_to / 60);
+                    $minutes_to = $duration_to % 60;
+                    $duration_to_formatted = $hours_to . ' ' . ($hours_to != 1 ? viator_t('hours') : viator_t('hour'));
+                    if ($minutes_to > 0) {
+                        $duration_to_formatted .= ' ' . viator_t('and') . ' ' . $minutes_to . ' ' . ($minutes_to != 1 ? viator_t('minutes') : viator_t('minute'));
+                    }
+                }
+
+                return viator_t('from') . ' ' . $duration_from_formatted . ' ' . viator_t('to') . ' ' . $duration_to_formatted;
+            }
+        }
+    } else {
+        return viator_t('duration_not_available');
+    }
+}

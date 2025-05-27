@@ -1093,7 +1093,7 @@
         }
 
         .viator-sort:before {
-            content: "Ordenar por:\00a0\00a0\00a0"; /* Usando caracteres Unicode para espaço não-quebrável */
+            content: "Ordenar por:\00a0\00a0\00a0"; /* Padrão em português */
             position: absolute;
             left: 12px;
             top: 50%;
@@ -1104,6 +1104,16 @@
             font-size: 15px;
             font-weight: 400;
             white-space: pre; /* Preserva os espaços */
+        }
+
+        /* Tradução para inglês */
+        body[data-viator-lang="en-US"] .viator-sort:before {
+            content: "Sort by:\00a0\00a0\00a0\00a0\00a0\00a0\00a0\00a0";
+        }
+
+        /* Tradução para espanhol */
+        body[data-viator-lang="es-ES"] .viator-sort:before {
+            content: "Ordenar por:\00a0\00a0\00a0";
         }
 
         .viator-sort select {

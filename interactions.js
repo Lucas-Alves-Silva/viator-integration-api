@@ -163,7 +163,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (currentErrorMessageElement) {
                 // Verifica se a mensagem de timeout específica está presente
                 if (currentErrorMessageElement.textContent.includes("OPS! Aguarde um instante e tente novamente.")) {
-                    currentErrorMessageElement.textContent = "Buscando novamente... Por favor, aguarde!";
+                    currentErrorMessageElement.textContent = (viatorConfig.translations.searching || 'Buscando...') + " Por favor, aguarde!";
                     currentErrorMessageElement.classList.add('searching'); // Adiciona classe para estilo de "buscando"
                 } else {
                     // Limpa qualquer outra mensagem de erro anterior se não for a de timeout
@@ -174,7 +174,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Update interface for search
             if (searchText) {
-                searchText.innerHTML = 'Pesquisando<div class="bouncy-loader"><span></span><span></span><span></span></div>';
+                searchText.innerHTML = (viatorConfig.translations.searching || 'Pesquisando') + '<div class="bouncy-loader"><span></span><span></span><span></span></div>';
             }
             if (searchIcon) {
                 searchIcon.innerHTML = '✈️';
@@ -398,17 +398,7 @@ document.addEventListener('DOMContentLoaded', function () {
             dateFormat: "Y-m-d",
             closeOnSelect: false,
             defaultDate: savedStartDate && savedEndDate ? [savedStartDate, savedEndDate] : null,
-            locale: {
-                firstDayOfWeek: 0,
-                weekdays: {
-                    shorthand: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
-                    longhand: ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
-                },
-                months: {
-                    shorthand: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
-                    longhand: ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
-                }
-            },
+            locale: viatorConfig.flatpickrLocale || 'default',
             onChange: function(selectedDates, dateStr) {
                 if (selectedDates.length === 2) {
                     const startDate = selectedDates[0];
@@ -420,8 +410,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     
                     const formatDate = (date) => {
                         const day = date.getDate();
-                        const month = fp.l10n.months.shorthand[date.getMonth()];
-                        return `${day} de ${month}`;
+                        const month = viatorConfig.translations.months_short[date.getMonth()];
+                        const connector = viatorConfig.translations.date_connector;
+                        
+                        if (connector) {
+                            return `${day} ${connector} ${month}`;
+                        } else {
+                            return `${month} ${day}`;
+                        }
                     };
                     
                     selectedDateRange = {
@@ -437,8 +433,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     
                     const formatDate = (date) => {
                         const day = date.getDate();
-                        const month = fp.l10n.months.shorthand[date.getMonth()];
-                        return `${day} de ${month}`;
+                        const month = viatorConfig.translations.months_short[date.getMonth()];
+                        const connector = viatorConfig.translations.date_connector;
+                        
+                        if (connector) {
+                            return `${day} ${connector} ${month}`;
+                        } else {
+                            return `${month} ${day}`;
+                        }
                     };
                     
                     selectedDateRange = {
@@ -456,12 +458,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 buttonsContainer.className = 'flatpickr-buttons';
                 
                 const resetButton = document.createElement('button');
-                resetButton.textContent = 'Redefinir';
+                resetButton.textContent = viatorConfig.translations.reset_button || 'Redefinir';
                 resetButton.className = 'flatpickr-button reset';
                 resetButton.type = 'button';
                 
                 const applyButton = document.createElement('button');
-                applyButton.textContent = 'Aplicar';
+                applyButton.textContent = viatorConfig.translations.apply_button || 'Aplicar';
                 applyButton.className = 'flatpickr-button apply';
                 applyButton.type = 'button';
                 
@@ -481,7 +483,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     fp.clear();
                     
                     // Atualizar UI para estado inicial
-                    dateSelector.querySelector('span').textContent = 'Escolher data';
+                    dateSelector.querySelector('span').textContent = viatorConfig.translations.choose_date || 'Escolher data';
                     
                     // Pegar os parâmetros atuais da URL
                     const url = new URL(window.location.href);
@@ -838,8 +840,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 
                 const formatDate = (date) => {
                     const day = date.getDate();
-                    const month = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][date.getMonth()];
-                    return `${day} de ${month}`;
+                    const month = viatorConfig.translations.months_short[date.getMonth()];
+                    const connector = viatorConfig.translations.date_connector;
+                    
+                    if (connector) {
+                        return `${day} ${connector} ${month}`;
+                    } else {
+                        return `${month} ${day}`;
+                    }
                 };
 
                 const displayText = savedStartDate === savedEndDate 
@@ -851,11 +859,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 console.log('DatePicker reinicializado com datas:', savedStartDate, savedEndDate);
             } catch (error) {
                 console.error('Erro ao processar datas salvas:', error);
-                dateSelector.querySelector('span').textContent = 'Escolher data';
+                dateSelector.querySelector('span').textContent = viatorConfig.translations.choose_date || 'Escolher data';
             }
         } else {
             // Resetar para o texto padrão se não houver datas salvas
-            dateSelector.querySelector('span').textContent = 'Escolher data';
+            dateSelector.querySelector('span').textContent = viatorConfig.translations.choose_date || 'Escolher data';
         }
 
         return initializeDatePicker();
@@ -1659,11 +1667,11 @@ function initializePriceSlider() {
                 const newMaxPrice = updatedParams.get('max_price') || '5000';
 
                 minPriceSlider.value = newMinPrice;
-                minPriceDisplay.textContent = `R$ ${newMinPrice}`;
+                minPriceDisplay.textContent = `${viatorConfig.currencySymbol} ${newMinPrice}`;
                 minPriceHidden.value = newMinPrice;
 
                 maxPriceSlider.value = newMaxPrice;
-                maxPriceDisplay.textContent = `R$ ${newMaxPrice}`;
+                maxPriceDisplay.textContent = `${viatorConfig.currencySymbol} ${newMaxPrice}`;
                 maxPriceHidden.value = newMaxPrice;
 
                 // Reinicializar componentes
@@ -1708,7 +1716,7 @@ function initializePriceSlider() {
             if (minValue < 0) minValue = 0;
             minPriceSlider.value = minValue;
         }
-        minPriceDisplay.textContent = `R$ ${minValue}`;
+        minPriceDisplay.textContent = `${viatorConfig.currencySymbol} ${minValue}`;
         minPriceHidden.value = minValue;
         triggerPriceFilterUpdate();
     });
@@ -1721,7 +1729,7 @@ function initializePriceSlider() {
             if (maxValue > 5000) maxValue = 5000;
             maxPriceSlider.value = maxValue;
         }
-        maxPriceDisplay.textContent = `R$ ${maxValue}`;
+        maxPriceDisplay.textContent = `${viatorConfig.currencySymbol} ${maxValue}`;
         maxPriceHidden.value = maxValue;
         triggerPriceFilterUpdate();
     });
@@ -1733,13 +1741,13 @@ function initializePriceSlider() {
 
     if (initialMinPrice !== null) {
         minPriceSlider.value = initialMinPrice;
-        minPriceDisplay.textContent = `R$ ${initialMinPrice}`;
+        minPriceDisplay.textContent = `${viatorConfig.currencySymbol} ${initialMinPrice}`;
         minPriceHidden.value = initialMinPrice;
     }
 
     if (initialMaxPrice !== null) {
         maxPriceSlider.value = initialMaxPrice;
-        maxPriceDisplay.textContent = `R$ ${initialMaxPrice}`;
+        maxPriceDisplay.textContent = `${viatorConfig.currencySymbol} ${initialMaxPrice}`;
         maxPriceHidden.value = initialMaxPrice;
     }
 }
@@ -2179,7 +2187,7 @@ function initializeClearAllButton() {
         }
         const dateSelector = document.querySelector('.viator-date-selector');
         if (dateSelector) {
-            dateSelector.querySelector('span').textContent = 'Escolher data';
+            dateSelector.querySelector('span').textContent = viatorConfig.translations.choose_date || 'Escolher data';
         }
         
         // 2. Resetar filtro de duração
@@ -2199,8 +2207,8 @@ function initializeClearAllButton() {
         if (minPriceSlider && maxPriceSlider) {
             minPriceSlider.value = 0;
             maxPriceSlider.value = 5000;
-            if (minPriceDisplay) minPriceDisplay.textContent = 'R$ 0';
-            if (maxPriceDisplay) maxPriceDisplay.textContent = 'R$ 5000';
+                    if (minPriceDisplay) minPriceDisplay.textContent = `${viatorConfig.currencySymbol} 0`;
+        if (maxPriceDisplay) maxPriceDisplay.textContent = `${viatorConfig.currencySymbol} 5000`;
             if (minPriceHidden) minPriceHidden.value = 0;
             if (maxPriceHidden) maxPriceHidden.value = 5000;
         }

@@ -37,12 +37,15 @@ function viator_modify_page_title($title, $sep = '|') {
                 $api_key = get_option('viator_api_key');
                 if (!empty($api_key)) {
                     $url = "https://api.sandbox.viator.com/partner/products/{$product_code}";
+                    // Obter configurações de idioma
+                    $locale_settings = viator_get_locale_settings();
+                    
                     $response = wp_remote_get($url, [
                         'headers' => [
                             'Accept'           => 'application/json;version=2.0',
                             'Content-Type'     => 'application/json;version=2.0',
                             'exp-api-key'      => $api_key,
-                            'Accept-Language'  => 'pt-BR',
+                            'Accept-Language'  => $locale_settings['language'],
                         ],
                         'timeout' => 10, // Timeout reduzido para não atrasar muito o carregamento da página
                     ]);
@@ -100,7 +103,7 @@ function viator_product_detail_shortcode($atts) {
     
     // If still no product code, show error message
     if (empty($atts['product_code'])) {
-        return '<div class="viator-error">Código do passeio/serviço não fornecido.</div>';
+        return '<div class="viator-error">' . esc_html(viator_t('product_code_not_provided')) . '</div>';
     }
     
     // Get product details
@@ -121,6 +124,9 @@ function get_product_recommendations($product_code) {
     if (empty($api_key)) {
         return [];
     }
+    
+    // Obter configurações de idioma
+    $locale_settings = viator_get_locale_settings();
 
     $url = "https://api.sandbox.viator.com/partner/products/recommendations";
     $body = [
@@ -137,7 +143,7 @@ function get_product_recommendations($product_code) {
             'Accept'           => 'application/json;version=2.0',
             'Content-Type'     => 'application/json;version=2.0',
             'exp-api-key'      => $api_key,
-            'Accept-Language'  => 'pt-BR',
+            'Accept-Language'  => $locale_settings['language'],
         ],
         'body'    => json_encode($body),
         'timeout' => 120,
@@ -183,7 +189,7 @@ function get_product_recommendations($product_code) {
                 'Accept'           => 'application/json;version=2.0',
                 'Content-Type'     => 'application/json;version=2.0',
                 'exp-api-key'      => $api_key,
-                'Accept-Language'  => 'pt-BR',
+                'Accept-Language'  => $locale_settings['language'],
             ],
             'timeout' => 30,
         ]);
@@ -421,8 +427,11 @@ function viator_get_product_details($product_code) {
     // Get API key from settings
     $api_key = get_option('viator_api_key');
     if (empty($api_key)) {
-        return '<p class="error">Por favor, configure sua chave API da Viator nas configurações do WordPress.</p>';
+        return '<p class="error">' . esc_html(viator_t('error_api_key')) . '</p>';
     }
+    
+    // Obter configurações de idioma e moeda
+    $locale_settings = viator_get_locale_settings();
     
     // API endpoint
     $url = "https://api.sandbox.viator.com/partner/products/{$product_code}";
@@ -433,14 +442,14 @@ function viator_get_product_details($product_code) {
             'Accept'           => 'application/json;version=2.0',
             'Content-Type'     => 'application/json;version=2.0',
             'exp-api-key'      => $api_key,
-            'Accept-Language'  => 'pt-BR',
+            'Accept-Language'  => $locale_settings['language'],
         ],
         'timeout' => 120,
     ]);
     
     // Check for errors
     if (is_wp_error($response)) {
-        return '<div class="viator-error">Erro ao buscar detalhes do produto. Por favor, tente novamente mais tarde.</div>';
+        return '<div class="viator-error">' . esc_html(viator_t('error_fetch_details')) . '</div>';
     }
     
     // Parse response
@@ -449,7 +458,7 @@ function viator_get_product_details($product_code) {
     
     // Check if product exists
     if (empty($product) || isset($product['error'])) {
-        return '<div class="viator-error">Produto não encontrado ou indisponível.</div>';
+        return '<div class="viator-error">' . esc_html(viator_t('error_product_not_found')) . '</div>';
     }
     
     // Get main product details
@@ -465,8 +474,8 @@ function viator_get_product_details($product_code) {
     
     // Try to get price from product API response first
     $has_price_data = isset($product['pricing']['summary']['fromPrice']);
-    $price = $has_price_data ? 'R$ ' . number_format($product['pricing']['summary']['fromPrice'], 2, ',', '.') : 'Preço não disponível';
-    $original_price = isset($product['pricing']['summary']['fromPriceBeforeDiscount']) ? 'R$ ' . number_format($product['pricing']['summary']['fromPriceBeforeDiscount'], 2, ',', '.') : '';
+    $price = $has_price_data ? $locale_settings['currency_symbol'] . ' ' . number_format($product['pricing']['summary']['fromPrice'], 2, ',', '.') : 'Preço não disponível';
+    $original_price = isset($product['pricing']['summary']['fromPriceBeforeDiscount']) ? $locale_settings['currency_symbol'] . ' ' . number_format($product['pricing']['summary']['fromPriceBeforeDiscount'], 2, ',', '.') : '';
     
     // Initialize flags variable
     $flags = isset($product['flags']) ? $product['flags'] : [];
@@ -475,11 +484,11 @@ function viator_get_product_details($product_code) {
     if (!$has_price_data || $price === 'Preço não disponível') {
         $stored_price_data = get_option('viator_product_' . $product_code . '_price');
         if ($stored_price_data && isset($stored_price_data['fromPrice'])) {
-            $price = 'R$ ' . number_format($stored_price_data['fromPrice'], 2, ',', '.');
+            $price = $locale_settings['currency_symbol'] . ' ' . number_format($stored_price_data['fromPrice'], 2, ',', '.');
             
             // If it's a special offer, also get the original price
             if (isset($stored_price_data['fromPriceBeforeDiscount']) && !empty($stored_price_data['fromPriceBeforeDiscount'])) {
-                $original_price = 'R$ ' . number_format($stored_price_data['fromPriceBeforeDiscount'], 2, ',', '.');
+                $original_price = $locale_settings['currency_symbol'] . ' ' . number_format($stored_price_data['fromPriceBeforeDiscount'], 2, ',', '.');
             }
             // Removida chave extra aqui
         }
@@ -749,7 +758,7 @@ function viator_get_product_details($product_code) {
         <!-- Breadcrumbs -->
         <div class="viator-breadcrumbs" style="display: flex; justify-content: space-between; align-items: center;">
             <div>
-                <a href="<?php echo esc_url(home_url()); ?>" target="_blank">Home</a> &gt; 
+                <a href="<?php echo esc_url(home_url()); ?>" target="_blank"><?php echo esc_html(viator_t('home')); ?></a> &gt; 
                 <?php if (!empty($destination)): ?>
                     <a href="<?php echo esc_url(add_query_arg('viator_query', urlencode($destination), home_url())); ?>" target="_blank">
                         <?php echo esc_html($destination); ?>
@@ -771,13 +780,13 @@ function viator_get_product_details($product_code) {
                         <!-- Flags/Badges fixos sobre a imagem principal -->
                         <div class="viator-badge-container">
                             <?php if ($has_free_cancellation): ?>
-                                <span class="viator-badge" data-type="free-cancellation">Cancelamento gratuito</span>
+                                <span class="viator-badge" data-type="free-cancellation"><?php echo esc_html(viator_t('free_cancellation_badge')); ?></span>
                             <?php endif; ?>
                             <?php if ($is_likely_to_sell_out): ?>
-                                <span class="viator-badge" data-type="sell-out">Geralmente se esgota</span>
+                                <span class="viator-badge" data-type="sell-out"><?php echo esc_html(viator_t('likely_to_sell_out_badge')); ?></span>
                             <?php endif; ?>
                             <?php if ($is_special_offer): ?>
-                                <span class="viator-badge" data-type="special-offer">Oferta especial</span>
+                                <span class="viator-badge" data-type="special-offer"><?php echo esc_html(viator_t('special_offer_badge')); ?></span>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -798,10 +807,10 @@ function viator_get_product_details($product_code) {
                 <div class="viator-product-header">
                     <!-- Código do produto -->
                     <span style="margin-bottom: 10px; display: inline-block;">
-                        Código do passeio/serviço: <span class="product-code-tooltip" style="position: relative; cursor: help; display: inline-block;">
+                        <?php echo esc_html(viator_t('product_code')); ?>: <span class="product-code-tooltip" style="position: relative; cursor: help; display: inline-block;">
                             <strong><?php echo esc_html($product_code); ?></strong>
                             <span class="tooltip-text">
-                            Cite este código ao falar com o suporte ao cliente.
+                            <?php echo esc_html(viator_t('tooltip_support')); ?>
                             </span>
                         </span>
                     </span>
@@ -826,9 +835,9 @@ function viator_get_product_details($product_code) {
                         </span>
                         <?php if ($rating > 0): ?>
                             <span class="viator-rating-number"><?php echo number_format($rating, 1); ?></span>
-                            <a href="#viator-reviews" class="viator-review-count">(<?php echo $review_count; ?> <?php echo $review_count == 1 ? 'avaliação' : 'avaliações'; ?>)</a>
+                            <a href="#viator-reviews" class="viator-review-count">(<?php echo $review_count; ?> <?php echo $review_count == 1 ? viator_t('review') : viator_t('reviews'); ?>)</a>
                         <?php else: ?>
-                            <span class="viator-review-count">Sem avaliações</span>
+                            <span class="viator-review-count"><?php echo esc_html(viator_t('no_reviews')); ?></span>
                         <?php endif; ?>
                     </div>
     
@@ -840,45 +849,45 @@ function viator_get_product_details($product_code) {
                             <div class="viator-product-original-price"><?php echo esc_html($original_price); ?></div>
                         <?php endif; ?>
                         <div class="viator-product-price"><?php echo esc_html($price); ?></div>
-                        <div class="viator-product-price-note">*Preço por pessoa</div>
+                        <div class="viator-product-price-note"><?php echo esc_html(viator_t('price_per_person')); ?></div>
                     </div>
                 </div>
     
                 <!-- Quick Info -->
                 <div class="viator-quick-info">
                     <div class="viator-info-item">
-                        <span class="viator-info-label">Duração:</span>
-                        <span class="viator-info-value"><?php echo esc_html($duration); ?> (aprox.)</span>
+                        <span class="viator-info-label"><?php echo esc_html(viator_t('duration')); ?>:</span>
+                        <span class="viator-info-value"><?php echo esc_html($duration); ?></span>
                     </div>
                     <?php if (!empty($timezone)): ?>
                         <div class="viator-info-item">
-                            <span class="viator-info-label">Fuso Horário:</span>
+                            <span class="viator-info-label"><?php echo esc_html(viator_t('timezone')); ?>:</span>
                             <span class="viator-info-value"><?php echo esc_html($timezone); ?></span>
                         </div>
                     <?php endif; ?>
                     <?php if (!empty($destination)): ?>
                         <div class="viator-info-item">
-                            <span class="viator-info-label">Localização:</span>
+                            <span class="viator-info-label"><?php echo esc_html(viator_t('location')); ?>:</span>
                             <span class="viator-info-value"><?php echo esc_html($destination); ?></span>
                         </div>
                     <?php endif; ?>
                 </div>
                 
                 <!-- Botão de Verificar Disponibilidade -->
-                <button class="button-check-availability">Verificar Disponibilidade</button>
+                <button class="button-check-availability"><?php echo esc_html(viator_t('check_availability')); ?></button>
             </div>
         </div>
     
         <!-- Product Description -->
         <div class="viator-product-description">
-            <h2>Descrição</h2>
+            <h2><?php echo esc_html(viator_t('description')); ?></h2>
             <?php echo wpautop($description); ?>
         </div>
     
         <!-- Logistics and Special Instructions -->
         <?php if (!empty($logistics) || !empty($special_instructions)): ?>
             <div class="viator-logistics-section">
-                <h2>Informações Logísticas</h2>
+                <h2><?php echo esc_html(viator_t('logistics_info')); ?></h2>
                 <?php if (!empty($logistics)): ?>
                     <div class="viator-logistics">
                         <?php foreach ($logistics as $logistic): ?>
@@ -925,7 +934,7 @@ function viator_get_product_details($product_code) {
                 <?php endif; ?>
                 <?php if (!empty($special_instructions)): ?>
                     <div class="viator-special-instructions">
-                        <h3>Instruções Especiais</h3>
+                        <h3><?php echo esc_html(viator_t('special_instructions')); ?></h3>
                         <?php foreach ($special_instructions as $instruction): ?>
                             <div class="viator-instruction-item">
                                 <?php 
@@ -954,7 +963,7 @@ function viator_get_product_details($product_code) {
         <div class="viator-inclusions-exclusions">
             <?php if (!empty($inclusions)): ?>
                 <div class="viator-inclusions">
-                    <h2>O que está incluído</h2>
+                    <h2><?php echo esc_html(viator_t('included')); ?></h2>
                     <ul>
                         <?php foreach ($inclusions as $inclusion): ?>
                             <?php if (is_array($inclusion) && (isset($inclusion['otherDescription']) || isset($inclusion['description']))): ?>
@@ -1006,7 +1015,7 @@ function viator_get_product_details($product_code) {
             <?php endif; ?>
             <?php if (!empty($exclusions)): ?>
                 <div class="viator-exclusions">
-                    <h2>O que não está incluído</h2>
+                    <h2><?php echo esc_html(viator_t('not_included')); ?></h2>
                     <ul>
                         <?php foreach ($exclusions as $exclusion): ?>
                             <?php if (is_array($exclusion) && (isset($exclusion['otherDescription']) || isset($exclusion['description']))): ?>
@@ -1056,7 +1065,7 @@ function viator_get_product_details($product_code) {
         <!-- Additional Info -->
         <?php if (!empty($additional_info)): ?>
             <div class="viator-additional-info-section">
-                <h2>Informações Adicionais</h2>
+                <h2><?php echo esc_html(viator_t('additional_info')); ?></h2>
                 <div class="viator-additional-info">
                     <?php 
                     // Agrupar informações adicionais por tipo
@@ -1115,36 +1124,39 @@ function viator_get_product_details($product_code) {
                                 <div class="viator-info-content">
                                     <div class="viator-info-type">
                                         <?php 
-                                        // Traduzir os tipos de informações adicionais para português
-                                        $info_types_pt = [
-                                            'STROLLER_ACCESSIBLE' => 'Acessível para Carrinhos de Bebê',
-                                            'PETS_WELCOME' => 'Animais de Serviço Permitidos',
-                                            'PUBLIC_TRANSPORTATION_NEARBY' => 'Transporte Público Próximo',
-                                            'PHYSICAL_EASY' => 'Adequado para Todos os Níveis de Condicionamento Físico',
-                                            'PHYSICAL_MEDIUM' => 'Nível Médio de Atividade Física',
-                                            'PHYSICAL_MODERATE' => 'Nível Moderado de Atividade Física',
-                                            'PHYSICAL_STRENUOUS' => 'Nível Intenso de Atividade Física',
-                                            'WHEELCHAIR_ACCESSIBLE' => 'Acessível para Cadeirantes',
-                                            'SURFACES_WHEELCHAIR_ACCESSIBLE' => 'Superfícies acessíveis para cadeira de rodas',
-                                            'TRANSPORTATION_WHEELCHAIR_ACCESSIBLE' => 'Transporte acessível para cadeira de rodas',
-                                            'INFANT_FRIENDLY' => 'Adequado para Bebês',
-                                            'INFANT_SEATS_AVAILABLE' => 'Assentos para Bebês Disponíveis',
-                                            'KID_FRIENDLY' => 'Adequado para Crianças',
-                                            'SENIOR_FRIENDLY' => 'Adequado para Idosos',
-                                            'INFANTS_MUST_SIT_ON_LAPS' => 'Crianças pequenas no colo',
-                                            'NO_PREGNANT' => 'Não grávidas',
-                                            'NO_HEART_PROBLEMS' => 'Não Cardíacos',
-                                            'NO_BACK_PROBLEMS' => 'Problemas de Coluna',
-                                            'HEALTH_OTHER' => 'Saúde e outros',
-                                            'PICKUP_AVAILABLE' => 'Serviço de Transporte Disponível',
-                                            'SHOPPING_OPPORTUNITY' => 'Oportunidade de Compras',
-                                            'VEGETARIAN_OPTION' => 'Opção Vegetariana Disponível',
-                                            'SKIP_THE_LINE' => 'Acesso Sem Fila',
-                                            'PRIVATE_TOUR' => 'Tour Privado',
-                                            'GROUP_TOUR' => 'Tour em Grupo',
-                                            'OTHER' => 'Outros'
+                                        // Mapear os tipos de informações adicionais para as chaves de tradução
+                                        $info_type_mapping = [
+                                            'STROLLER_ACCESSIBLE' => 'stroller_accessible',
+                                            'PETS_WELCOME' => 'pets_welcome', 
+                                            'PUBLIC_TRANSPORTATION_NEARBY' => 'public_transportation_nearby',
+                                            'PHYSICAL_EASY' => 'physical_easy',
+                                            'PHYSICAL_MEDIUM' => 'physical_medium',
+                                            'PHYSICAL_MODERATE' => 'physical_moderate',
+                                            'PHYSICAL_STRENUOUS' => 'physical_strenuous',
+                                            'WHEELCHAIR_ACCESSIBLE' => 'wheelchair_accessible',
+                                            'SURFACES_WHEELCHAIR_ACCESSIBLE' => 'surfaces_wheelchair_accessible',
+                                            'TRANSPORTATION_WHEELCHAIR_ACCESSIBLE' => 'transportation_wheelchair_accessible',
+                                            'INFANT_FRIENDLY' => 'infant_friendly',
+                                            'INFANT_SEATS_AVAILABLE' => 'infant_seats_available',
+                                            'KID_FRIENDLY' => 'kid_friendly',
+                                            'SENIOR_FRIENDLY' => 'senior_friendly',
+                                            'INFANTS_MUST_SIT_ON_LAPS' => 'infants_must_sit_on_laps',
+                                            'NO_PREGNANT' => 'no_pregnant',
+                                            'NO_HEART_PROBLEMS' => 'no_heart_problems',
+                                            'NO_BACK_PROBLEMS' => 'no_back_problems',
+                                            'HEALTH_OTHER' => 'health_other',
+                                            'PICKUP_AVAILABLE' => 'pickup_available',
+                                            'SHOPPING_OPPORTUNITY' => 'shopping_opportunity',
+                                            'VEGETARIAN_OPTION' => 'vegetarian_option',
+                                            'SKIP_THE_LINE' => 'skip_the_line_info',
+                                            'PRIVATE_TOUR' => 'private_tour_info',
+                                            'GROUP_TOUR' => 'group_tour',
+                                            'OTHER' => 'other_info'
                                         ];
-                                        echo esc_html(isset($info_types_pt[$info_type]) ? $info_types_pt[$info_type] : $info_type);
+                                        
+                                        // Usar tradução dinâmica baseada no idioma configurado
+                                        $translation_key = isset($info_type_mapping[$info_type]) ? $info_type_mapping[$info_type] : 'other_info';
+                                        echo esc_html(viator_t($translation_key));
                                         ?>
                                     </div>
                                     <div class="viator-info-description">
@@ -1178,7 +1190,7 @@ function viator_get_product_details($product_code) {
         <!-- Cancellation Policy -->
         <?php if (!empty($cancellation_policy)): ?>
             <div class="viator-cancellation-section">
-                <h2>Política de Cancelamento</h2>
+                <h2><?php echo esc_html(viator_t('cancellation_policy')); ?></h2>
                 <?php 
                 // Verifica se a política de cancelamento está no formato esperado com type e description
                 if (isset($cancellation_policy['description'])) {
@@ -1213,7 +1225,7 @@ function viator_get_product_details($product_code) {
         <!-- Language Guides -->
         <?php if (!empty($language_guides)): ?>
             <div class="viator-language-guides">
-                <h2>Idiomas Disponíveis</h2>
+                <h2><?php echo esc_html(viator_t('available_languages')); ?></h2>
                 <ul>
                     <?php foreach ($language_guides as $language): ?>
                         <li>
@@ -1232,17 +1244,17 @@ function viator_get_product_details($product_code) {
                             // Check for GUIDE format
                             if (preg_match('/GUIDE\s+(\w+)\s+\w+\/SERVICE_GUIDE/i', $language, $matches)) {
                                 $language_code = strtolower($matches[1]);
-                                $service_type = 'Guia Presencial';
+                                $service_type = viator_t('guide_service');
                             }
                             // Check for WRITTEN format
                             elseif (preg_match('/WRITTEN\s+(\w+)\s+\w+\/SERVICE_WRITTEN/i', $language, $matches)) {
                                 $language_code = strtolower($matches[1]);
-                                $service_type = 'Guia Escrito';
+                                $service_type = viator_t('written_service');
                             }
                             // Check for AUDIO format
                             elseif (preg_match('/AUDIO\s+(\w+)\s+\w+\/SERVICE_AUDIO/i', $language, $matches)) {
                                 $language_code = strtolower($matches[1]);
-                                $service_type = 'Áudio Guia';
+                                $service_type = viator_t('audio_service');
                             }
                             // Default fallback for other formats
                             else {
@@ -1251,11 +1263,11 @@ function viator_get_product_details($product_code) {
                                 
                                 // Try to determine service type from the string
                                 if (stripos($language, 'GUIDE') !== false) {
-                                    $service_type = 'Guia Presencial';
+                                    $service_type = viator_t('guide_service');
                                 } elseif (stripos($language, 'WRITTEN') !== false) {
-                                    $service_type = 'Guia Escrito';
+                                    $service_type = viator_t('written_service');
                                 } else {
-                                    $service_type = 'Áudio Guia';
+                                    $service_type = viator_t('audio_service');
                                 }
                             }
                             $language_names = [
@@ -1300,7 +1312,7 @@ function viator_get_product_details($product_code) {
     
         <!-- Reviews Section -->
         <div id="viator-reviews" class="viator-reviews">
-            <h2>Avaliações <span class="review-count">(<?php echo esc_html($review_count); ?> avaliações)</span></h2>
+            <h2><?php echo esc_html(viator_t('reviews_title')); ?> <span class="review-count">(<?php echo esc_html($review_count); ?> <?php echo $review_count == 1 ? viator_t('review') : viator_t('reviews'); ?>)</span></h2>
             
             <div class="viator-reviews-summary">
                 <div class="viator-reviews-rating"><?php echo esc_html($rating); ?></div>
@@ -1331,27 +1343,27 @@ function viator_get_product_details($product_code) {
             
             <div class="viator-reviews-filter">
                 <div class="viator-filter-ratings">
-                    <button class="active" data-rating="all">Todas</button>
-                    <button data-rating="5">5 estrelas</button>
-                    <button data-rating="4">4 estrelas</button>
-                    <button data-rating="3">3 estrelas</button>
-                    <button data-rating="2">2 estrelas</button>
-                    <button data-rating="1">1 estrela</button>
+                    <button class="active" data-rating="all"><?php echo esc_html(viator_t('all_reviews')); ?></button>
+                    <button data-rating="5">5 <?php echo esc_html(viator_t('stars')); ?></button>
+                    <button data-rating="4">4 <?php echo esc_html(viator_t('stars')); ?></button>
+                    <button data-rating="3">3 <?php echo esc_html(viator_t('stars')); ?></button>
+                    <button data-rating="2">2 <?php echo esc_html(viator_t('stars')); ?></button>
+                    <button data-rating="1">1 <?php echo esc_html(viator_t('star')); ?></button>
                 </div>
                 <div class="viator-filter-sort">
                     <select id="viator-sort-reviews">
-                        <option value="MOST_RECENT_PER_LOCALE">Mais recentes</option>
-                        <option value="HIGHEST_RATING_PER_LOCALE">Melhor avaliação</option>
-                        <option value="MOST_HELPFUL_PER_LOCALE">Mais úteis</option>
-                        <option value="MOST_RECENT">Mais recentes (todos idiomas)</option>
-                        <option value="HIGHEST_RATING">Melhor avaliação (todos idiomas)</option>
-                        <option value="MOST_HELPFUL">Mais úteis (todos idiomas)</option>
+                        <option value="MOST_RECENT_PER_LOCALE"><?php echo esc_html(viator_t('most_recent')); ?></option>
+                        <option value="HIGHEST_RATING_PER_LOCALE"><?php echo esc_html(viator_t('highest_rating')); ?></option>
+                        <option value="MOST_HELPFUL_PER_LOCALE"><?php echo esc_html(viator_t('most_helpful')); ?></option>
+                        <option value="MOST_RECENT"><?php echo esc_html(viator_t('most_recent')); ?> <?php echo esc_html(viator_t('all_languages')); ?></option>
+                        <option value="HIGHEST_RATING"><?php echo esc_html(viator_t('highest_rating')); ?> <?php echo esc_html(viator_t('all_languages')); ?></option>
+                        <option value="MOST_HELPFUL"><?php echo esc_html(viator_t('most_helpful')); ?> <?php echo esc_html(viator_t('all_languages')); ?></option>
                     </select>
                 </div>
             </div>
             
             <div class="viator-reviews-list" data-product-code="<?php echo esc_attr($product_code); ?>">
-                <div class="viator-reviews-loading">Carregando avaliações...</div>
+                <div class="viator-reviews-loading"><?php echo esc_html(viator_t('loading_reviews')); ?></div>
             </div>
             
             <div class="viator-reviews-pagination"></div>
@@ -1371,7 +1383,7 @@ function viator_get_product_details($product_code) {
                         'Accept'           => 'application/json;version=2.0',
                         'Content-Type'     => 'application/json;version=2.0',
                         'exp-api-key'      => $api_key,
-                        'Accept-Language'  => 'pt-BR',
+                        'Accept-Language'  => $locale_settings['language'],
                     ],
                     'timeout' => 10,
                 ]);
@@ -1452,7 +1464,7 @@ function viator_get_product_details($product_code) {
                                     'Accept'           => 'application/json;version=2.0',
                                     'Content-Type'     => 'application/json;version=2.0',
                                     'exp-api-key'      => $api_key,
-                                    'Accept-Language'  => 'pt-BR',
+                                    'Accept-Language'  => $locale_settings['language'],
                                 ],
                                 'body'    => json_encode($availability_body),
                                 'timeout' => 10,
@@ -1499,7 +1511,7 @@ function viator_get_product_details($product_code) {
                                 "searchTypes" => [
                                     ["searchType" => "PRODUCTS", "pagination" => ["start" => 1, "count" => 1]],
                                 ],
-                                "currency" => "BRL"
+                                "currency" => $locale_settings['currency']
                             ];
                             
                             $search_response = wp_remote_post($search_url, [
@@ -1507,7 +1519,7 @@ function viator_get_product_details($product_code) {
                                     'Accept'           => 'application/json;version=2.0',
                                     'Content-Type'     => 'application/json;version=2.0',
                                     'exp-api-key'      => $api_key,
-                                    'Accept-Language'  => 'pt-BR',
+                                    'Accept-Language'  => $locale_settings['language'],
                                 ],
                                 'body'    => json_encode($search_body),
                                 'timeout' => 10,
@@ -1590,7 +1602,7 @@ function viator_get_product_details($product_code) {
             if (!empty($recommended_items)):
             ?>
             <div class="viator-recommendations">
-                <h2>Você pode gostar</h2>
+                <h2><?php echo esc_html(viator_t('you_might_like')); ?></h2>
                 <div class="swiper-container viator-recommendations-slider">
                     <div class="swiper-button-prev"></div>
                     <div class="swiper-button-next"></div>
@@ -1608,10 +1620,10 @@ function viator_get_product_details($product_code) {
                                                     // A flag SPECIAL_OFFER já está sendo exibida de outra forma
                                                     if (isset($item['flags']) && is_array($item['flags'])) {
                                                         if (in_array('LIKELY_TO_SELL_OUT', $item['flags'])) {
-                                                            echo '<span class="viator-badge" data-type="sell-out">Geralmente se esgota</span>';
+                                                            echo '<span class="viator-badge" data-type="sell-out">' . esc_html(viator_t('likely_to_sell_out_badge')) . '</span>';
                                                         }
                                                         if (in_array('FREE_CANCELLATION', $item['flags'])) {
-                                                            echo '<span class="viator-badge" data-type="free-cancellation">Cancelamento gratuito</span>';
+                                                            echo '<span class="viator-badge" data-type="free-cancellation">' . esc_html(viator_t('free_cancellation_badge')) . '</span>';
                                                         }
                                                     }
                                                     ?>
@@ -1621,9 +1633,9 @@ function viator_get_product_details($product_code) {
                                         <div class="viator-recommendation-content">
                                             <h3 class="viator-recommendation-title"><?php echo esc_html($item['title']); ?></h3>
                                             <?php if (!empty($item['formatted_duration'])): ?>
-                                            <div class="viator-recommendation-duration">
-                                            <img loading="lazy" decoding="async" src="https://img.icons8.com/?size=100&amp;id=82767&amp;format=png&amp;color=000000" alt="Duração" title="Duração aproximada" width="15" height="15"> <?php echo esc_html($item['formatted_duration']); ?> <span>(aprox.)</span>
-                                            </div>
+                                                                        <div class="viator-recommendation-duration">
+                            <img loading="lazy" decoding="async" src="https://img.icons8.com/?size=100&amp;id=82767&amp;format=png&amp;color=000000" alt="<?php echo esc_attr(viator_t('duration')); ?>" title="<?php echo esc_attr(viator_t('duration_approx')); ?>" width="15" height="15"> <?php echo esc_html($item['formatted_duration']); ?> <span><?php echo esc_html(viator_t('duration_approx_short')); ?></span>
+                            </div>
                                             <?php endif; ?>
                                             <div class="viator-recommendation-rating">
                                                 <div class="viator-stars">
@@ -1644,18 +1656,18 @@ function viator_get_product_details($product_code) {
                                                     ?>
                                                 </div>
                                                 <span class="viator-recommendation-review-count">
-                                                    <?php echo $item['reviews']; ?> <?php echo $item['reviews'] == 1 ? 'avaliação' : 'avaliações'; ?>
+                                                    <?php echo $item['reviews']; ?> <?php echo $item['reviews'] == 1 ? viator_t('review') : viator_t('reviews'); ?>
                                                 </span>
                                             </div>
                                             <div class="viator-recommendation-price">
                                                 <?php if (isset($item['price']) && $item['price'] !== null): ?>
                                                     <?php if ($item['is_special_offer']): ?>
-                                                        <span class="viator-recommendation-original-price">R$ <?php echo number_format($item['original_price'], 2, ',', '.'); ?></span>
-                                                        <span class="viator-recommendation-special-offer">Oferta Especial</span><br>
+                                                        <span class="viator-recommendation-original-price"><?php echo $locale_settings['currency_symbol']; ?> <?php echo number_format($item['original_price'], 2, ',', '.'); ?></span>
+                                                        <span class="viator-recommendation-special-offer"><?php echo esc_html(viator_t('special_offer')); ?></span><br>
                                                     <?php endif; ?>
-                                                    <strong>A partir de R$ <?php echo number_format($item['price'], 2, ',', '.'); ?></strong>
+                                                    <strong><?php echo esc_html(viator_t('from_price')); ?> <?php echo $locale_settings['currency_symbol']; ?> <?php echo number_format($item['price'], 2, ',', '.'); ?></strong>
                                                 <?php else: ?>
-                                                    <strong>Consulte disponibilidade</strong>
+                                                    <strong><?php echo esc_html(viator_t('consult_availability')); ?></strong>
                                                 <?php endif; ?>
                                             </div>
                                         </div>
@@ -1675,7 +1687,7 @@ function viator_get_product_details($product_code) {
         <!-- Tags -->
         <?php if (!empty($tags)): ?>
             <div class="viator-tags">
-                <h2>Tags</h2>
+                <h2><?php echo esc_html(viator_t('tags')); ?></h2>
                 <div class="viator-tag-list">
                     <?php foreach ($tags as $tag): ?>
                         <span class="viator-tag"><?php echo esc_html($tag); ?></span>
@@ -1704,7 +1716,16 @@ function viator_enqueue_product_scripts() {
         // Add JavaScript variables
         wp_localize_script('viator-reviews', 'viatorReviewsData', array(
             'ajaxurl' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('viator_reviews_nonce')
+            'nonce' => wp_create_nonce('viator_reviews_nonce'),
+            'translations' => array(
+                'loading_reviews' => viator_t('loading_reviews'),
+                'reviews_load_error' => viator_t('reviews_load_error'),
+                'reviews_load_error_generic' => viator_t('reviews_load_error_generic'),
+                'try_again_later' => viator_t('try_again_later'),
+                'no_reviews_found' => viator_t('no_reviews_found_rating'),
+                'no_more_reviews' => viator_t('no_more_reviews_page'),
+                'anonymous_traveler' => viator_t('anonymous_traveler')
+            )
         ));
     }
 }
@@ -1716,14 +1737,17 @@ add_action('wp_enqueue_scripts', 'viator_enqueue_product_scripts');
 function viator_get_reviews_ajax() {
     // Verify request
     if (!isset($_POST['product_code']) || empty($_POST['product_code'])) {
-        wp_send_json_error(array('message' => 'Código do passeio/serviço não fornecido.'));
+        wp_send_json_error(array('message' => viator_t('product_code_not_provided')));
     }
     
     // Get API key
     $api_key = get_option('viator_api_key');
     if (empty($api_key)) {
-        wp_send_json_error(array('message' => 'Chave API não configurada.'));
+        wp_send_json_error(array('message' => viator_t('error_api_key')));
     }
+    
+    // Obter configurações de idioma
+    $locale_settings = viator_get_locale_settings();
     
     // Get parameters
     $product_code = sanitize_text_field($_POST['product_code']);
@@ -1773,7 +1797,7 @@ function viator_get_reviews_ajax() {
             'Accept' => 'application/json;version=2.0',
             'Content-Type' => 'application/json;version=2.0',
             'exp-api-key' => $api_key,
-            'Accept-Language' => 'pt-BR'
+            'Accept-Language' => $locale_settings['language']
         ),
         'body' => json_encode($request_data),
         'timeout' => 30
