@@ -1711,12 +1711,24 @@ function viator_enqueue_product_scripts() {
     // Enqueue reviews script only on product pages
     global $post;
     if (is_a($post, 'WP_Post') && has_shortcode($post->post_content, 'viator_product')) {
-        wp_enqueue_script('viator-reviews', plugin_dir_url(__FILE__) . 'viator-reviews.js', array('jquery'), '1.0.0', true);
+        wp_enqueue_script('viator-reviews', plugin_dir_url(__FILE__) . 'viator-reviews.js', array('jquery'), '1.0.1', true);
+        
+        // Get locale settings
+        $locale_settings = viator_get_locale_settings();
+        
+        // Map language codes to JavaScript locale format
+        $js_locale_map = [
+            'pt-BR' => 'pt-BR',
+            'en-US' => 'en-US', 
+            'es-ES' => 'es-ES'
+        ];
+        $js_locale = isset($js_locale_map[$locale_settings['language']]) ? $js_locale_map[$locale_settings['language']] : 'pt-BR';
         
         // Add JavaScript variables
         wp_localize_script('viator-reviews', 'viatorReviewsData', array(
             'ajaxurl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('viator_reviews_nonce'),
+            'locale' => $js_locale,
             'translations' => array(
                 'loading_reviews' => viator_t('loading_reviews'),
                 'reviews_load_error' => viator_t('reviews_load_error'),

@@ -358,7 +358,11 @@ jQuery(document).ready(function($) {
     function createReviewHtml(review) {
         // Format date - use publishedDate instead of submissionDate
         const reviewDate = new Date(review.publishedDate);
-        const formattedDate = reviewDate.toLocaleDateString('pt-BR', {
+        
+        // Get locale from viatorReviewsData or fallback to pt-BR
+        const locale = viatorReviewsData.locale || 'pt-BR';
+        
+        const formattedDate = reviewDate.toLocaleDateString(locale, {
             year: 'numeric',
             month: 'long',
             day: 'numeric'
