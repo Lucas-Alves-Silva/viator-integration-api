@@ -1603,7 +1603,7 @@ function viator_get_translation($key, $language = null) {
             // Elementos adicionais da interface
             'additional_info' => 'Informações Adicionais',
             'tooltip_support' => 'Cite este código ao falar com o suporte ao cliente.',
-            'searching' => 'Buscando...',
+            'searching' => 'Pesquisando...',
             'please_wait' => 'Por favor, aguarde!',
             'lets_go_searching' => 'Vamos lá! Pesquisando',
             'reset_button' => 'Redefinir',
