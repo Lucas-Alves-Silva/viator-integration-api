@@ -1711,7 +1711,7 @@ function viator_enqueue_product_scripts() {
     // Enqueue reviews script only on product pages
     global $post;
     if (is_a($post, 'WP_Post') && has_shortcode($post->post_content, 'viator_product')) {
-        wp_enqueue_script('viator-reviews', plugin_dir_url(__FILE__) . 'viator-reviews.js', array('jquery'), '1.0.1', true);
+        wp_enqueue_script('viator-reviews', plugin_dir_url(__FILE__) . 'viator-reviews.js', array('jquery'), '1.0.2', true);
         
         // Get locale settings
         $locale_settings = viator_get_locale_settings();

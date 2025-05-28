@@ -163,7 +163,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (currentErrorMessageElement) {
                 // Verifica se a mensagem de timeout específica está presente
                 if (currentErrorMessageElement.textContent.includes("OPS! Aguarde um instante e tente novamente.")) {
-                    currentErrorMessageElement.textContent = (viatorConfig.translations.searching || 'Buscando...') + " Por favor, aguarde!";
+                    currentErrorMessageElement.textContent = (viatorConfig.translations.searching || 'Buscando...') + " " + (viatorConfig.translations.please_wait || 'Por favor, aguarde!');
                     currentErrorMessageElement.classList.add('searching'); // Adiciona classe para estilo de "buscando"
                 } else {
                     // Limpa qualquer outra mensagem de erro anterior se não for a de timeout
@@ -1538,7 +1538,7 @@ function setSearchDestination(destino) {
     if (searchInput) {
         if (errorMessage) {
             errorMessage.classList.add('searching');
-            errorMessage.innerHTML = 'Vamos lá! Pesquisando<div class="bouncy-loader"><span></span><span></span><span></span></div>';
+            errorMessage.innerHTML = (viatorConfig.translations.lets_go_searching || 'Vamos lá! Pesquisando') + '<div class="bouncy-loader"><span></span><span></span><span></span></div>';
         }
         
         searchInput.value = destino;

@@ -129,7 +129,7 @@ function viator_enqueue_scripts() {
     wp_enqueue_script('swiper-js', 'https://cdn.jsdelivr.net/npm/swiper@8/swiper-bundle.min.js', array('jquery'), '8.0.0', true);
     
     // Enqueue interactions.js with Swiper as dependency
-    wp_enqueue_script('viator-interactions', $plugin_dir . 'interactions.js', array('jquery', 'ipgeolocation-api', 'swiper-js'), '1.0.0', true);
+    wp_enqueue_script('viator-interactions', $plugin_dir . 'interactions.js', array('jquery', 'ipgeolocation-api', 'swiper-js'), '1.0.2', true);
 
     // Add JavaScript variables
     wp_localize_script('viator-interactions', 'viatorAjax', array(
@@ -177,6 +177,8 @@ function viator_enqueue_scripts() {
                 viator_t('jul_short'), viator_t('aug_short'), viator_t('sep_short'),
                 viator_t('oct_short'), viator_t('nov_short'), viator_t('dec_short')
             ],
+            'please_wait' => viator_t('please_wait'),
+            'lets_go_searching' => viator_t('lets_go_searching'),
         )
     ));
     
@@ -1626,6 +1628,8 @@ function viator_get_translation($key, $language = null) {
             'additional_info' => 'Informações Adicionais',
             'tooltip_support' => 'Cite este código ao falar com o suporte ao cliente.',
             'searching' => 'Buscando...',
+            'please_wait' => 'Por favor, aguarde!',
+            'lets_go_searching' => 'Vamos lá! Pesquisando',
             'reset_button' => 'Redefinir',
             'apply_button' => 'Aplicar',
             'duration_approx_short' => '(aprox.)',
@@ -1678,12 +1682,12 @@ function viator_get_translation($key, $language = null) {
             'audio_service' => 'Áudio Guia',
             
             // Avaliações - traduções para o JavaScript
-            'reviews_load_error' => 'No se pudieron cargar las reseñas.',
-            'reviews_load_error_generic' => 'Error al cargar reseñas.',
-            'try_again_later' => 'Inténtelo de nuevo más tarde.',
-            'no_reviews_found_rating' => 'No se encontraron reseñas para esta calificación.',
-            'no_more_reviews_page' => 'No hay más reseñas para mostrar en esta página.',
-            'anonymous_traveler' => 'Viajero Anónimo',
+            'reviews_load_error' => 'Não foi possível carregar as avaliações.',
+            'reviews_load_error_generic' => 'Erro ao carregar avaliações.',
+            'try_again_later' => 'Tente novamente mais tarde.',
+            'no_reviews_found_rating' => 'Nenhuma avaliação encontrada para esta classificação.',
+            'no_more_reviews_page' => 'Não há mais avaliações para exibir nesta página.',
+            'anonymous_traveler' => 'Viajante anônimo',
         ],
         'en-US' => [
             // Search form
@@ -1799,6 +1803,8 @@ function viator_get_translation($key, $language = null) {
             'additional_info' => 'Additional Information',
             'tooltip_support' => 'Quote this code when contacting customer support.',
             'searching' => 'Searching...',
+            'please_wait' => 'Please wait...',
+            'lets_go_searching' => 'Let\'s go searching!',
             'reset_button' => 'Reset',
             'apply_button' => 'Apply',
             'duration_approx_short' => '(approx.)',
@@ -1972,6 +1978,8 @@ function viator_get_translation($key, $language = null) {
             'additional_info' => 'Información Adicional',
             'tooltip_support' => 'Cite este código al contactar con el servicio de atención al cliente.',
             'searching' => 'Buscando...',
+            'please_wait' => 'Por favor, aguarde!',
+            'lets_go_searching' => '¡Vamos a buscar!',
             'reset_button' => 'Restablecer',
             'apply_button' => 'Aplicar',
             'duration_approx_short' => '(aprox.)',
