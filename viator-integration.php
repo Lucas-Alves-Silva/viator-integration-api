@@ -51,6 +51,7 @@ add_action('admin_menu', 'viator_admin_menu');
 // Register settings
 function viator_register_settings() {
     register_setting('viator_settings', 'viator_api_key');
+    register_setting('viator_settings', 'viator_groq_api_key');
     register_setting('viator_settings', 'viator_language');
     register_setting('viator_settings', 'viator_currency');
 }
@@ -76,6 +77,16 @@ function viator_settings_page() {
                                class="regular-text"
                                required>
                         <p class="description">Insira sua chave API da Viator aqui.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">Groq API Key</th>
+                    <td>
+                        <input type="text" 
+                               name="viator_groq_api_key" 
+                               value="<?php echo esc_attr(get_option('viator_groq_api_key')); ?>" 
+                               class="regular-text">
+                        <p class="description">Insira sua chave API do Groq para gerar curiosidades inteligentes sobre os destinos pesquisados.</p>
                     </td>
                 </tr>
                 <tr>
@@ -1005,43 +1016,8 @@ function viator_get_search_results($searchTerm) {
     </div>';
     $output .= '</div>';
 
-    // Obtenha informações de destino da Wikipedia usando a API MediaWiki
-    $wiki_url = "https://pt.wikipedia.org/w/api.php";
-    $search_params = [
-        'action' => 'query',
-        'format' => 'json',
-        'prop' => 'extracts',
-        'exintro' => true,
-        'explaintext' => true,
-        'titles' => $searchTerm
-    ];
-
-    $wiki_response = wp_remote_get(add_query_arg($search_params, $wiki_url));
-    $wiki_data = [];
-    
-    if (!is_wp_error($wiki_response)) {
-        $wiki_body = wp_remote_retrieve_body($wiki_response);
-        $wiki_data = json_decode($wiki_body, true);
-        
-        // Extraia o conteúdo da primeira página
-        $pages = isset($wiki_data['query']['pages']) ? $wiki_data['query']['pages'] : [];
-        $first_page = reset($pages);
-        $extract = isset($first_page['extract']) ? $first_page['extract'] : '';
-        
-        // Limpe e limite o texto
-        $extract = wp_trim_words($extract, 60, '...');
-    }
-
-    // Se não houver dados obtidos do Wikipedia, use curiosidades aleatórias
-    if (empty($extract)) {
-        $facts = [
-            "Você sabia que esta é uma das regiões mais visitadas pelos turistas?",
-            "Este destino oferece experiências únicas durante todo o ano!",
-            "A cultura local é rica em tradições e histórias fascinantes.",
-            "Os visitantes costumam se surpreender com a hospitalidade local."
-        ];
-        $extract = $facts[array_rand($facts)];
-    }
+    // Obter curiosidade usando a API do Groq
+    $extract = viator_get_groq_curiosity($searchTerm);
 
     // Output the curiosities div
     $output .= '<div class="viator-curiosities">
@@ -2138,4 +2114,142 @@ function viator_format_duration($duration_fixed, $duration_from = null, $duratio
     } else {
         return viator_t('duration_not_available');
     }
+}
+
+// Função para gerar curiosidades usando a API do Groq
+function viator_get_groq_curiosity($searchTerm) {
+    $groq_api_key = get_option('viator_groq_api_key');
+    
+    // Se não houver chave da API do Groq, usar curiosidades padrão
+    if (empty($groq_api_key)) {
+        return viator_get_fallback_curiosity();
+    }
+    
+    // Configurar o idioma para o prompt baseado na configuração
+    $locale_settings = viator_get_locale_settings();
+    $language = $locale_settings['language'];
+    
+    $language_prompts = [
+        'pt-BR' => "Gere uma curiosidade interessante e envolvente sobre {$searchTerm} em português brasileiro. A curiosidade deve ser educativa, factual e despertar o interesse turístico. Mantenha entre 40-60 palavras. Não use aspas ou formatação especial.",
+        'en-US' => "Generate an interesting and engaging curiosity about {$searchTerm} in English. The curiosity should be educational, factual and spark tourist interest. Keep it between 40-60 words. Don't use quotes or special formatting.",
+        'es-ES' => "Genera una curiosidad interesante y atractiva sobre {$searchTerm} en español. La curiosidad debe ser educativa, factual y despertar el interés turístico. Mantén entre 40-60 palabras. No uses comillas o formato especial."
+    ];
+    
+    $prompt = isset($language_prompts[$language]) ? $language_prompts[$language] : $language_prompts['pt-BR'];
+    
+    // Preparar dados para a API do Groq
+    $data = [
+        'messages' => [
+            [
+                'role' => 'user',
+                'content' => $prompt
+            ]
+        ],
+        'model' => 'llama3-8b-8192',
+        'temperature' => 0.7,
+        'max_tokens' => 150,
+        'top_p' => 1,
+        'stream' => false
+    ];
+    
+    // Fazer requisição para a API do Groq
+    $response = wp_remote_post('https://api.groq.com/openai/v1/chat/completions', [
+        'headers' => [
+            'Authorization' => 'Bearer ' . $groq_api_key,
+            'Content-Type' => 'application/json'
+        ],
+        'body' => json_encode($data),
+        'timeout' => 30
+    ]);
+    
+    // Verificar se a requisição foi bem-sucedida
+    if (is_wp_error($response)) {
+        error_log('Erro na requisição Groq: ' . $response->get_error_message());
+        return viator_get_fallback_curiosity();
+    }
+    
+    $response_code = wp_remote_retrieve_response_code($response);
+    if ($response_code !== 200) {
+        error_log('Erro na API Groq - Código: ' . $response_code);
+        return viator_get_fallback_curiosity();
+    }
+    
+    $body = wp_remote_retrieve_body($response);
+    $groq_data = json_decode($body, true);
+    
+    // Extrair a curiosidade da resposta
+    if (isset($groq_data['choices'][0]['message']['content'])) {
+        $curiosity = trim($groq_data['choices'][0]['message']['content']);
+        
+        // Limpar a resposta removendo aspas e formatação desnecessária
+        $curiosity = str_replace(['"', "'", '**', '*'], '', $curiosity);
+        $curiosity = preg_replace('/^(Curiosidade:|Did you know\?|¿Sabías que\?)/i', '', $curiosity);
+        $curiosity = trim($curiosity);
+        
+        // Limitar o tamanho se necessário
+        if (str_word_count($curiosity) > 70) {
+            $curiosity = wp_trim_words($curiosity, 60, '...');
+        }
+        
+        return $curiosity;
+    }
+    
+    // Se não conseguir extrair a curiosidade, usar fallback
+    error_log('Não foi possível extrair curiosidade da resposta Groq');
+    return viator_get_fallback_curiosity();
+}
+
+// Função para curiosidades padrão (fallback)
+function viator_get_fallback_curiosity() {
+    $locale_settings = viator_get_locale_settings();
+    $language = $locale_settings['language'];
+    
+    if ($language === 'pt-BR') {
+        $facts = [
+            "Você sabia que esta é uma das regiões mais visitadas pelos turistas?",
+            "Este destino oferece experiências únicas durante todo o ano!",
+            "A cultura local é rica em tradições e histórias fascinantes.",
+            "Os visitantes costumam se surpreender com a hospitalidade local.",
+            "Este lugar possui uma gastronomia única que encanta turistas do mundo todo.",
+            "A arquitetura local reflete séculos de história e influências culturais diversas.",
+            "Muitos festivais tradicionais acontecem aqui, celebrando a rica herança cultural.",
+            "A natureza exuberante desta região oferece paisagens de tirar o fôlego.",
+            "Artesãos locais preservam técnicas ancestrais passadas de geração em geração.",
+            "Este destino é conhecido por suas tradições musicais e danças folclóricas únicas.",
+            "A vida noturna local oferece uma mistura perfeita entre tradição e modernidade.",
+            "Mercados locais são verdadeiros tesouros onde se encontram produtos autênticos da região."
+        ];
+    } elseif ($language === 'en-US') {
+        $facts = [
+            "Did you know this is one of the most visited regions by tourists?",
+            "This destination offers unique experiences throughout the year!",
+            "The local culture is rich in fascinating traditions and stories.",
+            "Visitors are often surprised by the local hospitality.",
+            "This place has a unique cuisine that delights tourists from around the world.",
+            "The local architecture reflects centuries of history and diverse cultural influences.",
+            "Many traditional festivals take place here, celebrating the rich cultural heritage.",
+            "The lush nature of this region offers breathtaking landscapes.",
+            "Local artisans preserve ancestral techniques passed down through generations.",
+            "This destination is known for its unique musical traditions and folk dances.",
+            "The local nightlife offers a perfect blend of tradition and modernity.",
+            "Local markets are true treasures where you can find authentic regional products."
+        ];
+    } else { // es-ES
+        $facts = [
+            "¿Sabías que esta es una de las regiones más visitadas por los turistas?",
+            "¡Este destino ofrece experiencias únicas durante todo el año!",
+            "La cultura local es rica en tradiciones e historias fascinantes.",
+            "Los visitantes suelen sorprenderse con la hospitalidad local.",
+            "Este lugar tiene una gastronomía única que deleita a turistas de todo el mundo.",
+            "La arquitectura local refleja siglos de historia e influencias culturales diversas.",
+            "Muchos festivales tradicionales tienen lugar aquí, celebrando la rica herencia cultural.",
+            "La naturaleza exuberante de esta región ofrece paisajes que quitan el aliento.",
+            "Los artesanos locales preservan técnicas ancestrales transmitidas de generación en generación.",
+            "Este destino es conocido por sus tradiciones musicales y danzas folclóricas únicas.",
+            "La vida nocturna local ofrece una mezcla perfecta entre tradición y modernidad.",
+            "Los mercados locales son verdaderos tesoros donde se encuentran productos auténticos de la región."
+        ];
+    }
+    
+    return $facts[array_rand($facts)];
 }
