@@ -1000,12 +1000,17 @@
     transition: all 0.2s ease;
   }
 
-  .copy-product-code-btn:hover svg path {
+  .copy-product-code-btn .copy-icon,
+  .copy-product-code-btn .check-icon {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+
+  .copy-product-code-btn:hover .copy-icon path {
     stroke: #04846b !important;
   }
 
   /* Animação de sucesso ao copiar */
-  .copy-product-code-btn.copied svg path {
+  .copy-product-code-btn.copied .check-icon path {
     stroke: #28a745 !important;
   }
 
