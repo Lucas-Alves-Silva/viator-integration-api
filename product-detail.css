@@ -970,3 +970,52 @@
   .button-check-availability:focus {
     background-color: #081030; /* Um pouco mais escuro para o hover */
   }
+
+  /* Botão de Copiar Código do Produto */
+  .copy-product-code-btn {
+    background: none !important;
+    border: none !important;
+    cursor: pointer !important;
+    margin-left: 8px !important;
+    padding: 6px !important;
+    border-radius: 6px !important;
+    transition: all 0.2s ease !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    position: relative !important;
+  }
+
+  .copy-product-code-btn:hover {
+    background-color: #f0f8ff !important;
+    transform: translateY(-1px);
+  }
+
+  .copy-product-code-btn:active {
+    background-color: #e6f3ff !important;
+    transform: scale(0.95);
+  }
+
+  .copy-product-code-btn svg {
+    transition: all 0.2s ease;
+  }
+
+  .copy-product-code-btn:hover svg path {
+    stroke: #04846b !important;
+  }
+
+  /* Animação de sucesso ao copiar */
+  .copy-product-code-btn.copied svg path {
+    stroke: #28a745 !important;
+  }
+
+  /* Mensagem de feedback */
+  .copy-feedback-message {
+    font-size: 14px !important;
+    color: #28a745 !important;
+    font-weight: 500 !important;
+    margin-left: 8px !important;
+    opacity: 0 !important;
+    transition: opacity 0.3s ease !important;
+    white-space: nowrap !important;
+  }
