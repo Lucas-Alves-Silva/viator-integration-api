@@ -180,9 +180,9 @@ function get_product_recommendations($product_code) {
     $formatted_recommendations = [];
     
     foreach (array_slice(array_unique($recommended_products), 0, 5) as $rec_product_code) {
-        $product_url = "https://api.sandbox.viator.com/partner/products/{$rec_product_code}";
+        $product_url = add_query_arg('currencyCode', $locale_settings['currency'], "https://api.sandbox.viator.com/partner/products/{$rec_product_code}");
         
-        viator_debug_log('Buscando detalhes do produto recomendado:', $rec_product_code);
+        viator_debug_log('Buscando detalhes do produto recomendado (URL com moeda):', $product_url);
         
         $product_response = wp_remote_get($product_url, [
             'headers' => [
@@ -191,7 +191,7 @@ function get_product_recommendations($product_code) {
                 'exp-api-key'      => $api_key,
                 'Accept-Language'  => $locale_settings['language'],
             ],
-            'timeout' => 30,
+            'timeout' => 30
         ]);
         
         if (!is_wp_error($product_response)) {
@@ -434,7 +434,8 @@ function viator_get_product_details($product_code) {
     $locale_settings = viator_get_locale_settings();
     
     // API endpoint
-    $url = "https://api.sandbox.viator.com/partner/products/{$product_code}";
+    $url = add_query_arg('currencyCode', $locale_settings['currency'], "https://api.sandbox.viator.com/partner/products/{$product_code}");
+    viator_debug_log('Buscando detalhes do produto (URL com moeda):', $url);
     
     // Make API request
     $response = wp_remote_get($url, [
@@ -460,7 +461,46 @@ function viator_get_product_details($product_code) {
     if (empty($product) || isset($product['error'])) {
         return '<div class="viator-error">' . esc_html(viator_t('error_product_not_found')) . '</div>';
     }
+
+    // Extract pricing information
+    $pricing_info = isset($product['pricingInfo']) ? $product['pricingInfo'] : null;
+    $age_bands = ($pricing_info && isset($pricing_info['ageBands']) && is_array($pricing_info['ageBands'])) ? $pricing_info['ageBands'] : [];
+    $pricing_summary = isset($product['pricing']['summary']) ? $product['pricing']['summary'] : [];
     
+    // Variável para HTML do serviço de unidade (ex: Traslado disponível)
+    $unit_service_html = '';
+    if (isset($pricing_info['type']) && $pricing_info['type'] === 'UNIT' && isset($pricing_info['unitType'])) {
+        $unit_type = $pricing_info['unitType'];
+        $icon_svg = '';
+        $text_key = '';
+        $service_text_display = '';
+
+        if ($unit_type === 'VEHICLE') {
+            // Ícone de Carro (específico)
+            $icon_svg = '<img width="22" height="22" src="https://img.icons8.com/ios-glyphs/30/car--v1.png" alt="' . esc_attr(viator_t('unit_type_vehicle_available')) . '"/>';
+            $text_key = 'unit_type_vehicle_available';
+            $service_text_display = esc_html(viator_t($text_key));
+        } elseif ($unit_type === 'BOAT') {
+            // Ícone de Barco (específico)
+            $icon_svg = '<img width="22" height="22" src="https://img.icons8.com/ios-glyphs/30/water-transportation.png" alt="' . esc_attr(viator_t('unit_type_boat_available')) . '"/>';
+            $text_key = 'unit_type_boat_available';
+            $service_text_display = esc_html(viator_t($text_key));
+        } else {
+            // Ícone Genérico SVG (mantido para outros tipos)
+            $icon_svg = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 22H15C20 22 22 20 22 15V9C22 4 20 2 15 2H9C4 2 2 4 2 9V15C2 20 4 22 9 22Z" stroke="#00715D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M15.75 9H8.25" stroke="#00715D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M15.75 15H8.25" stroke="#00715D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            $translated_unit_type = viator_t(strtolower($unit_type));
+            // Se não houver tradução específica para o unit_type, usar o próprio unitType (capitalizado)
+            if ($translated_unit_type === strtolower($unit_type)) {
+                $translated_unit_type = esc_html(ucfirst(strtolower($unit_type)));
+            }
+            $service_text_display = sprintf(esc_html(viator_t('unit_type_generic_available')), $translated_unit_type);
+        }
+
+        if (!empty($service_text_display)) {
+            $unit_service_html = '<div class="viator-unit-service-info"><span class="service-icon">' . $icon_svg . '</span> <span class="service-text">' . $service_text_display . '</span></div>';
+        }
+    }
+
     // Get main product details
     $title = isset($product['title']) ? esc_html($product['title']) : 'Título não disponível';
     
@@ -475,7 +515,62 @@ function viator_get_product_details($product_code) {
     // Try to get price from product API response first
     $has_price_data = isset($product['pricing']['summary']['fromPrice']);
     $price = $has_price_data ? $locale_settings['currency_symbol'] . ' ' . number_format($product['pricing']['summary']['fromPrice'], 2, ',', '.') : 'Preço não disponível';
-    $original_price = isset($product['pricing']['summary']['fromPriceBeforeDiscount']) ? $locale_settings['currency_symbol'] . ' ' . number_format($product['pricing']['summary']['fromPriceBeforeDiscount'], 2, ',', '.') : '';
+    $original_price = isset($pricing_summary['fromPriceBeforeDiscount']) ? $locale_settings['currency_symbol'] . ' ' . number_format($pricing_summary['fromPriceBeforeDiscount'], 2, ',', '.') : '';
+
+    // Determinar a nota de preço
+    $price_note_text = ''; 
+    $max_travelers_overall = 0;
+
+    if ($pricing_info && isset($pricing_info['type'])) {
+        if ($pricing_info['type'] === 'UNIT') {
+            $price_note_text = viator_t('price_per_group'); 
+            // Calcular o máximo de viajantes se for por unidade/grupo
+            if (!empty($age_bands)) {
+                foreach ($age_bands as $band) {
+                    if (isset($band['maxTravelersPerBooking'])) {
+                        // Se houver várias ageBands, pegamos o maior maxTravelersPerBooking como uma aproximação
+                        // A lógica exata de combinação de ageBands para total de viajantes pode ser mais complexa
+                        $max_travelers_overall = max($max_travelers_overall, $band['maxTravelersPerBooking']);
+                    }
+                }
+                if ($max_travelers_overall > 0) {
+                    $price_note_text .= ' ' . sprintf(viator_t('up_to_travelers'), $max_travelers_overall);
+                }
+            }
+        } else {
+            $price_note_text = viator_t('price_per_person'); // Padrão para PER_PERSON ou outros tipos
+        }
+    }
+
+    // Preparar dados das faixas etárias para exibição
+    $age_bands_display_data = [];
+    $total_max_travelers_possible = 0; // Para a frase "Você pode selecionar até X viajantes"
+
+    if (!empty($age_bands)) {
+        foreach ($age_bands as $band) {
+            $band_label = isset($band['ageBand']) ? ucfirst(strtolower(str_replace('_', ' ', $band['ageBand']))) : 'Viajante';
+            // Tentar traduzir o rótulo da faixa (ADULT, CHILD, INFANT, TRAVELER)
+            $translated_band_label = viator_t(strtolower($band['ageBand']));
+            if ($translated_band_label === strtolower($band['ageBand'])) { // Se não houver tradução específica para ADULT, CHILD etc.
+                 $translated_band_label = $band_label; // Usa o formatado em Title Case
+            }
+
+            $age_bands_display_data[] = [
+                'label' => sprintf(viator_t('traveler_age_band'), esc_html($translated_band_label), (isset($band['startAge']) ? intval($band['startAge']) : 0), (isset($band['endAge']) ? intval($band['endAge']) : 99)),
+                'min_max' => sprintf(viator_t('min_max_travelers'), (isset($band['minTravelersPerBooking']) ? intval($band['minTravelersPerBooking']) : 1), (isset($band['maxTravelersPerBooking']) ? intval($band['maxTravelersPerBooking']) : 'N/A')),
+            ];
+            if (isset($band['maxTravelersPerBooking'])) {
+                // Esta é uma simplificação. O real total de viajantes pode depender das combinações de faixas.
+                // Para uma frase geral, somar os máximos pode não ser preciso.
+                // Usaremos o $max_travelers_overall se for tipo UNIT, ou o maior maxTravelersPerBooking de uma única faixa.
+                if ($pricing_info && $pricing_info['type'] === 'UNIT') {
+                    $total_max_travelers_possible = $max_travelers_overall; // Já calculado
+                } elseif (isset($band['maxTravelersPerBooking'])) {
+                    $total_max_travelers_possible = max($total_max_travelers_possible, $band['maxTravelersPerBooking']);
+                }
+            }
+        }
+    }
     
     // Initialize flags variable
     $flags = isset($product['flags']) ? $product['flags'] : [];
@@ -800,8 +895,10 @@ function viator_get_product_details($product_code) {
                         </div>
                     <?php endif; ?>
                 <?php endif; ?>
-            </div>
-    
+                
+                <?php echo $unit_service_html; // Nova seção de informação do tipo de unidade AQUI DENTRO DA GALLERY ?>
+            </div> <!-- Fim viator-product-gallery -->
+
             <div class="viator-product-info-container">
                 <!-- Product Header -->
                 <div class="viator-product-header">
@@ -859,10 +956,10 @@ function viator_get_product_details($product_code) {
                             <div class="viator-product-original-price"><?php echo esc_html($original_price); ?></div>
                         <?php endif; ?>
                         <div class="viator-product-price"><?php echo esc_html($price); ?></div>
-                        <div class="viator-product-price-note"><?php echo esc_html(viator_t('price_per_person')); ?></div>
+                        <div class="viator-product-price-note"><?php echo esc_html($price_note_text); ?></div>
                     </div>
                 </div>
-    
+
                 <!-- Quick Info -->
                 <div class="viator-quick-info">
                     <div class="viator-info-item">
@@ -882,7 +979,25 @@ function viator_get_product_details($product_code) {
                         </div>
                     <?php endif; ?>
                 </div>
-                
+
+                <!-- Traveler Information Section -->
+                <?php if (!empty($age_bands_display_data)): ?>
+                <div class="viator-traveler-info-section">
+                    <h4><?php echo esc_html(viator_t('traveler_info_title')); ?></h4>
+                    <?php if ($total_max_travelers_possible > 0): ?>
+                        <p class="total-travelers-note"><?php echo sprintf(esc_html(viator_t('total_travelers_info')), $total_max_travelers_possible); ?></p>
+                    <?php endif; ?>
+                    <ul class="age-bands-list">
+                        <?php foreach ($age_bands_display_data as $band_data): ?>
+                            <li>
+                                <span class="age-band-label"><?php echo esc_html($band_data['label']); ?></span>
+                                <span class="age-band-min-max"><?php echo esc_html($band_data['min_max']); ?></span>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+                <?php endif; ?>
+    
                 <!-- Botão de Verificar Disponibilidade -->
                 <button class="button-check-availability"><?php echo esc_html(viator_t('check_availability')); ?></button>
             </div>
@@ -1005,7 +1120,7 @@ function viator_get_product_details($product_code) {
                                         'Dinner' => 'Jantar',
                                         'Breakfast' => 'Café da manhã',
                                         'WiFi on board' => 'WiFi a bordo',
-                                        'Gratuities' => 'Gorjetas',
+                                        'Gorjetas' => 'Gorjetas',
                                         'Private tour' => 'Tour privado',
                                         'Small-group tour' => 'Tour em pequeno grupo',
                                         'Use of bicycle' => 'Uso de bicicleta',
@@ -1045,7 +1160,7 @@ function viator_get_product_details($product_code) {
                                         'Drinks' => 'Bebidas',
                                         'Food' => 'Comida',
                                         'Alcoholic drinks' => 'Bebidas alcoólicas',
-                                        'Gratuities' => 'Gorjetas',
+                                        'Gorjetas' => 'Gorjetas',
                                         'Hotel pickup and drop-off' => 'Serviço de busca e entrega no hotel',
                                         'Transportation to/from attractions' => 'Transporte de/para atrações',
                                         'Souvenir photos' => 'Fotos de lembrança',
@@ -1466,7 +1581,8 @@ function viator_get_product_details($product_code) {
                             $availability_body = [
                                 'productCodes' => [$rec_product_code],
                                 'fromDate' => $today,
-                                'toDate' => $next_year
+                                'toDate' => $next_year,
+                                'currency' => $locale_settings['currency'] // Adicionando parâmetro de moeda
                             ];
                             
                             $availability_response = wp_remote_post($availability_url, [
@@ -1918,4 +2034,5 @@ function viator_get_reviews_ajax() {
     wp_send_json_success($data);
 }
 add_action('wp_ajax_viator_get_reviews', 'viator_get_reviews_ajax');
+add_action('wp_ajax_nopriv_viator_get_reviews', 'viator_get_reviews_ajax');
 add_action('wp_ajax_nopriv_viator_get_reviews', 'viator_get_reviews_ajax');
