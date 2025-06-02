@@ -1537,7 +1537,7 @@ function viator_get_translation($key, $language = null) {
             'rating' => 'Avaliação',
             'specials' => 'Especiais',
             'free_cancellation' => 'Cancelamento Gratuito',
-            'likely_to_sell_out' => 'Geralmente se esgota',
+            'likely_to_sell_out' => 'Esgota rápido',
             'skip_the_line' => 'Evitar fila',
             'private_tour' => 'Tour Privado',
             'new_on_viator' => 'Novidade na Viator',
@@ -1573,7 +1573,7 @@ function viator_get_translation($key, $language = null) {
             
             // Badges
             'free_cancellation_badge' => 'Cancelamento gratuito',
-            'likely_to_sell_out_badge' => 'Geralmente se esgota',
+            'likely_to_sell_out_badge' => 'Esgota rápido',
             'special_offer_badge' => 'Oferta especial',
             
             // Duração
