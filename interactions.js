@@ -1017,7 +1017,7 @@ function updateSort(value) {
         specialFilters.push(checkbox.value);
     });
     
-    console.log('Filtros especiais ativos antes da ordenação:', specialFilters);
+    // console.log('Filtros especiais ativos antes da ordenação:', specialFilters);
     
     // Atualizar a URL com o novo valor de ordenação
     const newUrl = new URL(window.location);
@@ -1064,7 +1064,7 @@ function updateSort(value) {
         });
     }
     
-    console.log('Parâmetros da requisição de ordenação:', requestParams);
+    // console.log('Parâmetros da requisição de ordenação:', requestParams);
     
     // Fazer requisição AJAX
     fetch(viatorAjax.ajaxurl, {
@@ -1111,11 +1111,11 @@ function updateSort(value) {
                 // Verificar se os filtros especiais foram realmente aplicados
                 const updatedCheckboxes = document.querySelectorAll('input[name="special_filter[]"]:checked');
                 const updatedFilters = Array.from(updatedCheckboxes).map(cb => cb.value);
-                console.log('Filtros especiais após atualização:', updatedFilters);
+                // console.log('Filtros especiais após atualização:', updatedFilters);
                 
                 // Se os filtros não foram aplicados corretamente, tentar novamente
                 if (specialFilters.length > 0 && updatedFilters.length === 0) {
-                    console.log('Tentando reaplicar filtros especiais...');
+                    // console.log('Tentando reaplicar filtros especiais...');
                     specialFilters.forEach(value => {
                         const checkbox = document.querySelector(`input[name="special_filter[]"][value="${value}"]`);
                         if (checkbox) {
@@ -2133,7 +2133,7 @@ function reinitializeSpecialsFilter() {
     // Remover duplicatas
     specialFiltersFromUrl = [...new Set(specialFiltersFromUrl)];
     
-    console.log('Filtros especiais encontrados na URL:', specialFiltersFromUrl);
+    // console.log('Filtros especiais encontrados na URL:', specialFiltersFromUrl);
     
     // Marcar os checkboxes correspondentes
     const specialCheckboxes = document.querySelectorAll('input[name="special_filter[]"]');

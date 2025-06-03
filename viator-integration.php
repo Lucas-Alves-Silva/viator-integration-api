@@ -468,6 +468,11 @@ function viator_get_search_results($searchTerm) {
                         ['NEW_ON_VIATOR'];
                     viator_debug_log('Adicionado filtro NEW_ON_VIATOR para Novo no Viator', $filter);
                     break;
+                case 'special_offer':
+                    // Nota: Filtro de Oferta Especial será processado localmente após a resposta da API
+                    // pois depende da comparação entre fromPrice e fromPriceBeforeDiscount
+                    viator_debug_log('Filtro SPECIAL_OFFER será processado localmente', $filter);
+                    break;
             }
         }
     }
@@ -581,6 +586,9 @@ function viator_get_search_results($searchTerm) {
                 case 'new_on_viator':
                     $special_filters_to_check[] = 'NEW_ON_VIATOR';
                     break;
+                case 'special_offer':
+                    $special_filters_to_check[] = 'SPECIAL_OFFER_LOCAL';
+                    break;
             }
         }
     }
@@ -645,15 +653,66 @@ function viator_get_search_results($searchTerm) {
     // Filtrar produtos que não têm as flags selecionadas
     if (!empty($special_filters_to_check) && !empty($data['products']['results'])) {
         $filtered_results = [];
+        $total_before_filter = count($data['products']['results']);
+        $special_offer_count = 0;
+        
+        viator_debug_log('Iniciando filtragem de ofertas especiais:', [
+            'total_produtos_antes' => $total_before_filter,
+            'filtros_aplicados' => $special_filters_to_check
+        ]);
+        
+        // Log adicional para contar produtos com flag SPECIAL_OFFER
+        $produtos_com_special_offer = 0;
+        $produtos_com_desconto = 0;
+        foreach ($data['products']['results'] as $tour_temp) {
+            $flags_temp = isset($tour_temp['flags']) ? $tour_temp['flags'] : [];
+            if (in_array('SPECIAL_OFFER', $flags_temp)) {
+                $produtos_com_special_offer++;
+            }
+            
+            $fromPrice_temp = isset($tour_temp['pricing']['summary']['fromPrice']) ? $tour_temp['pricing']['summary']['fromPrice'] : null;
+            $fromPriceBeforeDiscount_temp = isset($tour_temp['pricing']['summary']['fromPriceBeforeDiscount']) ? $tour_temp['pricing']['summary']['fromPriceBeforeDiscount'] : null;
+            if ($fromPrice_temp !== null && $fromPriceBeforeDiscount_temp !== null && $fromPrice_temp < $fromPriceBeforeDiscount_temp) {
+                $produtos_com_desconto++;
+            }
+        }
+        
+        viator_debug_log('Análise dos produtos encontrados:', [
+            'produtos_com_flag_SPECIAL_OFFER' => $produtos_com_special_offer,
+            'produtos_com_desconto_real' => $produtos_com_desconto
+        ]);
+        
         foreach ($data['products']['results'] as $tour) {
             $flags = isset($tour['flags']) ? $tour['flags'] : [];
             $should_include = true;
             
             // Verificar se o produto tem TODAS as flags selecionadas
             foreach ($special_filters_to_check as $required_flag) {
-                if (!in_array($required_flag, $flags)) {
-                    $should_include = false;
-                    break;
+                if ($required_flag === 'SPECIAL_OFFER_LOCAL') {
+                    // Verificação especial para ofertas especiais: fromPrice < fromPriceBeforeDiscount
+                    $fromPrice = isset($tour['pricing']['summary']['fromPrice']) ? $tour['pricing']['summary']['fromPrice'] : null;
+                    $fromPriceBeforeDiscount = isset($tour['pricing']['summary']['fromPriceBeforeDiscount']) ? $tour['pricing']['summary']['fromPriceBeforeDiscount'] : null;
+                    
+                    // Verificação mais flexível: aceitar produtos que tenham desconto OU flag SPECIAL_OFFER
+                    $hasRealDiscount = ($fromPrice !== null && $fromPriceBeforeDiscount !== null && $fromPrice < $fromPriceBeforeDiscount);
+                    $hasSpecialOfferFlag = in_array('SPECIAL_OFFER', $flags);
+                    
+                    // Para ser mais confiável, vamos aceitar qualquer produto com flag SPECIAL_OFFER
+                    // mesmo que não tenha fromPriceBeforeDiscount, pois a Viator marca como oferta especial
+                    $qualifiesAsSpecialOffer = $hasSpecialOfferFlag || $hasRealDiscount;
+                    
+                    if (!$qualifiesAsSpecialOffer) {
+                        $should_include = false;
+                        break;
+                    } else {
+                        $special_offer_count++;
+                    }
+                } else {
+                    // Verificação normal para flags
+                    if (!in_array($required_flag, $flags)) {
+                        $should_include = false;
+                        break;
+                    }
                 }
             }
             
@@ -667,6 +726,12 @@ function viator_get_search_results($searchTerm) {
         
         // Atualizar o total de produtos
         $data['products']['totalCount'] = count($filtered_results);
+        
+        viator_debug_log('Resultado da filtragem de ofertas especiais:', [
+            'total_antes' => $total_before_filter,
+            'ofertas_encontradas' => $special_offer_count,
+            'total_apos_filtro' => count($filtered_results)
+        ]);
         
         // Se não houver resultados após a filtragem, mostrar mensagem de "nenhum produto encontrado"
         if (empty($filtered_results)) {
@@ -960,6 +1025,13 @@ function viator_get_search_results($searchTerm) {
     $output .= '<div class="viator-specials-filter">';
     $output .= '<h3>' . esc_html(viator_t('specials')) . '</h3>';
     $output .= '<div class="viator-specials-options">';
+    
+    // Opção: Oferta Especial (primeira posição)
+    $special_offer_checked = isset($_GET['special_filter']) && in_array('special_offer', (array)$_GET['special_filter']) ? 'checked' : '';
+    $output .= '<label class="viator-special-option">';
+    $output .= '<input type="checkbox" name="special_filter[]" value="special_offer" ' . $special_offer_checked . '>';
+    $output .= '<span class="viator-special-text">' . esc_html(viator_t('special_offer')) . '</span>';
+    $output .= '</label>';
     
     // Opção: Cancelamento Gratuito
     $free_cancel_checked = isset($_GET['special_filter']) && in_array('free_cancellation', (array)$_GET['special_filter']) ? 'checked' : '';
