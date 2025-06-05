@@ -558,7 +558,16 @@ function viator_get_product_details($product_code) {
             $age_bands_display_data[] = [
                 'label' => sprintf(viator_t('traveler_age_band'), esc_html($translated_band_label), (isset($band['startAge']) ? intval($band['startAge']) : 0), (isset($band['endAge']) ? intval($band['endAge']) : 99)),
                 'min_max' => sprintf(viator_t('min_max_travelers'), (isset($band['minTravelersPerBooking']) ? intval($band['minTravelersPerBooking']) : 1), (isset($band['maxTravelersPerBooking']) ? intval($band['maxTravelersPerBooking']) : 'N/A')),
+                // Adicionando dados brutos para os data-attributes
+                'bandId' => $band['bandId'],
+                'ageBand' => $band['ageBand'],
+                'minTravelers' => $band['minTravelersPerBooking'],
+                'maxTravelers' => $band['maxTravelersPerBooking'],
+                'startAge' => $band['startAge'],
+                'endAge' => $band['endAge'],
+                'default' => $band['ageBand'] === 'ADULT' ? 1 : 0 // Define 1 adulto como padrão inicial
             ];
+
             if (isset($band['maxTravelersPerBooking'])) {
                 // Esta é uma simplificação. O real total de viajantes pode depender das combinações de faixas.
                 // Para uma frase geral, somar os máximos pode não ser preciso.
@@ -989,7 +998,13 @@ function viator_get_product_details($product_code) {
                     <?php endif; ?>
                     <ul class="age-bands-list">
                         <?php foreach ($age_bands_display_data as $band_data): ?>
-                            <li>
+                            <li data-band-id="<?php echo esc_attr($band_data['bandId']); ?>"
+                                data-age-band="<?php echo esc_attr($band_data['ageBand']); ?>"
+                                data-min-travelers="<?php echo esc_attr($band_data['minTravelers']); ?>"
+                                data-max-travelers="<?php echo esc_attr($band_data['maxTravelers']); ?>"
+                                data-start-age="<?php echo esc_attr($band_data['startAge']); ?>"
+                                data-end-age="<?php echo esc_attr($band_data['endAge']); ?>"
+                                data-default-value="<?php echo esc_attr($band_data['default']); ?>">
                                 <span class="age-band-label"><?php echo esc_html($band_data['label']); ?></span>
                                 <span class="age-band-min-max"><?php echo esc_html($band_data['min_max']); ?></span>
                             </li>
@@ -999,7 +1014,7 @@ function viator_get_product_details($product_code) {
                 <?php endif; ?>
     
                 <!-- Botão de Verificar Disponibilidade -->
-                <button class="button-check-availability"><?php echo esc_html(viator_t('check_availability')); ?></button>
+                <button class="button-check-availability" data-product-code="<?php echo esc_attr($product_code); ?>"><?php echo esc_html(viator_t('check_availability')); ?></button>
             </div>
         </div>
     
@@ -1398,7 +1413,6 @@ function viator_get_product_details($product_code) {
                             $language_names = [
                                 'pt' => 'Português',
                                 'en' => 'Inglês',
-                                'es' => 'Espanhol',
                                 'fr' => 'Francês',
                                 'de' => 'Alemão',
                                 'it' => 'Italiano',
@@ -1917,8 +1931,7 @@ function viator_enqueue_product_scripts() {
         // Map language codes to JavaScript locale format
         $js_locale_map = [
             'pt-BR' => 'pt-BR',
-            'en-US' => 'en-US', 
-            'es-ES' => 'es-ES'
+            'en-US' => 'en-US'
         ];
         $js_locale = isset($js_locale_map[$locale_settings['language']]) ? $js_locale_map[$locale_settings['language']] : 'pt-BR';
         

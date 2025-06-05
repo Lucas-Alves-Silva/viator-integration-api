@@ -1,0 +1,952 @@
+/**
+ * Viator Booking System - Styles
+ * Estilos para o modal de reserva e processo de checkout
+ */
+
+/* Modal Base */
+.viator-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.3s ease-out;
+}
+
+.viator-modal-content {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    max-width: 800px;
+    width: 90%;
+    max-height: 90vh;
+    overflow: hidden;
+    position: relative;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideIn {
+    from { 
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+    to { 
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Header */
+.viator-modal-header {
+    background: linear-gradient(135deg, #0056b3 0%, #004494 100%);
+    color: white;
+    padding: 20px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.viator-modal-title {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.viator-modal-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+    line-height: 1;
+}
+
+.viator-modal-close:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Progress Bar */
+.viator-booking-progress {
+    display: flex;
+    background: #f8f9fa;
+    padding: 20px 30px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.progress-step {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    opacity: 0.5;
+    transition: opacity 0.3s;
+}
+
+.progress-step.active {
+    opacity: 1;
+}
+
+.progress-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 15px;
+    right: -50%;
+    width: 100%;
+    height: 2px;
+    background: #e9ecef;
+    z-index: 1;
+}
+
+.progress-step.active:not(:last-child)::after {
+    background: #0056b3;
+}
+
+.step-number {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #e9ecef;
+    color: #6c757d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 14px;
+    position: relative;
+    z-index: 2;
+    transition: all 0.3s;
+}
+
+.progress-step.active .step-number {
+    background: #0056b3;
+    color: white;
+}
+
+.step-label {
+    margin-top: 8px;
+    font-size: 12px;
+    text-align: center;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.progress-step.active .step-label {
+    color: #0056b3;
+}
+
+/* Modal Body */
+.viator-modal-body {
+    padding: 30px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.booking-step h3 {
+    margin: 0 0 20px 0;
+    color: #333;
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+.booking-step h4 {
+    margin: 20px 0 15px 0;
+    color: #555;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+/* Form Styles */
+.form-group {
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #333;
+    font-size: 14px;
+}
+
+.form-control {
+    width: 100%;
+    padding: 14px 16px;
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    font-size: 15px;
+    transition: all 0.3s ease;
+    background: white;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.form-control:focus {
+    border-color: #0056b3;
+    box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.1);
+    outline: none;
+}
+
+.form-row {
+    display: flex;
+    gap: 15px;
+}
+
+.form-row .form-group {
+    flex: 1;
+}
+
+/* Datepicker personalizado para o booking */
+.viator-booking-date-selector {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    position: relative;
+    min-height: 50px;
+    background: white;
+    transition: all 0.3s ease;
+}
+
+.viator-booking-date-selector:hover {
+    border-color: #0056b3;
+    box-shadow: 0 2px 8px rgba(0, 86, 179, 0.1);
+}
+
+.viator-booking-date-selector.flatpickr-input.active {
+    border-color: #0056b3 !important;
+    box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.1) !important;
+}
+
+.viator-booking-date-selector .calendar-icon {
+    font-size: 18px;
+    color: #0056b3;
+    flex-shrink: 0;
+}
+
+.viator-booking-date-selector span {
+    color: #333;
+    font-weight: 500;
+    flex: 1;
+    font-size: 15px;
+}
+
+.viator-booking-date-selector span:empty::before {
+    content: 'Escolher data';
+    color: #999;
+}
+
+/* Estilização do calendário do booking */
+.viator-booking-calendar.flatpickr-calendar {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12) !important;
+    border: none !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    background: white !important;
+    z-index: 10001 !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    width: 640px !important;
+    max-width: 640px !important;
+}
+
+/* Ajuste específico para garantir que o calendário herde a largura correta do form-group */
+.form-group .viator-booking-date-selector + .flatpickr-calendar.viator-booking-calendar,
+.form-group .flatpickr-calendar.viator-booking-calendar {
+    width: 640px !important;
+    min-width: auto !important;
+    max-width: 640px !important;
+    left: 0 !important;
+    right: auto !important;
+}
+
+/* Posicionamento responsivo do calendário */
+.form-group {
+    position: relative;
+}
+
+.form-group .flatpickr-calendar.viator-booking-calendar {
+    position: absolute !important;
+    top: 100% !important;
+    left: 0 !important;
+    right: auto !important;
+    width: 640px !important;
+    margin-top: 4px !important;
+}
+
+/* Estilização específica para 2 meses lado a lado */
+.viator-booking-calendar.flatpickr-calendar.hasWeeks.showTimeInput {
+    width: 640px !important;
+}
+
+.viator-booking-calendar.flatpickr-calendar .flatpickr-months {
+    display: flex !important;
+    background: #0056b3 !important;
+    color: white !important;
+    padding: 16px 20px !important;
+}
+
+.viator-booking-calendar.flatpickr-calendar .flatpickr-month {
+    flex: 1 !important;
+    color: white !important;
+}
+
+.viator-booking-calendar.flatpickr-calendar .flatpickr-current-month .flatpickr-monthDropdown-months {
+    background: transparent !important;
+    color: white !important;
+    border: none !important;
+    font-weight: 600 !important;
+    font-size: 16px !important;
+}
+
+.viator-booking-calendar.flatpickr-calendar .flatpickr-current-month input.cur-year {
+    background: transparent !important;
+    color: white !important;
+    border: none !important;
+    font-weight: 600 !important;
+    font-size: 16px !important;
+}
+
+.viator-booking-calendar.flatpickr-calendar .flatpickr-weekdays {
+    background: #f8f9fa !important;
+    color: #6c757d !important;
+    font-weight: 600 !important;
+    padding: 12px 0 !important;
+}
+
+.viator-booking-calendar.flatpickr-calendar .flatpickr-weekday {
+    color: #6c757d !important;
+    font-weight: 600 !important;
+    font-size: 12px !important;
+    text-transform: uppercase !important;
+}
+
+.viator-booking-calendar.flatpickr-calendar .flatpickr-days {
+    display: flex !important;
+    padding: 8px !important;
+}
+
+.viator-booking-calendar.flatpickr-calendar .dayContainer {
+    flex: 1 !important;
+    padding: 0 8px !important;
+}
+
+.viator-booking-calendar.flatpickr-calendar .flatpickr-day {
+    width: 40px !important;
+    height: 50px !important;
+    line-height: 1.2 !important;
+    margin: 2px !important;
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+    font-size: 14px !important;
+    transition: all 0.2s ease !important;
+    border: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 4px 2px !important;
+}
+
+.viator-booking-calendar.flatpickr-calendar .flatpickr-day:hover {
+    background: rgba(0, 86, 179, 0.1) !important;
+    color: #0056b3 !important;
+    border-color: transparent !important;
+}
+
+.viator-booking-calendar.flatpickr-calendar .flatpickr-day.selected,
+.viator-booking-calendar.flatpickr-calendar .flatpickr-day.selected:hover {
+    background: #0056b3 !important;
+    color: white !important;
+    border-color: #0056b3 !important;
+    font-weight: 600 !important;
+}
+
+.viator-booking-calendar.flatpickr-calendar .flatpickr-day.today {
+    background: rgba(0, 86, 179, 0.1) !important;
+    color: #0056b3 !important;
+    border-color: transparent !important;
+    font-weight: 600 !important;
+}
+
+.viator-booking-calendar.flatpickr-calendar .flatpickr-day.today:hover {
+    background: rgba(0, 86, 179, 0.2) !important;
+}
+
+.viator-booking-calendar.flatpickr-calendar .flatpickr-day.disabled,
+.viator-booking-calendar.flatpickr-calendar .flatpickr-day.disabled:hover {
+    color: rgba(72, 72, 72, 0.3) !important;
+    background: transparent !important;
+    border-color: transparent !important;
+    cursor: not-allowed !important;
+}
+
+.viator-booking-calendar.flatpickr-calendar .flatpickr-prev-month,
+.viator-booking-calendar.flatpickr-calendar .flatpickr-next-month {
+    color: white !important;
+    fill: white !important;
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 50% !important;
+    transition: all 0.2s ease !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.viator-booking-calendar.flatpickr-calendar .flatpickr-prev-month:hover,
+.viator-booking-calendar.flatpickr-calendar .flatpickr-next-month:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.viator-booking-calendar.flatpickr-calendar .flatpickr-prev-month svg,
+.viator-booking-calendar.flatpickr-calendar .flatpickr-next-month svg {
+    width: 12px !important;
+    height: 12px !important;
+    fill: white !important;
+    margin: auto !important;
+}
+
+/* Preços exibidos no calendário - OCULTOS */
+.viator-booking-calendar.flatpickr-calendar .flatpickr-day .price-label {
+    display: none !important;
+}
+
+.viator-booking-calendar.flatpickr-calendar .flatpickr-day.selected .price-label {
+    display: none !important;
+}
+
+.viator-booking-calendar.flatpickr-calendar .flatpickr-day.today .price-label {
+    display: none !important;
+}
+
+/* Travelers Section */
+.travelers-section {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.traveler-group {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding: 10px 0;
+}
+
+.traveler-group:last-child {
+    margin-bottom: 0;
+}
+
+/* Seletor de quantidade com maior especificidade para evitar overrides */
+.viator-modal .quantity-selector {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    background: #f8f9fa;
+    padding: 15px 20px;
+    border-radius: 12px;
+    border: 1px solid #e9ecef;
+}
+
+.viator-modal .quantity-selector .qty-btn {
+    width: 84px !important;
+    height: 42px !important;
+    border: 2px solid #0056b3 !important;
+    background: white !important;
+    color: #0056b3 !important;
+    border-radius: 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    font-size: 22px !important;
+    font-weight: 700 !important;
+    transition: all 0.2s ease-out !important;
+    line-height: 1 !important;
+    padding: 0 !important;
+    box-shadow: 0 3px 8px rgba(0, 86, 179, 0.15) !important;
+    user-select: none !important;
+    outline: none !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+
+.viator-modal .quantity-selector .qty-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 50%);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.viator-modal .quantity-selector .qty-btn:hover {
+    background: linear-gradient(135deg, #0056b3 0%, #004494 100%) !important;
+    color: white !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(0, 86, 179, 0.3) !important;
+    border-color: #004494 !important;
+}
+
+.viator-modal .quantity-selector .qty-btn:hover::before {
+    opacity: 1;
+}
+
+.viator-modal .quantity-selector .qty-btn:active {
+    background: linear-gradient(135deg, #003d82 0%, #002c5f 100%) !important;
+    color: white !important;
+    transform: translateY(0px) scale(0.96) !important;
+    box-shadow: 0 3px 10px rgba(0, 86, 179, 0.4) !important;
+    transition: all 0.1s ease !important;
+}
+
+.viator-modal .quantity-selector .qty-btn:disabled,
+.viator-modal .quantity-selector .qty-btn[disabled],
+.viator-modal .quantity-selector .qty-btn:disabled:hover,
+.viator-modal .quantity-selector .qty-btn:disabled:active {
+    opacity: 0.4 !important;
+    cursor: not-allowed !important;
+    background: #f8f9fa !important;
+    color: #adb5bd !important;
+    border-color: #dee2e6 !important;
+    transform: none !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+}
+
+.viator-modal .quantity-selector .qty-btn:disabled::before {
+    display: none;
+}
+
+.viator-modal .quantity-selector input[type="text"] {
+    width: 50px !important;
+    height: 42px !important;
+    text-align: center !important;
+    border: 2px solid #e9ecef !important;
+    border-radius: 12px !important;
+    padding: 0 !important;
+    font-weight: 700 !important;
+    font-size: 18px !important;
+    color: #0056b3 !important;
+    background: white !important;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1) !important;
+    outline: none !important;
+    transition: all 0.2s ease !important;
+    line-height: 42px !important;
+}
+
+.viator-modal .quantity-selector input[type="text"]:focus {
+    border-color: #0056b3 !important;
+    box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.1), inset 0 2px 4px rgba(0,0,0,0.1) !important;
+}
+
+.viator-modal .quantity-selector input[type="text"]:read-only {
+    background: #f8f9fa !important;
+    cursor: default;
+}
+
+/* Traveler Forms */
+.traveler-form {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #0056b3;
+}
+
+.traveler-form h4 {
+    margin-top: 0;
+    color: #0056b3;
+}
+
+/* Payment Section */
+.payment-summary {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+}
+
+.summary-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.summary-item:last-child {
+    border-bottom: none;
+}
+
+.summary-item.total {
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: #0056b3;
+    border-top: 2px solid #e9ecef;
+    margin-top: 10px;
+    padding-top: 15px;
+}
+
+.payment-form {
+    margin-top: 20px;
+}
+
+/* Availability Result */
+.availability-result {
+    margin-top: 24px;
+    padding: 20px;
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    background: #f8f9fa;
+    animation: slideDown 0.3s ease-out;
+}
+
+.availability-result.success {
+    border-color: #0056b3;
+    background: linear-gradient(135deg, #f8fbff 0%, #e8f2ff 100%);
+}
+
+.availability-success {
+    text-align: center;
+}
+
+.availability-success h4 {
+    color: #0056b3 !important;
+    margin: 0 0 12px 0 !important;
+    font-size: 1.2rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.availability-success p {
+    color: #666;
+    margin: 0 0 16px 0;
+    font-size: 14px;
+}
+
+.price-display {
+    background: white;
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.price-label {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 4px;
+    font-weight: 500;
+}
+
+.price-value {
+    font-size: 1.5rem !important;
+    color: #0056b3 !important;
+    font-weight: 700;
+    margin: 0 !important;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Confirmation */
+.confirmation-success {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.success-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: #28a745;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    margin: 0 auto 20px auto;
+    animation: successPulse 0.6s ease-out;
+}
+
+@keyframes successPulse {
+    0% { transform: scale(0.3); opacity: 0; }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.confirmation-success h3 {
+    color: #28a745;
+    margin-bottom: 10px;
+}
+
+/* Modal Footer */
+.viator-modal-footer {
+    padding: 20px 30px;
+    background: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+    display: flex;
+    gap: 15px;
+    justify-content: flex-end;
+}
+
+/* Buttons */
+.viator-btn-primary,
+.viator-btn-secondary,
+.viator-btn-cancel {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+}
+
+.viator-btn-primary {
+    background: #0056b3;
+    color: white;
+}
+
+.viator-btn-primary:hover {
+    background: #004494;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 86, 179, 0.3);
+}
+
+.viator-btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.viator-btn-secondary:hover {
+    background: #5a6268;
+}
+
+.viator-btn-cancel {
+    background: transparent;
+    color: #6c757d;
+    border: 2px solid #e9ecef;
+}
+
+.viator-btn-cancel:hover {
+    background: #e9ecef;
+    color: #495057;
+}
+
+/* Loading States */
+.loading {
+    position: relative;
+    pointer-events: none;
+}
+
+.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid #e9ecef;
+    border-top: 2px solid #0056b3;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .viator-modal-content {
+        width: 95%;
+        max-height: 95vh;
+    }
+    
+    /* Ajuste do calendário para mobile - volta para 1 mês */
+    .viator-booking-calendar.flatpickr-calendar {
+        width: 100% !important; /* 100% da largura disponível em mobile */
+        max-width: 350px !important; /* Máximo de 350px */
+    }
+    
+    .form-group .viator-booking-date-selector + .flatpickr-calendar.viator-booking-calendar,
+    .form-group .flatpickr-calendar.viator-booking-calendar {
+        width: 100% !important; /* 100% da largura disponível em mobile */
+        max-width: 350px !important; /* Máximo de 350px */
+    }
+    
+    .form-group .flatpickr-calendar.viator-booking-calendar {
+        width: 100% !important; /* 100% da largura disponível em mobile */
+    }
+
+    /* Reset layout para mobile - 1 mês */
+    .viator-booking-calendar.flatpickr-calendar .flatpickr-months {
+        display: block !important;
+    }
+
+    .viator-booking-calendar.flatpickr-calendar .flatpickr-days {
+        display: block !important;
+    }
+
+    .viator-booking-calendar.flatpickr-calendar .dayContainer {
+        flex: none !important;
+        padding: 0 !important;
+    }
+
+    /* Ajustar botões de quantidade para mobile */
+    .viator-modal .quantity-selector {
+        padding: 12px 15px;
+        gap: 12px;
+    }
+
+    .viator-modal .quantity-selector .qty-btn {
+        width: 60px !important; /* Menor que desktop mas ainda maior que antes */
+        height: 38px;
+        font-size: 20px;
+    }
+
+    .viator-modal .quantity-selector input[type="text"] {
+        width: 45px !important; /* Reduzido para mobile */
+        height: 38px;
+        font-size: 16px;
+        line-height: 38px !important;
+    }
+    
+    .viator-modal-header,
+    .viator-modal-body,
+    .viator-modal-footer {
+        padding: 20px;
+    }
+    
+    .viator-booking-progress {
+        padding: 15px 20px;
+    }
+    
+    .form-row {
+        flex-direction: column;
+        gap: 0;
+    }
+    
+    .traveler-group {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .viator-modal-footer {
+        flex-direction: column;
+    }
+    
+    .step-label {
+        font-size: 11px;
+    }
+    
+    .progress-step:not(:last-child)::after {
+        display: none;
+    }
+    
+    .viator-booking-calendar .flatpickr-day {
+        width: 35px !important;
+        height: 45px !important;
+        font-size: 13px !important;
+        padding: 3px 1px !important;
+    }
+    
+    .viator-booking-calendar .flatpickr-day .price-label {
+        font-size: 9px !important;
+    }
+    
+    .viator-booking-date-selector {
+        min-height: 48px;
+        padding: 12px 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    .viator-modal-title {
+        font-size: 1.2rem;
+    }
+    
+    .booking-step h3 {
+        font-size: 1.1rem;
+    }
+    
+    .price-display {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+}
+
+/* Security Indicators */
+.security-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #d4edda;
+    color: #155724;
+    padding: 10px 15px;
+    border-radius: 6px;
+    font-size: 12px;
+    margin-top: 15px;
+}
+
+.security-badge::before {
+    content: '🔒';
+    font-size: 14px;
+}
+
+/* Form Validation */
+.form-control.error {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+}
+
+.error-message {
+    color: #dc3545;
+    font-size: 12px;
+    margin-top: 5px;
+    display: block;
+} 

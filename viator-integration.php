@@ -95,7 +95,6 @@ function viator_settings_page() {
                         <select name="viator_language" id="viator_language">
                             <option value="pt-BR" <?php selected(get_option('viator_language', 'pt-BR'), 'pt-BR'); ?>>Português do Brasil</option>
                             <option value="en-US" <?php selected(get_option('viator_language', 'pt-BR'), 'en-US'); ?>>English (US)</option>
-                            <option value="es-ES" <?php selected(get_option('viator_language', 'pt-BR'), 'es-ES'); ?>>Español</option>
                         </select>
                         <p class="description">Selecione o idioma para exibição dos produtos e traduções automáticas.</p>
                     </td>
@@ -159,9 +158,6 @@ function viator_enqueue_scripts() {
     if ($locale_settings['language'] === 'pt-BR') {
         wp_enqueue_script('flatpickr-pt', 'https://npmcdn.com/flatpickr/dist/l10n/pt.js', array('flatpickr'), null, true);
         $flatpickr_locale = 'pt';
-    } elseif ($locale_settings['language'] === 'es-ES') {
-        wp_enqueue_script('flatpickr-es', 'https://npmcdn.com/flatpickr/dist/l10n/es.js', array('flatpickr'), null, true);
-        $flatpickr_locale = 'es';
     }
     // Para inglês (en-US), não precisamos carregar localização adicional, pois é o padrão
 
@@ -1734,48 +1730,110 @@ function viator_get_translation($key, $language = null) {
             'product_code_not_provided' => 'Código do passeio/serviço não fornecido.',
             
             // Tipos de informações adicionais
-            'stroller_accessible' => 'Accesible para cochecitos de bebé',
-            'pets_welcome' => 'Se permiten animales de servicio',
-            'public_transportation_nearby' => 'Transporte público cercano',
-            'physical_easy' => 'Adecuado para todos los niveles de condición física',
-            'physical_medium' => 'Nivel medio de actividad física',
-            'physical_moderate' => 'Nivel moderado de actividad física',
-            'physical_strenuous' => 'Nivel intenso de actividad física',
-            'wheelchair_accessible' => 'Accesible para sillas de ruedas',
-            'surfaces_wheelchair_accessible' => 'Superficies accesibles para sillas de ruedas',
-            'transportation_wheelchair_accessible' => 'Transporte accesible para sillas de ruedas',
-            'infant_friendly' => 'Adecuado para bebés',
-            'infant_seats_available' => 'Asientos para bebés disponibles',
-            'kid_friendly' => 'Adecuado para niños',
-            'senior_friendly' => 'Adecuado para personas mayores',
-            'infants_must_sit_on_laps' => 'Los bebés deben ir en el regazo',
-            'no_pregnant' => 'No recomendado para viajeras embarazadas',
-            'no_heart_problems' => 'No recomendado para personas con problemas cardíacos u otras afecciones médicas graves',
-            'no_back_problems' => 'No recomendado para personas con problemas de espalda',
-            'health_other' => 'Salud y otras consideraciones',
-            'pickup_available' => 'Recogida disponible',
-            'shopping_opportunity' => 'Oportunidad de compras',
-            'vegetarian_option' => 'Opción vegetariana disponible',
-            'skip_the_line_info' => 'Evitar las colas',
-            'private_tour_info' => 'Tour privado',
-            'group_tour' => 'Tour en grupo',
-            'other_info' => 'Otra información',
+            'stroller_accessible' => 'Acessível para Carrinhos de Bebê',
+            'pets_welcome' => 'Animais de Serviço Permitidos',
+            'public_transportation_nearby' => 'Transporte Público Próximo',
+            'physical_easy' => 'Adequado para Todos os Níveis de Condicionamento Físico',
+            'physical_medium' => 'Nível Médio de Atividade Física',
+            'physical_moderate' => 'Nível Moderado de Atividade Física',
+            'physical_strenuous' => 'Nível Intenso de Atividade Física',
+            'wheelchair_accessible' => 'Acessível para Cadeirantes',
+            'surfaces_wheelchair_accessible' => 'Superfícies acessíveis para cadeira de rodas',
+            'transportation_wheelchair_accessible' => 'Transporte acessível para cadeira de rodas',
+            'infant_friendly' => 'Adequado para Bebês',
+            'infant_seats_available' => 'Assentos para Bebês Disponíveis',
+            'kid_friendly' => 'Adequado para Crianças',
+            'senior_friendly' => 'Adequado para Idosos',
+            'infants_must_sit_on_laps' => 'Crianças pequenas devem ir no colo',
+            'no_pregnant' => 'Não recomendado para grávidas',
+            'no_heart_problems' => 'Não recomendado para pessoas com problemas cardíacos ou outras condições médicas graves',
+            'no_back_problems' => 'Não recomendado para pessoas com problemas de coluna',
+            'health_other' => 'Saúde e outras considerações',
+            'pickup_available' => 'Serviço de Transporte Disponível',
+            'shopping_opportunity' => 'Oportunidade de Compras',
+            'vegetarian_option' => 'Opção Vegetariana Disponível',
+            'skip_the_line_info' => 'Acesso Sem Fila',
+            'private_tour_info' => 'Tour Privado',
+            'group_tour' => 'Tour em Grupo',
+            'other_info' => 'Outras informações',
             
             // Tipos de serviços de idioma
-            'guide_service' => 'Guía presencial',
-            'written_service' => 'Guía escrita',
-            'audio_service' => 'Audio guía',
+            'guide_service' => 'Guia Presencial',
+            'written_service' => 'Guia Escrito',
+            'audio_service' => 'Áudio Guia',
             
             // Avaliações - traduções para o JavaScript
-            'reviews_load_error' => 'No se pudieron cargar las reseñas.',
-            'reviews_load_error_generic' => 'Error al cargar las reseñas.',
-            'try_again_later' => 'Inténtelo de nuevo más tarde.',
+            'reviews_load_error' => 'Não foi possível carregar as avaliações.',
+            'reviews_load_error_generic' => 'Erro ao carregar avaliações.',
+            'try_again_later' => 'Tente novamente mais tarde.',
             'no_reviews_found_rating' => 'Nenhuma avaliação encontrada para esta classificação.',
-            'no_more_reviews_page' => 'No hay más reseñas para mostrar en esta página.',
-            'anonymous_traveler' => 'Viajero anónimo',
-            'product_code_copied' => '¡Código copiado al portapapeles!',
-            'copy_product_code' => 'Copiar código de producto',
-            'code_copied_short' => '¡Código copiado!',
+            'no_more_reviews_page' => 'Não há mais avaliações para exibir nesta página.',
+            'anonymous_traveler' => 'Viajante anônimo',
+            'product_code_copied' => 'Código copiado para a área de transferência!',
+            'copy_product_code' => 'Copiar código do produto',
+            'code_copied_short' => 'Código copiado!',
+            // Traduções em português (Brasil)
+            'book_experience' => 'Reservar Experiência',
+            'availability' => 'Disponibilidade',
+            'travelers' => 'Viajantes',
+            'payment' => 'Pagamento',
+            'confirmation' => 'Confirmação',
+            'select_date_travelers' => 'Selecione a Data e Número de Viajantes',
+            'travel_date' => 'Data da Viagem',
+            'number_travelers' => 'Número de Viajantes',
+            'adults_18_plus' => 'Adultos (18+ anos)',
+            'children_3_17' => 'Crianças (3-17 anos)',
+            'infants_0_2' => 'Bebês (0-2 anos)',
+            'check_availability_btn' => 'Verificar Disponibilidade',
+            'continue_payment' => 'Continuar para Pagamento',
+            'process_payment' => 'Processar Pagamento',
+            'traveler_information' => 'Informações dos Viajantes',
+            'payment_information' => 'Informações de Pagamento',
+            'booking_summary' => 'Resumo da Reserva',
+            'credit_card' => 'Cartão de Crédito',
+            'card_number' => 'Número do Cartão',
+            'expiry_month' => 'Mês',
+            'expiry_year' => 'Ano',
+            'security_code' => 'CVV',
+            'cardholder_name' => 'Nome no Cartão',
+            'billing_address' => 'Endereço de Cobrança',
+            'address' => 'Endereço',
+            'city' => 'Cidade',
+            'state' => 'Estado',
+            'zip_code' => 'CEP',
+            'country' => 'País',
+            'booking_confirmed' => 'Reserva Confirmada!',
+            'booking_success_message' => 'Sua reserva foi processada com sucesso.',
+            'back' => 'Voltar',
+            'cancel' => 'Cancelar',
+            'next' => 'Próximo',
+            'first_name' => 'Nome',
+            'last_name' => 'Sobrenome',
+            'birth_date' => 'Data de Nascimento',
+            'gender' => 'Gênero',
+            'male' => 'Masculino',
+            'female' => 'Feminino',
+            'select_option' => 'Selecione',
+            'adult' => 'Adulto',
+            'child' => 'Criança',
+            'infant' => 'Bebê',
+            'product' => 'Produto',
+            'date' => 'Data',
+            'total' => 'Total',
+            'available' => 'Disponível!',
+            'experience_available' => 'Esta experiência está disponível na data selecionada.',
+            'total_price' => 'Preço total',
+            'month' => 'Mês',
+            'year' => 'Ano',
+            'select_date_message' => 'Por favor, selecione uma data de viagem.',
+            'fill_traveler_info' => 'Por favor, preencha todas as informações dos viajantes.',
+            'fill_payment_info' => 'Por favor, preencha todas as informações de pagamento.',
+            'connection_error' => 'Erro de conexão. Tente novamente.',
+            'payment_error' => 'Erro no processamento do pagamento',
+            'incomplete_data' => 'Dados incompletos',
+            'incomplete_payment_data' => 'Dados de pagamento incompletos',
+            'incomplete_confirmation_data' => 'Dados incompletos para confirmação',
+            'invalid_nonce' => 'Nonce inválido',
         ],
         'en-US' => [
             // Search form
@@ -1972,202 +2030,68 @@ function viator_get_translation($key, $language = null) {
             'product_code_copied' => 'Code copied to clipboard!',
             'copy_product_code' => 'Copy product code',
             'code_copied_short' => 'Code copied!',
-        ],
-        'es-ES' => [
-            // Formulario de búsqueda
-            'search_placeholder' => '🌍 ¿Dónde quieres ir?',
-            'search_button' => 'Buscar',
-            'search_nearby' => 'Cerca',
-            
-            // Filtros
-            'when_travel' => '¿Cuándo planeas viajar?',
-            'choose_date' => 'Elegir fecha',
-            'duration' => 'Duración',
-            'up_to_one_hour' => 'Hasta 1 hora',
-            'one_to_four_hours' => '1 a 4 horas',
-            'four_hours_to_one_day' => '4 horas a 1 día',
-            'one_to_three_days' => '1 a 3 días',
-            'more_than_three_days' => 'Más de 3 días',
-            'price_range' => 'Rango de Precio',
-            'rating' => 'Calificación',
-            'specials' => 'Especiales',
-            'free_cancellation' => 'Cancelación Gratuita',
-            'likely_to_sell_out' => 'Probablemente se Agote',
-            'skip_the_line' => 'Evitar la Cola',
-            'private_tour' => 'Tour Privado',
-            'new_on_viator' => 'Nuevo en Viator',
-            'clear_all' => 'Limpiar todo',
-            'filters' => 'Filtros',
-            
-            // Ordenación
-            'featured' => 'Destacados',
-            'best_rated' => 'Mejor Calificados',
-            'price_low_to_high' => 'Precio (Menor a Mayor)',
-            'price_high_to_low' => 'Precio (Mayor a Menor)',
-            'duration_ascending' => 'Duración (Ascendente)',
-            'duration_descending' => 'Duración (Descendente)',
-            'newest_on_viator' => 'Nuevo en Viator',
-            
-            // Resultados
-            'results' => 'resultados',
-            'no_tours_found' => 'No se encontraron tours para',
-            'no_tours_found_filters' => 'No se encontraron tours con los filtros seleccionados para',
-            'try_popular_destinations' => '¿Qué tal probar uno de estos destinos populares?',
-            'did_you_know' => '¿Sabías que?',
-            'free_cancellation_note' => 'Cancelación gratuita hasta 24 horas antes del inicio de la experiencia (hora local)',
-            
-            // Tarjetas de producto
-            'duration_approx' => '(aprox.)',
-            'from_price' => 'desde',
-            'see_details' => 'Ver detalles',
-            'price_not_available' => 'Precio no disponible',
-            'no_reviews' => 'Sin reseñas',
-            'review' => 'reseña',
-            'reviews' => 'reseñas',
-            'special_offer' => 'Oferta especial',
-            
-            // Distintivos
-            'free_cancellation_badge' => 'Cancelación gratuita',
-            'likely_to_sell_out_badge' => 'Probablemente se agote',
-            'special_offer_badge' => 'Oferta especial',
-            
-            // Duración
-            'duration_not_available' => 'Duración no disponible',
-            'flexible' => 'Flexible',
-            'minute' => 'minuto',
-            'minutes' => 'minutos',
-            'hour' => 'hora',
-            'hours' => 'horas',
-            'day' => 'día',
-            'days' => 'días',
-            'and' => 'y',
-            'from' => 'De',
-            'to' => 'a',
-            'duration_approx' => 'Duración aproximada',
-            
-            // Avaliações - traduções para o JavaScript
-            'reviews_load_error' => 'Não foi possível carregar as avaliações.',
-            'reviews_load_error_generic' => 'Erro ao carregar avaliações.',
-            'try_again_later' => 'Tente novamente mais tarde.',
-            'no_reviews_found_rating' => 'No se encontraron reseñas para esta calificación.',
-            'no_more_reviews_page' => 'Não há mais avaliações para exibir nesta página.',
-            'anonymous_traveler' => 'Viajante anônimo',
-            
-            // Product page
-            'home' => 'Inicio',
-            'product_code' => 'Código del Tour/Servicio',
-            'description' => 'Descripción',
-            'included' => 'Qué está Incluido',
-            'not_included' => 'Qué no está Incluido',
-            'additional_info' => 'Información Adicional',
-            'cancellation_policy' => 'Política de Cancelación',
-            'available_languages' => 'Idiomas Disponibles',
-            'check_availability' => 'Verificar Disponibilidad',
-            'price_per_person' => '*Precio por persona',
-            'location' => 'Ubicación',
-            'timezone' => 'Zona Horaria',
-            'logistics_info' => 'Información Logística',
-            'special_instructions' => 'Instrucciones Especiales',
-            'you_might_like' => 'Te puede gustar',
-            'tags' => 'Etiquetas',
-            'consult_availability' => 'Consultar disponibilidad',
-            'price_per_group' => 'Precio por grupo',
-            'price_per_unit' => 'Precio por unidad (%s)',
-            'up_to_travelers' => '(hasta %d viajantes)',
-            'traveler_age_band' => '%s (Edad: %d-%d)',
-            'min_max_travelers' => 'Mín: %d, Máx: %d',
-            'total_travelers_info' => 'Puedes seleccionar hasta %d viajantes en total.',
-            'traveler_info_title' => 'Información del Viajante',
-            'infant' => 'Infantil',
-            'child' => 'Criança',
-            'youth' => 'Jovem',
-            'adult' => 'Adulto',
-            'senior' => 'Idoso',
-            'traveler' => 'Viajante',
-            'boat' => 'barco',
-            'vehicle' => 'veículo',
-            'unit_type_vehicle_available' => 'Traslado disponible',
-            'unit_type_boat_available' => 'Paseo en barco disponible',
-            'unit_type_generic_available' => 'Serviço de %s disponível',
-            
-            // Reseñas
-            'reviews_title' => 'Reseñas',
-            'all_reviews' => 'Todas',
-            'stars' => 'estrellas',
-            'star' => 'estrella',
-            'most_recent' => 'Más Recientes',
-            'highest_rating' => 'Mejor Calificación',
-            'most_helpful' => 'Más Útiles',
-            'all_languages' => '(todos los idiomas)',
-            'loading_reviews' => 'Cargando reseñas...',
-            
-            // Elementos adicionales de la interfaz
-            'additional_info' => 'Información Adicional',
-            'tooltip_support' => 'Cite este código al contactar con el servicio de atención al cliente.',
-            'searching' => 'Buscando...',
-            'please_wait' => 'Por favor, aguarde!',
-            'lets_go_searching' => '¡Vamos a buscar!',
-            'reset_button' => 'Restablecer',
-            'apply_button' => 'Aplicar',
-            'duration_approx_short' => '(aprox.)',
-            'date_connector' => 'de',
-            
-            // Meses abreviados
-            'jan_short' => 'Ene', 'feb_short' => 'Feb', 'mar_short' => 'Mar',
-            'apr_short' => 'Abr', 'may_short' => 'May', 'jun_short' => 'Jun',
-            'jul_short' => 'Jul', 'aug_short' => 'Ago', 'sep_short' => 'Sep',
-            'oct_short' => 'Oct', 'nov_short' => 'Nov', 'dec_short' => 'Dic',
-            
-            // Errores
-            'error_api_key' => 'Por favor, configure su clave API de Viator en la configuración de WordPress.',
-            'error_try_again' => '¡UPS! Espere un momento e intente nuevamente.',
-            'error_product_not_found' => 'Producto no encontrado o no disponible.',
-            'error_fetch_details' => 'Error al obtener detalles del producto. Por favor, inténtelo de nuevo más tarde.',
-            'product_code_not_provided' => 'Código del tour/servicio no proporcionado.',
-            
-            // Tipos de informações adicionais
-            'stroller_accessible' => 'Acessível para Carrinhos de Bebê',
-            'pets_welcome' => 'Animais de Serviço Permitidos',
-            'public_transportation_nearby' => 'Transporte Público Próximo',
-            'physical_easy' => 'Adequado para Todos os Níveis de Condicionamento Físico',
-            'physical_medium' => 'Nível Médio de Atividade Física',
-            'physical_moderate' => 'Nível Moderado de Atividade Física',
-            'physical_strenuous' => 'Nível Intenso de Atividade Física',
-            'wheelchair_accessible' => 'Acessível para Cadeirantes',
-            'surfaces_wheelchair_accessible' => 'Superfícies acessíveis para cadeira de rodas',
-            'transportation_wheelchair_accessible' => 'Transporte acessível para cadeira de rodas',
-            'infant_friendly' => 'Adequado para Bebês',
-            'infant_seats_available' => 'Assentos para Bebês Disponíveis',
-            'kid_friendly' => 'Adequado para Crianças',
-            'senior_friendly' => 'Adequado para Idosos',
-            'infants_must_sit_on_laps' => 'Crianças pequenas no colo',
-            'no_pregnant' => 'Não recomendado para grávidas',
-            'no_heart_problems' => 'Não recomendado para cardíacos',
-            'no_back_problems' => 'Não recomendado para problemas de coluna',
-            'health_other' => 'Saúde e outros',
-            'pickup_available' => 'Serviço de Transporte Disponível',
-            'shopping_opportunity' => 'Oportunidade de Compras',
-            'vegetarian_option' => 'Opção Vegetariana Disponível',
-            'skip_the_line_info' => 'Acesso Sem Fila',
-            'private_tour_info' => 'Tour Privado',
-            'group_tour' => 'Tour em Grupo',
-            'other_info' => 'Outros',
-            
-            // Tipos de serviços de idioma
-            'guide_service' => 'Guia Presencial',
-            'written_service' => 'Guia Escrito',
-            'audio_service' => 'Áudio Guia',
-            
-            // Avaliações - traduções para o JavaScript
-            'reviews_load_error' => 'Não foi possível carregar as avaliações.',
-            'reviews_load_error_generic' => 'Erro ao carregar avaliações.',
-            'try_again_later' => 'Tente novamente mais tarde.',
-            'no_reviews_found_rating' => 'Nenhuma avaliação encontrada para esta classificação.',
-            'no_more_reviews_page' => 'Não há mais avaliações para exibir nesta página.',
-            'anonymous_traveler' => 'Viajante anônimo',
-            'product_code_copied' => 'Código copiado para a área de transferência!',
-            'copy_product_code' => 'Copiar código do produto',
-            'code_copied_short' => 'Código copiado!',
+            // Traduções em inglês
+            'book_experience' => 'Book Experience',
+            'availability' => 'Availability',
+            'travelers' => 'Travelers',
+            'payment' => 'Payment',
+            'confirmation' => 'Confirmation',
+            'select_date_travelers' => 'Select Date and Number of Travelers',
+            'travel_date' => 'Travel Date',
+            'number_travelers' => 'Number of Travelers',
+            'adults_18_plus' => 'Adults (18+ years)',
+            'children_3_17' => 'Children (3-17 years)',
+            'infants_0_2' => 'Infants (0-2 years)',
+            'check_availability_btn' => 'Check Availability',
+            'continue_payment' => 'Continue to Payment',
+            'process_payment' => 'Process Payment',
+            'traveler_information' => 'Traveler Information',
+            'payment_information' => 'Payment Information',
+            'booking_summary' => 'Booking Summary',
+            'credit_card' => 'Credit Card',
+            'card_number' => 'Card Number',
+            'expiry_month' => 'Month',
+            'expiry_year' => 'Year',
+            'security_code' => 'CVV',
+            'cardholder_name' => 'Cardholder Name',
+            'billing_address' => 'Billing Address',
+            'address' => 'Address',
+            'city' => 'City',
+            'state' => 'State',
+            'zip_code' => 'ZIP Code',
+            'country' => 'Country',
+            'booking_confirmed' => 'Booking Confirmed!',
+            'booking_success_message' => 'Your booking has been processed successfully.',
+            'back' => 'Back',
+            'cancel' => 'Cancel',
+            'next' => 'Next',
+            'first_name' => 'First Name',
+            'last_name' => 'Last Name',
+            'birth_date' => 'Birth Date',
+            'gender' => 'Gender',
+            'male' => 'Male',
+            'female' => 'Female',
+            'select_option' => 'Select',
+            'adult' => 'Adult',
+            'child' => 'Child',
+            'infant' => 'Infant',
+            'product' => 'Product',
+            'date' => 'Date',
+            'total' => 'Total',
+            'available' => 'Available!',
+            'experience_available' => 'This experience is available on the selected date.',
+            'total_price' => 'Total price',
+            'month' => 'Month',
+            'year' => 'Year',
+            'select_date_message' => 'Please select a travel date.',
+            'fill_traveler_info' => 'Please fill in all traveler information.',
+            'fill_payment_info' => 'Please fill in all payment information.',
+            'connection_error' => 'Connection error. Please try again.',
+            'payment_error' => 'Payment processing error',
+            'incomplete_data' => 'Incomplete data',
+            'incomplete_payment_data' => 'Incomplete payment data',
+            'incomplete_confirmation_data' => 'Incomplete data for confirmation',
+            'invalid_nonce' => 'Invalid nonce',
         ]
     ];
     
@@ -2285,8 +2209,7 @@ function viator_get_groq_curiosity($searchTerm) {
     
     $language_prompts = [
         'pt-BR' => "Gere uma curiosidade interessante e envolvente sobre {$searchTerm} em português brasileiro. A curiosidade deve ser educativa, factual e despertar o interesse turístico. Mantenha entre 40-60 palavras. Não use aspas ou formatação especial.",
-        'en-US' => "Generate an interesting and engaging curiosity about {$searchTerm} in English. The curiosity should be educational, factual and spark tourist interest. Keep it between 40-60 words. Don't use quotes or special formatting.",
-        'es-ES' => "Genera una curiosidad interesante y atractiva sobre {$searchTerm} en español. La curiosidad debe ser educativa, factual y despertar el interés turístico. Mantén entre 40-60 palabras. No uses comillas o formato especial."
+        'en-US' => "Generate an interesting and engaging curiosity about {$searchTerm} in English. The curiosity should be educational, factual and spark tourist interest. Keep it between 40-60 words. Don't use quotes or special formatting."
     ];
     
     $prompt = isset($language_prompts[$language]) ? $language_prompts[$language] : $language_prompts['pt-BR'];
@@ -2337,7 +2260,7 @@ function viator_get_groq_curiosity($searchTerm) {
         
         // Limpar a resposta removendo aspas e formatação desnecessária
         $curiosity = str_replace(['"', "'", '**', '*'], '', $curiosity);
-        $curiosity = preg_replace('/^(Curiosidade:|Did you know\?|¿Sabías que\?)/i', '', $curiosity);
+        $curiosity = preg_replace('/^(Curiosidade:|Did you know\?)/i', '', $curiosity);
         $curiosity = trim($curiosity);
         
         // Limitar o tamanho se necessário
@@ -2388,22 +2311,66 @@ function viator_get_fallback_curiosity() {
             "The local nightlife offers a perfect blend of tradition and modernity.",
             "Local markets are true treasures where you can find authentic regional products."
         ];
-    } else { // es-ES
+    } else {
+        // Fallback para outros idiomas não suportados - usar inglês
         $facts = [
-            "¿Sabías que esta es una de las regiones más visitadas por los turistas?",
-            "¡Este destino ofrece experiencias únicas durante todo el año!",
-            "La cultura local es rica en tradiciones e historias fascinantes.",
-            "Los visitantes suelen sorprenderse con la hospitalidad local.",
-            "Este lugar tiene una gastronomía única que deleita a turistas de todo el mundo.",
-            "La arquitectura local refleja siglos de historia e influencias culturales diversas.",
-            "Muchos festivales tradicionales tienen lugar aquí, celebrando la rica herencia cultural.",
-            "La naturaleza exuberante de esta región ofrece paisajes que quitan el aliento.",
-            "Los artesanos locales preservan técnicas ancestrales transmitidas de generación en generación.",
-            "Este destino es conocido por sus tradiciones musicales y danzas folclóricas únicas.",
-            "La vida nocturna local ofrece una mezcla perfecta entre tradición y modernidad.",
-            "Los mercados locales son verdaderos tesoros donde se encuentran productos auténticos de la región."
+            "Did you know this is one of the most visited regions by tourists?",
+            "This destination offers unique experiences throughout the year!",
+            "The local culture is rich in fascinating traditions and stories.",
+            "Visitors are often surprised by the local hospitality.",
+            "This place has a unique cuisine that delights tourists from around the world.",
+            "The local architecture reflects centuries of history and diverse cultural influences.",
+            "Many traditional festivals take place here, celebrating the rich cultural heritage.",
+            "The lush nature of this region offers breathtaking landscapes.",
+            "Local artisans preserve ancestral techniques passed down through generations.",
+            "This destination is known for its unique musical traditions and folk dances.",
+            "The local nightlife offers a perfect blend of tradition and modernity.",
+            "Local markets are true treasures where you can find authentic regional products."
         ];
     }
     
     return $facts[array_rand($facts)];
 }
+
+// Incluir o sistema de booking
+require_once plugin_dir_path(__FILE__) . 'viator-booking.php';
+
+/**
+ * Enqueue scripts and styles for booking system
+ */
+function viator_enqueue_booking_scripts() {
+    // Enqueue booking scripts only on pages with product details
+    if (is_page() || is_single()) {
+        // Enqueue Viator Payment Library first
+        wp_enqueue_script(
+            'viator-payment-lib',
+            'https://checkout-assets.payments.tamg.cloud/stable/v2/payment.js',
+            array(),
+            null,
+            true
+        );
+        
+        wp_enqueue_script(
+            'viator-booking-js',
+            plugin_dir_url(__FILE__) . 'viator-booking.js',
+            array('jquery', 'viator-payment-lib'),
+            '1.0.0',
+            true
+        );
+        
+        wp_enqueue_style(
+            'viator-booking-css',
+            plugin_dir_url(__FILE__) . 'viator-booking.css',
+            array(),
+            '1.0.0'
+        );
+        
+        // Localizar script para AJAX
+        wp_localize_script('viator-booking-js', 'viatorBookingAjax', array(
+            'ajaxurl' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('viator_booking_nonce'),
+            'environment' => 'sandbox' // Change to 'production' when ready
+        ));
+    }
+}
+add_action('wp_enqueue_scripts', 'viator_enqueue_booking_scripts');

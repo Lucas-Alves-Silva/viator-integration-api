@@ -34,10 +34,10 @@ O **Viator API Integration** é um plugin avançado para WordPress que conecta s
 ### 🧠 **Curiosidades Inteligentes com IA**
 - **Integração com Groq AI:** Gera curiosidades personalizadas sobre destinos
 - **Fallback Inteligente:** Sistema de backup com curiosidades pré-definidas
-- **Suporte Multilíngue:** Curiosidades em português, inglês e espanhol
+- **Suporte Multilíngue:** Curiosidades em português e inglês
 
 ### 🌍 **Sistema Multilíngue Completo**
-- **Idiomas Suportados:** Português (Brasil), Inglês (EUA), Espanhol (Espanha)
+- **Idiomas Suportados:** Português (Brasil), Inglês (EUA)
 - **Traduções Automáticas:** Interface completamente traduzida
 - **Moedas Suportadas:** Real (BRL), Dólar (USD), Euro (EUR)
 - **Formatação Localizada:** Datas, números e moedas formatados por região
@@ -126,7 +126,6 @@ Após a instalação, clique em "Ativar Plugin"
 #### **Idiomas Disponíveis**
 - 🇧🇷 **Português do Brasil** (pt-BR)
 - 🇺🇸 **Inglês Americano** (en-US)  
-- 🇪🇸 **Espanhol** (es-ES)
 
 #### **Moedas Suportadas**
 - **Real Brasileiro (BRL)** - R$
@@ -289,7 +288,7 @@ add_action('init', function() {
 ### **Versão 1.0 (Atual)**
 - ✅ Integração completa com Viator API
 - ✅ Sistema de busca e filtros avançados
-- ✅ Suporte multilíngue (PT/EN/ES)
+- ✅ Suporte multilíngue (PT/EN)
 - ✅ Integração com Groq AI para curiosidades
 - ✅ Sistema de cache e otimização
 - ✅ Páginas de produto detalhadas
