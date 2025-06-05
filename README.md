@@ -37,9 +37,9 @@ O **Viator API Integration** é um plugin avançado para WordPress que conecta s
 - **Suporte Multilíngue:** Curiosidades em português e inglês
 
 ### 🌍 **Sistema Multilíngue Completo**
-- **Idiomas Suportados:** Português (Brasil), Inglês (EUA)
-- **Traduções Automáticas:** Interface completamente traduzida
-- **Moedas Suportadas:** Real (BRL), Dólar (USD), Euro (EUR)
+- **Idiomas Suportados:** Português (pt-BR) e Inglês (en-US).
+- **Moedas Suportadas:** Real (BRL) e Dólar (USD).
+- **Traduções Automáticas:** Descrições e títulos de passeios traduzidos automaticamente pela API da Viator.
 - **Formatação Localizada:** Datas, números e moedas formatados por região
 
 ### 📄 **Páginas de Detalhes Avançadas**
@@ -130,7 +130,6 @@ Após a instalação, clique em "Ativar Plugin"
 #### **Moedas Suportadas**
 - **Real Brasileiro (BRL)** - R$
 - **Dólar Americano (USD)** - $
-- **Euro (EUR)** - €
 
 ---
 

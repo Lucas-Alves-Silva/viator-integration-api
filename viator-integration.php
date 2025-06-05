@@ -105,7 +105,6 @@ function viator_settings_page() {
                         <select name="viator_currency" id="viator_currency">
                             <option value="BRL" <?php selected(get_option('viator_currency', 'BRL'), 'BRL'); ?>>Real Brasileiro (BRL)</option>
                             <option value="USD" <?php selected(get_option('viator_currency', 'BRL'), 'USD'); ?>>Dólar Americano (USD)</option>
-                            <option value="EUR" <?php selected(get_option('viator_currency', 'BRL'), 'EUR'); ?>>Euro (EUR)</option>
                         </select>
                         <p class="description">Selecione a moeda para exibição dos preços dos produtos.</p>
                     </td>
@@ -1563,8 +1562,7 @@ function viator_get_currency_symbol($currency_code = null) {
     
     $currency_symbols = [
         'BRL' => 'R$',
-        'USD' => '$',
-        'EUR' => '€'
+        'USD' => '$'
     ];
     
     return isset($currency_symbols[$currency_code]) ? $currency_symbols[$currency_code] : $currency_code;
