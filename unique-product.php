@@ -550,22 +550,22 @@ function viator_get_product_details($product_code) {
         foreach ($age_bands as $band) {
             $band_label = isset($band['ageBand']) ? ucfirst(strtolower(str_replace('_', ' ', $band['ageBand']))) : 'Viajante';
             // Tentar traduzir o rótulo da faixa (ADULT, CHILD, INFANT, TRAVELER)
-            $translated_band_label = viator_t(strtolower($band['ageBand']));
-            if ($translated_band_label === strtolower($band['ageBand'])) { // Se não houver tradução específica para ADULT, CHILD etc.
+            $translated_band_label = viator_t(strtolower($band['ageBand'] ?? ''));
+            if ($translated_band_label === strtolower($band['ageBand'] ?? '')) { // Se não houver tradução específica para ADULT, CHILD etc.
                  $translated_band_label = $band_label; // Usa o formatado em Title Case
             }
 
             $age_bands_display_data[] = [
                 'label' => sprintf(viator_t('traveler_age_band'), esc_html($translated_band_label), (isset($band['startAge']) ? intval($band['startAge']) : 0), (isset($band['endAge']) ? intval($band['endAge']) : 99)),
                 'min_max' => sprintf(viator_t('min_max_travelers'), (isset($band['minTravelersPerBooking']) ? intval($band['minTravelersPerBooking']) : 1), (isset($band['maxTravelersPerBooking']) ? intval($band['maxTravelersPerBooking']) : 'N/A')),
-                // Adicionando dados brutos para os data-attributes
-                'bandId' => $band['bandId'],
-                'ageBand' => $band['ageBand'],
-                'minTravelers' => $band['minTravelersPerBooking'],
-                'maxTravelers' => $band['maxTravelersPerBooking'],
-                'startAge' => $band['startAge'],
-                'endAge' => $band['endAge'],
-                'default' => $band['ageBand'] === 'ADULT' ? 1 : 0 // Define 1 adulto como padrão inicial
+                // Adicionando dados brutos para os data-attributes com verificação de existência
+                'bandId' => $band['bandId'] ?? null,
+                'ageBand' => $band['ageBand'] ?? null,
+                'minTravelers' => $band['minTravelersPerBooking'] ?? 1,
+                'maxTravelers' => $band['maxTravelersPerBooking'] ?? null,
+                'startAge' => $band['startAge'] ?? null,
+                'endAge' => $band['endAge'] ?? null,
+                'default' => ($band['ageBand'] ?? '') === 'ADULT' ? 1 : 0 // Define 1 adulto como padrão inicial
             ];
 
             if (isset($band['maxTravelersPerBooking'])) {
