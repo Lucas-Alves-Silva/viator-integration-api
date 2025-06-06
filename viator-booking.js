@@ -1567,7 +1567,8 @@ class ViatorBookingManager {
         priceDisplay.innerHTML = `
             <div class="price-loading">
                 <div class="loading-spinner">↻</div>
-                Calculando preços...
+                <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">🔍 Verificando disponibilidade</div>
+                <div style="font-size: 14px; color: #6c757d;">Buscando as melhores opções e preços para você...</div>
             </div>
         `;
         priceDisplay.style.display = 'block';
@@ -1575,6 +1576,17 @@ class ViatorBookingManager {
         // Esconder footer summary durante loading
         const footerSummary = document.getElementById('footer-price-summary');
         footerSummary.style.display = 'none';
+        
+        // Fazer scroll automático para a div de loading para dar evidência ao usuário
+        setTimeout(() => {
+            const loadingDiv = priceDisplay.querySelector('.price-loading');
+            if (loadingDiv) {
+                loadingDiv.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'center' 
+                });
+            }
+        }, 100);
     }
 
     showPriceError(message) {
