@@ -2348,6 +2348,14 @@ function viator_enqueue_booking_scripts() {
             true
         );
         
+        // Adicionar o atributo type="module" ao script da Viator
+        add_filter('script_loader_tag', function($tag, $handle, $src) {
+            if ($handle === 'viator-payment-lib') {
+                return '<script type="module" src="' . esc_url($src) . '"></script>' . "\n";
+            }
+            return $tag;
+        }, 10, 3);
+        
         wp_enqueue_script(
             'viator-booking-js',
             plugin_dir_url(__FILE__) . 'viator-booking.js',
@@ -2372,3 +2380,8 @@ function viator_enqueue_booking_scripts() {
     }
 }
 add_action('wp_enqueue_scripts', 'viator_enqueue_booking_scripts');
+
+// Include debug functionality for admin users
+if (is_admin()) {
+    include_once(plugin_dir_path(__FILE__) . 'admin-debug.php');
+}

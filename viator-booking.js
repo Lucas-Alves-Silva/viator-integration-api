@@ -17,6 +17,7 @@ class ViatorBookingManager {
             holdData: null,
             paymentToken: null
         };
+        this.availableDates = new Set(); // Armazenar datas disponíveis
         this.steps = ['availability', 'travelers', 'payment', 'confirmation'];
         this.ageBands = []; // Array para armazenar as regras de viajantes
     }
@@ -53,10 +54,13 @@ class ViatorBookingManager {
      * Raspa os dados das faixas etárias da página de produto único
      */
     scrapeAgeBandsFromPage() {
+        console.log('🔍 scrapeAgeBandsFromPage chamado');
         this.ageBands = []; // Limpa dados anteriores
         const bandElements = document.querySelectorAll('.age-bands-list li');
+        console.log('📋 Elementos de age bands encontrados:', bandElements.length);
         
-        bandElements.forEach(el => {
+        bandElements.forEach((el, index) => {
+            console.log(`🔖 Processando elemento ${index}:`, el);
             const bandData = {
                 bandId: el.dataset.bandId,
                 ageBand: el.dataset.ageBand,
@@ -67,8 +71,11 @@ class ViatorBookingManager {
                 defaultValue: parseInt(el.dataset.defaultValue, 10),
                 label: el.querySelector('.age-band-label')?.textContent || ''
             };
+            console.log(`📊 Band data ${index}:`, bandData);
             this.ageBands.push(bandData);
         });
+        
+        console.log('✅ AgeBands extraídos:', this.ageBands);
     }
     
     createBookingModal() {
@@ -112,9 +119,17 @@ class ViatorBookingManager {
                 </div>
                 
                 <div class="viator-modal-footer">
-                    <button id="booking-back-btn" class="viator-btn-secondary" style="display: none;">Voltar</button>
-                    <button id="booking-next-btn" class="viator-btn-primary">Próximo</button>
-                    <button id="booking-cancel-btn" class="viator-btn-cancel">Cancelar</button>
+                    <div class="footer-price-summary" id="footer-price-summary" style="display: none;">
+                        <div class="price-breakdown">
+                            <div id="price-details"></div>
+                            <div class="total-price" id="total-price"></div>
+                        </div>
+                    </div>
+                    <div class="footer-buttons">
+                        <button id="booking-back-btn" class="viator-btn-secondary" style="display: none;">Voltar</button>
+                        <button id="booking-next-btn" class="viator-btn-primary">Continuar</button>
+                        <button id="booking-cancel-btn" class="viator-btn-cancel">Cancelar</button>
+                    </div>
                 </div>
             </div>
         `;
@@ -176,21 +191,30 @@ class ViatorBookingManager {
     updateNavigationButtons() {
         const backBtn = document.getElementById('booking-back-btn');
         const nextBtn = document.getElementById('booking-next-btn');
+        const cancelBtn = document.getElementById('booking-cancel-btn');
+
+        // Lógica do botão Voltar: aparece do passo 2 em diante (exceto confirmação)
+        backBtn.style.display = this.currentStep > 1 && this.currentStep < 4 ? 'inline-block' : 'none';
         
-        backBtn.style.display = this.currentStep > 1 ? 'inline-block' : 'none';
+        // Garante que o botão de próximo esteja visível, exceto na confirmação
+        nextBtn.style.display = this.currentStep < 4 ? 'inline-block' : 'none';
         
+        // Move o botão de cancelar/fechar para a direita
+        cancelBtn.style.marginLeft = 'auto';
+
         switch (this.currentStep) {
             case 1:
-                nextBtn.textContent = 'Verificar Disponibilidade';
+                nextBtn.textContent = 'Continuar';
                 break;
             case 2:
-                nextBtn.textContent = 'Continuar para Pagamento';
+                nextBtn.textContent = 'Continuar';
                 break;
             case 3:
                 nextBtn.textContent = 'Processar Pagamento';
                 break;
             case 4:
-                nextBtn.style.display = 'none';
+                // No passo de confirmação, não há "próximo" ou "voltar"
+                cancelBtn.textContent = 'Fechar';
                 break;
         }
     }
@@ -242,6 +266,15 @@ class ViatorBookingManager {
                 <div class="travelers-section">
                     <h4>Número de Viajantes</h4>
                     ${travelersHTML}
+                    <div class="update-price-section">
+                        <button type="button" id="update-price-btn" class="viator-btn-update-price">
+                            <span class="update-icon">↻</span>
+                            Atualizar Preços
+                        </button>
+                        <div id="price-display" class="price-display-dynamic" style="display: none;">
+                            <div class="price-loading">Calculando preços...</div>
+                        </div>
+                    </div>
                 </div>
                 
                 <div id="availability-result" class="availability-result" style="display: none;"></div>
@@ -354,24 +387,27 @@ class ViatorBookingManager {
     }
     
     getConfirmationStepHTML() {
+        // O conteúdo será preenchido dinamicamente após a confirmação
         return `
             <div class="booking-step confirmation-step">
-                <div class="confirmation-success">
-                    <div class="success-icon">✓</div>
-                    <h3>Reserva Confirmada!</h3>
-                    <p>Sua reserva foi processada com sucesso.</p>
-                    <div id="booking-details"></div>
+                <div class="confirmation-message">
+                    <!-- Gerado dinamicamente -->
                 </div>
             </div>
         `;
     }
     
     initializeAvailabilityStep() {
+        console.log('🚀 initializeAvailabilityStep chamado');
+        
         // Initialize date picker
         this.initializeBookingDatePicker();
         
         // Quantity selectors
-        document.querySelectorAll('.qty-btn').forEach(btn => {
+        const qtyButtons = document.querySelectorAll('.qty-btn');
+        console.log('🔢 Botões de quantidade encontrados:', qtyButtons.length);
+        
+        qtyButtons.forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const target = e.target.dataset.target;
                 const input = document.getElementById(target + '-qty');
@@ -384,10 +420,134 @@ class ViatorBookingManager {
                     value = Math.max(value - 1, parseInt(input.min));
                 }
                 input.value = value;
+                
+                console.log('👥 Quantidade alterada:', target, value);
+                
+                // Limpar preços quando alterar viajantes
+                this.clearPriceDisplay();
             });
         });
+        
+        // Setup price updater
+        console.log('🔧 Chamando setupPriceUpdater...');
+        this.setupPriceUpdater();
     }
     
+    /**
+     * Busca a disponibilidade da API para os meses fornecidos e atualiza o calendário
+     */
+    async fetchAndSetAvailableDates(instance, monthsToFetch) {
+        console.log('🗓️ Iniciando busca de disponibilidade para:', monthsToFetch.map(d => `${d.getFullYear()}-${d.getMonth() + 1}`));
+        
+        const loadingIndicator = document.querySelector('.viator-booking-calendar .flatpickr-days');
+        if (loadingIndicator) {
+            loadingIndicator.classList.add('loading-dates');
+        }
+
+        const fetchPromises = monthsToFetch.map(d => {
+            const month = d.getMonth() + 1;
+            const year = d.getFullYear();
+            console.log(`📡 Fazendo requisição para mês ${month}/${year} do produto:`, this.bookingData.productCode);
+            
+            return fetch(viatorBookingAjax.ajaxurl, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: new URLSearchParams({
+                    action: 'viator_get_monthly_availability',
+                    product_code: this.bookingData.productCode,
+                    month: month,
+                    year: year,
+                    nonce: viatorBookingAjax.nonce
+                })
+            }).then(res => {
+                console.log(`📥 Resposta recebida para ${month}/${year}:`, res.status, res.statusText);
+                return res.json();
+            }).catch(error => {
+                console.warn('❌ Erro ao buscar disponibilidade:', error);
+                return { success: false, error: error.message };
+            });
+        });
+
+        try {
+            const results = await Promise.all(fetchPromises);
+            console.log('📊 Resultados consolidados:', results);
+            
+            let hasSpecificDates = false;
+            
+            // Processar resultados
+            results.forEach((result, index) => {
+                const monthInfo = `${monthsToFetch[index].getFullYear()}-${monthsToFetch[index].getMonth() + 1}`;
+                console.log(`📋 Processando resultado para ${monthInfo}:`, result);
+                
+                // Debug mais detalhado
+                if (result.success) {
+                    console.log(`✅ Requisição bem-sucedida para ${monthInfo}`);
+                    console.log(`📊 Dados completos:`, result.data);
+                    
+                    if (result.data && result.data.availableDates) {
+                        console.log(`📅 Array de datas para ${monthInfo}:`, result.data.availableDates, `(${result.data.availableDates.length} datas)`);
+                        
+                        if (result.data.availableDates.length > 0) {
+                            console.log(`✅ Datas disponíveis encontradas para ${monthInfo}:`, result.data.availableDates);
+                            result.data.availableDates.forEach(date => this.availableDates.add(date));
+                            hasSpecificDates = true;
+                        } else {
+                            console.log(`⚠️ Array de datas vazio para ${monthInfo}`);
+                        }
+                    } else {
+                        console.log(`❌ Propriedade 'availableDates' não encontrada ou é inválida para ${monthInfo}:`, result.data);
+                    }
+                } else {
+                    console.log(`❌ Requisição falhou para ${monthInfo}:`, result.error || result);
+                }
+            });
+            
+            console.log('🎯 Total de datas únicas coletadas:', this.availableDates.size, Array.from(this.availableDates));
+            
+            // Se temos datas específicas da API, usar apenas essas
+            if (hasSpecificDates && this.availableDates.size > 0) {
+                console.log('✅ Usando datas específicas da API');
+                instance.set('enable', Array.from(this.availableDates));
+            } else {
+                // Se não há datas específicas, permitir seleção de qualquer data futura
+                // A validação acontecerá no momento do check de disponibilidade
+                console.log('⚠️ Nenhuma data específica retornada pela API, permitindo seleção livre');
+                
+                // Gerar datas dos próximos 90 dias como disponíveis
+                const enabledDates = [];
+                const today = new Date();
+                for (let i = 0; i < 90; i++) {
+                    const date = new Date(today);
+                    date.setDate(today.getDate() + i);
+                    enabledDates.push(date.toISOString().split('T')[0]);
+                }
+                
+                console.log('📅 Habilitando todas as datas dos próximos 90 dias:', enabledDates.length, 'datas');
+                instance.set('enable', enabledDates);
+            }
+
+        } catch (error) {
+            console.error('❌ Erro geral ao buscar disponibilidade mensal:', error);
+            
+            // Em caso de erro, permitir seleção de qualquer data futura
+            // A validação acontecerá no check de disponibilidade
+            const enabledDates = [];
+            const today = new Date();
+            for (let i = 0; i < 90; i++) {
+                const date = new Date(today);
+                date.setDate(today.getDate() + i);
+                enabledDates.push(date.toISOString().split('T')[0]);
+            }
+            
+            console.log('🔄 Fallback: Habilitando todas as datas dos próximos 90 dias');
+            instance.set('enable', enabledDates);
+        } finally {
+            if (loadingIndicator) {
+                loadingIndicator.classList.remove('loading-dates');
+            }
+        }
+    }
+
     initializeBookingDatePicker() {
         const dateSelector = document.querySelector('.viator-booking-date-selector');
         const hiddenInput = document.getElementById('travel-date-value');
@@ -401,21 +561,20 @@ class ViatorBookingManager {
 
         // Configuração do Flatpickr
         const isMobile = window.innerWidth <= 768;
-        this.bookingDatePicker = flatpickr(dateSelector, {
+        
+        const config = {
             mode: "single",
             minDate: "today",
             maxDate: new Date().fp_incr(365),
             dateFormat: "Y-m-d",
             locale: "pt",
-            showMonths: isMobile ? 1 : 2, // 1 mês em mobile, 2 meses em desktop
+            showMonths: isMobile ? 1 : 2,
+            enable: [], // Inicia vazio, será preenchido pela API
             onChange: (selectedDates, dateStr) => {
                 if (selectedDates.length === 1) {
                     const selectedDate = selectedDates[0];
-                    
-                    // Definir o valor no input hidden
                     hiddenInput.value = dateStr;
                     
-                    // Formatação da data em português completo
                     const diasDaSemana = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
                     const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
                     
@@ -425,25 +584,36 @@ class ViatorBookingManager {
                     const ano = selectedDate.getFullYear();
                     
                     const dataFormatada = `${diaSemana}, ${dia} de ${mes} de ${ano}`;
-                    
-                    // Atualizar o texto exibido
                     dateSelector.querySelector('span').textContent = dataFormatada;
                 }
             },
             onReady: (selectedDates, dateStr, instance) => {
-                // Adicionar estilo personalizado ao calendário
                 instance.calendarContainer.classList.add('viator-booking-calendar');
                 
-                // Não adicionar preços aos dias (conforme solicitado)
-                // this.addPricesToCalendar(instance);
+                // Busca a disponibilidade para os meses visíveis iniciais
+                const currentMonth = new Date(instance.currentYear, instance.currentMonth);
+                const monthsToFetch = [currentMonth];
+                if (!isMobile) {
+                    const nextMonth = new Date(currentMonth);
+                    nextMonth.setMonth(currentMonth.getMonth() + 1);
+                    monthsToFetch.push(nextMonth);
+                }
+                this.fetchAndSetAvailableDates(instance, monthsToFetch);
             },
             onMonthChange: (selectedDates, dateStr, instance) => {
-                // Não recarregar preços (conforme solicitado)
-                // setTimeout(() => {
-                //     this.addPricesToCalendar(instance);
-                // }, 100);
+                 // Busca a disponibilidade para os novos meses visíveis
+                const newMonth = new Date(instance.currentYear, instance.currentMonth);
+                const monthsToFetch = [newMonth];
+                if (!isMobile) {
+                    const nextMonth = new Date(newMonth);
+                    nextMonth.setMonth(newMonth.getMonth() + 1);
+                    monthsToFetch.push(nextMonth);
+                }
+                this.fetchAndSetAvailableDates(instance, monthsToFetch);
             }
-        });
+        };
+
+        this.bookingDatePicker = flatpickr(dateSelector, config);
     }
     
     addPricesToCalendar(flatpickrInstance) {
@@ -515,12 +685,24 @@ class ViatorBookingManager {
     
     generateTravelersForm() {
         const container = document.getElementById('travelers-forms');
+        if (!container) {
+            console.error('❌ Container travelers-forms não encontrado');
+            return;
+        }
+        
         let html = '';
         
         if (this.ageBands && this.ageBands.length > 0) {
             this.ageBands.forEach(band => {
                 const id = band.ageBand.toLowerCase();
-                const quantity = parseInt(document.getElementById(`${id}-qty`).value, 10);
+                const qtyElement = document.getElementById(`${id}-qty`);
+                
+                if (!qtyElement) {
+                    console.warn(`⚠️ Elemento quantity não encontrado para: ${id}-qty`);
+                    return; // Pular esta iteração
+                }
+                
+                const quantity = parseInt(qtyElement.value, 10);
 
                 if (quantity > 0) {
                     for (let i = 0; i < quantity; i++) {
@@ -529,6 +711,16 @@ class ViatorBookingManager {
                     }
                 }
             });
+        } else {
+            console.warn('⚠️ Nenhum age band configurado, usando fallback');
+            // Fallback para dados básicos
+            const adultQtyElement = document.getElementById('adults-qty');
+            if (adultQtyElement) {
+                const quantity = parseInt(adultQtyElement.value, 10);
+                for (let i = 0; i < quantity; i++) {
+                    html += this.getTravelerFormHTML('adults', i + 1, 'ADULT', 'Adulto');
+                }
+            }
         }
         
         container.innerHTML = html;
@@ -592,15 +784,55 @@ class ViatorBookingManager {
     }
     
     getTotalTravelers() {
-        const adults = parseInt(document.getElementById('adults-qty').value);
-        const children = parseInt(document.getElementById('children-qty').value);
-        const infants = parseInt(document.getElementById('infants-qty').value);
+        let totalTravelers = 0;
+        let travelersText = [];
         
-        let text = `${adults} adulto${adults > 1 ? 's' : ''}`;
-        if (children > 0) text += `, ${children} criança${children > 1 ? 's' : ''}`;
-        if (infants > 0) text += `, ${infants} bebê${infants > 1 ? 's' : ''}`;
+        if (this.ageBands && this.ageBands.length > 0) {
+            // Usar age bands dinâmicos
+            this.ageBands.forEach(band => {
+                const id = band.ageBand.toLowerCase();
+                const qtyElement = document.getElementById(`${id}-qty`);
+                
+                if (qtyElement) {
+                    const quantity = parseInt(qtyElement.value, 10);
+                    if (quantity > 0) {
+                        totalTravelers += quantity;
+                        travelersText.push(`${quantity} ${quantity === 1 ? band.label.toLowerCase() : band.label.toLowerCase()}`);
+                    }
+                }
+            });
+        } else {
+            // Fallback para elementos fixos
+            const adultElement = document.getElementById('adults-qty');
+            const childrenElement = document.getElementById('children-qty');
+            const infantsElement = document.getElementById('infants-qty');
+            
+            if (adultElement) {
+                const adults = parseInt(adultElement.value, 10);
+                if (adults > 0) {
+                    totalTravelers += adults;
+                    travelersText.push(`${adults} adulto${adults > 1 ? 's' : ''}`);
+                }
+            }
+            
+            if (childrenElement) {
+                const children = parseInt(childrenElement.value, 10);
+                if (children > 0) {
+                    totalTravelers += children;
+                    travelersText.push(`${children} criança${children > 1 ? 's' : ''}`);
+                }
+            }
+            
+            if (infantsElement) {
+                const infants = parseInt(infantsElement.value, 10);
+                if (infants > 0) {
+                    totalTravelers += infants;
+                    travelersText.push(`${infants} bebê${infants > 1 ? 's' : ''}`);
+                }
+            }
+        }
         
-        return text;
+        return travelersText.length > 0 ? travelersText.join(', ') : '0 viajantes';
     }
     
     formatPrice(price) {
@@ -644,7 +876,13 @@ class ViatorBookingManager {
             return false;
         }
         
-        const travelers = this.collectTravelersData();
+        // Verificar se uma opção foi selecionada
+        if (!this.bookingData.selectedOption) {
+            alert('Por favor, atualize os preços e selecione uma opção de passeio antes de continuar.');
+            return false;
+        }
+        
+        const paxMix = this.collectTravelersData();
         
         try {
             const response = await fetch(viatorBookingAjax.ajaxurl, {
@@ -656,7 +894,7 @@ class ViatorBookingManager {
                     action: 'viator_check_availability',
                     product_code: this.bookingData.productCode,
                     travel_date: travelDate,
-                    travelers: JSON.stringify(travelers),
+                    travelers: JSON.stringify(paxMix),
                     nonce: viatorBookingAjax.nonce
                 })
             });
@@ -678,20 +916,34 @@ class ViatorBookingManager {
     }
     
     collectTravelersData() {
-        const travelers = [];
+        console.log('👥 collectTravelersData chamado');
+        console.log('🔍 ageBands disponíveis:', this.ageBands);
+        
+        const paxMix = [];
         if (this.ageBands && this.ageBands.length > 0) {
             this.ageBands.forEach(band => {
                 const id = band.ageBand.toLowerCase();
-                const quantity = parseInt(document.getElementById(`${id}-qty`).value, 10);
+                const qtyElement = document.getElementById(`${id}-qty`);
+                console.log(`🔢 Elemento quantidade para ${id}:`, qtyElement);
                 
-                if (quantity > 0) {
-                    for (let i = 0; i < quantity; i++) {
-                        travelers.push({ bandId: band.bandId });
+                if (qtyElement) {
+                    const quantity = parseInt(qtyElement.value, 10);
+                    console.log(`👥 Quantidade para ${band.ageBand}: ${quantity}`);
+                    
+                    if (quantity > 0) {
+                        paxMix.push({ 
+                            ageBand: band.ageBand, // Usar ageBand diretamente
+                            numberOfTravelers: quantity
+                        });
                     }
                 }
             });
+        } else {
+            console.log('❌ Nenhum ageBand disponível');
         }
-        return travelers;
+        
+        console.log('📊 PaxMix final:', paxMix);
+        return paxMix;
     }
     
     displayAvailabilityResult(data) {
@@ -821,7 +1073,9 @@ class ViatorBookingManager {
                             this.bookingData.paymentToken = result.paymentToken;
                             resolve(true);
                         } else {
-                            reject(new Error('Pagamento não foi processado com sucesso'));
+                            // A API pode retornar erros específicos aqui
+                            const errorMessage = result.error?.message || 'Pagamento não foi processado com sucesso';
+                            reject(new Error(errorMessage));
                         }
                     })
                     .catch((error) => {
@@ -836,6 +1090,13 @@ class ViatorBookingManager {
     
     async confirmBooking() {
         try {
+            const cardholderName = document.getElementById('cardholder-name').value.split(' ');
+            const bookerInfo = {
+                firstname: cardholderName[0] || 'Guest',
+                lastname: cardholderName.slice(1).join(' ') || 'User',
+                email: document.getElementById('cardholder-email').value
+            };
+
             const response = await fetch(viatorBookingAjax.ajaxurl, {
                 method: 'POST',
                 headers: {
@@ -843,8 +1104,9 @@ class ViatorBookingManager {
                 },
                 body: new URLSearchParams({
                     action: 'viator_confirm_booking',
-                    hold_data: JSON.stringify(this.bookingData.holdData),
+                    cart_id: this.bookingData.holdData.cartId,
                     payment_token: this.bookingData.paymentToken,
+                    booker_info: JSON.stringify(bookerInfo),
                     nonce: viatorBookingAjax.nonce
                 })
             });
@@ -853,15 +1115,62 @@ class ViatorBookingManager {
             
             if (data.success) {
                 this.bookingData.confirmationData = data.data;
+                this.displayConfirmationMessage(data.data);
                 return true;
             } else {
-                alert('Erro na confirmação: ' + data.data.message);
+                const reasons = data.data.reasons ? data.data.reasons.map(r => r.message).join(', ') : 'Detalhes não fornecidos.';
+                alert(`Erro na confirmação: ${data.data.message} (${reasons})`);
                 return false;
             }
         } catch (error) {
             alert('Erro de conexão na confirmação.');
             return false;
         }
+    }
+    
+    displayConfirmationMessage(data) {
+        const container = document.querySelector('.confirmation-message');
+        if (!container) return;
+
+        const status = data.custom_data?.confirmationStatus || 'UNKNOWN';
+        const isRestricted = data.custom_data?.isVoucherRestrictionRequired || false;
+        const bookingRef = data.bookingInfo?.bookingRef || 'N/A';
+
+        let html = '';
+
+        if (status === 'CONFIRMED') {
+            html = `
+                <div class="confirmation-success">
+                    <div class="success-icon">✓</div>
+                    <h3>Reserva Confirmada!</h3>
+                    <p>Sua reserva foi processada com sucesso. Um email de confirmação foi enviado para você.</p>
+                    <p><strong>Referência da Reserva:</strong> ${bookingRef}</p>
+            `;
+            if (isRestricted) {
+                html += `<p class="voucher-notice"><strong>Atenção:</strong> Por motivos de segurança, seu voucher será enviado para o seu email e não está disponível para download imediato.</p>`;
+            }
+            html += `</div>`;
+        } else if (status === 'PENDING') {
+            html = `
+                <div class="confirmation-pending">
+                    <div class="pending-icon">…</div>
+                    <h3>Reserva Pendente!</h3>
+                    <p>Sua reserva foi recebida e está aguardando confirmação do fornecedor. Isso pode levar até 48 horas.</p>
+                    <p>Você receberá um email assim que o status for atualizado. Seu cartão <strong>não foi cobrado</strong> ainda, apenas uma pré-autorização foi feita.</p>
+                    <p><strong>Referência da Reserva:</strong> ${bookingRef}</p>
+                </div>
+            `;
+        } else { // FAILED, CANCELLED, etc.
+             html = `
+                <div class="confirmation-error">
+                    <div class="error-icon">!</div>
+                    <h3>Falha na Reserva</h3>
+                    <p>Não foi possível completar sua reserva. Por favor, verifique os detalhes e tente novamente.</p>
+                </div>
+            `;
+        }
+        
+        container.innerHTML = html;
     }
     
     collectDetailedTravelersData() {
@@ -885,6 +1194,340 @@ class ViatorBookingManager {
         return travelers;
     }
     
+    setupPriceUpdater() {
+        const updateBtn = document.getElementById('update-price-btn');
+        console.log('🔧 setupPriceUpdater chamado, botão encontrado:', !!updateBtn);
+        
+        if (updateBtn) {
+            updateBtn.addEventListener('click', () => {
+                console.log('🖱️ Botão "Atualizar Preços" clicado');
+                this.updatePricesForCurrentSelection();
+            });
+            console.log('✅ Event listener adicionado ao botão');
+        } else {
+            console.log('❌ Botão "update-price-btn" não encontrado no DOM');
+        }
+    }
+
+    async updatePricesForCurrentSelection() {
+        console.log('🔄 updatePricesForCurrentSelection chamada');
+        
+        const travelDate = document.getElementById('travel-date-value').value;
+        console.log('📅 Data selecionada:', travelDate);
+        
+        if (!travelDate) {
+            console.log('❌ Nenhuma data selecionada');
+            alert('Por favor, selecione uma data de viagem antes de atualizar os preços.');
+            return;
+        }
+
+        const paxMix = this.collectTravelersData();
+        console.log('👥 PaxMix coletado:', paxMix);
+        
+        if (paxMix.length === 0) {
+            console.log('❌ Nenhum viajante selecionado');
+            alert('Por favor, selecione pelo menos um viajante.');
+            return;
+        }
+
+        console.log('🔄 Iniciando requisição de preços...');
+        this.showPriceLoading();
+
+        try {
+            const requestData = {
+                action: 'viator_check_availability',
+                product_code: this.bookingData.productCode,
+                travel_date: travelDate,
+                travelers: JSON.stringify(paxMix),
+                nonce: viatorBookingAjax.nonce
+            };
+            
+            console.log('📡 Fazendo requisição AJAX com dados:', requestData);
+            console.log('📍 URL da requisição:', viatorBookingAjax.ajaxurl);
+            
+            const response = await fetch(viatorBookingAjax.ajaxurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams(requestData)
+            });
+
+            console.log('📥 Resposta HTTP recebida:', response.status, response.statusText);
+            
+            const data = await response.json();
+            console.log('📊 Dados da resposta:', data);
+
+            if (data.success) {
+                console.log('✅ Requisição bem-sucedida, exibindo preços');
+                this.displayDynamicPricing(data.data);
+                this.bookingData.availabilityData = data.data; // Armazenar para uso posterior
+            } else {
+                console.log('❌ Erro na resposta:', data);
+                this.showPriceError('Erro: ' + (data.data?.message || 'Erro desconhecido'));
+            }
+        } catch (error) {
+            console.log('❌ Erro na requisição:', error);
+            this.showPriceError('Erro de conexão. Tente novamente.');
+        }
+    }
+
+    displayDynamicPricing(data) {
+        const priceDisplay = document.getElementById('price-display');
+        const footerSummary = document.getElementById('footer-price-summary');
+        const priceDetails = document.getElementById('price-details');
+        const totalPrice = document.getElementById('total-price');
+
+        if (!data.bookableItems || data.bookableItems.length === 0) {
+            this.showPriceError('Nenhuma opção disponível para esta data.');
+            return;
+        }
+
+        // Organizar opções disponíveis
+        const availableOptions = data.bookableItems.filter(item => item.available);
+
+        if (availableOptions.length === 0) {
+            this.showPriceError('Nenhuma opção disponível para esta data e quantidade de viajantes.');
+            return;
+        }
+
+        // Construir HTML para todas as opções
+        let optionsHTML = '<div class="dynamic-price-result">';
+        optionsHTML += '<h5>🎯 Opções Disponíveis</h5>';
+        optionsHTML += `
+            <div class="option-selection-note">
+                <p>💡 <strong>Selecione uma opção abaixo</strong> para continuar com a reserva.</p>
+            </div>
+        `;
+        optionsHTML += '<div class="product-options-list">';
+
+        let cheapestTotal = null;
+        let selectedOptionCode = null;
+
+        availableOptions.forEach((option, index) => {
+            const optionTotal = option.totalPrice.price.recommendedRetailPrice;
+            const hasDiscount = option.totalPrice.priceBeforeDiscount && 
+                               option.totalPrice.priceBeforeDiscount.recommendedRetailPrice > optionTotal;
+            
+            // Definir a opção mais barata como selecionada por padrão
+            if (cheapestTotal === null || optionTotal < cheapestTotal) {
+                cheapestTotal = optionTotal;
+                selectedOptionCode = option.productOptionCode;
+            }
+
+            // Construir breakdown de preços para esta opção
+            let optionBreakdown = '';
+            if (option.lineItems) {
+                option.lineItems.forEach(item => {
+                    const totalPrice = item.subtotalPrice.price.recommendedRetailPrice; // Preço total para esta quantidade
+                    const unitPrice = totalPrice / item.numberOfTravelers; // Preço unitário
+                    const originalPrice = item.subtotalPrice.priceBeforeDiscount?.recommendedRetailPrice;
+                    const originalUnitPrice = originalPrice ? originalPrice / item.numberOfTravelers : null;
+                    const ageBandName = this.getAgeBandDisplayName(item.ageBand);
+                    const quantity = item.numberOfTravelers;
+                    
+                    optionBreakdown += `
+                        <div class="price-line">
+                            <span class="traveler-info">${quantity} ${ageBandName}${quantity > 1 ? 's' : ''} x</span>
+                            <span class="price-info">
+                                ${originalUnitPrice && originalUnitPrice > unitPrice ? 
+                                    `<span class="price-original">${this.formatPrice(totalPrice)}</span>` : ''}
+                                <span class="price-current">${this.formatPrice(unitPrice)}</span>
+                            </span>
+                        </div>
+                    `;
+                });
+            }
+
+            const isSelected = selectedOptionCode === option.productOptionCode;
+            
+            optionsHTML += `
+                <div class="product-option-card" data-option-code="${option.productOptionCode}">
+                    <div class="option-header">
+                        <div class="option-info">
+                            <h6 class="option-title">${option.optionTitle || option.productOptionCode}</h6>
+                            <div class="option-details">
+                                <span class="option-code">${option.productOptionCode}</span>
+                                ${option.startTime ? `<span class="option-time">🕐 ${option.startTime}</span>` : ''}
+                            </div>
+                        </div>
+                        <div class="option-pricing">
+                            ${hasDiscount ? 
+                                `<div class="price-before">${this.formatPrice(option.totalPrice.priceBeforeDiscount.recommendedRetailPrice)}</div>` : ''}
+                            <div class="price-current"><span class="price-total">${this.formatPrice(optionTotal)}</span></div>
+                            ${hasDiscount ? '<div class="discount-badge">Desconto!</div>' : ''}
+                        </div>
+                    </div>
+                    <div class="option-breakdown">
+                        ${optionBreakdown}
+                    </div>
+                </div>
+            `;
+        });
+
+        optionsHTML += '</div>';
+        optionsHTML += '</div>';
+
+        // Exibir no modal
+        priceDisplay.innerHTML = optionsHTML;
+        priceDisplay.style.display = 'block';
+
+        // Scroll automático para os resultados
+        setTimeout(() => {
+            priceDisplay.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'start' 
+            });
+        }, 100);
+
+        // Adicionar event listeners para seleção de opções
+        this.setupOptionSelection();
+
+        // Não selecionar nenhuma opção automaticamente
+        this.bookingData.selectedOption = null;
+
+        // Footer será atualizado apenas quando usuário selecionar uma opção
+        console.log('💡 Opções exibidas - aguardando seleção do usuário');
+    }
+
+    setupOptionSelection() {
+        const optionCards = document.querySelectorAll('.product-option-card');
+        
+        optionCards.forEach(card => {
+            card.addEventListener('click', () => {
+                // Remover seleção anterior
+                optionCards.forEach(c => c.classList.remove('selected'));
+                
+                // Selecionar nova opção
+                card.classList.add('selected');
+                
+                // Atualizar footer
+                const optionCode = card.dataset.optionCode;
+                const availableOptions = this.bookingData.availabilityData?.bookableItems || [];
+                this.updateFooterSummary(optionCode, availableOptions);
+                
+                // Armazenar opção selecionada para uso posterior
+                this.bookingData.selectedOption = optionCode;
+            });
+        });
+    }
+
+    updateFooterSummary(selectedOptionCode, availableOptions) {
+        console.log('🦶 updateFooterSummary chamado', {selectedOptionCode, availableOptions});
+        
+        const footerSummary = document.getElementById('footer-price-summary');
+        const priceDetails = document.getElementById('price-details');
+        const totalPrice = document.getElementById('total-price');
+        
+        console.log('🧾 Elementos do footer:', {
+            footerSummary: !!footerSummary,
+            priceDetails: !!priceDetails,
+            totalPrice: !!totalPrice
+        });
+
+        const selectedOption = availableOptions.find(opt => opt.productOptionCode === selectedOptionCode);
+        console.log('🎯 Opção selecionada:', selectedOption);
+        if (!selectedOption) return;
+
+        // Construir breakdown para o footer
+        let footerBreakdown = '';
+        let totalAmount = selectedOption.totalPrice.price.recommendedRetailPrice;
+
+        if (selectedOption.lineItems) {
+            selectedOption.lineItems.forEach(item => {
+                const totalPrice = item.subtotalPrice.price.recommendedRetailPrice;
+                const unitPrice = totalPrice / item.numberOfTravelers;
+                const ageBandName = this.getAgeBandDisplayName(item.ageBand);
+                const quantity = item.numberOfTravelers;
+                
+                footerBreakdown += `
+                    <div class="price-line">
+                        <span>${quantity} ${ageBandName}${quantity > 1 ? 's' : ''} x</span>
+                        <span>${this.formatPrice(unitPrice)}</span>
+                    </div>
+                `;
+            });
+        }
+
+        // Exibir no footer
+        console.log('💰 Atualizando footer com:', {footerBreakdown, totalAmount});
+        
+        if (priceDetails) {
+            priceDetails.innerHTML = footerBreakdown;
+        }
+        
+        if (totalPrice) {
+            totalPrice.innerHTML = `
+                <div class="total-label">Total (${selectedOption.optionTitle || selectedOptionCode}):</div>
+                <div class="total-amount">${this.formatPrice(totalAmount)}</div>
+            `;
+        }
+        
+        if (footerSummary) {
+            footerSummary.style.display = 'block';
+            // Garantir que não oculte os botões
+            footerSummary.style.marginBottom = '0';
+            footerSummary.style.overflow = 'visible';
+            console.log('✅ Footer summary exibido');
+        } else {
+            console.log('❌ Footer summary não encontrado');
+        }
+    }
+
+    getAgeBandDisplayName(ageBand) {
+        const ageBandNames = {
+            'ADULT': 'Adulto',
+            'CHILD': 'Criança',
+            'INFANT': 'Bebê',
+            'TRAVELER': 'Viajante'
+        };
+        return ageBandNames[ageBand] || ageBand;
+    }
+
+    showPriceLoading() {
+        const priceDisplay = document.getElementById('price-display');
+        priceDisplay.innerHTML = `
+            <div class="price-loading">
+                <div class="loading-spinner">↻</div>
+                Calculando preços...
+            </div>
+        `;
+        priceDisplay.style.display = 'block';
+        
+        // Esconder footer summary durante loading
+        const footerSummary = document.getElementById('footer-price-summary');
+        footerSummary.style.display = 'none';
+    }
+
+    showPriceError(message) {
+        const priceDisplay = document.getElementById('price-display');
+        priceDisplay.innerHTML = `
+            <div class="price-error">
+                <div class="error-icon">❌</div>
+                ${message}
+            </div>
+        `;
+        priceDisplay.style.display = 'block';
+        
+        // Esconder footer summary em caso de erro
+        const footerSummary = document.getElementById('footer-price-summary');
+        footerSummary.style.display = 'none';
+    }
+
+    clearPriceDisplay() {
+        const priceDisplay = document.getElementById('price-display');
+        const footerSummary = document.getElementById('footer-price-summary');
+        
+        if (priceDisplay) {
+            priceDisplay.style.display = 'none';
+            priceDisplay.innerHTML = '';
+        }
+        
+        if (footerSummary) {
+            footerSummary.style.display = 'none';
+        }
+    }
+
     closeModal() {
         const modal = document.getElementById('viator-booking-modal');
         if (modal) {

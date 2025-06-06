@@ -423,6 +423,156 @@ function get_product_recommendations($product_code) {
     return $formatted_recommendations;
 }
 
+/**
+ * Atualiza os preços de um produto usando a API de availability/check
+ * Esta API fornece preços mais precisos e atuais
+ * 
+ * NOTA: Função mantida para uso na ferramenta de debug e possível uso futuro
+ * Não é usada automaticamente na exibição de produtos
+ */
+function viator_update_product_pricing($product_code) {
+    $api_key = get_option('viator_api_key');
+    if (empty($api_key)) {
+        return false;
+    }
+    
+    $locale_settings = viator_get_locale_settings();
+    
+    // Usar uma data próxima para verificar disponibilidade e preços
+    $test_date = date('Y-m-d', strtotime('+7 days'));
+    
+    $url = "https://api.sandbox.viator.com/partner/availability/check";
+    
+    $request_data = [
+        'productCode' => $product_code,
+        'travelDate' => $test_date,
+        'currency' => $locale_settings['currency'],
+        'paxMix' => [
+            [
+                'ageBand' => 'ADULT',
+                'numberOfTravelers' => 1  // Usando 1 pessoa para obter preço por pessoa
+            ]
+        ]
+    ];
+    
+    $response = wp_remote_post($url, [
+        'headers' => [
+            'Accept' => 'application/json;version=2.0',
+            'Content-Type' => 'application/json;version=2.0',
+            'exp-api-key' => $api_key,
+            'Accept-Language' => $locale_settings['language'],
+        ],
+        'body' => json_encode($request_data),
+        'timeout' => 30
+    ]);
+    
+    if (is_wp_error($response)) {
+        viator_debug_log('Erro ao atualizar preços via availability/check:', $response->get_error_message());
+        return false;
+    }
+    
+    $code = wp_remote_retrieve_response_code($response);
+    if ($code !== 200) {
+        viator_debug_log('Erro HTTP ao atualizar preços:', $code);
+        return false;
+    }
+    
+    $body = wp_remote_retrieve_body($response);
+    $data = json_decode($body, true);
+    
+    if (empty($data['bookableItems'])) {
+        viator_debug_log('Nenhum item disponível retornado para atualização de preços');
+        return false;
+    }
+    
+         // Procurar pelo melhor preço disponível (menor preço entre as opções disponíveis)
+     $best_price = null;
+     $best_original_price = null;
+     $available_options = [];
+     
+     foreach ($data['bookableItems'] as $item) {
+         if (isset($item['available']) && $item['available'] && isset($item['totalPrice']['price']['recommendedRetailPrice'])) {
+             $price = $item['totalPrice']['price']['recommendedRetailPrice'];
+             
+             // Se há desconto, pegar o preço original
+             $original_price = null;
+             if (isset($item['totalPrice']['priceBeforeDiscount']['recommendedRetailPrice'])) {
+                 $original_price = $item['totalPrice']['priceBeforeDiscount']['recommendedRetailPrice'];
+             }
+             
+             $available_options[] = [
+                 'productOptionCode' => $item['productOptionCode'] ?? 'N/A',
+                 'price' => $price,
+                 'original_price' => $original_price
+             ];
+             
+             // Usar o menor preço disponível (melhor oferta para o cliente)
+             if ($best_price === null || $price < $best_price) {
+                 $best_price = $price;
+                 $best_original_price = $original_price;
+             }
+         }
+     }
+     
+     viator_debug_log('Opções de preço encontradas para produto ' . $product_code, $available_options);
+    
+    if ($best_price === null) {
+        viator_debug_log('Nenhum preço válido encontrado na resposta da API');
+        return false;
+    }
+    
+    // Atualizar os dados armazenados com timestamp
+    $existing_data = get_option('viator_product_' . $product_code . '_price', []);
+    
+    $updated_data = array_merge($existing_data, [
+        'fromPrice' => $best_price,
+        'fromPriceBeforeDiscount' => $best_original_price,
+        'last_updated' => current_time('timestamp'),
+        'updated_via' => 'availability_check',
+        'currency' => $locale_settings['currency']
+    ]);
+    
+    update_option('viator_product_' . $product_code . '_price', $updated_data);
+    
+         viator_debug_log('Preços atualizados para produto ' . $product_code, [
+         'old_price' => isset($existing_data['fromPrice']) ? $existing_data['fromPrice'] : null,
+         'new_price' => $best_price,
+         'price_change' => isset($existing_data['fromPrice']) ? ($best_price - $existing_data['fromPrice']) : null,
+         'original_price' => $best_original_price,
+         'currency' => $locale_settings['currency'],
+         'available_options_count' => count($available_options),
+         'test_date_used' => $test_date
+     ]);
+    
+    return $updated_data;
+}
+
+/**
+ * Verifica se os preços de um produto precisam ser atualizados
+ * @param string $product_code
+ * @param int $max_age_hours Idade máxima em horas antes de considerar desatualizado (padrão: 1 hora)
+ * @return bool
+ */
+function viator_should_update_pricing($product_code, $max_age_hours = 1) {
+    $stored_data = get_option('viator_product_' . $product_code . '_price');
+    
+    // Se não há dados armazenados, precisa atualizar
+    if (!$stored_data || !isset($stored_data['fromPrice'])) {
+        return true;
+    }
+    
+    // Se não há timestamp, considerar desatualizado
+    if (!isset($stored_data['last_updated'])) {
+        return true;
+    }
+    
+    // Verificar se os dados estão dentro do prazo de validade
+    $age_seconds = current_time('timestamp') - $stored_data['last_updated'];
+    $max_age_seconds = $max_age_hours * 3600;
+    
+    return $age_seconds > $max_age_seconds;
+}
+
 function viator_get_product_details($product_code) {
     // Get API key from settings
     $api_key = get_option('viator_api_key');
@@ -594,7 +744,6 @@ function viator_get_product_details($product_code) {
             if (isset($stored_price_data['fromPriceBeforeDiscount']) && !empty($stored_price_data['fromPriceBeforeDiscount'])) {
                 $original_price = $locale_settings['currency_symbol'] . ' ' . number_format($stored_price_data['fromPriceBeforeDiscount'], 2, ',', '.');
             }
-            // Removida chave extra aqui
         }
     }
 

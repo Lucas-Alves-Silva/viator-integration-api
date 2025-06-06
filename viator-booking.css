@@ -23,8 +23,8 @@
     background: white;
     border-radius: 12px;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-    max-width: 800px;
-    width: 90%;
+    max-width: 950px;
+    width: 95%;
     max-height: 90vh;
     overflow: hidden;
     position: relative;
@@ -342,13 +342,14 @@
 }
 
 .viator-booking-calendar.flatpickr-calendar .flatpickr-days {
-    display: flex !important;
-    padding: 8px !important;
+    position: relative;
+    min-height: 200px;
 }
 
 .viator-booking-calendar.flatpickr-calendar .dayContainer {
     flex: 1 !important;
-    padding: 0 8px !important;
+    padding: 0;
+    border-right: 1px solid #e9ecef;
 }
 
 .viator-booking-calendar.flatpickr-calendar .flatpickr-day {
@@ -446,6 +447,315 @@
     padding: 20px;
     border-radius: 8px;
     margin-bottom: 20px;
+}
+
+/* Update Price Section */
+.update-price-section {
+    margin-top: 20px;
+    text-align: right;
+}
+
+.viator-modal .viator-btn-update-price,
+.viator-modal #update-price-btn {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important;
+    color: white !important;
+    border: none !important;
+    padding: 12px 24px !important;
+    border-radius: 25px !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3) !important;
+    margin-bottom: 15px !important;
+    text-decoration: none !important;
+    outline: none !important;
+}
+
+.viator-modal .viator-btn-update-price:hover,
+.viator-modal #update-price-btn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 16px rgba(40, 167, 69, 0.4) !important;
+}
+
+.viator-modal .viator-btn-update-price:active,
+.viator-modal #update-price-btn:active {
+    transform: translateY(0) !important;
+}
+
+.update-icon {
+    display: inline-block;
+    font-size: 16px;
+    font-weight: bold;
+    animation: none;
+    transition: transform 0.3s ease;
+    margin-right: 2px;
+}
+
+.viator-btn-update-price:hover .update-icon {
+    animation: rotate 1s linear infinite;
+}
+
+@keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Price Display Dynamic */
+.price-display-dynamic {
+    background: white;
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 15px;
+    text-align: left;
+}
+
+.dynamic-price-result h5 {
+    margin: 0 0 15px 0;
+    color: #28a745;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.price-option {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid #28a745;
+}
+
+.option-name {
+    font-weight: 600;
+    color: #0056b3;
+    margin-bottom: 5px;
+}
+
+.option-time {
+    font-size: 14px;
+    color: #6c757d;
+    margin-bottom: 10px;
+}
+
+.price-line {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.price-line:last-child {
+    border-bottom: none;
+    font-weight: 600;
+    color: #0056b3;
+}
+
+.price-loading {
+    text-align: center;
+    color: #6c757d;
+    padding: 20px;
+}
+
+.loading-spinner {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    animation: rotate 1s linear infinite;
+    color: #28a745;
+}
+
+.price-error {
+    text-align: center;
+    color: #dc3545;
+    padding: 20px;
+}
+
+.error-icon {
+    font-size: 20px;
+    margin-bottom: 10px;
+}
+
+/* Product Options List */
+.product-options-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin: 15px 0;
+}
+
+.product-option-card {
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    padding: 18px;
+    background: #ffffff;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.product-option-card:hover {
+    border-color: #007cba;
+    box-shadow: 0 4px 12px rgba(0, 124, 186, 0.15);
+    transform: translateY(-2px);
+}
+
+.product-option-card.selected {
+    border-color: #28a745;
+    background: linear-gradient(135deg, #f8fff9 0%, #e8f5e8 100%);
+    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.2);
+}
+
+.product-option-card.selected::before {
+    content: "✓";
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: #28a745;
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: bold;
+    z-index: 10;
+    box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+}
+
+.option-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+    padding-right: 25px;
+}
+
+.option-info h6.option-title {
+    margin: 0 0 8px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #2c3e50;
+    line-height: 1.3;
+}
+
+.option-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+}
+
+.option-code {
+    background: #e9ecef;
+    color: #495057;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: monospace;
+}
+
+.option-time {
+    color: #6c757d;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.option-pricing {
+    text-align: right;
+    position: relative;
+}
+
+.option-pricing .price-before {
+    color: #6c757d;
+    font-size: 14px;
+    text-decoration: line-through;
+    margin-bottom: 2px;
+}
+
+.option-pricing .price-current {
+    font-size: 18px;
+    font-weight: 700;
+    color: #28a745;
+}
+
+.option-pricing .price-total {
+    font-size: 18px;
+    font-weight: 700;
+    color: #28a745;
+}
+
+.discount-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+    color: white;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 8px rgba(238, 90, 36, 0.3);
+}
+
+.option-breakdown {
+    border-top: 1px solid #dee2e6;
+    padding-top: 12px;
+    margin-top: 12px;
+}
+
+.option-breakdown .price-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    font-size: 14px;
+}
+
+.traveler-info {
+    color: #495057;
+    font-weight: 500;
+}
+
+.price-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.price-info .price-original {
+    color: #6c757d;
+    font-size: 12px;
+    text-decoration: line-through;
+}
+
+.price-info .price-current {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.option-selection-note {
+    text-align: center;
+    margin-top: 20px;
+    padding: 15px;
+    background: linear-gradient(135deg, #e3f2fd, #f3e5f5);
+    border-radius: 8px;
+    border: 1px solid #e1bee7;
+}
+
+.option-selection-note p {
+    margin: 0;
+    color: #4a148c;
+    font-size: 14px;
 }
 
 .traveler-group {
@@ -713,17 +1023,69 @@
 
 .confirmation-success h3 {
     color: #28a745;
-    margin-bottom: 10px;
 }
 
-/* Modal Footer */
 .viator-modal-footer {
-    padding: 20px 30px;
     background: #f8f9fa;
     border-top: 1px solid #e9ecef;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+    position: sticky;
+    bottom: 0;
+    z-index: 1000;
+}
+
+.footer-price-summary {
+    padding: 15px 30px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    border-top: 1px solid #e9ecef;
+    margin-bottom: 0;
+}
+
+.price-breakdown {
     display: flex;
-    gap: 15px;
-    justify-content: flex-end;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.price-breakdown .price-line {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    font-size: 14px;
+    color: #495057;
+}
+
+.total-price {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 2px solid #e9ecef;
+    font-weight: 600;
+    font-size: 18px;
+    color: #0056b3;
+}
+
+.total-label {
+    font-size: 16px;
+}
+
+.total-amount {
+    font-size: 20px;
+    color: #28a745;
+}
+
+.footer-buttons {
+    padding: 20px 30px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f8f9fa;
+    position: relative;
+    z-index: 100;
 }
 
 /* Buttons */
@@ -875,8 +1237,25 @@
         gap: 10px;
     }
     
-    .viator-modal-footer {
+    .footer-buttons {
         flex-direction: column;
+        gap: 10px;
+    }
+    
+    .footer-price-summary {
+        padding: 15px 20px;
+    }
+    
+    .update-price-section {
+        text-align: center;
+    }
+    
+    .total-price {
+        font-size: 16px;
+    }
+    
+    .total-amount {
+        font-size: 18px;
     }
     
     .step-label {
@@ -902,6 +1281,41 @@
         min-height: 48px;
         padding: 12px 14px;
     }
+
+    /* Product options responsividade */
+    .product-option-card {
+        padding: 15px;
+    }
+
+    .option-header {
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch;
+    }
+
+    .option-pricing {
+        text-align: left;
+    }
+
+    .option-info h6.option-title {
+        font-size: 15px;
+    }
+
+    .option-details {
+        justify-content: flex-start;
+    }
+
+    .discount-badge {
+        position: static;
+        margin-top: 8px;
+        margin-left: auto;
+        align-self: flex-start;
+    }
+
+    .option-breakdown .price-line {
+        font-size: 13px;
+        padding: 4px 0;
+    }
 }
 
 @media (max-width: 480px) {
@@ -917,6 +1331,52 @@
         flex-direction: column;
         gap: 10px;
         text-align: center;
+    }
+
+    /* Product options mobile */
+    .product-option-card {
+        padding: 12px;
+    }
+
+    .option-info h6.option-title {
+        font-size: 14px;
+        line-height: 1.2;
+    }
+
+    .option-code {
+        font-size: 10px;
+        padding: 3px 6px;
+    }
+
+    .option-time {
+        font-size: 12px;
+    }
+
+    .option-pricing .price-current {
+        font-size: 16px;
+    }
+
+    .option-pricing .price-total {
+        font-size: 16px;
+    }
+
+    .option-breakdown .price-line {
+        font-size: 12px;
+    }
+
+    .product-option-card.selected::before {
+        width: 20px;
+        height: 20px;
+        font-size: 12px;
+        top: 8px;
+        right: 10px;
+    }
+
+    /* Botão Update Price 100% em mobile */
+    .viator-modal .viator-btn-update-price,
+    .viator-modal #update-price-btn {
+        width: 100% !important;
+        margin-bottom: 20px !important;
     }
 }
 
@@ -949,4 +1409,21 @@
     font-size: 12px;
     margin-top: 5px;
     display: block;
+}
+
+.viator-booking-calendar.flatpickr-calendar .flatpickr-days.loading-dates::before {
+    content: 'Carregando...';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #0056b3;
+    font-weight: 600;
+    z-index: 10;
+    border-radius: 0 0 8px 8px;
 } 
