@@ -877,7 +877,7 @@ class ViatorBookingManager {
         }
         
         // Verificar se uma opção foi selecionada
-        if (!this.bookingData.selectedOption) {
+        if (!this.bookingData.selectedOption || !this.bookingData.selectedOption.fullOption) {
             alert('Por favor, atualize os preços e selecione uma opção de passeio antes de continuar.');
             return false;
         }
@@ -1291,6 +1291,16 @@ class ViatorBookingManager {
             return;
         }
 
+        // Agrupar opções por productOptionCode
+        const groupedOptions = {};
+        availableOptions.forEach(option => {
+            const code = option.productOptionCode;
+            if (!groupedOptions[code]) {
+                groupedOptions[code] = [];
+            }
+            groupedOptions[code].push(option);
+        });
+
         // Construir HTML para todas as opções
         let optionsHTML = '<div class="dynamic-price-result">';
         optionsHTML += '<h5>🎯 Opções Disponíveis</h5>';
@@ -1304,23 +1314,27 @@ class ViatorBookingManager {
         let cheapestTotal = null;
         let selectedOptionCode = null;
 
-        availableOptions.forEach((option, index) => {
-            const optionTotal = option.totalPrice.price.recommendedRetailPrice;
-            const hasDiscount = option.totalPrice.priceBeforeDiscount && 
-                               option.totalPrice.priceBeforeDiscount.recommendedRetailPrice > optionTotal;
+        Object.keys(groupedOptions).forEach(optionCode => {
+            const optionsGroup = groupedOptions[optionCode];
+            const baseOption = optionsGroup[0]; // Usar primeira opção como base
+            
+            // Pegar o menor preço do grupo
+            const minPrice = Math.min(...optionsGroup.map(opt => opt.totalPrice.price.recommendedRetailPrice));
+            const hasDiscount = baseOption.totalPrice.priceBeforeDiscount && 
+                               baseOption.totalPrice.priceBeforeDiscount.recommendedRetailPrice > minPrice;
             
             // Definir a opção mais barata como selecionada por padrão
-            if (cheapestTotal === null || optionTotal < cheapestTotal) {
-                cheapestTotal = optionTotal;
-                selectedOptionCode = option.productOptionCode;
+            if (cheapestTotal === null || minPrice < cheapestTotal) {
+                cheapestTotal = minPrice;
+                selectedOptionCode = optionCode;
             }
 
-            // Construir breakdown de preços para esta opção
+            // Construir breakdown de preços (usar a primeira opção como exemplo)
             let optionBreakdown = '';
-            if (option.lineItems) {
-                option.lineItems.forEach(item => {
-                    const totalPrice = item.subtotalPrice.price.recommendedRetailPrice; // Preço total para esta quantidade
-                    const unitPrice = totalPrice / item.numberOfTravelers; // Preço unitário
+            if (baseOption.lineItems) {
+                baseOption.lineItems.forEach(item => {
+                    const totalPrice = item.subtotalPrice.price.recommendedRetailPrice;
+                    const unitPrice = totalPrice / item.numberOfTravelers;
                     const originalPrice = item.subtotalPrice.priceBeforeDiscount?.recommendedRetailPrice;
                     const originalUnitPrice = originalPrice ? originalPrice / item.numberOfTravelers : null;
                     const ageBandName = this.getAgeBandDisplayName(item.ageBand);
@@ -1339,22 +1353,39 @@ class ViatorBookingManager {
                 });
             }
 
-            const isSelected = selectedOptionCode === option.productOptionCode;
+            // Criar dropdown de horários se houver múltiplas opções
+            let timeSelector = '';
+            if (optionsGroup.length > 1) {
+                timeSelector = `
+                    <div class="time-selector">
+                        <label for="time-${optionCode}">🕐 Horário:</label>
+                        <select id="time-${optionCode}" class="time-dropdown" data-option-code="${optionCode}">
+                            ${optionsGroup.map((opt, idx) => `
+                                <option value="${opt.startTime || 'default'}" data-full-option='${JSON.stringify(opt)}' ${idx === 0 ? 'selected' : ''}>
+                                    ${opt.startTime || 'Horário padrão'}
+                                </option>
+                            `).join('')}
+                        </select>
+                    </div>
+                `;
+            } else if (optionsGroup[0].startTime) {
+                timeSelector = `<span class="option-time">🕐 ${optionsGroup[0].startTime}</span>`;
+            }
             
             optionsHTML += `
-                <div class="product-option-card" data-option-code="${option.productOptionCode}">
+                <div class="product-option-card" data-option-code="${optionCode}" data-start-time="${optionsGroup[0].startTime || ''}">
                     <div class="option-header">
                         <div class="option-info">
-                            <h6 class="option-title">${option.optionTitle || option.productOptionCode}</h6>
+                            <h6 class="option-title">${baseOption.optionTitle || optionCode}</h6>
                             <div class="option-details">
-                                <span class="option-code">${option.productOptionCode}</span>
-                                ${option.startTime ? `<span class="option-time">🕐 ${option.startTime}</span>` : ''}
+                                <span class="option-code">${optionCode}</span>
+                                ${timeSelector}
                             </div>
                         </div>
                         <div class="option-pricing">
                             ${hasDiscount ? 
-                                `<div class="price-before">${this.formatPrice(option.totalPrice.priceBeforeDiscount.recommendedRetailPrice)}</div>` : ''}
-                            <div class="price-current"><span class="price-total">${this.formatPrice(optionTotal)}</span></div>
+                                `<div class="price-before">${this.formatPrice(baseOption.totalPrice.priceBeforeDiscount.recommendedRetailPrice)}</div>` : ''}
+                            <div class="price-current"><span class="price-total option-price" data-base-price="${minPrice}">${this.formatPrice(minPrice)}</span></div>
                             ${hasDiscount ? '<div class="discount-badge">Desconto!</div>' : ''}
                         </div>
                     </div>
@@ -1392,9 +1423,14 @@ class ViatorBookingManager {
 
     setupOptionSelection() {
         const optionCards = document.querySelectorAll('.product-option-card');
+        const timeDropdowns = document.querySelectorAll('.time-dropdown');
         
+        // Event listeners para seleção de cards
         optionCards.forEach(card => {
-            card.addEventListener('click', () => {
+            card.addEventListener('click', (e) => {
+                // Não selecionar se clicou no dropdown
+                if (e.target.closest('.time-dropdown')) return;
+                
                 // Remover seleção anterior
                 optionCards.forEach(c => c.classList.remove('selected'));
                 
@@ -1402,18 +1438,61 @@ class ViatorBookingManager {
                 card.classList.add('selected');
                 
                 // Atualizar footer
-                const optionCode = card.dataset.optionCode;
-                const availableOptions = this.bookingData.availabilityData?.bookableItems || [];
-                this.updateFooterSummary(optionCode, availableOptions);
+                this.updateSelectedOption(card);
+            });
+        });
+
+        // Event listeners para dropdowns de horário
+        timeDropdowns.forEach(dropdown => {
+            dropdown.addEventListener('change', (e) => {
+                const card = e.target.closest('.product-option-card');
+                const selectedOption = JSON.parse(e.target.selectedOptions[0].dataset.fullOption);
                 
-                // Armazenar opção selecionada para uso posterior
-                this.bookingData.selectedOption = optionCode;
+                // Atualizar preço da opção
+                const priceElement = card.querySelector('.option-price');
+                priceElement.textContent = this.formatPrice(selectedOption.totalPrice.price.recommendedRetailPrice);
+                
+                // Se esta opção está selecionada, atualizar footer
+                if (card.classList.contains('selected')) {
+                    this.updateSelectedOption(card);
+                }
             });
         });
     }
 
-    updateFooterSummary(selectedOptionCode, availableOptions) {
-        console.log('🦶 updateFooterSummary chamado', {selectedOptionCode, availableOptions});
+    updateSelectedOption(card) {
+        const optionCode = card.dataset.optionCode;
+        const timeDropdown = card.querySelector('.time-dropdown');
+        let selectedTime = null;
+        let selectedFullOption = null;
+        
+        if (timeDropdown) {
+            selectedTime = timeDropdown.value;
+            selectedFullOption = JSON.parse(timeDropdown.selectedOptions[0].dataset.fullOption);
+        } else {
+            // Se não há dropdown, usar dados da opção única
+            const availableOptions = this.bookingData.availabilityData?.bookableItems || [];
+            selectedFullOption = availableOptions.find(opt => 
+                opt.productOptionCode === optionCode && 
+                (opt.startTime === card.dataset.startTime || !opt.startTime)
+            );
+        }
+        
+        // Atualizar footer com opção específica selecionada
+        if (selectedFullOption) {
+            this.updateFooterSummary(selectedFullOption);
+            
+            // Armazenar opção selecionada completa
+            this.bookingData.selectedOption = {
+                productOptionCode: optionCode,
+                startTime: selectedTime,
+                fullOption: selectedFullOption
+            };
+        }
+    }
+
+    updateFooterSummary(selectedOption) {
+        console.log('🦶 updateFooterSummary chamado', {selectedOption});
         
         const footerSummary = document.getElementById('footer-price-summary');
         const priceDetails = document.getElementById('price-details');
@@ -1425,8 +1504,6 @@ class ViatorBookingManager {
             totalPrice: !!totalPrice
         });
 
-        const selectedOption = availableOptions.find(opt => opt.productOptionCode === selectedOptionCode);
-        console.log('🎯 Opção selecionada:', selectedOption);
         if (!selectedOption) return;
 
         // Construir breakdown para o footer
@@ -1457,8 +1534,9 @@ class ViatorBookingManager {
         }
         
         if (totalPrice) {
+            const timeInfo = selectedOption.startTime ? ` - ${selectedOption.startTime}` : '';
             totalPrice.innerHTML = `
-                <div class="total-label">Total (${selectedOption.optionTitle || selectedOptionCode}):</div>
+                <div class="total-label">Total (${selectedOption.optionTitle || selectedOption.productOptionCode}${timeInfo}):</div>
                 <div class="total-amount">${this.formatPrice(totalAmount)}</div>
             `;
         }

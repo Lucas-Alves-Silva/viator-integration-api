@@ -667,6 +667,40 @@
     font-weight: 500;
 }
 
+/* Time Selector Dropdown */
+.time-selector {
+    margin-top: 8px;
+}
+
+.time-selector label {
+    display: block;
+    font-size: 12px;
+    color: #6c757d;
+    margin-bottom: 4px;
+    font-weight: 500;
+}
+
+.time-dropdown {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    font-size: 13px;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.2s ease;
+}
+
+.time-dropdown:focus {
+    outline: none;
+    border-color: #007cba;
+    box-shadow: 0 0 0 2px rgba(0, 124, 186, 0.1);
+}
+
+.time-dropdown:hover {
+    border-color: #007cba;
+}
+
 .option-pricing {
     text-align: right;
     position: relative;
@@ -1361,6 +1395,15 @@
     }
 
     .option-breakdown .price-line {
+        font-size: 12px;
+    }
+
+    .time-selector label {
+        font-size: 11px;
+    }
+
+    .time-dropdown {
+        padding: 5px 8px;
         font-size: 12px;
     }
 
