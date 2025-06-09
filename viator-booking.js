@@ -265,10 +265,11 @@ class ViatorBookingManager {
                 <div class="form-group">
                     <label for="travel-date">Data da Viagem:</label>
                     <div class="viator-booking-date-selector form-control" id="travel-date">
-                        <i class="calendar-icon">📅</i>
+                        <span class="calendar-icon">📅</span>
                         <span>Escolher data</span>
                     </div>
                     <input type="hidden" id="travel-date-value" name="travel_date" required>
+                    <span id="date-error-message" class="error-message" style="display: none;"></span>
                 </div>
                 
                 <div class="travelers-section">
@@ -577,11 +578,14 @@ class ViatorBookingManager {
             dateFormat: "Y-m-d",
             locale: "pt",
             showMonths: isMobile ? 1 : 2,
-            enable: [], // Inicia vazio, será preenchido pela API
+            // Permitir todas as datas futuras por padrão - a API pode refinar isso depois
             onChange: (selectedDates, dateStr) => {
                 if (selectedDates.length === 1) {
                     const selectedDate = selectedDates[0];
                     hiddenInput.value = dateStr;
+                    
+                    // Limpar mensagem de erro quando uma data for selecionada
+                    this.hideDateError();
                     
                     const diasDaSemana = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
                     const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
@@ -880,13 +884,13 @@ class ViatorBookingManager {
     async checkAvailability() {
         const travelDate = document.getElementById('travel-date-value').value;
         if (!travelDate) {
-            alert('Por favor, selecione uma data de viagem.');
+            this.showDateError('Por favor, selecione uma data de viagem antes de continuar.');
             return false;
         }
         
         // Verificar se uma opção foi selecionada
         if (!this.bookingData.selectedOption || !this.bookingData.selectedOption.fullOption) {
-            alert('Por favor, atualize os preços e selecione uma opção de passeio antes de continuar.');
+            this.showDateError('Por favor, atualize os preços e selecione uma opção de passeio antes de continuar.');
             return false;
         }
         
@@ -895,7 +899,7 @@ class ViatorBookingManager {
         // Validação adicional: verificar se atende aos requisitos mínimos
         const totalTravelers = paxMix.reduce((sum, pax) => sum + pax.numberOfTravelers, 0);
         if (totalTravelers === 0) {
-            alert('Por favor, selecione pelo menos um viajante.');
+            this.showDateError('Por favor, selecione pelo menos um viajante.');
             return false;
         }
         
@@ -917,7 +921,7 @@ class ViatorBookingManager {
         });
         
         if (validationErrors.length > 0) {
-            alert('Requisitos mínimos não atendidos:\n\n' + validationErrors.join('\n'));
+            this.showDateError('Requisitos mínimos não atendidos:\n\n' + validationErrors.join('\n'));
             return false;
         }
         
@@ -943,11 +947,11 @@ class ViatorBookingManager {
                 this.displayAvailabilityResult(data.data);
                 return true;
             } else {
-                alert('Erro: ' + data.data.message);
+                this.showDateError('Erro: ' + data.data.message);
                 return false;
             }
         } catch (error) {
-            alert('Erro de conexão. Tente novamente.');
+            this.showDateError('Erro de conexão. Tente novamente.');
             return false;
         }
     }
@@ -1005,7 +1009,7 @@ class ViatorBookingManager {
             const inputs = form.querySelectorAll('input[required], select[required]');
             for (let input of inputs) {
                 if (!input.value.trim()) {
-                    alert('Por favor, preencha todas as informações dos viajantes.');
+                    this.showDateError('Por favor, preencha todas as informações dos viajantes.');
                     input.focus();
                     return false;
                 }
@@ -1019,7 +1023,7 @@ class ViatorBookingManager {
         const paymentInputs = document.querySelectorAll('.payment-form input[required], .payment-form select[required]');
         for (let input of paymentInputs) {
             if (!input.value.trim()) {
-                alert('Por favor, preencha todas as informações de pagamento.');
+                this.showDateError('Por favor, preencha todas as informações de pagamento.');
                 input.focus();
                 return false;
             }
@@ -1040,7 +1044,7 @@ class ViatorBookingManager {
             return confirmResult;
             
         } catch (error) {
-            alert('Erro no processamento do pagamento: ' + error.message);
+            this.showDateError('Erro no processamento do pagamento: ' + error.message);
             return false;
         }
     }
@@ -1069,11 +1073,11 @@ class ViatorBookingManager {
                 this.initializeViatorPayment(); // Reinitializar com token de pagamento
                 return true;
             } else {
-                alert('Erro ao criar reserva: ' + data.data.message);
+                this.showDateError('Erro ao criar reserva: ' + data.data.message);
                 return false;
             }
         } catch (error) {
-            alert('Erro de conexão ao criar reserva.');
+            this.showDateError('Erro de conexão ao criar reserva.');
             return false;
         }
     }
@@ -1120,7 +1124,7 @@ class ViatorBookingManager {
                     });
             });
         } catch (error) {
-            alert('Erro no processamento do pagamento: ' + error.message);
+            this.showDateError('Erro no processamento do pagamento: ' + error.message);
             return false;
         }
     }
@@ -1156,11 +1160,11 @@ class ViatorBookingManager {
                 return true;
             } else {
                 const reasons = data.data.reasons ? data.data.reasons.map(r => r.message).join(', ') : 'Detalhes não fornecidos.';
-                alert(`Erro na confirmação: ${data.data.message} (${reasons})`);
+                this.showDateError(`Erro na confirmação: ${data.data.message} (${reasons})`);
                 return false;
             }
         } catch (error) {
-            alert('Erro de conexão na confirmação.');
+            this.showDateError('Erro de conexão na confirmação.');
             return false;
         }
     }
@@ -1254,7 +1258,7 @@ class ViatorBookingManager {
         
         if (!travelDate) {
             console.log('❌ Nenhuma data selecionada');
-            alert('Por favor, selecione uma data de viagem antes de atualizar os preços.');
+            this.showDateError('Por favor, selecione uma data de viagem antes de atualizar os preços.');
             return;
         }
 
@@ -1263,7 +1267,7 @@ class ViatorBookingManager {
         
         if (paxMix.length === 0) {
             console.log('❌ Nenhum viajante selecionado');
-            alert('Por favor, selecione pelo menos um viajante.');
+            this.showDateError('Por favor, selecione pelo menos um viajante.');
             return;
         }
 
@@ -1705,6 +1709,22 @@ class ViatorBookingManager {
         const modal = document.getElementById('viator-booking-modal');
         if (modal) {
             modal.remove();
+        }
+    }
+
+    showDateError(message) {
+        const errorElement = document.getElementById('date-error-message');
+        if (errorElement) {
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+        }
+    }
+    
+    hideDateError() {
+        const errorElement = document.getElementById('date-error-message');
+        if (errorElement) {
+            errorElement.style.display = 'none';
+            errorElement.textContent = '';
         }
     }
 }

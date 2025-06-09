@@ -246,7 +246,6 @@
 .viator-booking-date-selector span {
     color: #333;
     font-weight: 500;
-    flex: 1;
     font-size: 15px;
 }
 
@@ -710,6 +709,7 @@
     font-size: 12px;
     font-weight: 500;
     font-family: monospace;
+    display: none; /* Ocultar códigos de opção do usuário */
 }
 
 .option-time {
@@ -918,7 +918,7 @@
 }
 
 .viator-modal .quantity-selector .qty-btn:hover {
-    background: linear-gradient(135deg, #0056b3 0%, #004494 100%) !important;
+    background: #004494 !important;
     color: white !important;
     transform: translateY(-1px) !important;
     box-shadow: 0 2px 8px rgba(0, 86, 179, 0.25) !important;
@@ -930,7 +930,7 @@
 }
 
 .viator-modal .quantity-selector .qty-btn:active {
-    background: linear-gradient(135deg, #003d82 0%, #002c5f 100%) !important;
+    background: #002c5f !important;
     color: white !important;
     transform: translateY(0px) scale(0.95) !important;
     box-shadow: 0 1px 4px rgba(0, 86, 179, 0.3) !important;
@@ -1606,10 +1606,15 @@
 }
 
 .error-message {
+    display: block;
     color: #dc3545;
     font-size: 12px;
     margin-top: 5px;
-    display: block;
+    padding: 8px 12px;
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+    line-height: 1.4;
 }
 
 .viator-booking-calendar.flatpickr-calendar .flatpickr-days.loading-dates::before {
