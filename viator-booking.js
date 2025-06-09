@@ -443,118 +443,14 @@ class ViatorBookingManager {
     }
     
     /**
-     * Busca a disponibilidade da API para os meses fornecidos e atualiza o calendário
+     * Função simplificada - calendário agora permite todas as datas futuras
+     * A verificação real de disponibilidade é feita via /availability/check
      */
     async fetchAndSetAvailableDates(instance, monthsToFetch) {
-        console.log('🗓️ Iniciando busca de disponibilidade para:', monthsToFetch.map(d => `${d.getFullYear()}-${d.getMonth() + 1}`));
-        
-        const loadingIndicator = document.querySelector('.viator-booking-calendar .flatpickr-days');
-        if (loadingIndicator) {
-            loadingIndicator.classList.add('loading-dates');
-        }
-
-        const fetchPromises = monthsToFetch.map(d => {
-            const month = d.getMonth() + 1;
-            const year = d.getFullYear();
-            console.log(`📡 Fazendo requisição para mês ${month}/${year} do produto:`, this.bookingData.productCode);
-            
-            return fetch(viatorBookingAjax.ajaxurl, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: new URLSearchParams({
-                    action: 'viator_get_monthly_availability',
-                    product_code: this.bookingData.productCode,
-                    month: month,
-                    year: year,
-                    nonce: viatorBookingAjax.nonce
-                })
-            }).then(res => {
-                console.log(`📥 Resposta recebida para ${month}/${year}:`, res.status, res.statusText);
-                return res.json();
-            }).catch(error => {
-                console.warn('❌ Erro ao buscar disponibilidade:', error);
-                return { success: false, error: error.message };
-            });
-        });
-
-        try {
-            const results = await Promise.all(fetchPromises);
-            console.log('📊 Resultados consolidados:', results);
-            
-            let hasSpecificDates = false;
-            
-            // Processar resultados
-            results.forEach((result, index) => {
-                const monthInfo = `${monthsToFetch[index].getFullYear()}-${monthsToFetch[index].getMonth() + 1}`;
-                console.log(`📋 Processando resultado para ${monthInfo}:`, result);
-                
-                // Debug mais detalhado
-                if (result.success) {
-                    console.log(`✅ Requisição bem-sucedida para ${monthInfo}`);
-                    console.log(`📊 Dados completos:`, result.data);
-                    
-                    if (result.data && result.data.availableDates) {
-                        console.log(`📅 Array de datas para ${monthInfo}:`, result.data.availableDates, `(${result.data.availableDates.length} datas)`);
-                        
-                        if (result.data.availableDates.length > 0) {
-                            console.log(`✅ Datas disponíveis encontradas para ${monthInfo}:`, result.data.availableDates);
-                            result.data.availableDates.forEach(date => this.availableDates.add(date));
-                            hasSpecificDates = true;
-                        } else {
-                            console.log(`⚠️ Array de datas vazio para ${monthInfo}`);
-                        }
-                    } else {
-                        console.log(`❌ Propriedade 'availableDates' não encontrada ou é inválida para ${monthInfo}:`, result.data);
-                    }
-                } else {
-                    console.log(`❌ Requisição falhou para ${monthInfo}:`, result.error || result);
-                }
-            });
-            
-            console.log('🎯 Total de datas únicas coletadas:', this.availableDates.size, Array.from(this.availableDates));
-            
-            // Se temos datas específicas da API, usar apenas essas
-            if (hasSpecificDates && this.availableDates.size > 0) {
-                console.log('✅ Usando datas específicas da API');
-                instance.set('enable', Array.from(this.availableDates));
-            } else {
-                // Se não há datas específicas, permitir seleção de qualquer data futura
-                // A validação acontecerá no momento do check de disponibilidade
-                console.log('⚠️ Nenhuma data específica retornada pela API, permitindo seleção livre');
-                
-                // Gerar datas dos próximos 90 dias como disponíveis
-                const enabledDates = [];
-                const today = new Date();
-                for (let i = 0; i < 90; i++) {
-                    const date = new Date(today);
-                    date.setDate(today.getDate() + i);
-                    enabledDates.push(date.toISOString().split('T')[0]);
-                }
-                
-                console.log('📅 Habilitando todas as datas dos próximos 90 dias:', enabledDates.length, 'datas');
-                instance.set('enable', enabledDates);
-            }
-
-        } catch (error) {
-            console.error('❌ Erro geral ao buscar disponibilidade mensal:', error);
-            
-            // Em caso de erro, permitir seleção de qualquer data futura
-            // A validação acontecerá no check de disponibilidade
-            const enabledDates = [];
-            const today = new Date();
-            for (let i = 0; i < 90; i++) {
-                const date = new Date(today);
-                date.setDate(today.getDate() + i);
-                enabledDates.push(date.toISOString().split('T')[0]);
-            }
-            
-            console.log('🔄 Fallback: Habilitando todas as datas dos próximos 90 dias');
-            instance.set('enable', enabledDates);
-        } finally {
-            if (loadingIndicator) {
-                loadingIndicator.classList.remove('loading-dates');
-            }
-        }
+        console.log('📅 Calendário configurado para permitir todas as datas futuras');
+        console.log('✅ Verificação de disponibilidade será feita via /availability/check quando necessário');
+        // Não há mais necessidade de buscar datas específicas da API para o calendário
+        // A validação real acontece no momento do check de disponibilidade
     }
 
     initializeBookingDatePicker() {
@@ -596,32 +492,19 @@ class ViatorBookingManager {
                     const ano = selectedDate.getFullYear();
                     
                     const dataFormatada = `${diaSemana}, ${dia} de ${mes} de ${ano}`;
-                    dateSelector.querySelector('span').textContent = dataFormatada;
+                    // Atualizar especificamente o span de texto, não o ícone
+                    const textSpan = dateSelector.querySelector('span:not(.calendar-icon)');
+                    if (textSpan) {
+                        textSpan.textContent = dataFormatada;
+                    }
                 }
             },
             onReady: (selectedDates, dateStr, instance) => {
                 instance.calendarContainer.classList.add('viator-booking-calendar');
-                
-                // Busca a disponibilidade para os meses visíveis iniciais
-                const currentMonth = new Date(instance.currentYear, instance.currentMonth);
-                const monthsToFetch = [currentMonth];
-                if (!isMobile) {
-                    const nextMonth = new Date(currentMonth);
-                    nextMonth.setMonth(currentMonth.getMonth() + 1);
-                    monthsToFetch.push(nextMonth);
-                }
-                this.fetchAndSetAvailableDates(instance, monthsToFetch);
+                // Calendário permite todas as datas futuras - verificação real via /availability/check
             },
             onMonthChange: (selectedDates, dateStr, instance) => {
-                 // Busca a disponibilidade para os novos meses visíveis
-                const newMonth = new Date(instance.currentYear, instance.currentMonth);
-                const monthsToFetch = [newMonth];
-                if (!isMobile) {
-                    const nextMonth = new Date(newMonth);
-                    nextMonth.setMonth(newMonth.getMonth() + 1);
-                    monthsToFetch.push(nextMonth);
-                }
-                this.fetchAndSetAvailableDates(instance, monthsToFetch);
+                // Não há necessidade de buscar dados mensais - verificação via /availability/check
             }
         };
 
@@ -760,7 +643,7 @@ class ViatorBookingManager {
     
     generateBookingSummary() {
         const container = document.getElementById('booking-summary');
-        const dateSelector = document.querySelector('.viator-booking-date-selector span');
+        const dateSelector = document.querySelector('.viator-booking-date-selector span:not(.calendar-icon)');
         const selectedDate = dateSelector ? dateSelector.textContent : 'Data não selecionada';
         
         if (this.bookingData.availabilityData) {

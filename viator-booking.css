@@ -1339,9 +1339,6 @@
     }
     
     .traveler-group {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
         margin-bottom: 10px;
         padding: 6px 0;
     }
@@ -1350,12 +1347,7 @@
         font-size: 13px;
         margin-bottom: 5px;
     }
-    
-    .footer-buttons {
-        flex-direction: column;
-        gap: 10px;
-    }
-    
+       
     .footer-price-summary {
         padding: 15px 20px;
     }
@@ -1524,7 +1516,7 @@
     
     .traveler-group {
         margin-bottom: 8px;
-        padding: 4px 0;
+        padding: 10px;
     }
     
     .traveler-group label {
