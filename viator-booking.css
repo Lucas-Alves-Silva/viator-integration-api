@@ -3,6 +3,11 @@
  * Estilos para o modal de reserva e processo de checkout
  */
 
+/* Impedir scroll da página quando modal está aberto */
+body.viator-modal-open {
+    overflow: hidden;
+}
+
 /* Modal Base */
 .viator-modal {
     position: fixed;
@@ -17,6 +22,8 @@
     justify-content: center;
     backdrop-filter: blur(4px);
     animation: fadeIn 0.3s ease-out;
+    /* Garantir que o modal permaneça fixo e não seja afetado por scroll */
+    transform: translateZ(0); /* Força camada de composição no GPU */
 }
 
 .viator-modal-content {
@@ -291,6 +298,7 @@
     right: auto !important;
     width: 640px !important;
     margin-top: 4px !important;
+    z-index: 10002 !important;
 }
 
 /* Estilização específica para 2 meses lado a lado */
@@ -1685,4 +1693,55 @@
     transition: all 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
     opacity: 1;
     transform: translateY(0);
+}
+
+/* Destaque para opções que precisam ser selecionadas */
+.product-option-card.highlight-selection {
+    border-color: #dc3545 !important;
+    background: linear-gradient(135deg, #fff5f5 0%, #ffe6e6 100%) !important;
+    box-shadow: 0 6px 20px rgba(220, 53, 69, 0.3) !important;
+    animation: pulseHighlight 2s ease-in-out infinite;
+}
+
+@keyframes pulseHighlight {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 6px 20px rgba(220, 53, 69, 0.3);
+    }
+    50% {
+        transform: scale(1.02);
+        box-shadow: 0 8px 25px rgba(220, 53, 69, 0.4);
+    }
+}
+
+.product-option-card.selected {
+    border-color: #28a745;
+    background: linear-gradient(135deg, #f8fff9 0%, #e8f5e8 100%);
+    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.2);
+}
+
+/* Mensagem de erro específica para viajantes */
+.traveler-error-message {
+    display: block;
+    color: #dc3545;
+    font-size: 11px;
+    margin-top: 5px;
+    margin-bottom: 10px;
+    padding: 6px 10px;
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+    line-height: 1.4;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 } 

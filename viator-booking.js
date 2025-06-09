@@ -48,6 +48,39 @@ class ViatorBookingManager {
         this.scrapeAgeBandsFromPage(); // Raspa os dados da página primeiro
         this.createBookingModal();
         this.showStep(1);
+        
+        // Impedir scroll da página e preservar layout
+        this.preventPageScroll();
+    }
+    
+    preventPageScroll() {
+        // Calcular largura do scrollbar
+        const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+        
+        // Aplicar estilos para impedir scroll sem quebrar layout
+        document.body.style.overflow = 'hidden';
+        if (scrollbarWidth > 0) {
+            document.body.style.paddingRight = scrollbarWidth + 'px';
+        }
+        
+        document.body.classList.add('viator-modal-open');
+        
+        // Proteção: restaurar scroll se usuário sair da página
+        this.beforeUnloadListener = () => this.restorePageScroll();
+        window.addEventListener('beforeunload', this.beforeUnloadListener);
+    }
+    
+    restorePageScroll() {
+        // Remover estilos aplicados
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+        document.body.classList.remove('viator-modal-open');
+        
+        // Remover listener de proteção
+        if (this.beforeUnloadListener) {
+            window.removeEventListener('beforeunload', this.beforeUnloadListener);
+            this.beforeUnloadListener = null;
+        }
     }
     
     /**
@@ -421,15 +454,33 @@ class ViatorBookingManager {
                 const target = e.target.dataset.target;
                 const input = document.getElementById(target + '-qty');
                 const isPlus = e.target.classList.contains('plus');
+                const travelerGroup = e.target.closest('.traveler-group');
                 
                 let value = parseInt(input.value);
-                if (isPlus) {
-                    value = Math.min(value + 1, parseInt(input.max));
-                } else {
-                    value = Math.max(value - 1, parseInt(input.min));
-                }
-                input.value = value;
+                const maxValue = parseInt(input.max);
+                const minValue = parseInt(input.min);
                 
+                // Limpar qualquer mensagem de erro existente
+                this.clearTravelerError(travelerGroup);
+                
+                if (isPlus) {
+                    // Verificar se o máximo é 0 (não permitido)
+                    if (maxValue === 0 && value === 0) {
+                        this.showTravelerError(travelerGroup, 'Esta categoria de viajante não está disponível para este passeio.');
+                        return;
+                    }
+                    
+                    const newValue = Math.min(value + 1, maxValue);
+                    if (newValue === value && maxValue > 0) {
+                        this.showTravelerError(travelerGroup, `Máximo de ${maxValue} viajante${maxValue > 1 ? 's' : ''} permitido${maxValue > 1 ? 's' : ''} para esta categoria.`);
+                        return;
+                    }
+                    value = newValue;
+                } else {
+                    value = Math.max(value - 1, minValue);
+                }
+                
+                input.value = value;
                 console.log('👥 Quantidade alterada:', target, value);
                 
                 // Limpar preços quando alterar viajantes
@@ -770,13 +821,7 @@ class ViatorBookingManager {
             this.showDateError('Por favor, selecione uma data de viagem antes de continuar.');
             return false;
         }
-        
-        // Verificar se uma opção foi selecionada
-        if (!this.bookingData.selectedOption || !this.bookingData.selectedOption.fullOption) {
-            this.showDateError('Por favor, atualize os preços e selecione uma opção de passeio antes de continuar.');
-            return false;
-        }
-        
+
         const paxMix = this.collectTravelersData();
         
         // Validação adicional: verificar se atende aos requisitos mínimos
@@ -786,6 +831,24 @@ class ViatorBookingManager {
             return false;
         }
         
+        // Verificar se os preços foram atualizados (se há opções disponíveis)
+        const priceDisplay = document.getElementById('price-display');
+        const hasOptionsDisplayed = priceDisplay && priceDisplay.style.display !== 'none' && 
+                                  priceDisplay.querySelector('.product-options-list');
+        
+        if (!hasOptionsDisplayed) {
+            this.showDateError('Por favor, clique em "Atualizar Preços" para verificar a disponibilidade e opções de passeio.');
+            return false;
+        }
+        
+        // Verificar se uma opção foi selecionada
+        if (!this.bookingData.selectedOption || !this.bookingData.selectedOption.fullOption) {
+            this.showDateError('Por favor, selecione uma das opções de passeio disponíveis antes de continuar.');
+            // Destacar visualmente que uma opção precisa ser selecionada
+            this.highlightOptionSelection();
+            return false;
+        }
+
         // Validar se cada age band atende aos requisitos mínimos individuais
         const validationErrors = [];
         this.ageBands.forEach(band => {
@@ -807,7 +870,7 @@ class ViatorBookingManager {
             this.showDateError('Requisitos mínimos não atendidos:\n\n' + validationErrors.join('\n'));
             return false;
         }
-        
+
         try {
             const response = await fetch(viatorBookingAjax.ajaxurl, {
                 method: 'POST',
@@ -1123,7 +1186,7 @@ class ViatorBookingManager {
         console.log('🔧 setupPriceUpdater chamado, botão encontrado:', !!updateBtn);
         
         if (updateBtn) {
-            updateBtn.addEventListener('click', () => {
+            updateBtn.addEventListener('click', (e) => {
                 console.log('🖱️ Botão "Atualizar Preços" clicado');
                 this.updatePricesForCurrentSelection();
             });
@@ -1230,7 +1293,8 @@ class ViatorBookingManager {
         optionsHTML += '<h5>🎯 Opções Disponíveis</h5>';
         optionsHTML += `
             <div class="option-selection-note">
-                <p>💡 <strong>Selecione uma opção abaixo</strong> para continuar com a reserva.</p>
+                <p>⚠️ <strong>ATENÇÃO:</strong> Você deve <strong>clicar e selecionar uma das opções abaixo</strong> antes de continuar com a reserva.</p>
+                <p>💡 Clique no card da opção desejada para selecioná-la.</p>
             </div>
         `;
         optionsHTML += '<div class="product-options-list">';
@@ -1412,6 +1476,9 @@ class ViatorBookingManager {
                 startTime: selectedTime,
                 fullOption: selectedFullOption
             };
+            
+            // Limpar mensagem de erro agora que uma opção foi selecionada
+            this.hideDateError();
         }
     }
 
@@ -1540,6 +1607,9 @@ class ViatorBookingManager {
         if (footerSummary) {
             footerSummary.style.display = 'none';
         }
+        
+        // Limpar todas as mensagens de erro de viajantes também
+        this.clearAllTravelerErrors();
     }
 
     setupPriceDetailsToggle() {
@@ -1593,6 +1663,9 @@ class ViatorBookingManager {
         if (modal) {
             modal.remove();
         }
+        
+        // Remover classe de impedimento de scroll
+        this.restorePageScroll();
     }
 
     showDateError(message) {
@@ -1609,6 +1682,61 @@ class ViatorBookingManager {
             errorElement.style.display = 'none';
             errorElement.textContent = '';
         }
+    }
+
+    highlightOptionSelection() {
+        const optionCards = document.querySelectorAll('.product-option-card');
+        
+        if (optionCards.length > 0) {
+            // Adicionar classe de destaque a todos os cards
+            optionCards.forEach(card => {
+                card.classList.add('highlight-selection');
+            });
+            
+            // Scroll suave para as opções
+            const priceDisplay = document.getElementById('price-display');
+            if (priceDisplay) {
+                priceDisplay.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'start' 
+                });
+            }
+            
+            // Remover o destaque após alguns segundos
+            setTimeout(() => {
+                optionCards.forEach(card => {
+                    card.classList.remove('highlight-selection');
+                });
+            }, 4000);
+        }
+    }
+    
+    showTravelerError(travelerGroup, message) {
+        // Remover erro existente se houver
+        this.clearTravelerError(travelerGroup);
+        
+        // Criar span de erro
+        const errorSpan = document.createElement('span');
+        errorSpan.className = 'traveler-error-message';
+        errorSpan.textContent = message;
+        
+        // Inserir após o traveler-group
+        travelerGroup.parentNode.insertBefore(errorSpan, travelerGroup.nextSibling);
+    }
+    
+    clearTravelerError(travelerGroup) {
+        // Procurar por erros existentes após este traveler-group
+        const nextElement = travelerGroup.nextElementSibling;
+        if (nextElement && nextElement.classList.contains('traveler-error-message')) {
+            nextElement.remove();
+        }
+    }
+
+    clearAllTravelerErrors() {
+        const travelerGroups = document.querySelectorAll('.traveler-group');
+        travelerGroups.forEach(group => {
+            this.clearTravelerError(group);
+        });
     }
 }
 
