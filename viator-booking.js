@@ -8,6 +8,316 @@ document.addEventListener('DOMContentLoaded', function() {
     bookingSystem.init();
 });
 
+class CustomCalendar {
+    constructor(element, options = {}) {
+        this.element = element;
+        this.options = {
+            mode: "single",
+            minDate: "today",
+            maxDate: new Date().fp_incr ? new Date().fp_incr(365) : new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
+            dateFormat: "Y-m-d", 
+            locale: "pt",
+            showMonths: window.innerWidth <= 768 ? 1 : 2,
+            onChange: () => {},
+            onReady: () => {},
+            ...options
+        };
+        
+        this.selectedDate = null;
+        this.currentMonth = new Date().getMonth();
+        this.currentYear = new Date().getFullYear();
+        this.isVisible = false;
+        
+        this.monthNames = [
+            'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+            'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+        ];
+        
+        this.dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+        
+        this.init();
+    }
+    
+    init() {
+        this.createCalendar();
+        this.attachEvents();
+        
+        // Simular propriedade calendarContainer para compatibilidade
+        this.calendarContainer = this.calendar;
+        
+        // Chamar callback onReady
+        if (this.options.onReady) {
+            this.options.onReady([], '', this);
+        }
+    }
+    
+    createCalendar() {
+        // Criar container do calendário
+        this.calendar = document.createElement('div');
+        this.calendar.className = 'custom-calendar';
+        this.calendar.style.display = 'none';
+        
+        // Inserir após o elemento trigger
+        this.element.parentNode.insertBefore(this.calendar, this.element.nextSibling);
+        
+        this.renderCalendar();
+    }
+    
+    renderCalendar() {
+        const showMonths = this.options.showMonths;
+        let calendarHTML = '';
+        
+        // Verificar se pode navegar para o mês anterior
+        const today = new Date();
+        const currentRealMonth = today.getMonth();
+        const currentRealYear = today.getFullYear();
+        
+        let newMonth = this.currentMonth - 1;
+        let newYear = this.currentYear;
+        
+        if (newMonth < 0) {
+            newMonth = 11;
+            newYear--;
+        }
+        
+        const canGoPrevious = !(newYear < currentRealYear || 
+                               (newYear === currentRealYear && newMonth < currentRealMonth));
+        
+        calendarHTML += '<div class="calendar-header">';
+        calendarHTML += `<button type="button" class="calendar-nav-btn prev-btn${!canGoPrevious ? ' disabled' : ''}" aria-label="Mês anterior"${!canGoPrevious ? ' disabled' : ''}>‹</button>`;
+        calendarHTML += '<div class="calendar-months-container">';
+        
+        for (let i = 0; i < showMonths; i++) {
+            const monthDate = new Date(this.currentYear, this.currentMonth + i, 1);
+            calendarHTML += this.renderMonth(monthDate, i);
+        }
+        
+        calendarHTML += '</div>';
+        calendarHTML += `<button type="button" class="calendar-nav-btn next-btn" aria-label="Próximo mês">›</button>`;
+        calendarHTML += '</div>';
+        
+        this.calendar.innerHTML = calendarHTML;
+    }
+    
+    renderMonth(monthDate, index) {
+        const month = monthDate.getMonth();
+        const year = monthDate.getFullYear();
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const startDate = new Date(firstDay);
+        startDate.setDate(startDate.getDate() - firstDay.getDay());
+        
+        let monthHTML = `<div class="calendar-month" data-month="${month}" data-year="${year}">`;
+        monthHTML += `<div class="calendar-month-header">`;
+        monthHTML += `<h3>${this.monthNames[month]} ${year}</h3>`;
+        monthHTML += `</div>`;
+        
+        // Cabeçalho dos dias da semana
+        monthHTML += '<div class="calendar-weekdays">';
+        this.dayNames.forEach(day => {
+            monthHTML += `<div class="calendar-weekday">${day}</div>`;
+        });
+        monthHTML += '</div>';
+        
+        // Dias do mês
+        monthHTML += '<div class="calendar-days">';
+        
+        for (let i = 0; i < 42; i++) { // 6 semanas x 7 dias
+            const currentDate = new Date(startDate);
+            currentDate.setDate(startDate.getDate() + i);
+            
+            const isCurrentMonth = currentDate.getMonth() === month;
+            const isToday = this.isToday(currentDate);
+            const isSelected = this.isSelected(currentDate);
+            const isDisabled = this.isDisabled(currentDate);
+            
+            let dayClass = 'calendar-day';
+            if (!isCurrentMonth) dayClass += ' other-month';
+            if (isToday) dayClass += ' today';
+            if (isSelected) dayClass += ' selected';
+            if (isDisabled) dayClass += ' disabled';
+            
+            const dateStr = this.formatDate(currentDate);
+            
+            monthHTML += `<div class="${dayClass}" data-date="${dateStr}">`;
+            monthHTML += `<span class="day-number">${currentDate.getDate()}</span>`;
+            monthHTML += '</div>';
+        }
+        
+        monthHTML += '</div>';
+        monthHTML += '</div>';
+        
+        return monthHTML;
+    }
+    
+    attachEvents() {
+        // Click no elemento trigger para mostrar/esconder
+        this.element.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.toggle();
+        });
+        
+        // Fechar ao clicar fora - mas não nos botões de navegação
+        document.addEventListener('click', (e) => {
+            // Não fechar se clicar nos botões de navegação
+            if (e.target.classList.contains('prev-btn') || 
+                e.target.classList.contains('next-btn') ||
+                e.target.classList.contains('calendar-nav-btn')) {
+                return;
+            }
+            
+            if (!this.calendar.contains(e.target) && !this.element.contains(e.target)) {
+                this.close();
+            }
+        });
+        
+        // Event delegation para botões e dias
+        this.calendar.addEventListener('click', (e) => {
+            e.preventDefault(); // Prevenir comportamento padrão
+            e.stopPropagation(); // Impedir propagação que pode causar fechamento
+            
+            if (e.target.classList.contains('prev-btn') && !e.target.classList.contains('disabled') && !e.target.disabled) {
+                this.previousMonth();
+            } else if (e.target.classList.contains('next-btn')) {
+                this.nextMonth();
+            } else if (e.target.closest('.calendar-day') && !e.target.closest('.disabled')) {
+                const dayElement = e.target.closest('.calendar-day');
+                const dateStr = dayElement.dataset.date;
+                this.selectDate(dateStr);
+            }
+        });
+        
+        // Responsividade
+        window.addEventListener('resize', () => {
+            const newShowMonths = window.innerWidth <= 768 ? 1 : 2;
+            if (newShowMonths !== this.options.showMonths) {
+                this.options.showMonths = newShowMonths;
+                this.renderCalendar();
+            }
+        });
+    }
+    
+    selectDate(dateStr) {
+        const date = new Date(dateStr + 'T12:00:00');
+        this.selectedDate = date;
+        
+        // Atualizar visual
+        this.calendar.querySelectorAll('.calendar-day').forEach(day => {
+            day.classList.remove('selected');
+        });
+        
+        const selectedElement = this.calendar.querySelector(`[data-date="${dateStr}"]`);
+        if (selectedElement) {
+            selectedElement.classList.add('selected');
+        }
+        
+        // Callback onChange
+        if (this.options.onChange) {
+            this.options.onChange([date], dateStr, this);
+        }
+        
+        this.close();
+    }
+    
+    previousMonth() {
+        const today = new Date();
+        const currentRealMonth = today.getMonth();
+        const currentRealYear = today.getFullYear();
+        
+        // Calcular o mês anterior
+        let newMonth = this.currentMonth - 1;
+        let newYear = this.currentYear;
+        
+        if (newMonth < 0) {
+            newMonth = 11;
+            newYear--;
+        }
+        
+        // Verificar se o mês anterior não é anterior ao mês atual real
+        if (newYear < currentRealYear || 
+            (newYear === currentRealYear && newMonth < currentRealMonth)) {
+            // Não permitir navegação para meses anteriores ao atual
+            return;
+        }
+        
+        // Aplicar a mudança
+        this.currentMonth = newMonth;
+        this.currentYear = newYear;
+        this.renderCalendar();
+    }
+    
+    nextMonth() {
+        this.currentMonth++;
+        if (this.currentMonth > 11) {
+            this.currentMonth = 0;
+            this.currentYear++;
+        }
+        this.renderCalendar();
+    }
+    
+    open() {
+        this.isVisible = true;
+        this.calendar.style.display = 'block';
+        
+        // Pequeno delay para animação
+        setTimeout(() => {
+            this.calendar.classList.add('show');
+        }, 10);
+    }
+    
+    close() {
+        this.isVisible = false;
+        this.calendar.classList.remove('show');
+        
+        setTimeout(() => {
+            this.calendar.style.display = 'none';
+        }, 200);
+    }
+    
+    toggle() {
+        if (this.isVisible) {
+            this.close();
+        } else {
+            this.open();
+        }
+    }
+    
+    destroy() {
+        if (this.calendar && this.calendar.parentNode) {
+            this.calendar.parentNode.removeChild(this.calendar);
+        }
+    }
+    
+    // Métodos utilitários
+    isToday(date) {
+        const today = new Date();
+        return date.toDateString() === today.toDateString();
+    }
+    
+    isSelected(date) {
+        return this.selectedDate && date.toDateString() === this.selectedDate.toDateString();
+    }
+    
+    isDisabled(date) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const maxDate = this.options.maxDate;
+        
+        // Desabilitar datas passadas
+        if (date < today) return true;
+        
+        // Desabilitar datas além do máximo
+        if (maxDate && date > maxDate) return true;
+        
+        return false;
+    }
+    
+    formatDate(date) {
+        return date.toISOString().split('T')[0];
+    }
+}
+
 class ViatorBookingManager {
     constructor() {
         this.currentStep = 1;
@@ -515,17 +825,16 @@ class ViatorBookingManager {
             this.bookingDatePicker.destroy();
         }
 
-        // Configuração do Flatpickr
+        // Configuração do calendário personalizado
         const isMobile = window.innerWidth <= 768;
         
         const config = {
             mode: "single",
             minDate: "today",
-            maxDate: new Date().fp_incr(365),
+            maxDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
             dateFormat: "Y-m-d",
             locale: "pt",
             showMonths: isMobile ? 1 : 2,
-            // Permitir todas as datas futuras por padrão - a API pode refinar isso depois
             onChange: (selectedDates, dateStr) => {
                 if (selectedDates.length === 1) {
                     const selectedDate = selectedDates[0];
@@ -553,13 +862,11 @@ class ViatorBookingManager {
             onReady: (selectedDates, dateStr, instance) => {
                 instance.calendarContainer.classList.add('viator-booking-calendar');
                 // Calendário permite todas as datas futuras - verificação real via /availability/check
-            },
-            onMonthChange: (selectedDates, dateStr, instance) => {
-                // Não há necessidade de buscar dados mensais - verificação via /availability/check
             }
         };
 
-        this.bookingDatePicker = flatpickr(dateSelector, config);
+        // Usar o calendário personalizado em vez do flatpickr
+        this.bookingDatePicker = new CustomCalendar(dateSelector, config);
     }
     
     addPricesToCalendar(flatpickrInstance) {
