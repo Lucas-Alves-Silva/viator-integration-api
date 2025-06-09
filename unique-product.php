@@ -573,6 +573,64 @@ function viator_should_update_pricing($product_code, $max_age_hours = 1) {
     return $age_seconds > $max_age_seconds;
 }
 
+/**
+ * Função auxiliar para extrair informações de quantidade mínima de um age band
+ * Verifica múltiplos campos possíveis na resposta da API
+ */
+function viator_extract_traveler_quantities($band, $pricing_type = null) {
+    $min_travelers = null;
+    $max_travelers = null;
+    
+    // Lista de campos possíveis para quantidade mínima (em ordem de prioridade)
+    $min_fields = [
+        'minTravelersPerBooking',
+        'minTravelers', 
+        'minimum',
+        'requiredMinTravelers',
+        'minimumQuantity'
+    ];
+    
+    // Lista de campos possíveis para quantidade máxima
+    $max_fields = [
+        'maxTravelersPerBooking',
+        'maxTravelers',
+        'maximum', 
+        'maximumQuantity'
+    ];
+    
+    // Buscar quantidade mínima
+    foreach ($min_fields as $field) {
+        if (isset($band[$field]) && is_numeric($band[$field])) {
+            $min_travelers = intval($band[$field]);
+            break;
+        }
+    }
+    
+    // Buscar quantidade máxima
+    foreach ($max_fields as $field) {
+        if (isset($band[$field]) && is_numeric($band[$field])) {
+            $max_travelers = intval($band[$field]);
+            break;
+        }
+    }
+    
+    // Se não encontrou quantidade mínima, aplicar lógica padrão baseada no tipo de produto
+    if ($min_travelers === null) {
+        if ($pricing_type === 'UNIT') {
+            // Para produtos do tipo unidade (ex: transfer), algumas faixas podem ser opcionais
+            $min_travelers = 0;
+        } else {
+            // Para produtos per person, geralmente exige pelo menos 1
+            $min_travelers = 1;
+        }
+    }
+    
+    return [
+        'min' => $min_travelers,
+        'max' => $max_travelers
+    ];
+}
+
 function viator_get_product_details($product_code) {
     // Get API key from settings
     $api_key = get_option('viator_api_key');
@@ -617,6 +675,8 @@ function viator_get_product_details($product_code) {
     $age_bands = ($pricing_info && isset($pricing_info['ageBands']) && is_array($pricing_info['ageBands'])) ? $pricing_info['ageBands'] : [];
     $pricing_summary = isset($product['pricing']['summary']) ? $product['pricing']['summary'] : [];
     
+
+
     // Variável para HTML do serviço de unidade (ex: Traslado disponível)
     $unit_service_html = '';
     if (isset($pricing_info['type']) && $pricing_info['type'] === 'UNIT' && isset($pricing_info['unitType'])) {
@@ -705,27 +765,44 @@ function viator_get_product_details($product_code) {
                  $translated_band_label = $band_label; // Usa o formatado em Title Case
             }
 
+            // Usar função auxiliar para extrair quantidades
+            $quantities = viator_extract_traveler_quantities($band, $pricing_info['type'] ?? null);
+            $min_travelers = $quantities['min'];
+            $max_travelers = $quantities['max'];
+            
+            // Lógica para valor padrão inicial
+            $default_value = 0; // Padrão para a maioria
+            if (($band['ageBand'] ?? '') === 'ADULT') {
+                // Para adultos, definir 1 como padrão apenas se a quantidade mínima permitir
+                $default_value = max(1, $min_travelers);
+            } elseif ($min_travelers > 0) {
+                // Se há uma quantidade mínima obrigatória, usar ela como padrão
+                $default_value = $min_travelers;
+            }
+
             $age_bands_display_data[] = [
                 'label' => sprintf(viator_t('traveler_age_band'), esc_html($translated_band_label), (isset($band['startAge']) ? intval($band['startAge']) : 0), (isset($band['endAge']) ? intval($band['endAge']) : 99)),
-                'min_max' => sprintf(viator_t('min_max_travelers'), (isset($band['minTravelersPerBooking']) ? intval($band['minTravelersPerBooking']) : 1), (isset($band['maxTravelersPerBooking']) ? intval($band['maxTravelersPerBooking']) : 'N/A')),
+                'min_max' => sprintf(viator_t('min_max_travelers'), $min_travelers, ($max_travelers !== null ? $max_travelers : 'N/A')),
                 // Adicionando dados brutos para os data-attributes com verificação de existência
                 'bandId' => $band['bandId'] ?? null,
                 'ageBand' => $band['ageBand'] ?? null,
-                'minTravelers' => $band['minTravelersPerBooking'] ?? 1,
-                'maxTravelers' => $band['maxTravelersPerBooking'] ?? null,
+                'minTravelers' => $min_travelers,
+                'maxTravelers' => $max_travelers,
                 'startAge' => $band['startAge'] ?? null,
                 'endAge' => $band['endAge'] ?? null,
-                'default' => ($band['ageBand'] ?? '') === 'ADULT' ? 1 : 0 // Define 1 adulto como padrão inicial
+                'default' => $default_value
             ];
+            
 
-            if (isset($band['maxTravelersPerBooking'])) {
+
+            if ($max_travelers !== null) {
                 // Esta é uma simplificação. O real total de viajantes pode depender das combinações de faixas.
                 // Para uma frase geral, somar os máximos pode não ser preciso.
                 // Usaremos o $max_travelers_overall se for tipo UNIT, ou o maior maxTravelersPerBooking de uma única faixa.
                 if ($pricing_info && $pricing_info['type'] === 'UNIT') {
                     $total_max_travelers_possible = $max_travelers_overall; // Já calculado
-                } elseif (isset($band['maxTravelersPerBooking'])) {
-                    $total_max_travelers_possible = max($total_max_travelers_possible, $band['maxTravelersPerBooking']);
+                } else {
+                    $total_max_travelers_possible = max($total_max_travelers_possible, $max_travelers);
                 }
             }
         }
@@ -1547,21 +1624,30 @@ function viator_get_product_details($product_code) {
                             }
                             // Default fallback for other formats
                             else {
-                                // Remove service type prefix and suffix
-                                $language_code = strtolower(preg_replace('/(?:GUIDE|WRITTEN)\s+|\s*\/.*$/i', '', $language));
+                                // Tentar extrair código de idioma usando regex mais abrangente
+                                // Para casos como "AUDIO es es/SERVICE_AUDIO"
+                                if (preg_match('/(?:GUIDE|WRITTEN|AUDIO)\s+([a-z]{2,3})\s+[a-z]{2,3}?\/SERVICE_(?:GUIDE|WRITTEN|AUDIO)/i', $language, $matches)) {
+                                    $language_code = strtolower($matches[1]);
+                                } else {
+                                    // Remove service type prefix and suffix
+                                    $language_code = strtolower(preg_replace('/(?:GUIDE|WRITTEN|AUDIO)\s+|\s*\/.*$/i', '', $language));
+                                }
                                 
                                 // Try to determine service type from the string
-                                if (stripos($language, 'GUIDE') !== false) {
+                                if (stripos($language, 'SERVICE_GUIDE') !== false || stripos($language, 'GUIDE') !== false) {
                                     $service_type = viator_t('guide_service');
-                                } elseif (stripos($language, 'WRITTEN') !== false) {
+                                } elseif (stripos($language, 'SERVICE_WRITTEN') !== false || stripos($language, 'WRITTEN') !== false) {
                                     $service_type = viator_t('written_service');
-                                } else {
+                                } elseif (stripos($language, 'SERVICE_AUDIO') !== false || stripos($language, 'AUDIO') !== false) {
                                     $service_type = viator_t('audio_service');
+                                } else {
+                                    $service_type = viator_t('audio_service'); // padrão
                                 }
                             }
                             $language_names = [
                                 'pt' => 'Português',
                                 'en' => 'Inglês',
+                                'es' => 'Espanhol',
                                 'fr' => 'Francês',
                                 'de' => 'Alemão',
                                 'it' => 'Italiano',
@@ -1586,7 +1672,7 @@ function viator_get_product_details($product_code) {
                             ];
                             
                             // Display language name with service type in parentheses if available
-                            $display_name = isset($language_names[$language_code]) ? $language_names[$language_code] : $language;
+                            $display_name = isset($language_names[$language_code]) ? $language_names[$language_code] : ucfirst($language_code);
                             if (!empty($service_type)) {
                                 $display_name .= ' (' . $service_type . ')';
                             }

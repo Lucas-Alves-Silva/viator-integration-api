@@ -444,9 +444,35 @@
 /* Travelers Section */
 .travelers-section {
     background: #f8f9fa;
-    padding: 20px;
+    padding: 15px;
     border-radius: 8px;
     margin-bottom: 20px;
+    max-height: 400px; /* Altura máxima para evitar que cresça demais */
+    overflow-y: auto; /* Scroll se necessário */
+}
+
+.travelers-section h4 {
+    margin: 0 0 15px 0;
+    font-size: 16px;
+    color: #333;
+}
+
+.travelers-section::-webkit-scrollbar {
+    width: 6px;
+}
+
+.travelers-section::-webkit-scrollbar-track {
+    background: #e9ecef;
+    border-radius: 3px;
+}
+
+.travelers-section::-webkit-scrollbar-thumb {
+    background: #ced4da;
+    border-radius: 3px;
+}
+
+.travelers-section::-webkit-scrollbar-thumb:hover {
+    background: #adb5bd;
 }
 
 /* Update Price Section */
@@ -821,42 +847,58 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 15px;
-    padding: 10px 0;
+    margin-bottom: 12px;
+    min-height: auto;
+    border: solid 1px #e7e7e7;
+    border-radius: 10px;
+    padding: 10px;
+    background: #fff;
 }
 
 .traveler-group:last-child {
     margin-bottom: 0;
 }
 
+.traveler-group label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #495057;
+    margin: 0;
+    flex: 1;
+    min-width: 0; /* Permite que o label seja truncado se necessário */
+    margin-right: 10px;
+}
+
 /* Seletor de quantidade com maior especificidade para evitar overrides */
 .viator-modal .quantity-selector {
     display: flex;
     align-items: center;
-    gap: 15px;
-    background: #f8f9fa;
-    padding: 15px 20px;
-    border-radius: 12px;
+    gap: 10px;
+    background: #ffffff;
+    padding: 8px 12px;
+    border-radius: 8px;
     border: 1px solid #e9ecef;
+    min-width: 140px;
+    flex-shrink: 0;
 }
 
 .viator-modal .quantity-selector .qty-btn {
-    width: 84px !important;
-    height: 42px !important;
-    border: 2px solid #0056b3 !important;
+    width: 32px !important;
+    height: 32px !important;
+    border: 1px solid #0056b3 !important;
     background: white !important;
     color: #0056b3 !important;
-    border-radius: 12px !important;
+    border-radius: 6px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     cursor: pointer !important;
-    font-size: 22px !important;
-    font-weight: 700 !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
     transition: all 0.2s ease-out !important;
     line-height: 1 !important;
     padding: 0 !important;
-    box-shadow: 0 3px 8px rgba(0, 86, 179, 0.15) !important;
+    box-shadow: 0 1px 3px rgba(0, 86, 179, 0.1) !important;
     user-select: none !important;
     outline: none !important;
     position: relative !important;
@@ -878,8 +920,8 @@
 .viator-modal .quantity-selector .qty-btn:hover {
     background: linear-gradient(135deg, #0056b3 0%, #004494 100%) !important;
     color: white !important;
-    transform: translateY(-2px) !important;
-    box-shadow: 0 6px 20px rgba(0, 86, 179, 0.3) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 8px rgba(0, 86, 179, 0.25) !important;
     border-color: #004494 !important;
 }
 
@@ -890,8 +932,8 @@
 .viator-modal .quantity-selector .qty-btn:active {
     background: linear-gradient(135deg, #003d82 0%, #002c5f 100%) !important;
     color: white !important;
-    transform: translateY(0px) scale(0.96) !important;
-    box-shadow: 0 3px 10px rgba(0, 86, 179, 0.4) !important;
+    transform: translateY(0px) scale(0.95) !important;
+    box-shadow: 0 1px 4px rgba(0, 86, 179, 0.3) !important;
     transition: all 0.1s ease !important;
 }
 
@@ -899,13 +941,13 @@
 .viator-modal .quantity-selector .qty-btn[disabled],
 .viator-modal .quantity-selector .qty-btn:disabled:hover,
 .viator-modal .quantity-selector .qty-btn:disabled:active {
-    opacity: 0.4 !important;
+    opacity: 0.5 !important;
     cursor: not-allowed !important;
     background: #f8f9fa !important;
     color: #adb5bd !important;
     border-color: #dee2e6 !important;
     transform: none !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+    box-shadow: none !important;
 }
 
 .viator-modal .quantity-selector .qty-btn:disabled::before {
@@ -913,20 +955,20 @@
 }
 
 .viator-modal .quantity-selector input[type="text"] {
-    width: 50px !important;
-    height: 42px !important;
+    width: 40px !important;
+    height: 32px !important;
     text-align: center !important;
-    border: 2px solid #e9ecef !important;
-    border-radius: 12px !important;
+    border: 1px solid #e9ecef !important;
+    border-radius: 6px !important;
     padding: 0 !important;
-    font-weight: 700 !important;
-    font-size: 18px !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
     color: #0056b3 !important;
-    background: white !important;
-    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1) !important;
+    background: #f8f9fa !important;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.05) !important;
     outline: none !important;
     transition: all 0.2s ease !important;
-    line-height: 42px !important;
+    line-height: 32px !important;
 }
 
 .viator-modal .quantity-selector input[type="text"]:focus {
@@ -1256,23 +1298,29 @@
         padding: 0 !important;
     }
 
-    /* Ajustar botões de quantidade para mobile */
+    /* Ajustar botões de quantidade para tablet */
     .viator-modal .quantity-selector {
-        padding: 12px 15px;
-        gap: 12px;
+        padding: 6px 10px;
+        gap: 8px;
+        min-width: 120px;
     }
 
     .viator-modal .quantity-selector .qty-btn {
-        width: 60px !important; /* Menor que desktop mas ainda maior que antes */
-        height: 38px;
-        font-size: 20px;
+        width: 28px !important;
+        height: 28px !important;
+        font-size: 14px !important;
     }
 
     .viator-modal .quantity-selector input[type="text"] {
-        width: 45px !important; /* Reduzido para mobile */
-        height: 38px;
-        font-size: 16px;
-        line-height: 38px !important;
+        width: 36px !important;
+        height: 28px !important;
+        line-height: 28px !important;
+        font-size: 13px !important;
+    }
+    
+    .travelers-section {
+        max-height: 350px;
+        padding: 12px;
     }
     
     .viator-modal-header,
@@ -1293,7 +1341,14 @@
     .traveler-group {
         flex-direction: column;
         align-items: flex-start;
-        gap: 10px;
+        gap: 8px;
+        margin-bottom: 10px;
+        padding: 6px 0;
+    }
+    
+    .traveler-group label {
+        font-size: 13px;
+        margin-bottom: 5px;
     }
     
     .footer-buttons {
@@ -1303,6 +1358,16 @@
     
     .footer-price-summary {
         padding: 15px 20px;
+    }
+    
+    .price-details-toggle {
+        width: 36px;
+        height: 22px;
+        top: -11px;
+    }
+    
+    .toggle-icon {
+        font-size: 12px;
     }
     
     .update-price-section {
@@ -1451,6 +1516,51 @@
         right: 10px;
     }
 
+    /* Travelers Section mobile */
+    .travelers-section {
+        max-height: 300px;
+        padding: 10px;
+    }
+    
+    .traveler-group {
+        margin-bottom: 8px;
+        padding: 4px 0;
+    }
+    
+    .traveler-group label {
+        font-size: 12px;
+        margin-bottom: 4px;
+    }
+    
+    .viator-modal .quantity-selector {
+        padding: 4px 8px;
+        gap: 6px;
+        min-width: 110px;
+    }
+
+    .viator-modal .quantity-selector .qty-btn {
+        width: 26px !important;
+        height: 26px !important;
+        font-size: 12px !important;
+    }
+
+    .viator-modal .quantity-selector input[type="text"] {
+        width: 32px !important;
+        height: 26px !important;
+        line-height: 26px !important;
+        font-size: 12px !important;
+    }
+
+    .price-details-toggle {
+        width: 32px;
+        height: 20px;
+        top: -10px;
+    }
+    
+    .toggle-icon {
+        font-size: 11px;
+    }
+
     /* Botão Update Price 100% em mobile */
     .viator-modal .viator-btn-update-price,
     .viator-modal #update-price-btn {
@@ -1517,4 +1627,65 @@
     font-weight: 600;
     z-index: 10;
     border-radius: 0 0 8px 8px;
+}
+
+/* Price Details Toggle */
+.price-details-container {
+    position: relative;
+    width: 100%;
+}
+
+.price-details-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 24px;
+    background: linear-gradient(135deg, #0056b3 0%, #004494 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0, 86, 179, 0.25);
+    font-size: 12px;
+    outline: none;
+}
+
+.price-details-toggle:hover {
+    background: linear-gradient(135deg, #004494 0%, #003d82 100%);
+    transform: translateX(-50%) translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 86, 179, 0.35);
+}
+
+.price-details-toggle:active {
+    transform: translateX(-50%) translateY(0px) scale(0.95);
+    box-shadow: 0 2px 6px rgba(0, 86, 179, 0.3);
+}
+
+.price-details-toggle.collapsed {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+}
+
+.price-details-toggle.collapsed:hover {
+    background: linear-gradient(135deg, #20c997 0%, #17a2b8 100%);
+}
+
+.toggle-icon {
+    font-size: 14px;
+    font-weight: bold;
+    line-height: 1;
+    transition: transform 0.3s ease;
+}
+
+.price-details-content {
+    padding-top: 15px;
+    transition: all 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+    opacity: 1;
+    transform: translateY(0);
 } 

@@ -4,7 +4,7 @@ if (!defined('ABSPATH')) {
     exit; // Security check
 }
 
-define('CUSTOM_DEBUG_LOG', false); // Mude para true para habilitar o log
+define('CUSTOM_DEBUG_LOG', false); // Desabilitado após implementar melhorias
 
 function viator_debug_log($message, $data = null) {
     if (!CUSTOM_DEBUG_LOG) {

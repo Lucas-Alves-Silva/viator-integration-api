@@ -121,7 +121,12 @@ class ViatorBookingManager {
                 <div class="viator-modal-footer">
                     <div class="footer-price-summary" id="footer-price-summary" style="display: none;">
                         <div class="price-breakdown">
-                            <div id="price-details"></div>
+                            <div class="price-details-container">
+                                <button id="price-details-toggle" class="price-details-toggle" title="Expandir/Recolher detalhes">
+                                    <span class="toggle-icon">▼</span>
+                                </button>
+                                <div id="price-details" class="price-details-content"></div>
+                            </div>
                             <div class="total-price" id="total-price"></div>
                         </div>
                     </div>
@@ -141,6 +146,9 @@ class ViatorBookingManager {
         modal.querySelector('#booking-cancel-btn').addEventListener('click', () => this.closeModal());
         modal.querySelector('#booking-back-btn').addEventListener('click', () => this.previousStep());
         modal.querySelector('#booking-next-btn').addEventListener('click', () => this.nextStep());
+        
+        // Setup price details toggle
+        this.setupPriceDetailsToggle();
         
         // Close modal when clicking outside
         modal.addEventListener('click', (e) => {
@@ -884,6 +892,35 @@ class ViatorBookingManager {
         
         const paxMix = this.collectTravelersData();
         
+        // Validação adicional: verificar se atende aos requisitos mínimos
+        const totalTravelers = paxMix.reduce((sum, pax) => sum + pax.numberOfTravelers, 0);
+        if (totalTravelers === 0) {
+            alert('Por favor, selecione pelo menos um viajante.');
+            return false;
+        }
+        
+        // Validar se cada age band atende aos requisitos mínimos individuais
+        const validationErrors = [];
+        this.ageBands.forEach(band => {
+            const id = band.ageBand.toLowerCase();
+            const qtyElement = document.getElementById(`${id}-qty`);
+            
+            if (qtyElement) {
+                const quantity = parseInt(qtyElement.value, 10);
+                const minRequired = parseInt(qtyElement.min, 10) || 0;
+                
+                if (quantity < minRequired) {
+                    const bandName = this.getAgeBandDisplayName(band.ageBand);
+                    validationErrors.push(`${bandName}: mínimo ${minRequired} viajante${minRequired > 1 ? 's' : ''} necessário${minRequired > 1 ? 's' : ''}`);
+                }
+            }
+        });
+        
+        if (validationErrors.length > 0) {
+            alert('Requisitos mínimos não atendidos:\n\n' + validationErrors.join('\n'));
+            return false;
+        }
+        
         try {
             const response = await fetch(viatorBookingAjax.ajaxurl, {
                 method: 'POST',
@@ -1616,6 +1653,52 @@ class ViatorBookingManager {
         if (footerSummary) {
             footerSummary.style.display = 'none';
         }
+    }
+
+    setupPriceDetailsToggle() {
+        const toggleBtn = document.getElementById('price-details-toggle');
+        const priceDetails = document.getElementById('price-details');
+        const toggleIcon = toggleBtn?.querySelector('.toggle-icon');
+        
+        if (!toggleBtn || !priceDetails || !toggleIcon) return;
+        
+        // Estado inicial: expandido
+        let isExpanded = true;
+        
+        toggleBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            isExpanded = !isExpanded;
+            
+            if (isExpanded) {
+                // Expandir com animação
+                priceDetails.style.display = 'block';
+                priceDetails.style.opacity = '0';
+                priceDetails.style.transform = 'translateY(-10px)';
+                
+                setTimeout(() => {
+                    priceDetails.style.opacity = '1';
+                    priceDetails.style.transform = 'translateY(0)';
+                }, 10);
+                
+                toggleIcon.textContent = '▼';
+                toggleBtn.title = 'Recolher detalhes';
+                toggleBtn.classList.remove('collapsed');
+            } else {
+                // Recolher com animação
+                priceDetails.style.opacity = '0';
+                priceDetails.style.transform = 'translateY(-10px)';
+                
+                setTimeout(() => {
+                    priceDetails.style.display = 'none';
+                }, 200);
+                
+                toggleIcon.textContent = '▲';
+                toggleBtn.title = 'Expandir detalhes';
+                toggleBtn.classList.add('collapsed');
+            }
+        });
     }
 
     closeModal() {
