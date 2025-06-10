@@ -164,8 +164,9 @@ body.viator-modal-open {
 /* Modal Body */
 .viator-modal-body {
     padding: 30px;
-    max-height: 60vh;
+    max-height: 75vh;
     overflow-y: auto;
+    padding-bottom: 60px; /* Espaço extra para permitir scroll até o final */
 }
 
 .booking-step h3 {
@@ -786,41 +787,56 @@ body.viator-modal-open {
 
 .option-pricing {
     text-align: right;
-    position: relative;
+    display: flex;
+    gap: 5px;
+    align-items: center;
 }
 
 .option-pricing .price-before {
-    color: #6c757d;
-    font-size: 14px;
     text-decoration: line-through;
+    color: #999;
+    font-size: 0.9em;
+    font-weight: 400;
     margin-bottom: 2px;
 }
 
 .option-pricing .price-current {
-    font-size: 18px;
+    font-size: 1.1em;
     font-weight: 700;
     color: #28a745;
+    margin-bottom: 4px;
 }
 
 .option-pricing .price-total {
-    font-size: 18px;
-    font-weight: 700;
     color: #28a745;
 }
 
 .discount-badge {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    color: white;
+    font-size: 0.75em;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
     position: absolute;
     top: -8px;
     right: -8px;
-    background: linear-gradient(135deg, #ff6b6b, #ee5a24);
-    color: white;
-    font-size: 11px;
-    font-weight: bold;
-    padding: 4px 8px;
-    border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(231, 76, 60, 0.3);
+    z-index: 10;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    box-shadow: 0 2px 8px rgba(238, 90, 36, 0.3);
+    animation: discountPulse 2s infinite;
+}
+
+@keyframes discountPulse {
+    0%, 100% { 
+        transform: scale(1); 
+        box-shadow: 0 2px 6px rgba(231, 76, 60, 0.3);
+    }
+    50% { 
+        transform: scale(1.05); 
+        box-shadow: 0 4px 12px rgba(231, 76, 60, 0.5);
+    }
 }
 
 .option-breakdown {
@@ -844,20 +860,20 @@ body.viator-modal-open {
 
 .price-info {
     display: flex;
-    flex-direction: column;
     align-items: flex-end;
-    gap: 2px;
+    gap: 5px;
 }
 
 .price-info .price-original {
-    color: #6c757d;
-    font-size: 12px;
     text-decoration: line-through;
+    color: #999;
+    font-size: 0.85em;
+    font-weight: 400;
 }
 
 .price-info .price-current {
-    font-weight: 600;
-    color: #2c3e50;
+    font-weight: 700;
+    color: #28a745;
 }
 
 .option-selection-note {
@@ -1207,8 +1223,34 @@ body.viator-modal-open {
 }
 
 .total-amount {
-    font-size: 20px;
+    display: flex;
+    align-items: flex-end;
+    gap: 5px;
+}
+
+.price-original-total {
+    text-decoration: line-through;
+    color: #999;
+    font-size: 0.9em;
+    font-weight: 400;
+}
+
+.price-current-total {
+    font-weight: 700;
     color: #28a745;
+}
+
+.discount-badge-footer {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    color: white;
+    font-size: 0.7em;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 6px rgba(231, 76, 60, 0.3);
+    margin-top: 2px;
 }
 
 .footer-buttons {
@@ -1385,9 +1427,10 @@ body.viator-modal-open {
     }
     
     .price-details-toggle {
-        width: 36px;
-        height: 22px;
-        top: -11px;
+        width: 28px;
+        height: 18px;
+        top: -9px;
+        font-size: 9px;
     }
     
     .toggle-icon {
@@ -1576,9 +1619,10 @@ body.viator-modal-open {
     }
 
     .price-details-toggle {
-        width: 32px;
-        height: 20px;
-        top: -10px;
+        width: 26px;
+        height: 16px;
+        top: -8px;
+        font-size: 8px;
     }
     
     .toggle-icon {
@@ -1668,44 +1712,47 @@ body.viator-modal-open {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 24px;
-    background: linear-gradient(135deg, #0056b3 0%, #004494 100%);
-    color: white;
-    border: none;
-    border-radius: 12px;
+    width: 32px;
+    height: 20px;
+    background: #f8f9fa;
+    color: #6c757d;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
     position: absolute;
-    top: -12px;
+    top: -10px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 10;
-    box-shadow: 0 2px 8px rgba(0, 86, 179, 0.25);
-    font-size: 12px;
+    font-size: 10px;
     outline: none;
+    font-weight: 600;
 }
 
 .price-details-toggle:hover {
-    background: rgba(255, 255, 255, 0.3) !important;
-    transform: scale(1.05) !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
-    color: white !important;
-    text-decoration: none !important;
+    background: #e9ecef !important;
+    color: #495057;
+    border-color: #dee2e6;
+    transform: translateX(-50%);
 }
 
 .price-details-toggle:active {
-    transform: scale(0.95) !important;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2) !important;
-    background: rgba(255, 255, 255, 0.4) !important;
+    background: #dee2e6 !important;
+    transform: translateX(-50%) scale(0.95);
 }
 
 .price-details-toggle.collapsed {
-    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    background: #f8f9fa !important;
+    color: #6c757d;
+    border-color: #e9ecef;
 }
 
 .price-details-toggle.collapsed:hover {
-    background: linear-gradient(135deg, #20c997 0%, #17a2b8 100%);
+    background: #e9ecef !important;
+    color: #495057;
+    border-color: #dee2e6;
+    transform: translateX(-50%);
 }
 
 .toggle-icon {
@@ -2164,4 +2211,82 @@ body.viator-modal-open {
 
 .viator-booking-calendar.custom-calendar .calendar-day.today {
     background: rgba(255, 193, 7, 0.9) !important;
+}
+
+/* Responsividade para badges de desconto e preços */
+@media (max-width: 768px) {
+    .discount-badge {
+        font-size: 0.65em;
+        padding: 1px 4px;
+        top: -6px;
+        right: -6px;
+    }
+    
+    .option-pricing .price-before {
+        font-size: 0.8em;
+    }
+    
+    .option-pricing .price-current {
+        font-size: 1em;
+    }
+    
+    .price-info .price-original {
+        font-size: 0.8em;
+    }
+    
+    .discount-badge-footer {
+        font-size: 0.65em;
+        padding: 1px 4px;
+    }
+    
+    .price-original-total {
+        font-size: 0.85em;
+    }
+    
+    .price-current-total {
+        font-size: 1em;
+    }
+}
+
+@media (max-width: 480px) {
+    .discount-badge {
+        font-size: 0.6em;
+        padding: 1px 3px;
+        top: -4px;
+        right: -4px;
+    }
+    
+    .option-pricing .price-before {
+        font-size: 0.75em;
+    }
+    
+    .option-pricing .price-current {
+        font-size: 0.9em;
+    }
+    
+    .price-info {
+        align-items: flex-end;
+        gap: 1px;
+    }
+    
+    .price-info .price-original {
+        font-size: 0.75em;
+    }
+    
+    .discount-badge-footer {
+        font-size: 0.6em;
+        padding: 1px 3px;
+    }
+    
+    .price-original-total {
+        font-size: 0.8em;
+    }
+    
+    .price-current-total {
+        font-size: 0.95em;
+    }
+    
+    .total-amount {
+        gap: 2px;
+    }
 } 

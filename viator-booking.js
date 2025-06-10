@@ -1615,8 +1615,12 @@ class ViatorBookingManager {
             
             // Pegar o menor preço do grupo
             const minPrice = Math.min(...optionsGroup.map(opt => opt.totalPrice.price.recommendedRetailPrice));
-            const hasDiscount = baseOption.totalPrice.priceBeforeDiscount && 
-                               baseOption.totalPrice.priceBeforeDiscount.recommendedRetailPrice > minPrice;
+            
+            // Verificar se há desconto no preço total
+            const originalTotalPrice = baseOption.totalPrice.priceBeforeDiscount?.recommendedRetailPrice;
+            const currentTotalPrice = baseOption.totalPrice.price.recommendedRetailPrice;
+            const hasDiscount = originalTotalPrice && originalTotalPrice > currentTotalPrice;
+            const discountPercentage = hasDiscount ? Math.round(((originalTotalPrice - currentTotalPrice) / originalTotalPrice) * 100) : 0;
             
             // Definir a opção mais barata como selecionada por padrão
             if (cheapestTotal === null || minPrice < cheapestTotal) {
@@ -1628,20 +1632,21 @@ class ViatorBookingManager {
             let optionBreakdown = '';
             if (baseOption.lineItems) {
                 baseOption.lineItems.forEach(item => {
-                    const totalPrice = item.subtotalPrice.price.recommendedRetailPrice;
-                    const unitPrice = totalPrice / item.numberOfTravelers;
-                    const originalPrice = item.subtotalPrice.priceBeforeDiscount?.recommendedRetailPrice;
-                    const originalUnitPrice = originalPrice ? originalPrice / item.numberOfTravelers : null;
+                    const currentTotal = item.subtotalPrice.price.recommendedRetailPrice;
+                    const originalTotal = item.subtotalPrice.priceBeforeDiscount?.recommendedRetailPrice;
+                    const currentUnitPrice = currentTotal / item.numberOfTravelers;
+                    const originalUnitPrice = originalTotal ? originalTotal / item.numberOfTravelers : null;
                     const ageBandName = this.getAgeBandDisplayName(item.ageBand);
                     const quantity = item.numberOfTravelers;
+                    const hasItemDiscount = originalUnitPrice && originalUnitPrice > currentUnitPrice;
                     
                     optionBreakdown += `
                         <div class="price-line">
                             <span class="traveler-info">${quantity} ${ageBandName}${quantity > 1 ? 's' : ''} x</span>
                             <span class="price-info">
-                                ${originalUnitPrice && originalUnitPrice > unitPrice ? 
-                                    `<span class="price-original">${this.formatPrice(totalPrice)}</span>` : ''}
-                                <span class="price-current">${this.formatPrice(unitPrice)}</span>
+                                ${hasItemDiscount ? 
+                                    `<span class="price-original">${this.formatPrice(originalUnitPrice)}</span>` : ''}
+                                <span class="price-current">${this.formatPrice(currentUnitPrice)}</span>
                             </span>
                         </div>
                     `;
@@ -1679,9 +1684,11 @@ class ViatorBookingManager {
                         </div>
                         <div class="option-pricing">
                             ${hasDiscount ? 
-                                `<div class="price-before">${this.formatPrice(baseOption.totalPrice.priceBeforeDiscount.recommendedRetailPrice)}</div>` : ''}
-                            <div class="price-current"><span class="price-total option-price" data-base-price="${minPrice}">${this.formatPrice(minPrice)}</span></div>
-                            ${hasDiscount ? '<div class="discount-badge">Desconto!</div>' : ''}
+                                `<div class="price-before">${this.formatPrice(originalTotalPrice)}</div>` : ''}
+                            <div class="price-current">
+                                <span class="price-total option-price" data-base-price="${currentTotalPrice}">${this.formatPrice(currentTotalPrice)}</span>
+                            </div>
+                            ${hasDiscount ? `<div class="discount-badge">${discountPercentage}% OFF</div>` : ''}
                         </div>
                     </div>
                     <div class="option-breakdown">
@@ -1743,9 +1750,22 @@ class ViatorBookingManager {
                 const card = e.target.closest('.product-option-card');
                 const selectedOption = JSON.parse(e.target.selectedOptions[0].dataset.fullOption);
                 
-                // Atualizar preço da opção
-                const priceElement = card.querySelector('.option-price');
-                priceElement.textContent = this.formatPrice(selectedOption.totalPrice.price.recommendedRetailPrice);
+                // Verificar se há desconto na nova opção selecionada
+                const originalTotalPrice = selectedOption.totalPrice.priceBeforeDiscount?.recommendedRetailPrice;
+                const currentTotalPrice = selectedOption.totalPrice.price.recommendedRetailPrice;
+                const hasDiscount = originalTotalPrice && originalTotalPrice > currentTotalPrice;
+                const discountPercentage = hasDiscount ? Math.round(((originalTotalPrice - currentTotalPrice) / originalTotalPrice) * 100) : 0;
+                
+                // Atualizar a seção de preços do card
+                const pricingSection = card.querySelector('.option-pricing');
+                pricingSection.innerHTML = `
+                    ${hasDiscount ? 
+                        `<div class="price-before">${this.formatPrice(originalTotalPrice)}</div>` : ''}
+                    <div class="price-current">
+                        <span class="price-total option-price" data-base-price="${currentTotalPrice}">${this.formatPrice(currentTotalPrice)}</span>
+                    </div>
+                    ${hasDiscount ? `<div class="discount-badge">${discountPercentage}% OFF</div>` : ''}
+                `;
                 
                 // Se esta opção está selecionada, atualizar footer
                 if (card.classList.contains('selected')) {
@@ -1804,28 +1824,40 @@ class ViatorBookingManager {
 
         if (!selectedOption) return;
 
+        // Verificar se há desconto no total
+        const originalTotalPrice = selectedOption.totalPrice.priceBeforeDiscount?.recommendedRetailPrice;
+        const currentTotalPrice = selectedOption.totalPrice.price.recommendedRetailPrice;
+        const hasDiscount = originalTotalPrice && originalTotalPrice > currentTotalPrice;
+        const discountPercentage = hasDiscount ? Math.round(((originalTotalPrice - currentTotalPrice) / originalTotalPrice) * 100) : 0;
+
         // Construir breakdown para o footer
         let footerBreakdown = '';
-        let totalAmount = selectedOption.totalPrice.price.recommendedRetailPrice;
 
         if (selectedOption.lineItems) {
             selectedOption.lineItems.forEach(item => {
-                const totalPrice = item.subtotalPrice.price.recommendedRetailPrice;
-                const unitPrice = totalPrice / item.numberOfTravelers;
+                const currentTotal = item.subtotalPrice.price.recommendedRetailPrice;
+                const originalTotal = item.subtotalPrice.priceBeforeDiscount?.recommendedRetailPrice;
+                const currentUnitPrice = currentTotal / item.numberOfTravelers;
+                const originalUnitPrice = originalTotal ? originalTotal / item.numberOfTravelers : null;
                 const ageBandName = this.getAgeBandDisplayName(item.ageBand);
                 const quantity = item.numberOfTravelers;
+                const hasItemDiscount = originalUnitPrice && originalUnitPrice > currentUnitPrice;
                 
                 footerBreakdown += `
                     <div class="price-line">
                         <span>${quantity} ${ageBandName}${quantity > 1 ? 's' : ''} x</span>
-                        <span>${this.formatPrice(unitPrice)}</span>
+                        <span class="price-info">
+                            ${hasItemDiscount ? 
+                                `<span class="price-original">${this.formatPrice(originalUnitPrice)}</span>` : ''}
+                            <span class="price-current">${this.formatPrice(currentUnitPrice)}</span>
+                        </span>
                     </div>
                 `;
             });
         }
 
         // Exibir no footer
-        console.log('💰 Atualizando footer com:', {footerBreakdown, totalAmount});
+        console.log('💰 Atualizando footer com:', {footerBreakdown, currentTotalPrice, hasDiscount});
         
         if (priceDetails) {
             priceDetails.innerHTML = footerBreakdown;
@@ -1835,7 +1867,12 @@ class ViatorBookingManager {
             const timeInfo = selectedOption.startTime ? ` - ${selectedOption.startTime}` : '';
             totalPrice.innerHTML = `
                 <div class="total-label">Total (${selectedOption.optionTitle || selectedOption.productOptionCode}${timeInfo}):</div>
-                <div class="total-amount">${this.formatPrice(totalAmount)}</div>
+                <div class="total-amount">
+                    ${hasDiscount ? 
+                        `<span class="price-original-total">${this.formatPrice(originalTotalPrice)}</span>` : ''}
+                    <span class="price-current-total">${this.formatPrice(currentTotalPrice)}</span>
+                    ${hasDiscount ? `<span class="discount-badge-footer">${discountPercentage}% OFF</span>` : ''}
+                </div>
             `;
         }
         
