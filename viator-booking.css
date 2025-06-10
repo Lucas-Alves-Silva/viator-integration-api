@@ -5,7 +5,12 @@
 
 /* Impedir scroll da página quando modal está aberto */
 body.viator-modal-open {
-    overflow: hidden;
+    overflow: hidden !important; /* Previne scroll da página quando modal estiver aberto */
+    height: 100vh !important; /* Fixa a altura do body */
+    position: fixed !important; /* Impede qualquer movimento do body */
+    width: 100% !important; /* Garante largura total */
+    top: 0 !important; /* Fixa no topo */
+    left: 0 !important; /* Fixa na esquerda */
 }
 
 /* Modal Base */
@@ -24,6 +29,7 @@ body.viator-modal-open {
     animation: fadeIn 0.3s ease-out;
     /* Garantir que o modal permaneça fixo e não seja afetado por scroll */
     transform: translateZ(0); /* Força camada de composição no GPU */
+    overflow: hidden; /* Previne qualquer scroll fora do modal */
 }
 
 .viator-modal-content {
@@ -36,6 +42,8 @@ body.viator-modal-open {
     overflow: hidden;
     position: relative;
     animation: slideIn 0.3s ease-out;
+    display: flex;
+    flex-direction: column;
 }
 
 @keyframes fadeIn {
@@ -62,6 +70,7 @@ body.viator-modal-open {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-shrink: 0; /* Impede que o header encolha */
 }
 
 .viator-modal-title {
@@ -97,6 +106,7 @@ body.viator-modal-open {
     background: #f8f9fa;
     padding: 20px 30px;
     border-bottom: 1px solid #e9ecef;
+    flex-shrink: 0; /* Impede que a barra de progresso encolha */
 }
 
 .progress-step {
@@ -164,9 +174,33 @@ body.viator-modal-open {
 /* Modal Body */
 .viator-modal-body {
     padding: 30px;
-    max-height: 75vh;
-    overflow-y: auto;
+    flex: 1; /* Ocupa todo o espaço disponível */
+    overflow-y: auto; /* Permite scroll vertical */
+    overflow-x: hidden; /* Esconde scroll horizontal */
+    min-height: 0; /* Permite que o flexbox funcione corretamente */
     padding-bottom: 60px; /* Espaço extra para permitir scroll até o final */
+    scroll-behavior: smooth; /* Comportamento de scroll suave */
+    position: relative; /* Garante que o scroll seja contido */
+}
+
+/* Customizar a barra de scroll do modal-body */
+.viator-modal-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.viator-modal-body::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.viator-modal-body::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+    transition: background 0.3s ease;
+}
+
+.viator-modal-body::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
 }
 
 .booking-step h3 {
@@ -1179,8 +1213,7 @@ body.viator-modal-open {
     border-top: 1px solid #e9ecef;
     border-bottom-left-radius: 12px;
     border-bottom-right-radius: 12px;
-    position: sticky;
-    bottom: 0;
+    flex-shrink: 0; /* Impede que o footer encolha */
     z-index: 1000;
 }
 

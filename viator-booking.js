@@ -364,11 +364,19 @@ class ViatorBookingManager {
     }
     
     preventPageScroll() {
+        // Salvar posição atual do scroll
+        this.scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
+        
         // Calcular largura do scrollbar
         const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
         
         // Aplicar estilos para impedir scroll sem quebrar layout
         document.body.style.overflow = 'hidden';
+        document.body.style.position = 'fixed';
+        document.body.style.top = `-${this.scrollPosition}px`;
+        document.body.style.width = '100%';
+        document.body.style.height = '100vh';
+        
         if (scrollbarWidth > 0) {
             document.body.style.paddingRight = scrollbarWidth + 'px';
         }
@@ -383,8 +391,18 @@ class ViatorBookingManager {
     restorePageScroll() {
         // Remover estilos aplicados
         document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        document.body.style.height = '';
         document.body.style.paddingRight = '';
         document.body.classList.remove('viator-modal-open');
+        
+        // Restaurar posição original do scroll
+        if (this.scrollPosition !== undefined) {
+            window.scrollTo(0, this.scrollPosition);
+            this.scrollPosition = undefined;
+        }
         
         // Remover listener de proteção
         if (this.beforeUnloadListener) {
@@ -1705,12 +1723,22 @@ class ViatorBookingManager {
         priceDisplay.innerHTML = optionsHTML;
         priceDisplay.style.display = 'block';
 
-        // Scroll automático para os resultados
+        // Scroll automático para os resultados APENAS dentro do modal-body
         setTimeout(() => {
-            priceDisplay.scrollIntoView({ 
-                behavior: 'smooth', 
-                block: 'start' 
-            });
+            const modalBody = document.querySelector('.viator-modal-body');
+            if (priceDisplay && modalBody) {
+                // Calcular posição do elemento dentro do modal-body
+                const priceDisplayRect = priceDisplay.getBoundingClientRect();
+                const modalBodyRect = modalBody.getBoundingClientRect();
+                
+                // Fazer scroll apenas dentro do modal-body, não da página
+                const scrollTop = modalBody.scrollTop + (priceDisplayRect.top - modalBodyRect.top) - 20; // 20px de margem
+                
+                modalBody.scrollTo({
+                    top: scrollTop,
+                    behavior: 'smooth'
+                });
+            }
         }, 100);
 
         // Adicionar event listeners para seleção de opções
@@ -1912,13 +1940,21 @@ class ViatorBookingManager {
         const footerSummary = document.getElementById('footer-price-summary');
         footerSummary.style.display = 'none';
         
-        // Fazer scroll automático para a div de loading para dar evidência ao usuário
+        // Fazer scroll automático APENAS dentro do modal-body
         setTimeout(() => {
             const loadingDiv = priceDisplay.querySelector('.price-loading');
-            if (loadingDiv) {
-                loadingDiv.scrollIntoView({ 
-                    behavior: 'smooth', 
-                    block: 'center' 
+            const modalBody = document.querySelector('.viator-modal-body');
+            if (loadingDiv && modalBody) {
+                // Calcular posição do elemento dentro do modal-body
+                const loadingRect = loadingDiv.getBoundingClientRect();
+                const modalBodyRect = modalBody.getBoundingClientRect();
+                
+                // Fazer scroll apenas dentro do modal-body, não da página
+                const scrollTop = modalBody.scrollTop + (loadingRect.top - modalBodyRect.top) - (modalBodyRect.height / 2) + (loadingRect.height / 2);
+                
+                modalBody.scrollTo({
+                    top: scrollTop,
+                    behavior: 'smooth'
                 });
             }
         }, 100);
@@ -2037,12 +2073,20 @@ class ViatorBookingManager {
                 card.classList.add('highlight-selection');
             });
             
-            // Scroll suave para as opções
+            // Scroll suave para as opções APENAS dentro do modal-body
             const priceDisplay = document.getElementById('price-display');
-            if (priceDisplay) {
-                priceDisplay.scrollIntoView({ 
-                    behavior: 'smooth', 
-                    block: 'start' 
+            const modalBody = document.querySelector('.viator-modal-body');
+            if (priceDisplay && modalBody) {
+                // Calcular posição do elemento dentro do modal-body
+                const priceDisplayRect = priceDisplay.getBoundingClientRect();
+                const modalBodyRect = modalBody.getBoundingClientRect();
+                
+                // Fazer scroll apenas dentro do modal-body, não da página
+                const scrollTop = modalBody.scrollTop + (priceDisplayRect.top - modalBodyRect.top) - 20; // 20px de margem
+                
+                modalBody.scrollTo({
+                    top: scrollTop,
+                    behavior: 'smooth'
                 });
             }
             
