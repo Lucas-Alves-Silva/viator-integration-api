@@ -906,8 +906,8 @@ body.viator-modal-open {
 }
 
 .price-info .price-current {
-    font-weight: 700;
-    color: #28a745;
+    font-weight: 500;
+    color: #495057;
 }
 
 .option-selection-note {
@@ -1064,17 +1064,124 @@ body.viator-modal-open {
 }
 
 /* Traveler Forms */
+.travelers-step {
+    min-height: 200px; /* Garantir altura mínima */
+}
+
 .traveler-form {
     background: #f8f9fa;
     padding: 20px;
     border-radius: 8px;
     margin-bottom: 20px;
     border-left: 4px solid #0056b3;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    animation: fadeIn 0.3s ease-out;
 }
 
 .traveler-form h4 {
     margin-top: 0;
     color: #0056b3;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+#travelers-forms {
+    min-height: 100px; /* Garantir altura mínima para o container */
+}
+
+#travelers-forms:empty::before {
+    content: "Carregando informações dos viajantes...";
+    display: block;
+    text-align: center;
+    color: #6c757d;
+    font-style: italic;
+    padding: 40px 20px;
+}
+
+.travelers-step .error-message {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+/* Estilos para a nova interface simplificada da segunda etapa */
+.traveler-summary-section {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 25px;
+}
+
+.traveler-summary-section h4 {
+    margin: 0 0 15px 0;
+    color: #495057;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.travelers-summary-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.travelers-summary-list .summary-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+.travelers-summary-list .summary-item .icon {
+    font-size: 1.2rem;
+    color: #0056b3;
+}
+
+.travelers-summary-list .summary-item .details {
+    color: #495057;
+    flex: 1;
+}
+
+.booker-info-section {
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 25px;
+}
+
+.booker-info-section h4 {
+    margin: 0 0 10px 0;
+    color: #495057;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.booker-note {
+    margin: 0 0 20px 0;
+    color: #6c757d;
+    font-size: 0.95rem;
+    font-style: italic;
+}
+
+#travelers-summary:empty::before {
+    content: "Carregando resumo dos viajantes...";
+    display: block;
+    text-align: center;
+    padding: 40px;
+    color: #6c757d;
+    font-style: italic;
 }
 
 /* Payment Section */

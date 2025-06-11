@@ -29,6 +29,8 @@ class ViatorBookingSystem {
         add_action('wp_ajax_nopriv_viator_confirm_booking', array($this, 'ajax_confirm_booking'));
         add_action('wp_ajax_viator_get_monthly_availability', array($this, 'ajax_get_monthly_availability'));
         add_action('wp_ajax_nopriv_viator_get_monthly_availability', array($this, 'ajax_get_monthly_availability'));
+        add_action('wp_ajax_viator_test_api_access', array($this, 'ajax_test_api_access'));
+        add_action('wp_ajax_nopriv_viator_test_api_access', array($this, 'ajax_test_api_access'));
     }
     
     /**
@@ -83,16 +85,30 @@ class ViatorBookingSystem {
         
         $locale_settings = viator_get_locale_settings();
         
+        // Gerar referências únicas para cart e booking
+        $partner_cart_ref = 'CART_' . $this->generate_unique_id();
+        $partner_booking_ref = 'BOOK_' . $this->generate_unique_id();
+        
+        // Construir dados conforme a documentação da API
         $request_data = array(
-            'productCode' => $availability_data['productCode'],
-            'travelDate' => $availability_data['travelDate'],
-            'selectedOptions' => $availability_data['selectedOptions'],
-            'travelers' => $travelers_details,
             'currency' => $locale_settings['currency'],
-            // Para solução de pagamento via API
+            'partnerCartRef' => $partner_cart_ref,
+            'items' => array(
+                array(
+                    'partnerBookingRef' => $partner_booking_ref,
+                    'productCode' => $availability_data['productCode'] ?? $availability_data['product']['productCode'],
+                    'productOptionCode' => $availability_data['selectedOption']['productOptionCode'],
+                    'startTime' => $availability_data['selectedOption']['startTime'] ?? null,
+                    'travelDate' => $availability_data['travelDate'],
+                    'paxMix' => $this->convert_travelers_to_pax_mix($travelers_details)
+                )
+            ),
             'paymentDataSubmissionMode' => 'PARTNER_FORM',
-            'hostingUrl' => home_url()
+            'hostingUrl' => 'https://www.ingressosepasseios.com'
         );
+        
+        // Log para debug
+        viator_debug_log('Hold Request Data:', $request_data);
         
         $response = wp_remote_post($this->base_url . '/partner/bookings/cart/hold', array(
             'headers' => array(
@@ -106,17 +122,78 @@ class ViatorBookingSystem {
         ));
         
         if (is_wp_error($response)) {
+            viator_debug_log('Hold WP_Error:', $response->get_error_message());
             return array('error' => 'Erro de conexão: ' . $response->get_error_message());
         }
         
+        $response_code = wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
+        
+        // Log detalhado da resposta
+        viator_debug_log('Hold Response Code:', $response_code);
+        viator_debug_log('Hold Response Body:', $body);
+        viator_debug_log('Hold Response Data:', $data);
+        
+        // Verificar código de resposta HTTP
+        if ($response_code === 403) {
+            return array('error' => 'Acesso negado: Sua API key não tem permissões de booking. Verifique se sua conta tem nível "Full Access + Booking".');
+        }
+        
+        if ($response_code !== 200) {
+            $error_message = isset($data['message']) ? $data['message'] : "Erro HTTP {$response_code}";
+            return array('error' => $error_message);
+        }
         
         if (isset($data['errorCode']) || isset($data['error'])) {
             return array('error' => isset($data['errorMessage']) ? $data['errorMessage'] : 'Erro ao criar hold de reserva');
         }
         
+        // Adicionar referências ao retorno
+        $data['partnerCartRef'] = $partner_cart_ref;
+        $data['partnerBookingRef'] = $partner_booking_ref;
+        
         return $data;
+    }
+    
+    /**
+     * Converter detalhes dos viajantes para formato paxMix
+     */
+    private function convert_travelers_to_pax_mix($travelers_details) {
+        $pax_mix = array();
+        $age_band_counts = array();
+        
+        // Contar viajantes por age band
+        foreach ($travelers_details as $traveler) {
+            $band_id = $traveler['bandId'];
+            if (!isset($age_band_counts[$band_id])) {
+                $age_band_counts[$band_id] = 0;
+            }
+            $age_band_counts[$band_id]++;
+        }
+        
+        // Converter para formato paxMix
+        foreach ($age_band_counts as $age_band => $count) {
+            $pax_mix[] = array(
+                'ageBand' => $age_band,
+                'numberOfTravelers' => $count
+            );
+        }
+        
+        return $pax_mix;
+    }
+    
+    /**
+     * Gerar ID único para referências
+     */
+    private function generate_unique_id() {
+        // Usar função nativa do WordPress se disponível
+        if (function_exists('wp_generate_uuid4')) {
+            return str_replace('-', '', wp_generate_uuid4());
+        }
+        
+        // Fallback para geração manual
+        return strtoupper(substr(uniqid() . bin2hex(random_bytes(4)), 0, 8));
     }
     
     /**
@@ -530,6 +607,133 @@ class ViatorBookingSystem {
 
         wp_send_json_success($result);
     }
+
+    /**
+     * AJAX - Testar acesso à API
+     */
+    public function ajax_test_api_access() {
+        if (!wp_verify_nonce($_POST['nonce'], 'viator_booking_nonce')) {
+            wp_send_json_error(['message' => 'Nonce inválido']);
+        }
+
+        $result = $this->test_api_access_level();
+        
+        if (isset($result['error'])) {
+            wp_send_json_error($result);
+        }
+
+        wp_send_json_success($result);
+    }
+
+    /**
+     * Testar nível de acesso da API
+     */
+    public function test_api_access_level() {
+        if (empty($this->api_key)) {
+            return ['error' => 'API Key não configurada'];
+        }
+
+        $locale_settings = viator_get_locale_settings();
+        $tests = [];
+
+        // Teste 1: Verificar produtos básicos
+        $test_product_url = $this->base_url . '/partner/products/2484FAV';
+        $response1 = wp_remote_get($test_product_url, [
+            'headers' => [
+                'Accept' => 'application/json;version=2.0',
+                'exp-api-key' => $this->api_key,
+                'Accept-Language' => $locale_settings['language']
+            ],
+            'timeout' => 15
+        ]);
+
+        $tests['products_access'] = [
+            'endpoint' => '/partner/products/2484FAV',
+            'method' => 'GET',
+            'status_code' => wp_remote_retrieve_response_code($response1),
+            'success' => !is_wp_error($response1) && wp_remote_retrieve_response_code($response1) === 200
+        ];
+
+        // Teste 2: Verificar availability check
+        $availability_data = [
+            'productCode' => '2484FAV',
+            'travelDate' => date('Y-m-d', strtotime('+7 days')),
+            'currency' => $locale_settings['currency'],
+            'paxMix' => [['ageBand' => 'ADULT', 'numberOfTravelers' => 1]]
+        ];
+
+        $response2 = wp_remote_post($this->base_url . '/partner/availability/check', [
+            'headers' => [
+                'Accept' => 'application/json;version=2.0',
+                'Content-Type' => 'application/json;version=2.0',
+                'exp-api-key' => $this->api_key,
+                'Accept-Language' => $locale_settings['language']
+            ],
+            'body' => json_encode($availability_data),
+            'timeout' => 15
+        ]);
+
+        $tests['availability_access'] = [
+            'endpoint' => '/partner/availability/check',
+            'method' => 'POST',
+            'status_code' => wp_remote_retrieve_response_code($response2),
+            'success' => !is_wp_error($response2) && wp_remote_retrieve_response_code($response2) === 200
+        ];
+
+        // Teste 3: Verificar acesso ao booking hold (o que está falhando)
+        $hold_data = [
+            'currency' => $locale_settings['currency'],
+            'partnerCartRef' => 'TEST_CART_' . time(),
+            'items' => [[
+                'partnerBookingRef' => 'TEST_BOOK_' . time(),
+                'productCode' => '2484FAV',
+                'productOptionCode' => 'TG3',
+                'travelDate' => date('Y-m-d', strtotime('+7 days')),
+                'paxMix' => [['ageBand' => 'ADULT', 'numberOfTravelers' => 1]]
+            ]],
+            'paymentDataSubmissionMode' => 'PARTNER_FORM',
+            'hostingUrl' => 'https://www.ingressosepasseios.com'
+        ];
+
+        $response3 = wp_remote_post($this->base_url . '/partner/bookings/cart/hold', [
+            'headers' => [
+                'Accept' => 'application/json;version=2.0',
+                'Content-Type' => 'application/json;version=2.0',
+                'exp-api-key' => $this->api_key,
+                'Accept-Language' => $locale_settings['language']
+            ],
+            'body' => json_encode($hold_data),
+            'timeout' => 15
+        ]);
+
+        $hold_response_code = wp_remote_retrieve_response_code($response3);
+        $hold_body = wp_remote_retrieve_body($response3);
+        
+        $tests['booking_hold_access'] = [
+            'endpoint' => '/partner/bookings/cart/hold',
+            'method' => 'POST',
+            'status_code' => $hold_response_code,
+            'success' => !is_wp_error($response3) && $hold_response_code === 200,
+            'response_body' => $hold_body,
+            'error_details' => $hold_response_code === 403 ? 'API key não tem permissões de booking' : null
+        ];
+
+        // Resumo
+        $has_booking_access = $tests['booking_hold_access']['success'];
+        $access_level = $has_booking_access ? 'Full Access + Booking' : 'Somente leitura';
+
+        return [
+            'api_key_status' => 'Configurada',
+            'base_url' => $this->base_url,
+            'access_level' => $access_level,
+            'tests' => $tests,
+            'recommendations' => $has_booking_access ? [] : [
+                'Solicite à Viator upgrade para "Full Access + Booking"',
+                'Verifique se sua conta está aprovada para bookings',
+                'Confirme se está usando a API key correta para o ambiente'
+            ]
+        ];
+    }
 }
 
 // Inicializar a classe
@@ -545,5 +749,20 @@ if (!function_exists('viator_get_locale_settings')) {
             'currency' => 'BRL',
             'currency_symbol' => 'R$'
         );
+    }
+}
+
+/**
+ * Função de debug para registrar logs (se não existir)
+ */
+if (!function_exists('viator_debug_log')) {
+    function viator_debug_log($message, $data = null) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            $log_message = '[VIATOR DEBUG] ' . $message;
+            if ($data !== null) {
+                $log_message .= ' | Data: ' . print_r($data, true);
+            }
+            error_log($log_message);
+        }
     }
 } 

@@ -655,8 +655,38 @@ class ViatorBookingManager {
     getTravelersStepHTML() {
         return `
             <div class="booking-step travelers-step">
-                <h3>Informações dos Viajantes</h3>
-                <div id="travelers-forms"></div>
+                <h3>Informações da Reserva</h3>
+                <div class="traveler-summary-section">
+                    <h4>📋 Resumo dos Viajantes</h4>
+                    <div id="travelers-summary"></div>
+                </div>
+                
+                <div class="booker-info-section">
+                    <h4>👤 Informações do Responsável pela Reserva</h4>
+                    <p class="booker-note">Apenas o responsável principal precisa fornecer seus dados pessoais:</p>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="booker-firstname">Nome *:</label>
+                            <input type="text" id="booker-firstname" name="booker_firstname" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="booker-lastname">Sobrenome *:</label>
+                            <input type="text" id="booker-lastname" name="booker_lastname" class="form-control" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="booker-email">Email *:</label>
+                            <input type="email" id="booker-email" name="booker_email" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="booker-phone">Telefone (opcional):</label>
+                            <input type="tel" id="booker-phone" name="booker_phone" class="form-control" maxlength="20" placeholder="(11) 99999-9999">
+                        </div>
+                    </div>
+                </div>
             </div>
         `;
     }
@@ -931,7 +961,279 @@ class ViatorBookingManager {
     }
     
     initializeTravelersStep() {
+        console.log('🚀 initializeTravelersStep chamado');
+        console.log('📊 Dados armazenados:', {
+            selectedTravelers: this.bookingData.selectedTravelers,
+            ageBands: this.ageBands,
+            travelDate: this.bookingData.travelDate
+        });
+        
+        // Scroll para o topo da modal-body
+        const modalBody = document.querySelector('.viator-modal-body');
+        if (modalBody) {
+            modalBody.scrollTop = 0;
+            console.log('📜 Scroll resetado para o topo da modal-body');
+        }
+        
         this.generateTravelersForm();
+        
+        // Verificar se o resumo foi gerado
+        const container = document.getElementById('travelers-summary');
+        const summaryCount = container ? container.children.length : 0;
+        console.log(`✅ Resumo dos viajantes inicializado: ${summaryCount} itens`);
+        
+        if (summaryCount === 0) {
+            console.error('❌ PROBLEMA: Nenhum resumo de viajante foi gerado!');
+        }
+        
+        // Adicionar validações em tempo real para os campos do formulário
+        this.setupBookerInfoValidation();
+    }
+    
+    setupBookerInfoValidation() {
+        const bookerFirstname = document.getElementById('booker-firstname');
+        const bookerLastname = document.getElementById('booker-lastname');
+        const bookerEmail = document.getElementById('booker-email');
+        const bookerPhone = document.getElementById('booker-phone');
+        
+        // Função para limpar erro de campo específico
+        const clearFieldError = (field) => {
+            field.classList.remove('error');
+            const existingError = field.parentNode.querySelector('.error-message');
+            if (existingError) {
+                existingError.remove();
+            }
+        };
+        
+        // Função para mostrar erro de campo específico
+        const showFieldError = (field, message) => {
+            clearFieldError(field);
+            field.classList.add('error');
+            
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            field.parentNode.appendChild(errorDiv);
+        };
+        
+        // Validação em tempo real para nome
+        if (bookerFirstname) {
+            bookerFirstname.addEventListener('blur', () => {
+                const value = bookerFirstname.value.trim();
+                if (!value) {
+                    showFieldError(bookerFirstname, 'O nome é obrigatório.');
+                } else if (value.length < 2) {
+                    showFieldError(bookerFirstname, 'O nome deve ter pelo menos 2 caracteres.');
+                } else if (!/^[a-zA-ZÀ-ÿ\s]+$/.test(value)) {
+                    showFieldError(bookerFirstname, 'O nome deve conter apenas letras.');
+                } else {
+                    clearFieldError(bookerFirstname);
+                }
+            });
+            
+            bookerFirstname.addEventListener('input', () => {
+                // Limpar erro enquanto digita se o campo não está vazio
+                if (bookerFirstname.value.trim()) {
+                    clearFieldError(bookerFirstname);
+                }
+            });
+        }
+        
+        // Validação em tempo real para sobrenome
+        if (bookerLastname) {
+            bookerLastname.addEventListener('blur', () => {
+                const value = bookerLastname.value.trim();
+                if (!value) {
+                    showFieldError(bookerLastname, 'O sobrenome é obrigatório.');
+                } else if (value.length < 2) {
+                    showFieldError(bookerLastname, 'O sobrenome deve ter pelo menos 2 caracteres.');
+                } else if (!/^[a-zA-ZÀ-ÿ\s]+$/.test(value)) {
+                    showFieldError(bookerLastname, 'O sobrenome deve conter apenas letras.');
+                } else {
+                    clearFieldError(bookerLastname);
+                }
+            });
+            
+            bookerLastname.addEventListener('input', () => {
+                // Limpar erro enquanto digita se o campo não está vazio
+                if (bookerLastname.value.trim()) {
+                    clearFieldError(bookerLastname);
+                }
+            });
+        }
+        
+        // Validação em tempo real para email
+        if (bookerEmail) {
+            bookerEmail.addEventListener('blur', () => {
+                const value = bookerEmail.value.trim();
+                if (!value) {
+                    showFieldError(bookerEmail, 'O email é obrigatório.');
+                } else {
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(value)) {
+                        showFieldError(bookerEmail, 'Por favor, informe um email válido.');
+                    } else {
+                        clearFieldError(bookerEmail);
+                    }
+                }
+            });
+            
+            bookerEmail.addEventListener('input', () => {
+                // Limpar erro enquanto digita se parece ser um email válido
+                const value = bookerEmail.value.trim();
+                if (value && value.includes('@') && value.includes('.')) {
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (emailRegex.test(value)) {
+                        clearFieldError(bookerEmail);
+                    }
+                }
+            });
+        }
+        
+        // Validação em tempo real para telefone (opcional, mas com formato)
+        if (bookerPhone) {
+            bookerPhone.addEventListener('blur', () => {
+                const value = bookerPhone.value.trim();
+                if (value) {
+                    // Contar apenas dígitos para validação
+                    const digitsOnly = value.replace(/[^\d]/g, '');
+                    
+                    if (digitsOnly.length < 10) {
+                        showFieldError(bookerPhone, 'O telefone deve ter pelo menos 10 dígitos.');
+                    } else if (digitsOnly.length > 15) {
+                        showFieldError(bookerPhone, 'O telefone deve ter no máximo 15 dígitos.');
+                    } else {
+                        // Validar formato básico
+                        const phoneRegex = /^[\+]?[\d\s\-\(\)]{10,20}$/;
+                        if (!phoneRegex.test(value)) {
+                            showFieldError(bookerPhone, 'Por favor, informe um telefone válido.');
+                        } else {
+                            clearFieldError(bookerPhone);
+                        }
+                    }
+                } else {
+                    clearFieldError(bookerPhone);
+                }
+            });
+            
+            bookerPhone.addEventListener('input', (e) => {
+                // Obter valor atual
+                let value = e.target.value;
+                const digitsOnly = value.replace(/[^\d]/g, '');
+                
+                // Limitar a 15 dígitos máximo
+                if (digitsOnly.length > 15) {
+                    // Encontrar posição do 15º dígito e truncar
+                    let digitCount = 0;
+                    let newValue = '';
+                    for (let i = 0; i < value.length; i++) {
+                        const char = value[i];
+                        if (/\d/.test(char)) {
+                            digitCount++;
+                            if (digitCount > 15) break;
+                        }
+                        newValue += char;
+                    }
+                    e.target.value = newValue;
+                    value = newValue;
+                }
+                
+                // Limitar comprimento total a 20 caracteres
+                if (value.length > 20) {
+                    e.target.value = value.substring(0, 20);
+                    value = e.target.value;
+                }
+                
+                // Limpar erro enquanto digita se parece válido
+                if (value.trim()) {
+                    const currentDigits = value.replace(/[^\d]/g, '');
+                    if (currentDigits.length >= 10 && currentDigits.length <= 15) {
+                        const phoneRegex = /^[\+]?[\d\s\-\(\)]{10,20}$/;
+                        if (phoneRegex.test(value)) {
+                            clearFieldError(bookerPhone);
+                        }
+                    }
+                }
+            });
+            
+            // Permitir apenas números, espaços, parênteses, hífen e +
+            bookerPhone.addEventListener('keypress', (e) => {
+                const allowedChars = /[\d\s\-\(\)\+]/;
+                if (!allowedChars.test(e.key) && !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                    e.preventDefault();
+                    return;
+                }
+                
+                // Verificar se adicionar este caractere excederia os limites
+                const currentValue = e.target.value;
+                const currentDigits = currentValue.replace(/[^\d]/g, '');
+                
+                // Se é um dígito e já temos 15 dígitos, bloquear
+                if (/\d/.test(e.key) && currentDigits.length >= 15) {
+                    e.preventDefault();
+                    return;
+                }
+                
+                // Se o comprimento total chegaria a 20, bloquear
+                if (currentValue.length >= 20) {
+                    e.preventDefault();
+                    return;
+                }
+            });
+            
+            // Controlar operação de colar (paste)
+            bookerPhone.addEventListener('paste', (e) => {
+                e.preventDefault();
+                
+                // Obter texto colado
+                const paste = (e.clipboardData || window.clipboardData).getData('text');
+                
+                // Limpar e filtrar apenas caracteres permitidos
+                const cleaned = paste.replace(/[^\d\s\-\(\)\+]/g, '');
+                const digitsOnly = cleaned.replace(/[^\d]/g, '');
+                
+                // Verificar se não excede limites
+                const currentValue = e.target.value;
+                const currentDigits = currentValue.replace(/[^\d]/g, '');
+                const totalDigits = currentDigits.length + digitsOnly.length;
+                
+                if (totalDigits <= 15 && (currentValue + cleaned).length <= 20) {
+                    // Permitir colagem completa
+                    e.target.value = currentValue + cleaned;
+                } else {
+                    // Truncar para respeitar limites
+                    let allowedDigits = 15 - currentDigits.length;
+                    let newValue = currentValue;
+                    let digitCount = 0;
+                    
+                    for (let i = 0; i < cleaned.length && newValue.length < 20; i++) {
+                        const char = cleaned[i];
+                        if (/\d/.test(char)) {
+                            if (digitCount < allowedDigits) {
+                                newValue += char;
+                                digitCount++;
+                            }
+                        } else {
+                            newValue += char;
+                        }
+                    }
+                    
+                    e.target.value = newValue.substring(0, 20);
+                }
+                
+                // Disparar evento input para validações
+                e.target.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+        }
+        
+        // Limpar erro geral quando qualquer campo for corrigido
+        [bookerFirstname, bookerLastname, bookerEmail, bookerPhone].forEach(field => {
+            if (field) {
+                field.addEventListener('input', () => {
+                    this.hideDateError();
+                });
+            }
+        });
     }
     
     initializePaymentStep() {
@@ -955,67 +1257,124 @@ class ViatorBookingManager {
     }
     
     generateTravelersForm() {
-        const container = document.getElementById('travelers-forms');
+        const container = document.getElementById('travelers-summary');
         if (!container) {
-            console.error('❌ Container travelers-forms não encontrado');
+            console.error('❌ Container travelers-summary não encontrado');
             return;
         }
         
         let html = '';
         
-        if (this.ageBands && this.ageBands.length > 0) {
+        // Usar dados armazenados da primeira etapa para gerar apenas resumo
+        if (this.bookingData.selectedTravelers && this.bookingData.selectedTravelers.length > 0) {
+            console.log('✅ Gerando resumo dos viajantes:', this.bookingData.selectedTravelers);
+            
+            html += '<div class="travelers-summary-list">';
+            this.bookingData.selectedTravelers.forEach(travelerGroup => {
+                const ageBand = travelerGroup.ageBand;
+                const quantity = travelerGroup.numberOfTravelers;
+                
+                // Encontrar o band correspondente para obter o label
+                const band = this.ageBands.find(b => b.ageBand === ageBand);
+                const bandLabel = band ? band.label : this.getAgeBandDisplayName(ageBand);
+                
+                // Corrigir pluralização do label mantendo informações entre parênteses
+                let displayLabel;
+                if (quantity > 1) {
+                    // Verificar se o label contém parênteses
+                    if (bandLabel.includes('(')) {
+                        // Separar a palavra principal das informações entre parênteses
+                        const match = bandLabel.match(/^([^(]+)(\s*\([^)]*\).*)?$/);
+                        if (match) {
+                            const mainWord = match[1].trim();
+                            const parentheses = match[2] || '';
+                            displayLabel = `${mainWord}s ${parentheses}`.trim();
+                        } else {
+                            displayLabel = `${bandLabel}s`;
+                        }
+                    } else {
+                        displayLabel = `${bandLabel}s`;
+                    }
+                } else {
+                    displayLabel = bandLabel;
+                }
+                
+                html += `
+                    <div class="summary-item">
+                        <span class="icon">👥</span>
+                        <span class="details">${quantity} ${displayLabel}</span>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+        } else if (this.ageBands && this.ageBands.length > 0) {
+            console.warn('⚠️ Tentando usar elementos do DOM para gerar resumo (fallback)');
+            html += '<div class="travelers-summary-list">';
+            
             this.ageBands.forEach(band => {
                 const id = band.ageBand.toLowerCase();
                 const qtyElement = document.getElementById(`${id}-qty`);
                 
-                if (!qtyElement) {
-                    console.warn(`⚠️ Elemento quantity não encontrado para: ${id}-qty`);
-                    return; // Pular esta iteração
-                }
-                
-                const quantity = parseInt(qtyElement.value, 10);
-
-                if (quantity > 0) {
-                    for (let i = 0; i < quantity; i++) {
-                        // Passar bandId e label para a função que gera o HTML do formulário
-                        html += this.getTravelerFormHTML(id, i + 1, band.bandId, band.label);
+                if (qtyElement) {
+                    const quantity = parseInt(qtyElement.value, 10);
+                    if (quantity > 0) {
+                        // Corrigir pluralização do label mantendo informações entre parênteses
+                        let displayLabel;
+                        if (quantity > 1) {
+                            // Verificar se o label contém parênteses
+                            if (band.label.includes('(')) {
+                                // Separar a palavra principal das informações entre parênteses
+                                const match = band.label.match(/^([^(]+)(\s*\([^)]*\).*)?$/);
+                                if (match) {
+                                    const mainWord = match[1].trim();
+                                    const parentheses = match[2] || '';
+                                    displayLabel = `${mainWord}s ${parentheses}`.trim();
+                                } else {
+                                    displayLabel = `${band.label}s`;
+                                }
+                            } else {
+                                displayLabel = `${band.label}s`;
+                            }
+                        } else {
+                            displayLabel = band.label;
+                        }
+                        
+                        html += `
+                            <div class="summary-item">
+                                <span class="icon">👥</span>
+                                <span class="details">${quantity} ${displayLabel}</span>
+                            </div>
+                        `;
                     }
                 }
             });
+            html += '</div>';
+            
         } else {
-            console.warn('⚠️ Nenhum age band configurado, usando fallback');
-            // Fallback para dados básicos
-            const adultQtyElement = document.getElementById('adults-qty');
-            if (adultQtyElement) {
-                const quantity = parseInt(adultQtyElement.value, 10);
-                for (let i = 0; i < quantity; i++) {
-                    html += this.getTravelerFormHTML('adults', i + 1, 'ADULT', 'Adulto');
-                }
-            }
+            console.warn('⚠️ Nenhum dado de viajante disponível');
+            html = `
+                <div class="error-message">
+                    <p>⚠️ Erro: Não foi possível carregar o resumo dos viajantes.</p>
+                    <p>Por favor, volte ao passo anterior e tente novamente.</p>
+                </div>
+            `;
+        }
+        
+        if (html.includes('travelers-summary-list') && !html.includes('summary-item')) {
+            html = `
+                <div class="error-message">
+                    <p>⚠️ Nenhum viajante foi selecionado.</p>
+                    <p>Por favor, volte ao passo anterior e selecione os viajantes.</p>
+                </div>
+            `;
         }
         
         container.innerHTML = html;
+        console.log('📋 Resumo dos viajantes gerado');
     }
     
-    getTravelerFormHTML(type, number, bandId, label) {
-        return `
-            <div class="traveler-form" data-type="${type}" data-number="${number}" data-band-id="${bandId}">
-                <h4>${label} ${number}</h4>
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Nome:</label>
-                        <input type="text" name="${type}_${number}_firstname" class="form-control" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Sobrenome:</label>
-                        <input type="text" name="${type}_${number}_lastname" class="form-control" required>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
+    // Função removida - não precisamos mais de formulários individuais para cada viajante
     
     generateBookingSummary() {
         const container = document.getElementById('booking-summary');
@@ -1058,8 +1417,21 @@ class ViatorBookingManager {
         let totalTravelers = 0;
         let travelersText = [];
         
-        if (this.ageBands && this.ageBands.length > 0) {
-            // Usar age bands dinâmicos
+        // Usar dados armazenados se disponíveis (para uso em etapas posteriores)
+        if (this.bookingData.selectedTravelers && this.bookingData.selectedTravelers.length > 0) {
+            this.bookingData.selectedTravelers.forEach(travelerGroup => {
+                const ageBand = travelerGroup.ageBand;
+                const quantity = travelerGroup.numberOfTravelers;
+                
+                // Encontrar o band correspondente para obter o label
+                const band = this.ageBands.find(b => b.ageBand === ageBand);
+                const bandLabel = band ? band.label : this.getAgeBandDisplayName(ageBand);
+                
+                totalTravelers += quantity;
+                travelersText.push(`${quantity} ${quantity === 1 ? bandLabel.toLowerCase() : bandLabel.toLowerCase()}`);
+            });
+        } else if (this.ageBands && this.ageBands.length > 0) {
+            // Usar age bands dinâmicos dos elementos DOM (primeira etapa)
             this.ageBands.forEach(band => {
                 const id = band.ageBand.toLowerCase();
                 const qtyElement = document.getElementById(`${id}-qty`);
@@ -1196,6 +1568,10 @@ class ViatorBookingManager {
             return false;
         }
 
+        // ARMAZENAR os dados dos viajantes para usar nas próximas etapas
+        this.bookingData.selectedTravelers = paxMix;
+        this.bookingData.travelDate = travelDate;
+
         try {
             const response = await fetch(viatorBookingAjax.ajaxurl, {
                 method: 'POST',
@@ -1275,17 +1651,37 @@ class ViatorBookingManager {
     }
     
     validateTravelersInfo() {
-        const forms = document.querySelectorAll('.traveler-form');
-        for (let form of forms) {
-            const inputs = form.querySelectorAll('input[required], select[required]');
-            for (let input of inputs) {
-                if (!input.value.trim()) {
-                    this.showDateError('Por favor, preencha todas as informações dos viajantes.');
-                    input.focus();
-                    return false;
-                }
-            }
+        // Validar apenas os campos obrigatórios do responsável pela reserva
+        const bookerFirstname = document.getElementById('booker-firstname');
+        const bookerLastname = document.getElementById('booker-lastname');
+        const bookerEmail = document.getElementById('booker-email');
+        
+        if (!bookerFirstname?.value.trim()) {
+            this.showDateError('Por favor, informe o nome do responsável pela reserva.');
+            bookerFirstname?.focus();
+            return false;
         }
+        
+        if (!bookerLastname?.value.trim()) {
+            this.showDateError('Por favor, informe o sobrenome do responsável pela reserva.');
+            bookerLastname?.focus();
+            return false;
+        }
+        
+        if (!bookerEmail?.value.trim()) {
+            this.showDateError('Por favor, informe o email do responsável pela reserva.');
+            bookerEmail?.focus();
+            return false;
+        }
+        
+        // Validação básica de email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(bookerEmail.value.trim())) {
+            this.showDateError('Por favor, informe um email válido.');
+            bookerEmail?.focus();
+            return false;
+        }
+        
         return true;
     }
     
@@ -1324,6 +1720,19 @@ class ViatorBookingManager {
         try {
             const travelersDetails = this.collectDetailedTravelersData();
             
+            // Preparar dados de disponibilidade com a opção selecionada
+            const availabilityDataWithSelection = {
+                ...this.bookingData.availabilityData,
+                selectedOption: this.bookingData.selectedOption,
+                travelDate: this.bookingData.travelDate,
+                productCode: this.bookingData.productCode
+            };
+            
+            console.log('📋 Dados para hold:', {
+                availabilityData: availabilityDataWithSelection,
+                travelersDetails: travelersDetails
+            });
+            
             const response = await fetch(viatorBookingAjax.ajaxurl, {
                 method: 'POST',
                 headers: {
@@ -1331,23 +1740,26 @@ class ViatorBookingManager {
                 },
                 body: new URLSearchParams({
                     action: 'viator_request_hold',
-                    availability_data: JSON.stringify(this.bookingData.availabilityData),
+                    availability_data: JSON.stringify(availabilityDataWithSelection),
                     travelers_details: JSON.stringify(travelersDetails),
                     nonce: viatorBookingAjax.nonce
                 })
             });
             
             const data = await response.json();
+            console.log('📥 Resposta do hold:', data);
             
             if (data.success) {
                 this.bookingData.holdData = data.data;
                 this.initializeViatorPayment(); // Reinitializar com token de pagamento
                 return true;
             } else {
-                this.showDateError('Erro ao criar reserva: ' + data.data.message);
+                console.error('❌ Erro no hold:', data);
+                this.showDateError('Erro ao criar reserva: ' + (data.data?.message || 'Erro desconhecido'));
                 return false;
             }
         } catch (error) {
+            console.error('❌ Erro de conexão no hold:', error);
             this.showDateError('Erro de conexão ao criar reserva.');
             return false;
         }
@@ -1402,12 +1814,12 @@ class ViatorBookingManager {
     
     async confirmBooking() {
         try {
-            const cardholderName = document.getElementById('cardholder-name').value.split(' ');
-            const bookerInfo = {
-                firstname: cardholderName[0] || 'Guest',
-                lastname: cardholderName.slice(1).join(' ') || 'User',
-                email: document.getElementById('cardholder-email').value
-            };
+            // Usar dados do responsável coletados na segunda etapa
+            const travelersData = this.collectDetailedTravelersData();
+            const bookerInfo = travelersData.bookerInfo;
+            
+            // Usar email do responsável para pagamento se não foi informado no pagamento
+            const paymentEmail = document.getElementById('cardholder-email')?.value || bookerInfo.email;
 
             const response = await fetch(viatorBookingAjax.ajaxurl, {
                 method: 'POST',
@@ -1486,24 +1898,27 @@ class ViatorBookingManager {
     }
     
     collectDetailedTravelersData() {
-        const travelers = [];
-        const forms = document.querySelectorAll('.traveler-form');
+        // Coletar informações do responsável pela reserva
+        const bookerFirstname = document.getElementById('booker-firstname')?.value || '';
+        const bookerLastname = document.getElementById('booker-lastname')?.value || '';
+        const bookerEmail = document.getElementById('booker-email')?.value || '';
+        const bookerPhone = document.getElementById('booker-phone')?.value || '';
         
-        forms.forEach(form => {
-            const bandId = form.dataset.bandId; // Corrigido para pegar o bandId
-            const firstName = form.querySelector('input[name*="firstname"]').value;
-            const lastName = form.querySelector('input[name*="lastname"]').value;
-            
-            const traveler = {
-                bandId: bandId,
-                firstname: firstName,
-                lastname: lastName
-            };
-            
-            travelers.push(traveler);
-        });
+        // Usar dados dos viajantes já armazenados (paxMix)
+        const paxMix = this.bookingData.selectedTravelers || this.collectTravelersData();
         
-        return travelers;
+        return {
+            // Informações dos viajantes (apenas quantidades por faixa etária)
+            paxMix: paxMix,
+            
+            // Informações do responsável principal pela reserva
+            bookerInfo: {
+                firstname: bookerFirstname,
+                lastname: bookerLastname,
+                email: bookerEmail,
+                phone: bookerPhone
+            }
+        };
     }
     
     setupPriceUpdater() {
@@ -2126,7 +2541,57 @@ class ViatorBookingManager {
             this.clearTravelerError(group);
         });
     }
+
+    /**
+     * Função para testar o acesso à API (para debug)
+     */
+    async testApiAccess() {
+        console.log('🔍 Iniciando teste de acesso à API...');
+        
+        try {
+            const response = await fetch(viatorBookingAjax.ajaxurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    action: 'viator_test_api_access',
+                    nonce: viatorBookingAjax.nonce
+                })
+            });
+
+            const data = await response.json();
+            console.log('📊 Resultado do teste de API:', data);
+            
+            if (data.success) {
+                const result = data.data;
+                console.log(`🔑 Nível de acesso: ${result.access_level}`);
+                console.log('📋 Testes:', result.tests);
+                
+                if (result.recommendations.length > 0) {
+                    console.warn('⚠️ Recomendações:', result.recommendations);
+                    alert('PROBLEMA DE ACESSO À API:\n\n' + result.recommendations.join('\n\n'));
+                } else {
+                    console.log('✅ API funcionando corretamente!');
+                }
+                
+                return result;
+            } else {
+                console.error('❌ Erro no teste:', data);
+                return null;
+            }
+        } catch (error) {
+            console.error('❌ Erro de conexão no teste:', error);
+            return null;
+        }
+    }
 }
+
+// Adicionar função global para facilitar teste via console
+window.testViatorAPI = function() {
+    const bookingManager = new ViatorBookingManager();
+    return bookingManager.testApiAccess();
+};
 
 // Inicializar quando o DOM estiver carregado
 document.addEventListener('DOMContentLoaded', function() {
