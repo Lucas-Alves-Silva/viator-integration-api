@@ -1186,21 +1186,50 @@ body.viator-modal-open {
 
 /* Payment Section */
 .payment-summary {
-    background: #f8f9fa;
-    padding: 20px;
-    border-radius: 8px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    padding: 25px;
+    border-radius: 12px;
     margin-bottom: 30px;
+    border: 1px solid #e1e8ed;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.payment-summary h4 {
+    margin: 0 0 20px 0;
+    color: #495057;
+    font-size: 1.2rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.payment-summary h4::before {
+    content: '📋';
+    font-size: 1.1rem;
 }
 
 .summary-item {
     display: flex;
     justify-content: space-between;
-    padding: 8px 0;
+    align-items: center;
+    padding: 12px 0;
     border-bottom: 1px solid #e9ecef;
+    font-size: 14px;
 }
 
 .summary-item:last-child {
     border-bottom: none;
+}
+
+.summary-item span:first-child {
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.summary-item span:last-child {
+    color: #495057;
+    font-weight: 500;
 }
 
 .summary-item.total {
@@ -1208,12 +1237,175 @@ body.viator-modal-open {
     font-size: 1.1rem;
     color: #0056b3;
     border-top: 2px solid #e9ecef;
-    margin-top: 10px;
-    padding-top: 15px;
+    margin-top: 15px;
+    padding-top: 20px;
+    background: rgba(0, 86, 179, 0.05);
+    border-radius: 8px;
+    padding: 15px;
+    margin: 15px -10px 0;
+}
+
+.summary-item.total span:first-child {
+    color: #0056b3;
+    font-weight: 600;
+}
+
+.summary-item.total span:last-child {
+    color: #0056b3;
+    font-weight: 700;
+    font-size: 1.2rem;
 }
 
 .payment-form {
-    margin-top: 20px;
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    border: 1px solid #e1e8ed;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    margin-top: 25px;
+}
+
+.payment-form h4 {
+    margin: 0 0 20px 0;
+    color: #495057;
+    font-size: 1.1rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #f8f9fa;
+}
+
+.payment-form h4:first-of-type::before {
+    content: '💳';
+    font-size: 1.1rem;
+}
+
+.payment-form h4:last-of-type::before {
+    content: '🏠';
+    font-size: 1.1rem;
+}
+
+/* Estilização específica para campos de pagamento */
+.payment-form .form-group {
+    margin-bottom: 20px;
+}
+
+.payment-form .form-control {
+    background: #f8f9fa;
+    border: 2px solid #e9ecef;
+    transition: all 0.3s ease;
+}
+
+.payment-form .form-control:focus {
+    background: white;
+    border-color: #0056b3;
+    box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.1);
+}
+
+/* Card number formatting */
+#card-number {
+    font-family: 'Courier New', monospace;
+    letter-spacing: 1px;
+}
+
+/* CVV field smaller */
+#security-code {
+    text-align: center;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 1px;
+}
+
+/* Padronização dos campos Mês, Ano e CVV */
+#expiry-month,
+#expiry-year,
+#security-code {
+    min-height: 50px !important;
+    height: 50px !important;
+    padding: 14px 16px !important;
+    border-radius: 10px !important;
+    font-size: 15px !important;
+    font-weight: 500 !important;
+    box-sizing: border-box !important;
+}
+
+/* Padding específico para selects */
+#expiry-month,
+#expiry-year,
+#billing-country {
+    padding-right: 45px !important; /* Espaço extra para a seta */
+    padding-left: 16px !important;
+    margin-right: 0 !important; /* Remover margem que causa desalinhamento */
+    width: 100% !important; /* Garantir largura total */
+    box-sizing: border-box !important; /* Incluir padding/border no cálculo da largura */
+}
+
+/* Garantir que todos os campos de form-row tenham a mesma altura e largura */
+.payment-form .form-row .form-control {
+    min-height: 50px !important;
+    height: 50px !important;
+    padding: 14px 16px !important;
+    border-radius: 10px !important;
+    font-size: 15px !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+}
+
+/* Garantir alinhamento perfeito dos selects com outros campos */
+.payment-form select.form-control {
+    width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+}
+
+/* Payment form sections */
+.payment-form > h4:not(:first-child) {
+    margin-top: 35px;
+}
+
+/* Select styling for payment - Removido para evitar conflitos */
+.payment-form select.form-control {
+    appearance: auto; /* Usar aparência nativa do navegador */
+    -webkit-appearance: auto;
+    -moz-appearance: auto;
+    cursor: pointer;
+    background: #f8f9fa;
+    border: 2px solid #e9ecef;
+    transition: all 0.3s ease;
+    padding-right: 35px !important; /* Espaço extra para a seta */
+    padding-left: 16px !important;
+}
+
+.payment-form select.form-control:focus {
+    background: white;
+    border-color: #0056b3;
+    box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.1);
+    outline: none;
+}
+
+/* Reset adicional para selects problemáticos */
+.payment-form select {
+    background-image: none !important;
+    background-color: #f8f9fa !important;
+    -webkit-appearance: menulist !important;
+    -moz-appearance: menulist !important;
+    appearance: menulist !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    vertical-align: top !important; /* Alinhamento vertical consistente */
+}
+
+.payment-form select:focus {
+    background-color: white !important;
+}
+
+/* Garantir que form-group não tenha margens que afetem o alinhamento */
+.payment-form .form-group {
+    margin-bottom: 20px !important;
+    width: 100% !important;
+    position: relative !important;
 }
 
 /* Availability Result */
@@ -1658,6 +1850,59 @@ body.viator-modal-open {
         font-size: 28px;
         margin-bottom: 12px;
     }
+    
+    /* Payment responsivo - Tablet */
+    .payment-summary {
+        padding: 22px;
+    }
+    
+    .payment-summary h4 {
+        font-size: 1.15rem;
+    }
+    
+    .payment-form {
+        padding: 22px;
+    }
+    
+    .payment-form h4 {
+        font-size: 1.05rem;
+        padding-bottom: 13px;
+    }
+    
+    .summary-item {
+        padding: 11px 0;
+        font-size: 13.5px;
+    }
+    
+    .summary-item.total {
+        padding: 13px 0;
+        margin: 13px -9px 0;
+    }
+    
+    .summary-item.total span:last-child {
+        font-size: 1.15rem;
+    }
+    
+    /* Ajuste dos campos de pagamento em tablet */
+    .payment-form .form-row .form-control,
+    #expiry-month,
+    #expiry-year,
+    #security-code {
+        min-height: 48px !important;
+        height: 48px !important;
+        padding: 12px 14px !important;
+        font-size: 14px !important;
+    }
+    
+    /* Padding específico para selects em tablet */
+    #expiry-month,
+    #expiry-year,
+    #billing-country {
+        padding-right: 40px !important;
+        padding-left: 14px !important;
+        margin-right: 0 !important;
+        width: 100% !important;
+    }
 }
 
 @media (max-width: 480px) {
@@ -1786,6 +2031,59 @@ body.viator-modal-open {
     .loading-spinner {
         font-size: 24px;
         margin-bottom: 10px;
+    }
+    
+    /* Payment responsivo - Mobile */
+    .payment-summary {
+        padding: 20px;
+    }
+    
+    .payment-summary h4 {
+        font-size: 1.1rem;
+    }
+    
+    .payment-form {
+        padding: 20px;
+    }
+    
+    .payment-form h4 {
+        font-size: 1rem;
+        padding-bottom: 12px;
+    }
+    
+    .summary-item {
+        padding: 10px 0;
+        font-size: 13px;
+    }
+    
+    .summary-item.total {
+        padding: 12px 10px;
+        margin: 12px -8px 0;
+    }
+    
+    .summary-item.total span:last-child {
+        font-size: 1.1rem;
+    }
+    
+    /* Ajuste dos campos de pagamento em mobile */
+    .payment-form .form-row .form-control,
+    #expiry-month,
+    #expiry-year,
+    #security-code {
+        min-height: 46px !important;
+        height: 46px !important;
+        padding: 10px 12px !important;
+        font-size: 14px !important;
+    }
+    
+    /* Padding específico para selects em mobile */
+    #expiry-month,
+    #expiry-year,
+    #billing-country {
+        padding-right: 35px !important;
+        padding-left: 12px !important;
+        margin-right: 0 !important;
+        width: 100% !important;
     }
 }
 

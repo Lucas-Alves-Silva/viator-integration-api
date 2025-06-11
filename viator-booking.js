@@ -525,6 +525,13 @@ class ViatorBookingManager {
         
         const content = document.getElementById('booking-step-content');
         
+        // Scroll para o topo da modal-body sempre que mudar de etapa
+        const modalBody = document.querySelector('.viator-modal-body');
+        if (modalBody) {
+            modalBody.scrollTop = 0;
+            console.log(`📜 Scroll resetado para o topo na etapa ${stepNumber}`);
+        }
+        
         switch (stepNumber) {
             case 1:
                 content.innerHTML = this.getAvailabilityStepHTML();
@@ -713,10 +720,11 @@ class ViatorBookingManager {
                         <div class="form-group">
                             <label for="expiry-month">Mês:</label>
                             <select id="expiry-month" class="form-control" required>
-                                <option value="">Mês</option>
                                 ${Array.from({length: 12}, (_, i) => {
                                     const month = String(i + 1).padStart(2, '0');
-                                    return `<option value="${month}">${month}</option>`;
+                                    const monthName = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
+                                                     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][i];
+                                    return `<option value="${month}">${month} - ${monthName}</option>`;
                                 }).join('')}
                             </select>
                         </div>
@@ -724,7 +732,6 @@ class ViatorBookingManager {
                         <div class="form-group">
                             <label for="expiry-year">Ano:</label>
                             <select id="expiry-year" class="form-control" required>
-                                <option value="">Ano</option>
                                 ${Array.from({length: 20}, (_, i) => {
                                     const year = new Date().getFullYear() + i;
                                     return `<option value="${year}">${year}</option>`;
@@ -967,13 +974,6 @@ class ViatorBookingManager {
             ageBands: this.ageBands,
             travelDate: this.bookingData.travelDate
         });
-        
-        // Scroll para o topo da modal-body
-        const modalBody = document.querySelector('.viator-modal-body');
-        if (modalBody) {
-            modalBody.scrollTop = 0;
-            console.log('📜 Scroll resetado para o topo da modal-body');
-        }
         
         this.generateTravelersForm();
         
@@ -1378,30 +1378,84 @@ class ViatorBookingManager {
     
     generateBookingSummary() {
         const container = document.getElementById('booking-summary');
-        const dateSelector = document.querySelector('.viator-booking-date-selector span:not(.calendar-icon)');
-        const selectedDate = dateSelector ? dateSelector.textContent : 'Data não selecionada';
+        if (!container) return;
         
-        if (this.bookingData.availabilityData) {
-            // Gerar resumo baseado nos dados de disponibilidade
-            container.innerHTML = `
-                <div class="summary-item">
-                    <span>Produto:</span>
-                    <span>${this.bookingData.availabilityData.productTitle || 'Experiência Viator'}</span>
-                </div>
-                <div class="summary-item">
-                    <span>Data:</span>
-                    <span>${selectedDate !== 'Escolher data' ? selectedDate : 'Data não selecionada'}</span>
-                </div>
-                <div class="summary-item">
-                    <span>Viajantes:</span>
-                    <span>${this.getTotalTravelers()}</span>
-                </div>
-                <div class="summary-item total">
-                    <span>Total:</span>
-                    <span>${this.formatPrice(this.bookingData.availabilityData.totalPrice)}</span>
-                </div>
-            `;
+        // Obter dados corretos da data
+        const hiddenDateInput = document.getElementById('travel-date-value');
+        const dateSelector = document.querySelector('.viator-booking-date-selector span:not(.calendar-icon)');
+        
+        let selectedDate = 'Data não selecionada';
+        
+        // Tentar obter a data do input hidden primeiro
+        if (hiddenDateInput && hiddenDateInput.value) {
+            const dateValue = new Date(hiddenDateInput.value + 'T12:00:00');
+            if (!isNaN(dateValue.getTime())) {
+                const diasDaSemana = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
+                const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+                
+                const diaSemana = diasDaSemana[dateValue.getDay()];
+                const dia = dateValue.getDate().toString().padStart(2, '0');
+                const mes = meses[dateValue.getMonth()];
+                const ano = dateValue.getFullYear();
+                
+                selectedDate = `${diaSemana}, ${dia} de ${mes} de ${ano}`;
+            }
+        } 
+        // Se não conseguir do input hidden, tentar do dateSelector
+        else if (dateSelector && dateSelector.textContent !== 'Escolher data') {
+            selectedDate = dateSelector.textContent;
         }
+        // Como último recurso, usar a data armazenada
+        else if (this.bookingData.travelDate) {
+            const dateValue = new Date(this.bookingData.travelDate + 'T12:00:00');
+            if (!isNaN(dateValue.getTime())) {
+                const diasDaSemana = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
+                const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+                
+                const diaSemana = diasDaSemana[dateValue.getDay()];
+                const dia = dateValue.getDate().toString().padStart(2, '0');
+                const mes = meses[dateValue.getMonth()];
+                const ano = dateValue.getFullYear();
+                
+                selectedDate = `${diaSemana}, ${dia} de ${mes} de ${ano}`;
+            }
+        }
+        
+        // Obter título do produto da página atual se disponível
+        const productTitle = document.querySelector('h1.entry-title, .product-title, h1')?.textContent?.trim() || 
+                           this.bookingData.availabilityData?.productTitle || 
+                           'Experiência Viator';
+        
+        // Calcular total correto da opção selecionada
+        let totalPrice = 0;
+        if (this.bookingData.selectedOption && this.bookingData.selectedOption.fullOption) {
+            totalPrice = this.bookingData.selectedOption.fullOption.totalPrice.price.recommendedRetailPrice;
+        } else if (this.bookingData.availabilityData && this.bookingData.availabilityData.totalPrice) {
+            totalPrice = this.bookingData.availabilityData.totalPrice;
+        }
+        
+        // Obter nome da opção selecionada
+        const selectedOptionName = this.bookingData.selectedOption?.fullOption?.optionTitle || '';
+        const optionInfo = selectedOptionName ? ` - ${selectedOptionName}` : '';
+        
+        container.innerHTML = `
+            <div class="summary-item">
+                <span>Produto:</span>
+                <span>${productTitle}${optionInfo}</span>
+            </div>
+            <div class="summary-item">
+                <span>Data:</span>
+                <span>${selectedDate !== 'Escolher data' ? selectedDate : 'Data não selecionada'}</span>
+            </div>
+            <div class="summary-item">
+                <span>Viajantes:</span>
+                <span>${this.getTotalTravelers()}</span>
+            </div>
+            <div class="summary-item total">
+                <span>Total:</span>
+                <span>${totalPrice > 0 ? this.formatPrice(totalPrice) : 'Aguardando seleção'}</span>
+            </div>
+        `;
     }
     
     formatCardNumber() {
@@ -2335,6 +2389,7 @@ class ViatorBookingManager {
             'ADULT': 'Adulto',
             'CHILD': 'Criança',
             'INFANT': 'Bebê',
+            'YOUTH': 'Jovem',
             'TRAVELER': 'Viajante'
         };
         return ageBandNames[ageBand] || ageBand;
