@@ -51,6 +51,9 @@ function viator_debug_page() {
     // Verificar qual produto usar
     $product_code = isset($_GET['product']) ? sanitize_text_field($_GET['product']) : '26601P19';
     
+    // Verificar qual data usar para os testes de disponibilidade
+    $test_date = isset($_GET['test_date']) ? sanitize_text_field($_GET['test_date']) : date('Y-m-d', strtotime('+7 days'));
+    
     ?>
     <form method="post" style="margin: 20px 0;">
         <h3>🔍 Verificar Dados Armazenados</h3>
@@ -63,8 +66,20 @@ function viator_debug_page() {
 
     <form method="get">
         <input type="hidden" name="page" value="viator-debug" />
-        <p><label>Código do Produto: <input type="text" name="product" value="<?php echo esc_attr($product_code); ?>" /></label> 
-        <button type="submit" class="button">Testar</button></p>
+        <table class="form-table">
+            <tr>
+                <th scope="row"><label for="product">Código do Produto:</label></th>
+                <td><input type="text" name="product" id="product" value="<?php echo esc_attr($product_code); ?>" class="regular-text" /></td>
+            </tr>
+            <tr>
+                <th scope="row"><label for="test_date">Data para Teste de Disponibilidade:</label></th>
+                <td>
+                    <input type="date" name="test_date" id="test_date" value="<?php echo esc_attr(isset($_GET['test_date']) ? $_GET['test_date'] : date('Y-m-d', strtotime('+7 days'))); ?>" class="regular-text" />
+                    <p class="description">Data que será usada para testar a disponibilidade (deve ser uma data futura)</p>
+                </td>
+            </tr>
+        </table>
+        <button type="submit" class="button button-primary">🔍 Executar Testes</button>
     </form>
     
     <hr>
@@ -79,13 +94,13 @@ function viator_debug_page() {
     
     // Teste 2: Verificar disponibilidade mensal
     echo '<h2>📅 2. Teste de Disponibilidade Mensal</h2>';
-    test_monthly_availability($api_key, $product_code);
+    test_monthly_availability($api_key, $product_code, $test_date);
     
     echo '<hr>';
     
     // Teste 3: Verificar disponibilidade específica
     echo '<h2>🎯 3. Teste de Disponibilidade Específica</h2>';
-    test_specific_availability($api_key, $product_code);
+    test_specific_availability($api_key, $product_code, $test_date);
     
     echo '</div>';
 }
@@ -154,9 +169,15 @@ function test_product_info($api_key, $product_code) {
     }
 }
 
-function test_monthly_availability($api_key, $product_code) {
-    $current_date = new DateTime();
-    $test_date = $current_date->modify('+7 days')->format('Y-m-d');
+function test_monthly_availability($api_key, $product_code, $test_date) {
+    // Validar se a data fornecida é válida e futura
+    $provided_date = DateTime::createFromFormat('Y-m-d', $test_date);
+    $today = new DateTime();
+    
+    if (!$provided_date || $provided_date < $today) {
+        echo '<div class="notice notice-warning"><p>⚠️ Data inválida ou no passado. Usando data padrão (+7 dias).</p></div>';
+        $test_date = $today->modify('+7 days')->format('Y-m-d');
+    }
     
     $url = "https://api.sandbox.viator.com/partner/availability/check";
     
@@ -247,8 +268,15 @@ function test_monthly_availability($api_key, $product_code) {
     }
 }
 
-function test_specific_availability($api_key, $product_code) {
-    $test_date = date('Y-m-d', strtotime('+7 days'));
+function test_specific_availability($api_key, $product_code, $test_date) {
+    // Validar se a data fornecida é válida e futura
+    $provided_date = DateTime::createFromFormat('Y-m-d', $test_date);
+    $today = new DateTime();
+    
+    if (!$provided_date || $provided_date < $today) {
+        echo '<div class="notice notice-warning"><p>⚠️ Data inválida ou no passado. Usando data padrão (+7 dias).</p></div>';
+        $test_date = date('Y-m-d', strtotime('+7 days'));
+    }
     
     $url = "https://api.sandbox.viator.com/partner/availability/check";
     
