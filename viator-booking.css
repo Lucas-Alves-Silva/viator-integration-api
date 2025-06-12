@@ -2084,6 +2084,33 @@ body.viator-modal-open {
         margin-right: 0 !important;
         width: 100% !important;
     }
+    
+    /* Footer buttons mobile - ordenação específica */
+    .footer-buttons {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    /* Botão primário (avançar) - primeiro */
+    .footer-buttons .viator-btn-primary {
+        order: 1;
+        width: 100%;
+        margin-left: 0 !important;
+    }
+    
+    /* Botão secundário (voltar) - segundo */
+    .footer-buttons .viator-btn-secondary {
+        order: 2;
+        width: 100%;
+        margin-left: 0 !important;
+    }
+    
+    /* Botão cancelar - terceiro e último */
+    .footer-buttons .viator-btn-cancel {
+        order: 3;
+        width: 100%;
+        margin-left: 0 !important;
+    }
 }
 
 /* Security Indicators */

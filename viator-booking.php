@@ -674,7 +674,7 @@ class ViatorBookingSystem {
             return array('error' => 'Erro interno: ' . $e->getMessage());
         }
     }
-
+    
     /**
      * AJAX - Confirmar reserva
      */
