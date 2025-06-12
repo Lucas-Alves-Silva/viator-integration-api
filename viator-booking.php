@@ -25,6 +25,8 @@ class ViatorBookingSystem {
         add_action('wp_ajax_nopriv_viator_request_hold', array($this, 'ajax_request_hold'));
         add_action('wp_ajax_viator_process_payment', array($this, 'ajax_process_payment'));
         add_action('wp_ajax_nopriv_viator_process_payment', array($this, 'ajax_process_payment'));
+        add_action('wp_ajax_viator_submit_payment', array($this, 'ajax_submit_payment'));
+        add_action('wp_ajax_nopriv_viator_submit_payment', array($this, 'ajax_submit_payment'));
         add_action('wp_ajax_viator_confirm_booking', array($this, 'ajax_confirm_booking'));
         add_action('wp_ajax_nopriv_viator_confirm_booking', array($this, 'ajax_confirm_booking'));
         add_action('wp_ajax_viator_get_monthly_availability', array($this, 'ajax_get_monthly_availability'));
@@ -89,7 +91,13 @@ class ViatorBookingSystem {
         $partner_cart_ref = 'CART_' . $this->generate_unique_id();
         $partner_booking_ref = 'BOOK_' . $this->generate_unique_id();
         
+        // Log dados recebidos para debug
+        viator_debug_log('Hold - Travelers Details Received:', $travelers_details);
+        
         // Construir dados conforme a documentação da API
+        $pax_mix = $this->convert_travelers_to_pax_mix($travelers_details);
+        viator_debug_log('Hold - PaxMix Converted:', $pax_mix);
+        
         $request_data = array(
             'currency' => $locale_settings['currency'],
             'partnerCartRef' => $partner_cart_ref,
@@ -100,7 +108,7 @@ class ViatorBookingSystem {
                     'productOptionCode' => $availability_data['selectedOption']['productOptionCode'],
                     'startTime' => $availability_data['selectedOption']['startTime'] ?? null,
                     'travelDate' => $availability_data['travelDate'],
-                    'paxMix' => $this->convert_travelers_to_pax_mix($travelers_details)
+                    'paxMix' => $pax_mix
                 )
             ),
             'paymentDataSubmissionMode' => 'PARTNER_FORM',
@@ -160,16 +168,33 @@ class ViatorBookingSystem {
      * Converter detalhes dos viajantes para formato paxMix
      */
     private function convert_travelers_to_pax_mix($travelers_details) {
+        // Se já é um array com paxMix (formato atual do JavaScript)
+        if (isset($travelers_details['paxMix'])) {
+            return $travelers_details['paxMix'];
+        }
+        
+        // Se é um array de objetos paxMix direto
+        if (is_array($travelers_details) && !empty($travelers_details)) {
+            $first_item = reset($travelers_details);
+            if (isset($first_item['ageBand']) && isset($first_item['numberOfTravelers'])) {
+                return $travelers_details;
+            }
+        }
+        
+        // Fallback para formato legado (se ainda necessário)
         $pax_mix = array();
         $age_band_counts = array();
         
         // Contar viajantes por age band
         foreach ($travelers_details as $traveler) {
-            $band_id = $traveler['bandId'];
-            if (!isset($age_band_counts[$band_id])) {
-                $age_band_counts[$band_id] = 0;
+            // Tentar diferentes formatos de chave
+            $band_id = $traveler['bandId'] ?? $traveler['ageBand'] ?? null;
+            if ($band_id) {
+                if (!isset($age_band_counts[$band_id])) {
+                    $age_band_counts[$band_id] = 0;
+                }
+                $age_band_counts[$band_id]++;
             }
-            $age_band_counts[$band_id]++;
         }
         
         // Converter para formato paxMix
@@ -558,6 +583,98 @@ class ViatorBookingSystem {
         wp_send_json_success($result);
     }
     
+    /**
+     * AJAX - Submeter dados de pagamento para API da Viator
+     */
+    public function ajax_submit_payment() {
+        // Verificar nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'viator_booking_nonce')) {
+            wp_send_json_error(array('message' => 'Nonce inválido'));
+        }
+        
+        $session_token = sanitize_text_field($_POST['session_token']);
+        $payment_data = json_decode(stripslashes($_POST['payment_data']), true);
+        
+        if (empty($session_token) || empty($payment_data)) {
+            wp_send_json_error(array('message' => 'Dados de pagamento incompletos'));
+        }
+        
+        $result = $this->submit_payment_to_viator($session_token, $payment_data);
+        
+        if (isset($result['error'])) {
+            wp_send_json_error(array('message' => $result['error']));
+        }
+        
+        wp_send_json_success($result);
+    }
+    
+    /**
+     * Submeter dados de pagamento para API da Viator
+     */
+    public function submit_payment_to_viator($session_token, $payment_data) {
+        try {
+            // Construir URL usando o sessionToken - conforme documentação
+            $payment_url = "https://api.viator.com/v1/checkoutsessions/{$session_token}/paymentaccounts";
+            
+            $locale_settings = viator_get_locale_settings();
+            
+            // Headers conforme documentação
+            $headers = array(
+                'Content-Type' => 'application/json',
+                'x-trip-clientid' => $this->api_key,
+                'x-trip-requestid' => wp_generate_uuid4(),
+                'User-Agent' => 'WordPress-Plugin/1.0'
+            );
+            
+            viator_debug_log('Enviando dados de pagamento para API da Viator', array(
+                'url' => $payment_url,
+                'session_token' => $session_token,
+                'payment_structure' => array(
+                    'creditCards_count' => count($payment_data['paymentAccounts']['creditCards']),
+                    'first_card_last_four' => substr($payment_data['paymentAccounts']['creditCards'][0]['number'], -4),
+                    'country' => $payment_data['paymentAccounts']['creditCards'][0]['address']['country']
+                )
+            ));
+            
+            $response = wp_remote_post($payment_url, array(
+                'headers' => $headers,
+                'body' => json_encode($payment_data),
+                'timeout' => 30
+            ));
+            
+            if (is_wp_error($response)) {
+                viator_debug_log('Erro na requisição de pagamento', $response->get_error_message());
+                return array('error' => 'Erro de conexão: ' . $response->get_error_message());
+            }
+            
+            $response_code = wp_remote_retrieve_response_code($response);
+            $response_body = wp_remote_retrieve_body($response);
+            $response_data = json_decode($response_body, true);
+            
+            viator_debug_log('Resposta da API de pagamento da Viator', array(
+                'status_code' => $response_code,
+                'response_data' => $response_data
+            ));
+            
+            if ($response_code === 200) {
+                // Sucesso - retornar dados da resposta
+                return $response_data;
+            } elseif ($response_code === 404) {
+                return array('error' => 'Sessão de checkout expirada ou não encontrada.');
+            } else {
+                $error_message = 'Erro no processamento do pagamento';
+                if (isset($response_data['responseHeader']['responseMessage'])) {
+                    $error_message = $response_data['responseHeader']['responseMessage'];
+                }
+                return array('error' => $error_message);
+            }
+            
+        } catch (Exception $e) {
+            viator_debug_log('Exceção ao processar pagamento', $e->getMessage());
+            return array('error' => 'Erro interno: ' . $e->getMessage());
+        }
+    }
+
     /**
      * AJAX - Confirmar reserva
      */

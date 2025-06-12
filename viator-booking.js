@@ -512,10 +512,10 @@ class ViatorBookingManager {
         this.setupPriceDetailsToggle();
         
         // Close modal when clicking outside
+        // Impedir fechamento acidental - apenas permitir fechar via X ou botão Cancelar
         modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                this.closeModal();
-            }
+            // Não fazer nada - usuário só pode fechar via botões específicos
+            // Esta mudança impede fechamento acidental durante o fluxo de pagamento
         });
     }
     
@@ -709,16 +709,23 @@ class ViatorBookingManager {
                 </div>
                 
                 <div class="payment-form">
-                    <h4>Cartão de Crédito</h4>
+                    <h4>Dados do Cartão de Crédito</h4>
+                    
+                    <div class="security-notice">
+                        <div class="security-badge">
+                            🔒 Suas informações são criptografadas e processadas com segurança pela Viator
+                        </div>
+                    </div>
                     
                     <div class="form-group">
-                        <label for="card-number">Número do Cartão:</label>
+                        <label for="card-number">Número do Cartão *:</label>
                         <input type="text" id="card-number" class="form-control" placeholder="1234 5678 9012 3456" maxlength="19" required>
+                        <small class="form-text">Digite apenas os números do cartão</small>
                     </div>
                     
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="expiry-month">Mês:</label>
+                            <label for="expiry-month">Mês de Vencimento *:</label>
                             <select id="expiry-month" class="form-control" required>
                                 ${Array.from({length: 12}, (_, i) => {
                                     const month = String(i + 1).padStart(2, '0');
@@ -730,7 +737,7 @@ class ViatorBookingManager {
                         </div>
                         
                         <div class="form-group">
-                            <label for="expiry-year">Ano:</label>
+                            <label for="expiry-year">Ano de Vencimento *:</label>
                             <select id="expiry-year" class="form-control" required>
                                 ${Array.from({length: 20}, (_, i) => {
                                     const year = new Date().getFullYear() + i;
@@ -740,53 +747,47 @@ class ViatorBookingManager {
                         </div>
                         
                         <div class="form-group">
-                            <label for="security-code">CVV:</label>
+                            <label for="security-code">CVV *:</label>
                             <input type="text" id="security-code" class="form-control" placeholder="123" maxlength="4" required>
+                            <small class="form-text">3 ou 4 dígitos</small>
                         </div>
                     </div>
                     
                     <div class="form-group">
-                        <label for="cardholder-name">Nome no Cartão:</label>
-                        <input type="text" id="cardholder-name" class="form-control" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="cardholder-email">Email:</label>
-                        <input type="email" id="cardholder-email" class="form-control" placeholder="seu@email.com" required>
+                        <label for="cardholder-name">Nome no Cartão *:</label>
+                        <input type="text" id="cardholder-name" class="form-control" placeholder="Como aparece no cartão" required>
+                        <small class="form-text">Exatamente como está impresso no cartão</small>
                     </div>
                     
                     <h4>Endereço de Cobrança</h4>
                     
-                    <div class="form-group">
-                        <label for="billing-address">Endereço:</label>
-                        <input type="text" id="billing-address" class="form-control" required>
-                    </div>
-                    
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="billing-city">Cidade:</label>
-                            <input type="text" id="billing-city" class="form-control" required>
+                            <label for="billing-country">País *:</label>
+                            <select id="billing-country" class="form-control" required>
+                                <option value="BR">🇧🇷 Brasil</option>
+                                <option value="US">🇺🇸 Estados Unidos</option>
+                                <option value="CA">🇨🇦 Canadá</option>
+                                <option value="AR">🇦🇷 Argentina</option>
+                                <option value="CL">🇨🇱 Chile</option>
+                                <option value="CO">🇨🇴 Colômbia</option>
+                                <option value="MX">🇲🇽 México</option>
+                                <option value="PE">🇵🇪 Peru</option>
+                                <option value="UY">🇺🇾 Uruguai</option>
+                                <option value="FR">🇫🇷 França</option>
+                                <option value="DE">🇩🇪 Alemanha</option>
+                                <option value="IT">🇮🇹 Itália</option>
+                                <option value="ES">🇪🇸 Espanha</option>
+                                <option value="PT">🇵🇹 Portugal</option>
+                                <option value="GB">🇬🇧 Reino Unido</option>
+                            </select>
                         </div>
                         
                         <div class="form-group">
-                            <label for="billing-state">Estado:</label>
-                            <input type="text" id="billing-state" class="form-control" required>
+                            <label for="billing-zip">CEP/Código Postal *:</label>
+                            <input type="text" id="billing-zip" class="form-control" placeholder="12345-678" maxlength="10" required>
+                            <small class="form-text">Formato do seu país (ex: 01234-567 para Brasil)</small>
                         </div>
-                        
-                        <div class="form-group">
-                            <label for="billing-zip">CEP:</label>
-                            <input type="text" id="billing-zip" class="form-control" required>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="billing-country">País:</label>
-                        <select id="billing-country" class="form-control" required>
-                            <option value="BR">Brasil</option>
-                            <option value="US">Estados Unidos</option>
-                            <option value="CA">Canadá</option>
-                            <!-- Adicionar mais países conforme necessário -->
-                        </select>
                     </div>
                 </div>
             </div>
@@ -1740,14 +1741,71 @@ class ViatorBookingManager {
     }
     
     async processPayment() {
-        // Validar dados de pagamento
-        const paymentInputs = document.querySelectorAll('.payment-form input[required], .payment-form select[required]');
-        for (let input of paymentInputs) {
-            if (!input.value.trim()) {
-                this.showDateError('Por favor, preencha todas as informações de pagamento.');
-                input.focus();
-                return false;
-            }
+        // Validar dados específicos de pagamento
+        const cardNumber = document.getElementById('card-number');
+        const cvv = document.getElementById('security-code');
+        const expMonth = document.getElementById('expiry-month');
+        const expYear = document.getElementById('expiry-year');
+        const name = document.getElementById('cardholder-name');
+        const country = document.getElementById('billing-country');
+        const postalCode = document.getElementById('billing-zip');
+        
+        // Validação específica para cada campo
+        if (!cardNumber.value.replace(/\s/g, '')) {
+            this.showDateError('Por favor, informe o número do cartão.');
+            cardNumber.focus();
+            return false;
+        }
+        
+        if (!cvv.value.trim()) {
+            this.showDateError('Por favor, informe o CVV do cartão.');
+            cvv.focus();
+            return false;
+        }
+        
+        if (!expMonth.value) {
+            this.showDateError('Por favor, selecione o mês de vencimento.');
+            expMonth.focus();
+            return false;
+        }
+        
+        if (!expYear.value) {
+            this.showDateError('Por favor, selecione o ano de vencimento.');
+            expYear.focus();
+            return false;
+        }
+        
+        if (!name.value.trim()) {
+            this.showDateError('Por favor, informe o nome como aparece no cartão.');
+            name.focus();
+            return false;
+        }
+        
+        if (!country.value) {
+            this.showDateError('Por favor, selecione o país.');
+            country.focus();
+            return false;
+        }
+        
+        if (!postalCode.value.trim()) {
+            this.showDateError('Por favor, informe o CEP/código postal.');
+            postalCode.focus();
+            return false;
+        }
+        
+        // Validação básica do número do cartão (apenas dígitos e comprimento)
+        const cardDigits = cardNumber.value.replace(/\s/g, '');
+        if (!/^\d{13,19}$/.test(cardDigits)) {
+            this.showDateError('Por favor, informe um número de cartão válido (13-19 dígitos).');
+            cardNumber.focus();
+            return false;
+        }
+        
+        // Validação do CVV
+        if (!/^\d{3,4}$/.test(cvv.value)) {
+            this.showDateError('Por favor, informe um CVV válido (3 ou 4 dígitos).');
+            cvv.focus();
+            return false;
         }
         
         // Processar pagamento
@@ -1809,7 +1867,21 @@ class ViatorBookingManager {
                 return true;
             } else {
                 console.error('❌ Erro no hold:', data);
-                this.showDateError('Erro ao criar reserva: ' + (data.data?.message || 'Erro desconhecido'));
+                console.error('📋 Detalhes do erro:', {
+                    message: data.data?.message,
+                    isLocalhost: window.location.hostname === 'localhost' || window.location.hostname.includes('.local'),
+                    currentURL: window.location.href,
+                    recommendedAction: 'Para testes reais, use um domínio público com HTTPS'
+                });
+                
+                const errorMessage = data.data?.message || 'Erro desconhecido na criação da reserva';
+                const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname.includes('.local');
+                
+                if (isLocalhost) {
+                    this.showDateError(`⚠️ LOCALHOST DETECTADO: ${errorMessage}\n\n💡 Para testar o fluxo completo, use um domínio público com HTTPS ou configure um tunnel (ngrok).`);
+                } else {
+                    this.showDateError('Erro ao criar reserva: ' + errorMessage);
+                }
                 return false;
             }
         } catch (error) {
@@ -1821,46 +1893,83 @@ class ViatorBookingManager {
     
     async submitPayment() {
         try {
-            // Coletar dados de endereço necessários
+            // Coletar todos os dados necessários do formulário
+            const cardNumber = document.getElementById('card-number').value.replace(/\s/g, ''); // Remove espaços
+            const cvv = document.getElementById('security-code').value;
+            const expMonth = document.getElementById('expiry-month').value;
+            const expYear = document.getElementById('expiry-year').value;
+            const name = document.getElementById('cardholder-name').value;
             const country = document.getElementById('billing-country').value;
             const postalCode = document.getElementById('billing-zip').value;
-            const email = document.getElementById('cardholder-email').value;
             
-            // Dados para o sistema de pagamento da Viator
+            // Validar dados antes de enviar
+            if (!cardNumber || !cvv || !expMonth || !expYear || !name || !country || !postalCode) {
+                throw new Error('Todos os campos obrigatórios devem ser preenchidos');
+            }
+            
+            // Estrutura de dados conforme documentação da API da Viator
             const paymentData = {
-                address: {
-                    country: country,
-                    postalCode: postalCode
-                },
-                email: email
+                paymentAccounts: {
+                    creditCards: [
+                        {
+                            number: cardNumber,
+                            cvv: cvv,
+                            expMonth: expMonth,
+                            expYear: expYear,
+                            name: name,
+                            address: {
+                                country: country,
+                                postalCode: postalCode
+                            }
+                        }
+                    ]
+                }
             };
             
-            return new Promise((resolve, reject) => {
-                if (!this.payment) {
-                    reject(new Error('Sistema de pagamento não inicializado'));
-                    return;
-                }
-                
-                // Primeiro submeter dados para detecção de fraude
-                this.payment.submitDeviceData();
-                
-                // Depois submeter o formulário de pagamento
-                this.payment.submitForm(paymentData)
-                    .then((result) => {
-                        if (result.result === 'SUCCESS') {
-                            this.bookingData.paymentToken = result.paymentToken;
-                            resolve(true);
-                        } else {
-                            // A API pode retornar erros específicos aqui
-                            const errorMessage = result.error?.message || 'Pagamento não foi processado com sucesso';
-                            reject(new Error(errorMessage));
-                        }
-                    })
-                    .catch((error) => {
-                        reject(new Error('Erro no processamento do pagamento: ' + error.message));
-                    });
+            console.log('💳 Enviando dados de pagamento para API da Viator:', {
+                cardLastFour: cardNumber.slice(-4),
+                expMonth,
+                expYear,
+                name,
+                country,
+                postalCode
             });
+            
+            // Usar o endpoint correto da API de pagamentos da Viator
+            const response = await fetch(viatorBookingAjax.ajaxurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    action: 'viator_submit_payment',
+                    session_token: this.bookingData.holdData.sessionToken,
+                    payment_data: JSON.stringify(paymentData),
+                    nonce: viatorBookingAjax.nonce
+                })
+            });
+            
+            const data = await response.json();
+            console.log('📥 Resposta da API de pagamento:', data);
+            
+            if (data.success) {
+                // Extrair o sessionAccountToken da resposta
+                const paymentAccounts = data.data.paymentAccounts;
+                if (paymentAccounts && paymentAccounts.creditCards && paymentAccounts.creditCards.length > 0) {
+                    const creditCard = paymentAccounts.creditCards[0];
+                    this.bookingData.paymentToken = creditCard.accountMetaData.sessionAccountToken;
+                    console.log('✅ Token de pagamento obtido com sucesso');
+                    return true;
+                } else {
+                    throw new Error('Resposta da API não contém token de pagamento válido');
+                }
+            } else {
+                const errorMessage = data.data?.message || 'Erro no processamento do pagamento';
+                throw new Error(errorMessage);
+            }
+            
         } catch (error) {
+            console.error('❌ Erro no pagamento:', error);
             this.showDateError('Erro no processamento do pagamento: ' + error.message);
             return false;
         }
@@ -1871,9 +1980,6 @@ class ViatorBookingManager {
             // Usar dados do responsável coletados na segunda etapa
             const travelersData = this.collectDetailedTravelersData();
             const bookerInfo = travelersData.bookerInfo;
-            
-            // Usar email do responsável para pagamento se não foi informado no pagamento
-            const paymentEmail = document.getElementById('cardholder-email')?.value || bookerInfo.email;
 
             const response = await fetch(viatorBookingAjax.ajaxurl, {
                 method: 'POST',
