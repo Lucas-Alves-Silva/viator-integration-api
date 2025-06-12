@@ -61,7 +61,7 @@ add_action('admin_init', 'viator_register_settings');
 function viator_settings_page() {
     ?>
     <div class="wrap">
-        <h1>Viator API Integration Settings</h1>
+        <h1>Viator API - Configurações</h1>
         <form method="post" action="options.php">
             <?php
             settings_fields('viator_settings');

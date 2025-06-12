@@ -9,9 +9,9 @@ add_action('admin_menu', 'viator_debug_menu');
 
 function viator_debug_menu() {
     add_submenu_page(
-        'tools.php',
+        'viator-settings',  // Parent slug do menu principal do plugin
         'Debug API Viator',
-        'Debug API Viator',
+        'Debug API',
         'manage_options',
         'viator-debug',
         'viator_debug_page'
@@ -122,9 +122,14 @@ function test_product_info($api_key, $product_code) {
             echo '<h4>Faixas Etárias Disponíveis:</h4>';
             echo '<ul>';
             foreach ($data['pricingInfo']['ageBands'] as $band) {
-                $min_travelers = isset($band['minTravelers']) ? intval($band['minTravelers']) : 'N/A';
-                $max_travelers = isset($band['maxTravelers']) ? intval($band['maxTravelers']) : 'N/A';
-                echo '<li><strong>' . esc_html($band['ageBand'] ?? 'N/A') . '</strong> - Min: ' . 
+                // Usar os campos corretos conforme a resposta real da API
+                $min_travelers = isset($band['minTravelersPerBooking']) ? intval($band['minTravelersPerBooking']) : 'N/A';
+                $max_travelers = isset($band['maxTravelersPerBooking']) ? intval($band['maxTravelersPerBooking']) : 'N/A';
+                $start_age = isset($band['startAge']) ? intval($band['startAge']) : 'N/A';
+                $end_age = isset($band['endAge']) ? intval($band['endAge']) : 'N/A';
+                
+                echo '<li><strong>' . esc_html($band['ageBand'] ?? 'N/A') . '</strong> (Idade: ' . 
+                     $start_age . '-' . $end_age . ') - Min: ' . 
                      $min_travelers . ', Max: ' . $max_travelers . '</li>';
             }
             echo '</ul>';
