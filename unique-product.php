@@ -1607,30 +1607,36 @@ function viator_get_product_details($product_code) {
                             $service_type = '';
                             $language_code = '';
                             
-                            // Check for GUIDE format
-                            if (preg_match('/GUIDE\s+(\w+)\s+\w+\/SERVICE_GUIDE/i', $language, $matches)) {
+                            // Check for GUIDE format (suporta códigos compostos como zh-tw)
+                            if (preg_match('/GUIDE\s+([a-z]{2,3}(?:-[a-z]{2,3})?)\s+[a-z-]{2,6}\/SERVICE_GUIDE/i', $language, $matches)) {
                                 $language_code = strtolower($matches[1]);
                                 $service_type = viator_t('guide_service');
                             }
-                            // Check for WRITTEN format
-                            elseif (preg_match('/WRITTEN\s+(\w+)\s+\w+\/SERVICE_WRITTEN/i', $language, $matches)) {
+                            // Check for WRITTEN format (suporta códigos compostos como zh-tw)
+                            elseif (preg_match('/WRITTEN\s+([a-z]{2,3}(?:-[a-z]{2,3})?)\s+[a-z-]{2,6}\/SERVICE_WRITTEN/i', $language, $matches)) {
                                 $language_code = strtolower($matches[1]);
                                 $service_type = viator_t('written_service');
                             }
-                            // Check for AUDIO format
-                            elseif (preg_match('/AUDIO\s+(\w+)\s+\w+\/SERVICE_AUDIO/i', $language, $matches)) {
+                            // Check for AUDIO format (suporta códigos compostos como zh-tw)
+                            elseif (preg_match('/AUDIO\s+([a-z]{2,3}(?:-[a-z]{2,3})?)\s+[a-z-]{2,6}\/SERVICE_AUDIO/i', $language, $matches)) {
                                 $language_code = strtolower($matches[1]);
                                 $service_type = viator_t('audio_service');
                             }
                             // Default fallback for other formats
                             else {
                                 // Tentar extrair código de idioma usando regex mais abrangente
-                                // Para casos como "AUDIO es es/SERVICE_AUDIO"
-                                if (preg_match('/(?:GUIDE|WRITTEN|AUDIO)\s+([a-z]{2,3})\s+[a-z]{2,3}?\/SERVICE_(?:GUIDE|WRITTEN|AUDIO)/i', $language, $matches)) {
+                                // Para casos como "AUDIO es es/SERVICE_AUDIO" e "AUDIO zh-tw zh-tw/SERVICE_AUDIO"
+                                if (preg_match('/(?:GUIDE|WRITTEN|AUDIO)\s+([a-z]{2,3}(?:-[a-z]{2,3})?)\s+[a-z-]{2,6}?\/SERVICE_(?:GUIDE|WRITTEN|AUDIO)/i', $language, $matches)) {
                                     $language_code = strtolower($matches[1]);
                                 } else {
-                                    // Remove service type prefix and suffix
-                                    $language_code = strtolower(preg_replace('/(?:GUIDE|WRITTEN|AUDIO)\s+|\s*\/.*$/i', '', $language));
+                                    // Remove service type prefix and suffix para extrair o código
+                                    $clean_language = preg_replace('/(?:GUIDE|WRITTEN|AUDIO)\s+|\s*\/.*$/i', '', $language);
+                                    // Procura por códigos de idioma com possível hífen (ex: zh-tw)
+                                    if (preg_match('/^([a-z]{2,3}(?:-[a-z]{2,3})?)/i', trim($clean_language), $matches)) {
+                                        $language_code = strtolower($matches[1]);
+                                    } else {
+                                        $language_code = strtolower($clean_language);
+                                    }
                                 }
                                 
                                 // Try to determine service type from the string
@@ -1654,6 +1660,7 @@ function viator_get_product_details($product_code) {
                                 'ru' => 'Russo',
                                 'ja' => 'Japonês',
                                 'zh' => 'Chinês',
+                                'zh-tw' => 'Chinês Tradicional',
                                 'cmn' => 'Mandarim',
                                 'ko' => 'Coreano',
                                 'nl' => 'Holandês',
@@ -1665,6 +1672,8 @@ function viator_get_product_details($product_code) {
                                 'tr' => 'Turco',
                                 'ar' => 'Árabe',
                                 'he' => 'Hebraico',
+                                'hi' => 'Hindi',
+                                'uk' => 'Ucraniano',
                                 'th' => 'Tailandês',
                                 'cs' => 'Tcheco',
                                 'hu' => 'Húngaro',
