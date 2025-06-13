@@ -1062,8 +1062,67 @@ function viator_get_product_details($product_code) {
     $logistics = isset($product['logistics']) ? $product['logistics'] : [];
     $special_instructions = isset($product['specialInstructions']) ? $product['specialInstructions'] : [];
     
-    // Get tags
-    $tags = isset($product['tags']) ? $product['tags'] : [];
+    // Get tags and process them to get human-readable names
+    $raw_tags = isset($product['tags']) ? $product['tags'] : [];
+    
+    // FORCE: Limpar cache na primeira execução para ver as tags frescas
+    static $cache_cleared = false;
+    if (!$cache_cleared) {
+        viator_clear_tags_cache();
+        $cache_cleared = true;
+        error_log("VIATOR DEBUG: Cache de tags limpo forçadamente - TESTE CORREÇÃO");
+    }
+    
+    $tags = viator_process_tags_for_display($raw_tags);
+    
+    // DEBUG ROBUSTO: Log tag processing for troubleshooting (sempre ativo)
+    if (!empty($raw_tags)) {
+        error_log("=== VIATOR DEBUG PRODUTO {$product_code} - TAGS ===");
+        error_log("Tags brutas: " . print_r($raw_tags, true));
+        error_log("Tags processadas: " . print_r($tags, true));
+        error_log("Configuração de idioma: " . print_r(viator_get_locale_settings(), true));
+        
+        // Debug cada tag individualmente
+        foreach ($raw_tags as $index => $tag_id) {
+            error_log("--- DEBUGANDO TAG ID: {$tag_id} ---");
+            
+            $tag_details = viator_debug_tag($tag_id);
+            if ($tag_details) {
+                error_log("Tag {$tag_id} - Idiomas disponíveis: " . implode(', ', array_keys($tag_details)));
+                error_log("Tag {$tag_id} - Tradução escolhida: " . (isset($tags[$index]) ? $tags[$index] : 'ERRO'));
+                
+                // Check if Portuguese is available
+                $pt_available = [];
+                foreach (['pt-BR', 'pt_BR', 'pt', 'pt-PT', 'pt_PT'] as $pt_code) {
+                    if (isset($tag_details[$pt_code])) {
+                        $pt_available[$pt_code] = $tag_details[$pt_code];
+                    }
+                }
+                
+                if (!empty($pt_available)) {
+                    error_log("Tag {$tag_id} - Português disponível: " . print_r($pt_available, true));
+                } else {
+                    error_log("Tag {$tag_id} - SEM PORTUGUÊS DISPONÍVEL");
+                    error_log("Tag {$tag_id} - Todos os idiomas: " . print_r($tag_details, true));
+                    
+                    // Test manual translation
+                    $english_variations = ['en', 'en-US', 'en_US', 'en-UK', 'en_UK'];
+                    foreach ($english_variations as $en_code) {
+                        if (isset($tag_details[$en_code])) {
+                            $english_text = $tag_details[$en_code];
+                            $manual_translation = viator_translate_common_tags($english_text);
+                            error_log("Tag {$tag_id} - Inglês ({$en_code}): {$english_text}");
+                            error_log("Tag {$tag_id} - Tradução manual: {$manual_translation}");
+                            break;
+                        }
+                    }
+                }
+            } else {
+                error_log("Tag {$tag_id} - NÃO ENCONTRADA NA API");
+            }
+        }
+        error_log("=== FIM DEBUG TAGS PRODUTO {$product_code} ===");
+    }
 
     // Comentado para resolver erro de chave não correspondente
     /*
@@ -1097,6 +1156,25 @@ function viator_get_product_details($product_code) {
                 <span><?php echo esc_html($title); ?></span>
             </div>
         </div>
+        
+        <!-- Tags Carousel -->
+        <?php if (!empty($tags)): ?>
+            <div class="viator-tags-carousel">
+                <div class="viator-tags-container">
+                    <div class="viator-tags-scroll">
+                        <?php foreach ($tags as $tag): ?>
+                            <span class="viator-tag-chip"><?php echo esc_html($tag); ?></span>
+                        <?php endforeach; ?>
+                    </div>
+                    <button class="viator-tags-scroll-btn viator-tags-scroll-left" aria-label="Scroll left">
+                        &lt;
+                    </button>
+                    <button class="viator-tags-scroll-btn viator-tags-scroll-right" aria-label="Scroll right">
+                        &gt;
+                    </button>
+                </div>
+            </div>
+        <?php endif; ?>
         
         <!-- Título do produto -->
         <h1><?php echo esc_html($title); ?></h1>
@@ -2068,17 +2146,7 @@ function viator_get_product_details($product_code) {
         endif;
         ?>
 
-        <!-- Tags -->
-        <?php if (!empty($tags)): ?>
-            <div class="viator-tags">
-                <h2><?php echo esc_html(viator_t('tags')); ?></h2>
-                <div class="viator-tag-list">
-                    <?php foreach ($tags as $tag): ?>
-                        <span class="viator-tag"><?php echo esc_html($tag); ?></span>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-        <?php endif; ?>
+
     </div>
     <?php
     // Get the buffered content and clean the buffer
@@ -2162,6 +2230,67 @@ function viator_enqueue_product_scripts() {
                 }, 2000);
             }
         }
+        
+        // Tags Carousel functionality
+        document.addEventListener("DOMContentLoaded", function() {
+            const tagsCarousel = document.querySelector(".viator-tags-carousel");
+            if (!tagsCarousel) return;
+            
+            const scrollContainer = tagsCarousel.querySelector(".viator-tags-scroll");
+            const leftBtn = tagsCarousel.querySelector(".viator-tags-scroll-left");
+            const rightBtn = tagsCarousel.querySelector(".viator-tags-scroll-right");
+            
+            if (!scrollContainer || !leftBtn || !rightBtn) return;
+            
+            // Update button states
+            function updateButtonStates() {
+                const scrollLeft = scrollContainer.scrollLeft;
+                const maxScroll = scrollContainer.scrollWidth - scrollContainer.clientWidth;
+                
+                leftBtn.disabled = scrollLeft <= 0;
+                rightBtn.disabled = scrollLeft >= maxScroll - 1;
+            }
+            
+            // Scroll amount (adjust based on container width)
+            function getScrollAmount() {
+                return scrollContainer.clientWidth * 0.8;
+            }
+            
+            // Scroll left
+            leftBtn.addEventListener("click", function() {
+                scrollContainer.scrollBy({
+                    left: -getScrollAmount(),
+                    behavior: "smooth"
+                });
+            });
+            
+            // Scroll right
+            rightBtn.addEventListener("click", function() {
+                scrollContainer.scrollBy({
+                    left: getScrollAmount(),
+                    behavior: "smooth"
+                });
+            });
+            
+            // Update button states on scroll
+            scrollContainer.addEventListener("scroll", updateButtonStates);
+            
+            // Update button states on resize
+            window.addEventListener("resize", updateButtonStates);
+            
+            // Initial button state update
+            updateButtonStates();
+            
+            // Hide buttons if all content is visible
+            function checkIfScrollNeeded() {
+                const isScrollNeeded = scrollContainer.scrollWidth > scrollContainer.clientWidth;
+                leftBtn.style.display = isScrollNeeded ? "flex" : "none";
+                rightBtn.style.display = isScrollNeeded ? "flex" : "none";
+            }
+            
+            checkIfScrollNeeded();
+            window.addEventListener("resize", checkIfScrollNeeded);
+        });
     ');
     
     // Enqueue reviews script only on product pages
@@ -2293,3 +2422,413 @@ function viator_get_reviews_ajax() {
 add_action('wp_ajax_viator_get_reviews', 'viator_get_reviews_ajax');
 add_action('wp_ajax_nopriv_viator_get_reviews', 'viator_get_reviews_ajax');
 add_action('wp_ajax_nopriv_viator_get_reviews', 'viator_get_reviews_ajax');
+
+/**
+ * Get all tags from Viator API with caching
+ */
+function viator_get_tags_from_api() {
+    $cache_key = 'viator_all_tags';
+    $cached_tags = get_transient($cache_key);
+    
+    // Return cached data if available (cached for 7 days as recommended)
+    if (false !== $cached_tags) {
+        error_log('VIATOR DEBUG: Tags loaded from cache, count: ' . count($cached_tags));
+        return $cached_tags;
+    }
+    
+    $api_key = get_option('viator_api_key');
+    if (empty($api_key)) {
+        error_log('VIATOR DEBUG: API key not configured for tags');
+        return array();
+    }
+    
+    $url = viator_get_api_base_url() . '/partner/products/tags';
+    
+    error_log('VIATOR DEBUG: Fetching tags from API: ' . $url);
+    
+    $response = wp_remote_get($url, array(
+        'headers' => array(
+            'Accept' => 'application/json;version=2.0',
+            'exp-api-key' => $api_key
+        ),
+        'timeout' => 30
+    ));
+    
+    if (is_wp_error($response)) {
+        error_log('VIATOR DEBUG: Error fetching tags from API: ' . $response->get_error_message());
+        return array();
+    }
+    
+    $response_code = wp_remote_retrieve_response_code($response);
+    if ($response_code !== 200) {
+        error_log('VIATOR DEBUG: API returned non-200 response for tags: ' . $response_code);
+        $body = wp_remote_retrieve_body($response);
+        error_log('VIATOR DEBUG: Response body: ' . $body);
+        return array();
+    }
+    
+    $body = wp_remote_retrieve_body($response);
+    $data = json_decode($body, true);
+    
+    if (!$data || !isset($data['tags'])) {
+        error_log('VIATOR DEBUG: Invalid response from tags API: ' . print_r($data, true));
+        return array();
+    }
+    
+    error_log('VIATOR DEBUG: API returned ' . count($data['tags']) . ' tags');
+    
+    // Process tags and create indexed array by tagId
+    $processed_tags = array();
+    foreach ($data['tags'] as $tag) {
+        if (isset($tag['tagId']) && isset($tag['allNamesByLocale'])) {
+            $processed_tags[$tag['tagId']] = $tag['allNamesByLocale'];
+            
+            // Log sample tags for debugging
+            if (count($processed_tags) <= 5) {
+                error_log("VIATOR DEBUG: Sample tag {$tag['tagId']}: " . print_r($tag['allNamesByLocale'], true));
+            }
+        }
+    }
+    
+    // Cache for 7 days (604800 seconds) as recommended by Viator
+    set_transient($cache_key, $processed_tags, 604800);
+    
+    error_log('VIATOR DEBUG: Tags fetched and cached successfully, processed count: ' . count($processed_tags));
+    
+    return $processed_tags;
+}
+
+/**
+ * Get tag name by ID in the appropriate language
+ */
+function viator_get_tag_name($tag_id, $language = null) {
+    if ($language === null) {
+        $locale_settings = viator_get_locale_settings();
+        $language = $locale_settings['language'];
+    }
+    
+    error_log("VIATOR DEBUG: Getting tag name for ID {$tag_id} in language {$language}");
+    
+    $all_tags = viator_get_tags_from_api();
+    
+    if (empty($all_tags) || !isset($all_tags[$tag_id])) {
+        error_log("VIATOR DEBUG: Tag {$tag_id} not found in API");
+        return $tag_id; // Return the tag ID if not found
+    }
+    
+    $tag_names = $all_tags[$tag_id];
+    error_log("VIATOR DEBUG: Tag {$tag_id} available names: " . print_r($tag_names, true));
+    
+    // For Portuguese (Brazil), try multiple Portuguese variations
+    if ($language === 'pt-BR') {
+        $portuguese_variations = ['pt-BR', 'pt_BR', 'pt', 'pt-PT', 'pt_PT'];
+        
+        foreach ($portuguese_variations as $pt_code) {
+            if (isset($tag_names[$pt_code]) && !empty($tag_names[$pt_code])) {
+                $portuguese_text = $tag_names[$pt_code];
+                
+                // Check if this "Portuguese" text is actually English
+                // (some tags in the API have English text in all language fields)
+                $manual_translation = viator_translate_common_tags($portuguese_text, $language);
+                
+                if ($manual_translation !== $portuguese_text) {
+                    // Manual translation was applied, use it
+                    error_log("VIATOR DEBUG: Tag {$tag_id} - Portuguese text '{$portuguese_text}' was actually English, using manual translation: {$manual_translation}");
+                    return $manual_translation;
+                } else {
+                    // It's genuine Portuguese text
+                    error_log("VIATOR DEBUG: Tag {$tag_id} found in {$pt_code}: {$tag_names[$pt_code]}");
+                    return $tag_names[$pt_code];
+                }
+            }
+        }
+        error_log("VIATOR DEBUG: Tag {$tag_id} - No Portuguese translation found");
+    }
+    
+    // For English, try multiple English variations
+    if ($language === 'en-US') {
+        $english_variations = ['en-US', 'en_US', 'en', 'en-UK', 'en_UK', 'en-AU', 'en_AU'];
+        
+        foreach ($english_variations as $en_code) {
+            if (isset($tag_names[$en_code]) && !empty($tag_names[$en_code])) {
+                error_log("VIATOR DEBUG: Tag {$tag_id} found in {$en_code}: {$tag_names[$en_code]}");
+                return $tag_names[$en_code];
+            }
+        }
+    }
+    
+    // If primary language not found, try fallback to English variations
+    $english_fallback = ['en', 'en-US', 'en_US', 'en-UK', 'en_UK', 'en-AU', 'en_AU'];
+    foreach ($english_fallback as $en_code) {
+        if (isset($tag_names[$en_code]) && !empty($tag_names[$en_code])) {
+            error_log("VIATOR DEBUG: Tag {$tag_id} using English fallback {$en_code}: {$tag_names[$en_code]}");
+            $english_tag = $tag_names[$en_code];
+            
+            // Apply manual translation for common English tags
+            $translated_tag = viator_translate_common_tags($english_tag, $language);
+            error_log("VIATOR DEBUG: Tag {$tag_id} after manual translation: {$translated_tag}");
+            return $translated_tag;
+        }
+    }
+    
+    // If no English fallback, try any Portuguese variation
+    $portuguese_fallback = ['pt', 'pt-BR', 'pt_BR', 'pt-PT', 'pt_PT'];
+    foreach ($portuguese_fallback as $pt_code) {
+        if (isset($tag_names[$pt_code]) && !empty($tag_names[$pt_code])) {
+            error_log("VIATOR DEBUG: Tag {$tag_id} using Portuguese fallback {$pt_code}: {$tag_names[$pt_code]}");
+            return $tag_names[$pt_code];
+        }
+    }
+    
+    // If still nothing found, return the first available non-empty name
+    foreach ($tag_names as $locale => $name) {
+        if (!empty($name)) {
+            error_log("VIATOR DEBUG: Tag {$tag_id} using any available language {$locale}: {$name}");
+            $translated_tag = viator_translate_common_tags($name, $language);
+            error_log("VIATOR DEBUG: Tag {$tag_id} final translation: {$translated_tag}");
+            return $translated_tag;
+        }
+    }
+    
+    // Final fallback: return the tag ID
+    error_log("VIATOR DEBUG: Tag {$tag_id} no translation found, returning ID");
+    return $tag_id;
+}
+
+/**
+ * Translate common English tags to Portuguese manually
+ */
+function viator_translate_common_tags($english_tag, $target_language = null) {
+    if ($target_language === null) {
+        $locale_settings = viator_get_locale_settings();
+        $target_language = $locale_settings['language'];
+    }
+    
+    error_log("VIATOR DEBUG: Trying to translate '{$english_tag}' to language '{$target_language}'");
+    
+    // Only translate if target language is Portuguese
+    if ($target_language !== 'pt-BR') {
+        error_log("VIATOR DEBUG: Target language is not pt-BR, returning original: {$english_tag}");
+        return $english_tag;
+    }
+    
+    // Manual translation mapping for common tags
+    $translations = array(
+        'Low Last Minute Supplier Cancellation Rate' => 'Baixa taxa de cancelamento de última hora por parte de fornecedores',
+        'Top Product' => 'Produto Top',
+        'Low Supplier Cancellation Rate' => 'Baixa taxa de cancelamento de fornecedores',
+        'Bestseller' => 'Mais Vendido',
+        'Best Value' => 'Melhor Valor',
+        'Premium Experience' => 'Experiência Premium',
+        'Luxury Experience' => 'Experiência de Luxo',
+        'Family Friendly' => 'Adequado para Famílias',
+        'Small Group' => 'Grupo Pequeno',
+        'Private Tour' => 'Tour Privado',
+        'Skip the Line' => 'Evite as Filas',
+        'Free Cancellation' => 'Cancelamento Gratuito',
+        'Instant Confirmation' => 'Confirmação Instantânea',
+        'Mobile Ticket' => 'Ticket Digital',
+        'Audio Guide' => 'Áudio Guia',
+        'Live Guide' => 'Guia ao Vivo',
+        'Hotel Pickup' => 'Busca no Hotel',
+        'All-Inclusive' => 'Tudo Incluído',
+        'Outdoor Activity' => 'Atividade ao Ar Livre',
+        'Cultural Experience' => 'Experiência Cultural',
+        'Adventure' => 'Aventura',
+        'Food & Drink' => 'Comida e Bebida',
+        'Nightlife' => 'Vida Noturna',
+        'Historical' => 'Histórico',
+        'Photography' => 'Fotografia',
+        'Romantic' => 'Romântico',
+        'Wheelchair Accessible' => 'Acessível para Cadeirantes',
+        'Pet Friendly' => 'Aceita Animais',
+        'WiFi Available' => 'WiFi Disponível',
+        'Air Conditioning' => 'Ar Condicionado',
+        'Recommended' => 'Recomendado',
+        'Popular' => 'Popular',
+        'New Experience' => 'Nova Experiência',
+        'Limited Time' => 'Tempo Limitado',
+        'Seasonal' => 'Sazonal',
+        'Unique' => 'Único',
+        'Must See' => 'Imperdível',
+        'Hidden Gem' => 'Joia Escondida',
+        'New Product' => 'Novo Produto',
+    );
+    
+    // Check for exact match first
+    if (isset($translations[$english_tag])) {
+        error_log("VIATOR DEBUG: Exact manual translation found: {$english_tag} -> {$translations[$english_tag]}");
+        return $translations[$english_tag];
+    }
+    
+    // Check for partial matches (case insensitive)
+    foreach ($translations as $english => $portuguese) {
+        if (stripos($english_tag, $english) !== false) {
+            error_log("VIATOR DEBUG: Partial manual translation found: {$english_tag} contains '{$english}' -> {$portuguese}");
+            return $portuguese;
+        }
+    }
+    
+    // No translation found, return original
+    error_log("VIATOR DEBUG: No manual translation found for: {$english_tag}");
+    return $english_tag;
+}
+
+/**
+ * Process tags array to get human-readable names
+ */
+function viator_process_tags_for_display($tags) {
+    if (empty($tags) || !is_array($tags)) {
+        return array();
+    }
+    
+    $processed_tags = array();
+    
+    foreach ($tags as $tag) {
+        // Tags can be either integers (tag IDs) or strings
+        $tag_id = is_numeric($tag) ? intval($tag) : $tag;
+        $tag_name = viator_get_tag_name($tag_id);
+        $processed_tags[] = $tag_name;
+    }
+    
+    return $processed_tags;
+}
+
+/**
+ * Clear tags cache (useful for debugging or manual refresh)
+ */
+function viator_clear_tags_cache() {
+    delete_transient('viator_all_tags');
+    viator_debug_log('Tags cache cleared');
+}
+
+/**
+ * AJAX handler to refresh tags cache manually
+ */
+function viator_refresh_tags_cache_ajax() {
+    // Verify nonce for security
+    if (!wp_verify_nonce($_POST['nonce'], 'viator_admin_nonce')) {
+        wp_send_json_error('Invalid nonce');
+    }
+    
+    // Check if user has permission
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error('Insufficient permissions');
+    }
+    
+    // Clear cache and fetch fresh data
+    viator_clear_tags_cache();
+    $tags = viator_get_tags_from_api();
+    
+    wp_send_json_success(array(
+        'message' => 'Cache de tags atualizado com sucesso',
+        'tags_count' => count($tags)
+    ));
+}
+add_action('wp_ajax_viator_refresh_tags_cache', 'viator_refresh_tags_cache_ajax');
+
+/**
+ * Get the base URL for Viator API
+ */
+function viator_get_api_base_url() {
+    // Por enquanto usando sandbox, mas pode ser configurável no futuro
+    return 'https://api.sandbox.viator.com';
+}
+
+/**
+ * Debug specific tag to see available languages
+ */
+function viator_debug_tag($tag_id) {
+    $all_tags = viator_get_tags_from_api();
+    
+    if (empty($all_tags) || !isset($all_tags[$tag_id])) {
+        error_log("VIATOR DEBUG: Tag {$tag_id} not found in API");
+        return false;
+    }
+    
+    $tag_names = $all_tags[$tag_id];
+    error_log("VIATOR DEBUG: Tag {$tag_id} available languages: " . print_r($tag_names, true));
+    
+    return $tag_names;
+}
+
+/**
+ * AJAX handler for tag debugging
+ */
+function viator_debug_tag_ajax() {
+    // Verify nonce for security
+    if (!wp_verify_nonce($_POST['nonce'], 'viator_admin_nonce')) {
+        wp_send_json_error('Invalid nonce');
+    }
+    
+    // Check if user has permission
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error('Insufficient permissions');
+    }
+    
+    $tag_id = intval($_POST['tag_id']);
+    $tag_info = viator_debug_tag($tag_id);
+    
+    if ($tag_info === false) {
+        wp_send_json_error('Tag não encontrada');
+    }
+    
+    // Get the current language translation
+    $current_translation = viator_get_tag_name($tag_id);
+    
+    wp_send_json_success(array(
+        'tag_id' => $tag_id,
+        'available_languages' => $tag_info,
+        'current_translation' => $current_translation,
+        'plugin_language' => viator_get_locale_settings()['language']
+    ));
+}
+add_action('wp_ajax_viator_debug_tag', 'viator_debug_tag_ajax');
+
+/**
+ * Enhanced debug function to check tags from a specific product
+ */
+function viator_debug_product_tags($product_code) {
+    viator_debug_log("=== DEBUG TAGS DO PRODUTO {$product_code} ===");
+    
+    // Get product details first
+    $product_details = viator_get_product_details($product_code);
+    if (!$product_details || !isset($product_details['tags'])) {
+        viator_debug_log("Produto {$product_code} não tem tags ou não foi encontrado");
+        return;
+    }
+    
+    $raw_tags = $product_details['tags'];
+    viator_debug_log("Tags brutas do produto {$product_code}:", $raw_tags);
+    
+    // Process each tag
+    foreach ($raw_tags as $tag_id) {
+        viator_debug_log("--- Processando Tag ID: {$tag_id} ---");
+        
+        $tag_info = viator_debug_tag($tag_id);
+        if ($tag_info) {
+            viator_debug_log("Idiomas disponíveis para tag {$tag_id}:", array_keys($tag_info));
+            
+            // Check what our function returns
+            $current_translation = viator_get_tag_name($tag_id);
+            viator_debug_log("Tradução atual para tag {$tag_id}: {$current_translation}");
+            
+            // Check for Portuguese specifically
+            $has_portuguese = false;
+            $portuguese_variations = ['pt-BR', 'pt_BR', 'pt', 'pt-PT', 'pt_PT'];
+            foreach ($portuguese_variations as $pt_code) {
+                if (isset($tag_info[$pt_code])) {
+                    viator_debug_log("Tag {$tag_id} tem português ({$pt_code}): {$tag_info[$pt_code]}");
+                    $has_portuguese = true;
+                }
+            }
+            
+            if (!$has_portuguese) {
+                viator_debug_log("Tag {$tag_id} NÃO tem tradução em português");
+                viator_debug_log("Idiomas disponíveis:", $tag_info);
+            }
+        }
+    }
+    
+    viator_debug_log("=== FIM DEBUG TAGS DO PRODUTO {$product_code} ===");
+}

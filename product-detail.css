@@ -1109,3 +1109,131 @@
 .viator-unit-service-info .service-text {
     font-weight: 500; /* Deixa o texto um pouco mais destacado */
 }
+
+/* Tags Carousel */
+.viator-tags-carousel {
+    margin: 20px 0;
+    position: relative;
+}
+
+.viator-tags-container {
+    position: relative;
+    overflow: hidden;
+    border-radius: 12px;
+    padding: 4px;
+}
+
+.viator-tags-scroll {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    padding: 12px 16px;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+.viator-tags-scroll::-webkit-scrollbar {
+    display: none; /* WebKit */
+}
+
+.viator-tag-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 16px;
+    background: #F5F5F5;
+    border: 1px solid #e0e0e0;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #333;
+    white-space: nowrap;
+    flex-shrink: 0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    transition: all 0.2s ease;
+    cursor: default;
+}
+
+.viator-tag-chip:hover {
+    background: #F5F5F5;
+    color: #666;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(102, 102, 102, 0.2);
+}
+
+.viator-tags-scroll-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    border: 1px solid #333333;
+    border-radius: 50%;
+    background: #F5F5F5;
+    color: #666;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: all 0.2s ease;
+    z-index: 10;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.viator-tags-scroll-btn:hover {
+    background: #fff;
+    border: 1px solid #000;
+    color: #000;
+}
+
+.viator-tags-scroll-left {
+    left: 8px;
+}
+
+.viator-tags-scroll-right {
+    right: 8px;
+}
+
+.viator-tags-scroll-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: translateY(-50%);
+}
+
+.viator-tags-scroll-btn:disabled:hover {
+    background: #F5F5F5;
+    color: #666;
+    transform: translateY(-50%);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .viator-tags-carousel {
+        margin: 15px 0;
+    }
+    
+    .viator-tag-chip {
+        padding: 6px 12px;
+        font-size: 13px;
+    }
+    
+    .viator-tags-scroll-btn {
+        width: 28px;
+        height: 28px;
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    .viator-tags-scroll {
+        padding: 10px 12px;
+        gap: 6px;
+    }
+    
+    .viator-tag-chip {
+        padding: 5px 10px;
+        font-size: 12px;
+    }
+}
