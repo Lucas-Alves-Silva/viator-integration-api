@@ -9,7 +9,7 @@
 function formatTimezone(timezoneCode) {
     return new Promise((resolve) => {
         // Verifica se temos dados em cache
-        const cachedData = localStorage.getItem('viatorTimezoneCache_' + timezoneCode);
+        const cachedData = localStorage.getItem('timezoneCache_' + timezoneCode);
         if (cachedData) {
             const { formattedTimezone, timestamp } = JSON.parse(cachedData);
             const now = new Date().getTime();
@@ -67,7 +67,7 @@ function formatTimezone(timezoneCode) {
                 }
 
                 // Armazena em cache
-                localStorage.setItem('viatorTimezoneCache_' + timezoneCode, JSON.stringify({
+                localStorage.setItem('timezoneCache_' + timezoneCode, JSON.stringify({
                     formattedTimezone: formattedTimezone,
                     timestamp: new Date().getTime()
                 }));
@@ -102,7 +102,7 @@ function initTimezoneFormatter() {
     
     // Se encontrou o elemento de fuso horário
     if (timezoneElement && timezoneCode) {
-        console.log('Elemento de fuso horário encontrado:', timezoneCode);
+
         
         // Adiciona um indicador de carregamento
         timezoneElement.innerHTML = `${timezoneCode} <small>(carregando detalhes...)</small>`;

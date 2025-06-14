@@ -37,8 +37,8 @@ add_filter('query_vars', 'viator_query_vars');
 // Add admin menu and settings page
 function viator_admin_menu() {
     add_menu_page(
-        'Viator API Integration',
-        'Viator Integration',
+        'API de Turismo',
+        'API Turismo',
         'manage_options',
         'viator-settings',
         'viator_settings_page',
@@ -61,7 +61,7 @@ add_action('admin_init', 'viator_register_settings');
 function viator_settings_page() {
     ?>
     <div class="wrap">
-        <h1>Viator API - Configurações</h1>
+        <h1>API de Turismo - Configurações</h1>
         <form method="post" action="options.php">
             <?php
             settings_fields('viator_settings');
@@ -76,7 +76,7 @@ function viator_settings_page() {
                                value="<?php echo esc_attr(get_option('viator_api_key')); ?>" 
                                class="regular-text"
                                required>
-                        <p class="description">Insira sua chave API da Viator aqui.</p>
+                        <p class="description">Insira sua chave API aqui.</p>
                     </td>
                 </tr>
                 <tr>
@@ -125,52 +125,11 @@ function viator_settings_page() {
                         <div id="tags-cache-result" style="margin-top: 10px;"></div>
                     </td>
                 </tr>
-                <tr>
-                    <th scope="row">Debug de Tag</th>
-                    <td>
-                        <input type="number" id="debug-tag-id" placeholder="ID da tag" style="width: 100px;">
-                        <button type="button" id="debug-tag" class="button button-secondary">Verificar Tag</button>
-                        <p class="description">Digite o ID de uma tag para ver os idiomas disponíveis e a tradução atual.</p>
-                        <div id="tag-debug-result" style="margin-top: 10px;"></div>
-                    </td>
-                </tr>
+
             </table>
         </div>
         
-        <!-- Seção de Traduções de Tags -->
-        <div style="margin-top: 40px; border-top: 1px solid #ddd; padding-top: 20px;">
-            <h2>Traduções Manuais de Tags</h2>
-            <p>As tags abaixo são traduzidas automaticamente quando aparecem em inglês e o plugin está configurado para português:</p>
-            <div style="background: #f9f9f9; padding: 15px; border: 1px solid #ddd; border-radius: 4px; max-height: 300px; overflow-y: auto;">
-                <table style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr style="background: #e9e9e9;">
-                            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Inglês</th>
-                            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Português</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr><td style="padding: 5px; border-bottom: 1px solid #eee;">Low Last Minute Supplier Cancellation Rate</td><td style="padding: 5px; border-bottom: 1px solid #eee;">Baixa taxa de cancelamento de última hora por parte de fornecedores</td></tr>
-                        <tr><td style="padding: 5px; border-bottom: 1px solid #eee;">Top Product</td><td style="padding: 5px; border-bottom: 1px solid #eee;">Produto Top</td></tr>
-                        <tr><td style="padding: 5px; border-bottom: 1px solid #eee;">Low Supplier Cancellation Rate</td><td style="padding: 5px; border-bottom: 1px solid #eee;">Baixa taxa de cancelamento de fornecedores</td></tr>
-                        <tr><td style="padding: 5px; border-bottom: 1px solid #eee;">Bestseller</td><td style="padding: 5px; border-bottom: 1px solid #eee;">Mais Vendido</td></tr>
-                        <tr><td style="padding: 5px; border-bottom: 1px solid #eee;">Best Value</td><td style="padding: 5px; border-bottom: 1px solid #eee;">Melhor Valor</td></tr>
-                        <tr><td style="padding: 5px; border-bottom: 1px solid #eee;">Premium Experience</td><td style="padding: 5px; border-bottom: 1px solid #eee;">Experiência Premium</td></tr>
-                        <tr><td style="padding: 5px; border-bottom: 1px solid #eee;">Small Group</td><td style="padding: 5px; border-bottom: 1px solid #eee;">Grupo Pequeno</td></tr>
-                        <tr><td style="padding: 5px; border-bottom: 1px solid #eee;">Private Tour</td><td style="padding: 5px; border-bottom: 1px solid #eee;">Tour Privado</td></tr>
-                        <tr><td style="padding: 5px; border-bottom: 1px solid #eee;">Skip the Line</td><td style="padding: 5px; border-bottom: 1px solid #eee;">Evite as Filas</td></tr>
-                        <tr><td style="padding: 5px; border-bottom: 1px solid #eee;">Free Cancellation</td><td style="padding: 5px; border-bottom: 1px solid #eee;">Cancelamento Gratuito</td></tr>
-                        <tr><td style="padding: 5px; border-bottom: 1px solid #eee;">Instant Confirmation</td><td style="padding: 5px; border-bottom: 1px solid #eee;">Confirmação Instantânea</td></tr>
-                        <tr><td style="padding: 5px; border-bottom: 1px solid #eee;">Audio Guide</td><td style="padding: 5px; border-bottom: 1px solid #eee;">Áudio Guia</td></tr>
-                        <tr><td style="padding: 5px; border-bottom: 1px solid #eee;">Hotel Pickup</td><td style="padding: 5px; border-bottom: 1px solid #eee;">Busca no Hotel</td></tr>
-                        <tr><td style="padding: 5px; border-bottom: 1px solid #eee;">Cultural Experience</td><td style="padding: 5px; border-bottom: 1px solid #eee;">Experiência Cultural</td></tr>
-                        <tr><td style="padding: 5px; border-bottom: 1px solid #eee;">Must See</td><td style="padding: 5px; border-bottom: 1px solid #eee;">Imperdível</td></tr>
-                        <tr><td style="padding: 5px;">Hidden Gem</td><td style="padding: 5px;">Joia Escondida</td></tr>
-                    </tbody>
-                </table>
-            </div>
-            <p style="margin-top: 10px;"><em>Para adicionar novas traduções, edite a função <code>viator_translate_common_tags()</code> no arquivo unique-product.php</em></p>
-        </div>
+
         
         <script>
         jQuery(document).ready(function($) {
@@ -204,56 +163,7 @@ function viator_settings_page() {
                 });
             });
             
-            // Debug de tag específica
-            $('#debug-tag').on('click', function() {
-                var button = $(this);
-                var tagId = $('#debug-tag-id').val();
-                var resultDiv = $('#tag-debug-result');
-                
-                if (!tagId) {
-                    resultDiv.html('<span style="color: #dc3232;">Por favor, digite um ID de tag</span>');
-                    return;
-                }
-                
-                button.prop('disabled', true).text('Verificando...');
-                resultDiv.html('<span style="color: #0073aa;">Verificando tag...</span>');
-                
-                $.ajax({
-                    url: ajaxurl,
-                    type: 'POST',
-                    data: {
-                        action: 'viator_debug_tag',
-                        tag_id: tagId,
-                        nonce: '<?php echo wp_create_nonce('viator_admin_nonce'); ?>'
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            var data = response.data;
-                            var html = '<div style="background: #f9f9f9; padding: 15px; border: 1px solid #ddd; border-radius: 4px;">';
-                            html += '<h4>Tag ID: ' + data.tag_id + '</h4>';
-                            html += '<p><strong>Idioma do Plugin:</strong> ' + data.plugin_language + '</p>';
-                            html += '<p><strong>Tradução Atual:</strong> ' + data.current_translation + '</p>';
-                            html += '<h4>Idiomas Disponíveis:</h4><ul>';
-                            
-                            Object.keys(data.available_languages).forEach(function(lang) {
-                                var name = data.available_languages[lang];
-                                html += '<li><strong>' + lang + ':</strong> ' + name + '</li>';
-                            });
-                            
-                            html += '</ul></div>';
-                            resultDiv.html(html);
-                        } else {
-                            resultDiv.html('<span style="color: #dc3232;">✗ Erro: ' + response.data + '</span>');
-                        }
-                    },
-                    error: function() {
-                        resultDiv.html('<span style="color: #dc3232;">✗ Erro de conexão</span>');
-                    },
-                    complete: function() {
-                        button.prop('disabled', false).text('Verificar Tag');
-                    }
-                });
-            });
+
         });
         </script>
     </div>
@@ -605,7 +515,7 @@ function viator_get_search_results($searchTerm) {
                     $body_data['productFiltering']['flags'] = isset($body_data['productFiltering']['flags']) ? 
                         array_merge($body_data['productFiltering']['flags'], ['NEW_ON_VIATOR']) : 
                         ['NEW_ON_VIATOR'];
-                    viator_debug_log('Adicionado filtro NEW_ON_VIATOR para Novo no Viator', $filter);
+                    viator_debug_log('Adicionado filtro NEW_ON_VIATOR', $filter);
                     break;
                 case 'special_offer':
                     // Nota: Filtro de Oferta Especial será processado localmente após a resposta da API
@@ -1750,7 +1660,7 @@ function viator_get_translation($key, $language = null) {
             'likely_to_sell_out' => 'Esgota rápido',
             'skip_the_line' => 'Evitar fila',
             'private_tour' => 'Tour Privado',
-            'new_on_viator' => 'Novidade na Viator',
+            'new_on_viator' => 'Novidades',
             'clear_all' => 'Limpar tudo',
             'filters' => 'Filtros',
             
@@ -1761,7 +1671,7 @@ function viator_get_translation($key, $language = null) {
             'price_high_to_low' => 'Preço (maior para menor)',
             'duration_ascending' => 'Duração (crescente)',
             'duration_descending' => 'Duração (decrescente)',
-            'newest_on_viator' => 'Novidade na Viator',
+            'newest_on_viator' => 'Novidades',
             
             // Resultados
             'results' => 'resultados',
@@ -1999,7 +1909,7 @@ function viator_get_translation($key, $language = null) {
             'likely_to_sell_out' => 'Likely to Sell Out',
             'skip_the_line' => 'Skip the Line',
             'private_tour' => 'Private Tour',
-            'new_on_viator' => 'New on Viator',
+            'new_on_viator' => 'New',
             'clear_all' => 'Clear all',
             'filters' => 'Filters',
             
