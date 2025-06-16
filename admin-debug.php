@@ -22,87 +22,104 @@ function viator_debug_page() {
     if (!current_user_can('manage_options')) {
         wp_die('Você não tem permissão para acessar esta página.');
     }
-    
+
+    // Obter a aba ativa
+    $active_tab = isset($_GET['tab']) ? $_GET['tab'] : 'api_tests';
+
     echo '<div class="wrap">';
     echo '<h1>🔧 Debug da API Viator</h1>';
-    
-    // Verificar se temos API key
+
+    // Verificar se temos API key (sempre visível)
     $api_key = get_option('viator_api_key');
     if (empty($api_key)) {
         echo '<div class="notice notice-error"><p>❌ <strong>API Key não configurada!</strong> Configure em Configurações → Viator Integration</p></div>';
-        echo '</div>';
+        echo '</div>'; // Fecha .wrap
         return;
     }
-    
     echo '<div class="notice notice-info"><p>✅ API Key configurada</p></div>';
-    
-    // Verificar dados armazenados para produto específico
-    if (isset($_POST['check_stored_data'])) {
-        $product_code = sanitize_text_field($_POST['product_code']);
-        viator_debug_stored_data($product_code);
-    }
-    
-    // Forçar atualização de preços
-    if (isset($_POST['force_price_update'])) {
-        $product_code = sanitize_text_field($_POST['product_code']);
-        viator_force_price_update($product_code);
-    }
-    
-    // Verificar qual produto usar
-    $product_code = isset($_GET['product']) ? sanitize_text_field($_GET['product']) : '26601P19';
-    
-    // Verificar qual data usar para os testes de disponibilidade
-    $test_date = isset($_GET['test_date']) ? sanitize_text_field($_GET['test_date']) : date('Y-m-d', strtotime('+7 days'));
-    
-    ?>
-    <form method="post" style="margin: 20px 0;">
-        <h3>🔍 Verificar Dados Armazenados</h3>
-        <p>Verificar dados de preço e cache armazenados para um produto:</p>
-        <label for="product_code_stored">Código do Produto:</label>
-        <input type="text" name="product_code" id="product_code_stored" value="61268P24" style="width: 200px;">
-        <input type="submit" name="check_stored_data" value="Verificar Dados" class="button button-secondary">
-        <input type="submit" name="force_price_update" value="🔄 Forçar Atualização de Preços" class="button button-primary" style="margin-left: 10px;">
-    </form>
 
-    <form method="get">
-        <input type="hidden" name="page" value="viator-debug" />
-        <table class="form-table">
-            <tr>
-                <th scope="row"><label for="product">Código do Produto:</label></th>
-                <td><input type="text" name="product" id="product" value="<?php echo esc_attr($product_code); ?>" class="regular-text" /></td>
-            </tr>
-            <tr>
-                <th scope="row"><label for="test_date">Data para Teste de Disponibilidade:</label></th>
-                <td>
-                    <input type="date" name="test_date" id="test_date" value="<?php echo esc_attr(isset($_GET['test_date']) ? $_GET['test_date'] : date('Y-m-d', strtotime('+7 days'))); ?>" class="regular-text" />
-                    <p class="description">Data que será usada para testar a disponibilidade (deve ser uma data futura)</p>
-                </td>
-            </tr>
-        </table>
-        <button type="submit" class="button button-primary">🔍 Executar Testes</button>
-    </form>
+    // Processar ações POST da aba de cache antes de renderizar qualquer coisa
+    if ($active_tab === 'cache_data' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (isset($_POST['check_stored_data']) && !empty($_POST['product_code'])) {
+            $product_code = sanitize_text_field($_POST['product_code']);
+            viator_debug_stored_data($product_code);
+        }
+        if (isset($_POST['force_price_update']) && !empty($_POST['product_code'])) {
+            $product_code = sanitize_text_field($_POST['product_code']);
+            viator_force_price_update($product_code);
+        }
+    }
+
+    // Navegação por abas
+    echo '<h2 class="nav-tab-wrapper">';
+    echo '<a href="?page=viator-debug&tab=api_tests" class="nav-tab ' . ($active_tab == 'api_tests' ? 'nav-tab-active' : '') . '">Testes de API ao Vivo</a>';
+    echo '<a href="?page=viator-debug&tab=cache_data" class="nav-tab ' . ($active_tab == 'cache_data' ? 'nav-tab-active' : '') . '">Cache e Dados Locais</a>';
+    echo '</h2>';
+
+    // Conteúdo da aba de Testes de API
+    if ($active_tab == 'api_tests') {
+        $product_code = isset($_GET['product']) ? sanitize_text_field($_GET['product']) : '26601P19';
+        $test_date = isset($_GET['test_date']) ? sanitize_text_field($_GET['test_date']) : date('Y-m-d', strtotime('+7 days'));
+        ?>
+        <div style="margin-top: 20px;">
+            <form method="get">
+                <input type="hidden" name="page" value="viator-debug" />
+                <input type="hidden" name="tab" value="api_tests" />
+                <h3>Parâmetros para os Testes</h3>
+                <table class="form-table">
+                    <tr>
+                        <th scope="row"><label for="product">Código do Produto:</label></th>
+                        <td><input type="text" name="product" id="product" value="<?php echo esc_attr($product_code); ?>" class="regular-text" /></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="test_date">Data para Teste de Disponibilidade:</label></th>
+                        <td>
+                            <input type="date" name="test_date" id="test_date" value="<?php echo esc_attr($test_date); ?>" class="regular-text" />
+                            <p class="description">Data futura que será usada para verificar a disponibilidade do produto.</p>
+                        </td>
+                    </tr>
+                </table>
+                <button type="submit" class="button button-primary">🔍 Executar Testes de API</button>
+            </form>
+        </div>
+        
+        <?php
+        // Executar testes apenas se um produto foi enviado via GET (após o formulário ser submetido)
+        if (isset($_GET['product'])) {
+            echo '<hr><h2>Resultados dos Testes para o Produto: ' . esc_html($product_code) . '</h2>';
+            
+            // Teste 1: Informações do Produto
+            echo '<h3>📦 1. Informações do Produto</h3>';
+            test_product_info($api_key, $product_code);
+            
+            echo '<hr>';
+            
+            // Teste 2: Disponibilidade
+            echo '<h3>📅 2. Teste de Disponibilidade</h3>';
+            viator_test_availability($api_key, $product_code, $test_date);
+        }
+        
+    // Conteúdo da aba de Cache
+    } elseif ($active_tab == 'cache_data') {
+        $product_code_cache = isset($_POST['product_code']) ? sanitize_text_field($_POST['product_code']) : '61268P24';
+        ?>
+        <div style="margin-top: 20px;">
+            <h3>🔍 Ferramentas de Cache e Dados Locais</h3>
+            <p>Verifique ou force a atualização dos dados que seu plugin armazena localmente para um produto específico.</p>
+            <form method="post" action="?page=viator-debug&tab=cache_data">
+                <label for="product_code_stored"><strong>Código do Produto:</strong></label><br>
+                <input type="text" name="product_code" id="product_code_stored" value="<?php echo esc_attr($product_code_cache); ?>" style="width: 250px; margin-top: 5px;">
+                <br><br>
+                <input type="submit" name="check_stored_data" value="Verificar Dados Armazenados" class="button button-secondary">
+                <input type="submit" name="force_price_update" value="🔄 Forçar Atualização de Preços" class="button button-primary" style="margin-left: 10px;">
+            </form>
+            <hr>
+        </div>
+        <?php
+        // As funções de resultado são chamadas no topo da página
+    }
     
-    <hr>
-    
-    <?php
-    
-    // Teste 1: Verificar produto
-    echo '<h2>📦 1. Informações do Produto</h2>';
-    test_product_info($api_key, $product_code);
-    
-    echo '<hr>';
-    
-    // Teste 2: Verificar disponibilidade mensal
-    echo '<h2>📅 2. Teste de Disponibilidade Mensal</h2>';
-    test_monthly_availability($api_key, $product_code, $test_date);
-    
-    echo '<hr>';
-    
-    // Teste 3: Verificar disponibilidade específica
-    echo '<h2>🎯 3. Teste de Disponibilidade Específica</h2>';
-    test_specific_availability($api_key, $product_code, $test_date);
-    
-    echo '</div>';
+    echo '</div>'; // Fecha .wrap
 }
 
 function test_product_info($api_key, $product_code) {
@@ -169,111 +186,13 @@ function test_product_info($api_key, $product_code) {
     }
 }
 
-function test_monthly_availability($api_key, $product_code, $test_date) {
+// Função de teste de disponibilidade unificada
+function viator_test_availability($api_key, $product_code, $test_date) {
     // Validar se a data fornecida é válida e futura
     $provided_date = DateTime::createFromFormat('Y-m-d', $test_date);
     $today = new DateTime();
     
-    if (!$provided_date || $provided_date < $today) {
-        echo '<div class="notice notice-warning"><p>⚠️ Data inválida ou no passado. Usando data padrão (+7 dias).</p></div>';
-        $test_date = $today->modify('+7 days')->format('Y-m-d');
-    }
-    
-    $url = "https://api.sandbox.viator.com/partner/availability/check";
-    
-    // A API não suporta consulta apenas por mês, precisa de data específica
-    $request_data = [
-        'productCode' => $product_code,
-        'travelDate' => $test_date,
-        'currency' => 'BRL',
-        'paxMix' => [
-            [
-                'ageBand' => 'ADULT',
-                'numberOfTravelers' => 2
-            ]
-        ]
-    ];
-    
-    echo '<p><strong>Testando data:</strong> ' . $test_date . ' (Teste de disponibilidade com data específica)</p>';
-    echo '<p><strong>Request:</strong></p>';
-    echo '<pre>' . esc_html(json_encode($request_data, JSON_PRETTY_PRINT)) . '</pre>';
-    
-    $response = wp_remote_post($url, [
-        'headers' => [
-            'Accept' => 'application/json;version=2.0',
-            'Content-Type' => 'application/json;version=2.0',
-            'exp-api-key' => $api_key,
-            'Accept-Language' => 'pt-BR'
-        ],
-        'body' => json_encode($request_data),
-        'timeout' => 30
-    ]);
-    
-    if (is_wp_error($response)) {
-        echo '<div class="notice notice-error"><p>❌ Erro de conexão: ' . $response->get_error_message() . '</p></div>';
-        return;
-    }
-    
-    $code = wp_remote_retrieve_response_code($response);
-    $body = wp_remote_retrieve_body($response);
-    
-    echo '<p><strong>Status HTTP:</strong> ' . $code . '</p>';
-    
-    if ($code === 200) {
-        $data = json_decode($body, true);
-        
-        if ($data === null) {
-            echo '<div class="notice notice-error"><p>❌ Erro ao decodificar JSON da resposta</p></div>';
-            echo '<pre>' . esc_html($body) . '</pre>';
-            return;
-        }
-        
-        echo '<div class="notice notice-success"><p>✅ Resposta recebida</p></div>';
-        
-        if (isset($data['bookableItems']) && is_array($data['bookableItems'])) {
-            echo '<p><strong>Opções disponíveis encontradas:</strong> ' . count($data['bookableItems']) . '</p>';
-            if (!empty($data['bookableItems'])) {
-                echo '<ul>';
-                foreach ($data['bookableItems'] as $item) {
-                    $option_code = esc_html($item['productOptionCode'] ?? 'N/A');
-                    $start_time = esc_html($item['startTime'] ?? 'N/A');
-                    $available = isset($item['available']) ? ($item['available'] ? 'SIM' : 'NÃO') : 'N/A';
-                    $price = 'N/A';
-                    
-                    if (isset($item['totalPrice']['price']['recommendedRetailPrice'])) {
-                        $price = 'R$ ' . number_format($item['totalPrice']['price']['recommendedRetailPrice'], 2, ',', '.');
-                    }
-                    
-                    echo '<li><strong>' . $option_code . '</strong> às ' . $start_time . ' - Disponível: ' . $available . ' - Preço: ' . $price . '</li>';
-                }
-                echo '</ul>';
-            }
-        } else {
-            echo '<p>⚠️ Campo "bookableItems" não encontrado na resposta ou não é um array</p>';
-            if (isset($data['errorCode'])) {
-                echo '<p><strong>Erro da API:</strong> ' . esc_html($data['errorCode']) . '</p>';
-                if (isset($data['errorMessage'])) {
-                    echo '<p><strong>Mensagem:</strong> ' . esc_html($data['errorMessage']) . '</p>';
-                }
-            }
-        }
-        
-        echo '<details><summary>Ver resposta completa</summary>';
-        echo '<pre>' . esc_html(json_encode($data, JSON_PRETTY_PRINT)) . '</pre>';
-        echo '</details>';
-        
-    } else {
-        echo '<div class="notice notice-error"><p>❌ Erro HTTP ' . $code . '</p></div>';
-        echo '<pre>' . esc_html($body) . '</pre>';
-    }
-}
-
-function test_specific_availability($api_key, $product_code, $test_date) {
-    // Validar se a data fornecida é válida e futura
-    $provided_date = DateTime::createFromFormat('Y-m-d', $test_date);
-    $today = new DateTime();
-    
-    if (!$provided_date || $provided_date < $today) {
+    if (!$provided_date || $provided_date < $today->setTime(0,0,0)) {
         echo '<div class="notice notice-warning"><p>⚠️ Data inválida ou no passado. Usando data padrão (+7 dias).</p></div>';
         $test_date = date('Y-m-d', strtotime('+7 days'));
     }
@@ -292,8 +211,8 @@ function test_specific_availability($api_key, $product_code, $test_date) {
         ]
     ];
     
-    echo '<p><strong>Data teste:</strong> ' . $test_date . '</p>';
-    echo '<p><strong>Request:</strong></p>';
+    echo '<p><strong>Testando com data:</strong> ' . $test_date . '</p>';
+    echo '<h4>Request Body:</h4>';
     echo '<pre>' . esc_html(json_encode($request_data, JSON_PRETTY_PRINT)) . '</pre>';
     
     $response = wp_remote_post($url, [
@@ -321,14 +240,14 @@ function test_specific_availability($api_key, $product_code, $test_date) {
         $data = json_decode($body, true);
         
         if ($data === null) {
-            echo '<div class="notice notice-error"><p>❌ Erro ao decodificar JSON da resposta</p></div>';
+            echo '<div class="notice notice-error"><p>❌ Erro ao decodificar JSON da resposta.</p></div>';
             echo '<pre>' . esc_html($body) . '</pre>';
             return;
         }
         
-        echo '<div class="notice notice-success"><p>✅ Resposta recebida</p></div>';
+        echo '<div class="notice notice-success"><p>✅ Resposta da API recebida com sucesso.</p></div>';
         
-        // Verificar disponibilidade geral (se há pelo menos um item disponível)
+        // Resumo da Disponibilidade
         $has_availability = false;
         $available_count = 0;
         
@@ -339,50 +258,39 @@ function test_specific_availability($api_key, $product_code, $test_date) {
                     $available_count++;
                 }
             }
-            
-            echo '<p><strong>Disponibilidade Geral:</strong> ' . ($has_availability ? 'SIM' : 'NÃO') . '</p>';
-            echo '<p><strong>Opções disponíveis:</strong> ' . $available_count . ' de ' . count($data['bookableItems']) . '</p>';
+            echo '<h4>Resumo da Disponibilidade</h4>';
+            echo '<p><strong>Disponibilidade geral na data:</strong> ' . ($has_availability ? '<span style="color:green; font-weight:bold;">SIM</span>' : '<span style="color:red; font-weight:bold;">NÃO</span>') . '</p>';
+            echo '<p><strong>Opções/horários disponíveis:</strong> ' . $available_count . ' de ' . count($data['bookableItems']) . ' opções no total.</p>';
+        
         } else {
-            echo '<p>⚠️ Campo "bookableItems" não encontrado na resposta</p>';
-            if (isset($data['errorCode'])) {
-                echo '<p><strong>Erro da API:</strong> ' . esc_html($data['errorCode']) . '</p>';
-                if (isset($data['errorMessage'])) {
-                    echo '<p><strong>Mensagem:</strong> ' . esc_html($data['errorMessage']) . '</p>';
-                }
+             if (isset($data['errorCode'])) {
+                echo '<p><strong>Erro da API:</strong> ' . esc_html($data['errorCode']) . ' - ' . esc_html($data['errorMessage'] ?? 'N/A') . '</p>';
+            } else {
+                 echo '<p>⚠️ Nenhuma opção de reserva (bookableItems) encontrada na resposta para esta data e configuração de passageiros.</p>';
             }
         }
         
-        if (isset($data['productOptions']) && !empty($data['productOptions'])) {
-            echo '<h4>Opções de Produto Disponíveis:</h4>';
-            foreach ($data['productOptions'] as $option) {
-                $option_code = isset($option['productOptionCode']) ? esc_html($option['productOptionCode']) : 'N/A';
-                echo '<h5>' . $option_code . '</h5>';
+        // Itens Reserváveis Detalhados
+        if (isset($data['bookableItems']) && !empty($data['bookableItems'])) {
+            echo '<hr style="margin: 20px 0;"><h4>Detalhes por Horário (Bookable Items)</h4>';
+            echo '<table class="wp-list-table widefat striped"><thead><tr><th>Opção (Cód.)</th><th>Horário</th><th>Disponível?</th><th>Preço Total (2 Adultos)</th></tr></thead><tbody>';
+            foreach ($data['bookableItems'] as $item) {
+                $option_code = esc_html($item['productOptionCode'] ?? 'N/A');
+                $start_time = esc_html($item['startTime'] ?? 'Sem horário definido');
+                $available = (isset($item['available']) && $item['available']) ? '<span style="color:green;">SIM</span>' : '<span style="color:red;">NÃO</span>';
                 
-                if (isset($option['available'])) {
-                    echo '<p>Disponível: ' . ($option['available'] ? 'SIM' : 'NÃO') . '</p>';
+                $price = 'N/A';
+                if (isset($item['totalPrice']['price']['recommendedRetailPrice'])) {
+                    $price = 'R$ ' . number_format($item['totalPrice']['price']['recommendedRetailPrice'], 2, ',', '.');
                 }
                 
-                if (isset($option['totalPrice']['price']['recommendedRetailPrice'])) {
-                    $price = floatval($option['totalPrice']['price']['recommendedRetailPrice']);
-                    echo '<p>Preço: R$ ' . number_format($price, 2, ',', '.') . '</p>';
-                }
-                
-                // Adicionar informações sobre line items se disponível
-                if (isset($option['lineItems']) && !empty($option['lineItems'])) {
-                    echo '<h6>Detalhes por Viajante:</h6>';
-                    echo '<ul>';
-                    foreach ($option['lineItems'] as $item) {
-                        $age_band = isset($item['ageBand']) ? esc_html($item['ageBand']) : 'N/A';
-                        $travelers = isset($item['numberOfTravelers']) ? intval($item['numberOfTravelers']) : 0;
-                        echo '<li>' . $age_band . ': ' . $travelers . ' viajante(s)</li>';
-                    }
-                    echo '</ul>';
-                }
+                echo '<tr><td>' . $option_code . '</td><td>' . $start_time . '</td><td>' . $available . '</td><td>' . $price . '</td></tr>';
             }
+            echo '</tbody></table>';
         }
         
-        echo '<details><summary>Ver resposta completa</summary>';
-        echo '<pre>' . esc_html(json_encode($data, JSON_PRETTY_PRINT)) . '</pre>';
+        echo '<br><details><summary>Ver resposta completa da API</summary>';
+        echo '<pre>' . esc_html(json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) . '</pre>';
         echo '</details>';
         
     } else {
