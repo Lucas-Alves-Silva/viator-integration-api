@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * Plugin Name: Viator API Integration
  * Description: Integração com a API da Viator para exibição de produtos e passeios. Utilize o shortcode [viator_search]
@@ -24,12 +24,20 @@ function viator_rewrite_rules() {
         'index.php?pagename=passeio&product_code=$matches[1]',
         'top'
     );
+    
+    // Adicionar regra para páginas de atrações
+    add_rewrite_rule(
+        'atracoes/([^/]+)/?$',
+        'index.php?pagename=atracoes&attraction_id=$matches[1]',
+        'top'
+    );
 }
 add_action('init', 'viator_rewrite_rules');
 
 // Add product_code as a query var
 function viator_query_vars($query_vars) {
     $query_vars[] = 'product_code';
+    $query_vars[] = 'attraction_id'; // Adicionar attraction_id como query var
     return $query_vars;
 }
 add_filter('query_vars', 'viator_query_vars');
@@ -469,6 +477,7 @@ function viator_get_search_results($searchTerm) {
         ],
         "searchTypes" => [
             ["searchType" => "PRODUCTS", "pagination" => ["start" => $start, "count" => $per_page]],
+            ["searchType" => "ATTRACTIONS", "pagination" => ["start" => 1, "count" => 30]]
         ],
         "currency" => $locale_settings['currency']
     ];
@@ -1165,106 +1174,206 @@ function viator_get_search_results($searchTerm) {
         <strong>' . esc_html(viator_t('did_you_know')) . '</strong> ' . esc_html($extract) . '</span>
     </div>';
 
+
+
+    // Seção de Atrações
+    if (!empty($data['attractions']['results'])) {
+        $output .= '<div class="viator-attractions-section">';
+        $output .= '<div class="viator-attractions-header">';
+        $output .= '<h2>' . esc_html($searchTerm) . ' ' . esc_html(viator_t('attractions_activities_title')) . '</h2>';
+        $output .= '</div>';
+        
+        $output .= '<div class="viator-attractions-carousel-container">';
+        $output .= '<div class="viator-swiper-button-prev attractions-prev">';
+        $output .= '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>';
+        $output .= '</div>';
+        
+        $output .= '<div class="viator-attractions-swiper swiper">';
+        $output .= '<div class="swiper-wrapper">';
+        foreach ($data['attractions']['results'] as $index => $attraction) {
+            // Debug das imagens
+            $attraction_name = isset($attraction['name']) ? $attraction['name'] : 'Attraction'; 
+            $attraction_id = isset($attraction['attractionId']) ? $attraction['attractionId'] : '';
+            
+            // Debug para verificar se o attractionId está sendo capturado
+            viator_debug_log('Processando atração:', [
+                'index' => $index,
+                'name' => $attraction_name,
+                'attractionId' => $attraction_id,
+                'attraction_keys' => array_keys($attraction),
+                'full_attraction_data' => $attraction
+            ]);
+            
+            // Tentar diferentes caminhos para pegar o ID da atração
+            if (empty($attraction_id)) {
+                // Tentar outros campos possíveis para o ID
+                if (isset($attraction['id'])) {
+                    $attraction_id = $attraction['id'];
+                } elseif (isset($attraction['attractionCode'])) {
+                    $attraction_id = $attraction['attractionCode'];
+                } elseif (isset($attraction['code'])) {
+                    $attraction_id = $attraction['code'];
+                }
+                viator_debug_log('Tentativa alternativa de ID:', $attraction_id);
+            }
+            
+            // Tentar diferentes caminhos para a imagem
+            $image_url = '';
+            if (isset($attraction['images']) && !empty($attraction['images'])) {
+                if (isset($attraction['images'][0]['url'])) {
+                    $image_url = $attraction['images'][0]['url'];
+                } elseif (isset($attraction['images'][0]['variants'][0]['url'])) {
+                    $image_url = $attraction['images'][0]['variants'][0]['url'];
+                }
+            }
+            
+            // Fallback para placeholder se não houver imagem
+            if (empty($image_url)) {
+                $image_url = 'https://via.placeholder.com/400x200/04846b/ffffff?text=' . urlencode($attraction_name);
+            }
+            
+            $output .= '<div class="swiper-slide">';
+            
+            // Sempre criar um link, mesmo que seja um link temporário ou placeholder
+            $has_valid_id = !empty($attraction_id);
+            $attraction_url = $has_valid_id ? home_url('/atracoes/' . $attraction_id . '/') : '#';
+            
+            viator_debug_log('Gerando link para atração:', [
+                'name' => $attraction_name,
+                'id' => $attraction_id,
+                'has_valid_id' => $has_valid_id,
+                'url' => $attraction_url
+            ]);
+            
+            $link_class = 'viator-attraction-link';
+            $onclick = '';
+            
+            if (!$has_valid_id) {
+                // Se não temos ID válido, adicionar um onclick que mostra uma mensagem ou faz uma busca
+                $onclick = 'onclick="alert(\'Esta atração ainda não possui página de detalhes disponível.\\n\\nVocê pode:\\n• Usar nossa busca para encontrar passeios relacionados\\n• Verificar se há produtos disponíveis na lista abaixo\'); return false;"';
+                $link_class .= ' no-valid-id';
+            }
+            
+            $output .= '<a href="' . esc_url($attraction_url) . '" class="' . $link_class . '" target="_blank" rel="noopener noreferrer" ' . $onclick . '>';
+            $output .= '<div class="viator-attraction-card" data-attraction-id="' . esc_attr($attraction_id) . '" data-attraction-name="' . esc_attr($attraction_name) . '">';
+            $output .= '<img src="' . esc_url($image_url) . '" alt="' . esc_attr($attraction_name) . '" onerror="this.src=\'https://via.placeholder.com/400x200/04846b/ffffff?text=' . urlencode($attraction_name) . '\'">';
+            $output .= '<div class="viator-attraction-title">' . esc_html($attraction_name) . '</div>';
+            $output .= '</div>';
+            $output .= '</a>';
+            $output .= '</div>';
+        }
+        $output .= '</div>';
+        $output .= '</div>';
+        
+        $output .= '<div class="viator-swiper-button-next attractions-next">';
+        $output .= '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>';
+        $output .= '</div>';
+        $output .= '</div>';
+        $output .= '</div>';
+    }
+
     // Iniciar grid de cards
     $output .= '<div class="viator-grid">';
 
-    foreach ($data['products']['results'] as $tour) {
-        // Pegar a imagem de melhor qualidade
-        $image_url = isset($tour['images'][0]['variants'][3]['url']) ? $tour['images'][0]['variants'][3]['url'] : 'https://via.placeholder.com/400x200'; 
-    
-        // Pegar os dados principais
-        $title = esc_html($tour['title']);
-        $description = esc_html($tour['description']);
-        $price = isset($tour['pricing']['summary']['fromPrice']) ? $locale_settings['currency_symbol'] . ' ' . number_format($tour['pricing']['summary']['fromPrice'], 2, ',', '.') : viator_t('price_not_available');
-    
-        // Captura a média de avaliações
-        $rating = isset($tour['reviews']['combinedAverageRating']) ? number_format($tour['reviews']['combinedAverageRating'], 1) . '⭐' : viator_t('no_reviews');
-    
-        // Captura o total de avaliações e ajusta para singular/plural
-        $total_reviews = isset($tour['reviews']['totalReviews']) ? $tour['reviews']['totalReviews'] : 0;
-        if ($total_reviews == 0) {
-            $rating_count = ''; // Não exibe nada se não houver avaliações
-        } elseif ($total_reviews == 1) {
-            $rating_count = '(1 ' . viator_t('review') . ')';
-        } else {
-            $rating_count = '(' . $total_reviews . ' ' . viator_t('reviews') . ')';
-        }
+    if (!empty($data['products']['results'])) {
+        foreach ($data['products']['results'] as $tour) {
+            // Pegar a imagem de melhor qualidade
+            $image_url = isset($tour['images'][0]['variants'][3]['url']) ? $tour['images'][0]['variants'][3]['url'] : 'https://via.placeholder.com/400x200'; 
         
-        // Captura e formata a duração do passeio usando a função de tradução
-        $duration_fixed = isset($tour['duration']['fixedDurationInMinutes']) ? $tour['duration']['fixedDurationInMinutes'] : null;
-        $duration_from = isset($tour['duration']['variableDurationFromMinutes']) ? $tour['duration']['variableDurationFromMinutes'] : null;
-        $duration_to = isset($tour['duration']['variableDurationToMinutes']) ? $tour['duration']['variableDurationToMinutes'] : null;
-        $unstructured_duration = isset($tour['duration']['unstructuredDuration']) ? $tour['duration']['unstructuredDuration'] : null;
-
-        $duration = viator_format_duration($duration_fixed, $duration_from, $duration_to, $unstructured_duration);
+            // Pegar os dados principais
+            $title = esc_html($tour['title']);
+            $description = esc_html($tour['description']);
+            $price = isset($tour['pricing']['summary']['fromPrice']) ? $locale_settings['currency_symbol'] . ' ' . number_format($tour['pricing']['summary']['fromPrice'], 2, ',', '.') : viator_t('price_not_available');
         
-        $flags = isset($tour['flags']) ? $tour['flags'] : []; // Flags
-        $url = esc_url($tour['productUrl']);
-    
-        // Processar flags
-        $flag_output = '';
-        if (in_array('LIKELY_TO_SELL_OUT', $flags)) {
-            $flag_output .= '<span class="viator-badge" data-type="sell-out">' . esc_html(viator_t('likely_to_sell_out_badge')) . '</span>';
-        }
-        if (in_array('SPECIAL_OFFER', $flags)) {
-            $flag_output .= '<span class="viator-badge" data-type="special-offer">' . esc_html(viator_t('special_offer_badge')) . '</span>';
-        }
-    
-        // Processar preços
-        $price_html = '';
-        if (in_array('SPECIAL_OFFER', $flags) && isset($tour['pricing']['summary']['fromPriceBeforeDiscount'])) {
-            // Se for oferta especial e tiver preço com desconto
-            $original_price = number_format($tour['pricing']['summary']['fromPriceBeforeDiscount'], 2, ',', '.');
-            $discounted_price = number_format($tour['pricing']['summary']['fromPrice'], 2, ',', '.');
-            $price_html = '<span class="viator-original-price">' . $locale_settings['currency_symbol'] . ' ' . $original_price . '</span> <span class="viator-discount-price">' . $locale_settings['currency_symbol'] . ' ' . $discounted_price . '</span>';
-        } else {
-            // Preço normal sem desconto
-            $price = isset($tour['pricing']['summary']['fromPrice']) ? number_format($tour['pricing']['summary']['fromPrice'], 2, ',', '.') : '0,00';
-            $price_html = '<strong>' . $locale_settings['currency_symbol'] . ' ' . $price . '</strong>';
-        }
-    
-        // Criar o card
-        $output .= '<div class="viator-card">
-            <div class="viator-card-img">
-                <img src="' . $image_url . '" alt="' . $title . '">';
-                
-                // Adicionar as badges no container da imagem
-                if (!empty($flag_output)) {
-                    $output .= '<div class="viator-badge-container">' . $flag_output . '</div>';
-                }
-    
-        $output .= '</div>
-            <div class="viator-card-content">
-                <p class="viator-card-rating">' . $rating . ' ' . $rating_count . '</p>
-                <h3>' . $title . '</h3>
-                <p>' . substr($description, 0, 120) . '...</p>';
+            // Captura a média de avaliações
+            $rating = isset($tour['reviews']['combinedAverageRating']) ? number_format($tour['reviews']['combinedAverageRating'], 1) . '⭐' : viator_t('no_reviews');
+        
+            // Captura o total de avaliações e ajusta para singular/plural
+            $total_reviews = isset($tour['reviews']['totalReviews']) ? $tour['reviews']['totalReviews'] : 0;
+            if ($total_reviews == 0) {
+                $rating_count = ''; // Não exibe nada se não houver avaliações
+            } elseif ($total_reviews == 1) {
+                $rating_count = '(1 ' . viator_t('review') . ')';
+            } else {
+                $rating_count = '(' . $total_reviews . ' ' . viator_t('reviews') . ')';
+            }
+            
+            // Captura e formata a duração do passeio usando a função de tradução
+            $duration_fixed = isset($tour['duration']['fixedDurationInMinutes']) ? $tour['duration']['fixedDurationInMinutes'] : null;
+            $duration_from = isset($tour['duration']['variableDurationFromMinutes']) ? $tour['duration']['variableDurationFromMinutes'] : null;
+            $duration_to = isset($tour['duration']['variableDurationToMinutes']) ? $tour['duration']['variableDurationToMinutes'] : null;
+            $unstructured_duration = isset($tour['duration']['unstructuredDuration']) ? $tour['duration']['unstructuredDuration'] : null;
 
-        if (in_array('FREE_CANCELLATION', $flags)) {
-            $output .= '<p class="viator-card-duration"><img src="https://img.icons8.com/?size=100&id=85097&format=png&color=04846b" alt="Cancelamento gratuito" title="Política de cancelamento" width="15" height="15"> ' . esc_html(viator_t('free_cancellation_badge')) . '</p>';
-        }
+            $duration = viator_format_duration($duration_fixed, $duration_from, $duration_to, $unstructured_duration);
+            
+            $flags = isset($tour['flags']) ? $tour['flags'] : []; // Flags
+            $url = esc_url($tour['productUrl']);
+        
+            // Processar flags
+            $flag_output = '';
+            if (in_array('LIKELY_TO_SELL_OUT', $flags)) {
+                $flag_output .= '<span class="viator-badge" data-type="sell-out">' . esc_html(viator_t('likely_to_sell_out_badge')) . '</span>';
+            }
+            if (in_array('SPECIAL_OFFER', $flags)) {
+                $flag_output .= '<span class="viator-badge" data-type="special-offer">' . esc_html(viator_t('special_offer_badge')) . '</span>';
+            }
+        
+            // Processar preços
+            $price_html = '';
+            if (in_array('SPECIAL_OFFER', $flags) && isset($tour['pricing']['summary']['fromPriceBeforeDiscount'])) {
+                // Se for oferta especial e tiver preço com desconto
+                $original_price = number_format($tour['pricing']['summary']['fromPriceBeforeDiscount'], 2, ',', '.');
+                $discounted_price = number_format($tour['pricing']['summary']['fromPrice'], 2, ',', '.');
+                $price_html = '<span class="viator-original-price">' . $locale_settings['currency_symbol'] . ' ' . $original_price . '</span> <span class="viator-discount-price">' . $locale_settings['currency_symbol'] . ' ' . $discounted_price . '</span>';
+            } else {
+                // Preço normal sem desconto
+                $price = isset($tour['pricing']['summary']['fromPrice']) ? number_format($tour['pricing']['summary']['fromPrice'], 2, ',', '.') : '0,00';
+                $price_html = '<strong>' . $locale_settings['currency_symbol'] . ' ' . $price . '</strong>';
+            }
+        
+            // Criar o card
+            $output .= '<div class="viator-card">
+                <div class="viator-card-img">
+                    <img src="' . $image_url . '" alt="' . $title . '">';
+                    
+                    // Adicionar as badges no container da imagem
+                    if (!empty($flag_output)) {
+                        $output .= '<div class="viator-badge-container">' . $flag_output . '</div>';
+                    }
+        
+            $output .= '</div>
+                <div class="viator-card-content">
+                    <p class="viator-card-rating">' . $rating . ' ' . $rating_count . '</p>
+                    <h3>' . $title . '</h3>
+                    <p>' . substr($description, 0, 120) . '...</p>';
 
-        $output .= '<p class="viator-card-duration"><img src="https://img.icons8.com/?size=100&id=82767&format=png&color=000000" alt="Duração" title="Duração aproximada" width="15" height="15"> ' . esc_html($duration) . '</p>
-                <p class="viator-card-price"><img src="https://img.icons8.com/?size=100&id=ZXJaNFNjWGZF&format=png&color=000000" alt="Preço" width="15" height="15"> ' . esc_html(viator_t('from_price')) . ' ' . $price_html . '</p>                
-                <a href="' . esc_url(home_url('/passeio/' . $tour['productCode'] . '/')) . '" target="_blank" rel="noopener noreferrer">' . esc_html(viator_t('see_details')) . '</a>';
-                
-                // Armazenar informações de preço e duração para uso na página de detalhes do produto
-                $product_data = array(
-                    'fromPrice' => isset($tour['pricing']['summary']['fromPrice']) ? $tour['pricing']['summary']['fromPrice'] : null,
-                    'fromPriceBeforeDiscount' => isset($tour['pricing']['summary']['fromPriceBeforeDiscount']) ? $tour['pricing']['summary']['fromPriceBeforeDiscount'] : null,
-                    'flags' => $flags,
-                    'duration' => $duration,
-                    'duration_data' => array(
-                        'fixedDurationInMinutes' => $duration_fixed,
-                        'variableDurationFromMinutes' => $duration_from,
-                        'variableDurationToMinutes' => $duration_to,
-                        'unstructuredDuration' => $unstructured_duration
-                    )
-                );
-                update_option('viator_product_' . $tour['productCode'] . '_price', $product_data, false);
-                
-                $output .= "
-            </div>
-        </div>";
+            if (in_array('FREE_CANCELLATION', $flags)) {
+                $output .= '<p class="viator-card-duration"><img src="https://img.icons8.com/?size=100&id=85097&format=png&color=04846b" alt="Cancelamento gratuito" title="Política de cancelamento" width="15" height="15"> ' . esc_html(viator_t('free_cancellation_badge')) . '</p>';
+            }
+
+            $output .= '<p class="viator-card-duration"><img src="https://img.icons8.com/?size=100&id=82767&format=png&color=000000" alt="Duração" title="Duração aproximada" width="15" height="15"> ' . esc_html($duration) . '</p>
+                    <p class="viator-card-price"><img src="https://img.icons8.com/?size=100&id=ZXJaNFNjWGZF&format=png&color=000000" alt="Preço" width="15" height="15"> ' . esc_html(viator_t('from_price')) . ' ' . $price_html . '</p>                
+                    <a href="' . esc_url(home_url('/passeio/' . $tour['productCode'] . '/')) . '" target="_blank" rel="noopener noreferrer">' . esc_html(viator_t('see_details')) . '</a>';
+                    
+                    // Armazenar informações de preço e duração para uso na página de detalhes do produto
+                    $product_data = array(
+                        'fromPrice' => isset($tour['pricing']['summary']['fromPrice']) ? $tour['pricing']['summary']['fromPrice'] : null,
+                        'fromPriceBeforeDiscount' => isset($tour['pricing']['summary']['fromPriceBeforeDiscount']) ? $tour['pricing']['summary']['fromPriceBeforeDiscount'] : null,
+                        'flags' => $flags,
+                        'duration' => $duration,
+                        'duration_data' => array(
+                            'fixedDurationInMinutes' => $duration_fixed,
+                            'variableDurationFromMinutes' => $duration_from,
+                            'variableDurationToMinutes' => $duration_to,
+                            'unstructuredDuration' => $unstructured_duration
+                        )
+                    );
+                    update_option('viator_product_' . $tour['productCode'] . '_price', $product_data, false);
+                    
+                    $output .= "
+                </div>
+            </div>";
+        }
     }
 
     // Fechar grid
@@ -1395,6 +1504,41 @@ function viator_get_search_results($searchTerm) {
 
     $output .= '</div>'; // Fecha viator-results-container
     $output .= '</div>'; // Fecha viator-content-wrapper
+
+    // Adicionar JavaScript para inicializar o Swiper
+    $output .= '<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Inicializar Swiper para Atrações
+        if (document.querySelector(".viator-attractions-swiper")) {
+            window.attractionsSwiper = new Swiper(".viator-attractions-swiper", {
+                slidesPerView: 4,
+                spaceBetween: 20,
+                navigation: {
+                    nextEl: ".attractions-next",
+                    prevEl: ".attractions-prev",
+                },
+                breakpoints: {
+                    320: {
+                        slidesPerView: 1,
+                        spaceBetween: 15
+                    },
+                    480: {
+                        slidesPerView: 2,
+                        spaceBetween: 15
+                    },
+                    768: {
+                        slidesPerView: 3,
+                        spaceBetween: 20
+                    },
+                    1024: {
+                        slidesPerView: 4,
+                        spaceBetween: 20
+                    }
+                }
+            });
+        }
+    });
+    </script>';
 
     return $output;
 }
@@ -1624,8 +1768,17 @@ function viator_get_currency_symbol($currency_code = null) {
 
 // Função para obter configurações de idioma e moeda
 function viator_get_locale_settings() {
+    $language = get_option('viator_language', 'pt-BR');
+    
+    // Mapear para formato aceito pela API Viator
+    $accept_language_map = [
+        'pt-BR' => 'pt-BR',
+        'en-US' => 'en-US'
+    ];
+    
     return [
-        'language' => get_option('viator_language', 'pt-BR'),
+        'language' => $language,
+        'accept_language' => isset($accept_language_map[$language]) ? $accept_language_map[$language] : 'en-US',
         'currency' => get_option('viator_currency', 'BRL'),
         'currency_symbol' => viator_get_currency_symbol()
     ];
@@ -1838,6 +1991,19 @@ function viator_get_translation($key, $language = null) {
             'infants_0_2' => 'Bebês (0-2 anos)',
             'check_availability_btn' => 'Verificar Disponibilidade',
             'continue_payment' => 'Continuar para Pagamento',
+            
+            // Títulos dinâmicos
+            'attractions_activities_title' => 'Excursões, ingressos, atividades e coisas para fazer',
+        'attraction_not_found' => 'Atração não encontrada',
+        'introduction' => 'Introdução',
+        'overview' => 'Visão Geral',
+        'opening_hours' => 'Horários de Funcionamento',
+        'address' => 'Endereço',
+        'free_attraction' => 'Atração Gratuita',
+        'free_access' => 'Acesso gratuito disponível',
+        'available_tours' => 'Passeios e Ingressos Disponíveis',
+        'product_count' => 'Produtos disponíveis',
+        'search_products_note' => 'Para ver os passeios e ingressos disponíveis para esta atração, use nossa busca.',
             'process_payment' => 'Processar Pagamento',
             'traveler_information' => 'Informações dos Viajantes',
             'payment_information' => 'Informações de Pagamento',
@@ -2096,6 +2262,20 @@ function viator_get_translation($key, $language = null) {
             'infants_0_2' => 'Infants (0-2 years)',
             'check_availability_btn' => 'Check Availability',
             'continue_payment' => 'Continue to Payment',
+            
+            // Títulos dinâmicos
+            'attractions_activities_title' => 'Tours, tickets, activities and things to do',
+        'attraction_not_found' => 'Attraction not found',
+        'introduction' => 'Introduction',
+        'overview' => 'Overview',
+        'opening_hours' => 'Opening Hours',
+        'address' => 'Address',
+        'free_attraction' => 'Free Attraction',
+        'free_access' => 'Free access available',
+        'available_tours' => 'Available Tours and Tickets',
+        'product_count' => 'Available products',
+        'search_products_note' => 'To see the tours and tickets available for this attraction, use our search.',
+            
             'process_payment' => 'Process Payment',
             'traveler_information' => 'Traveler Information',
             'payment_information' => 'Payment Information',
@@ -2438,4 +2618,520 @@ add_action('wp_enqueue_scripts', 'viator_enqueue_booking_scripts');
 // Include debug functionality for admin users
 if (is_admin()) {
     include_once(plugin_dir_path(__FILE__) . 'admin-debug.php');
+}
+
+// Função para selecionar a melhor imagem disponível
+function viator_get_best_attraction_image($images) {
+    if (empty($images) || !is_array($images)) {
+        return '';
+    }
+    
+    $best_image = '';
+    $max_resolution = 0;
+    
+    foreach ($images as $image) {
+        // Verificar se há URL direta da imagem
+        if (isset($image['url'])) {
+            $url = $image['url'];
+            $width = isset($image['width']) ? $image['width'] : 800;
+            $height = isset($image['height']) ? $image['height'] : 600;
+            $resolution = $width * $height;
+            
+            if ($resolution > $max_resolution) {
+                $max_resolution = $resolution;
+                $best_image = $url;
+            }
+        }
+        
+        // Verificar variantes da imagem
+        if (isset($image['variants']) && is_array($image['variants'])) {
+            foreach ($image['variants'] as $variant) {
+                if (isset($variant['url'])) {
+                    $url = $variant['url'];
+                    $width = isset($variant['width']) ? $variant['width'] : 800;
+                    $height = isset($variant['height']) ? $variant['height'] : 600;
+                    $resolution = $width * $height;
+                    
+                    if ($resolution > $max_resolution) {
+                        $max_resolution = $resolution;
+                        $best_image = $url;
+                    }
+                }
+            }
+        }
+    }
+    
+    return $best_image;
+}
+
+// Função para buscar detalhes de uma atração específica
+function viator_get_attraction_details($attraction_id) {
+    $api_key = get_option('viator_api_key');
+    
+    if (empty($api_key)) {
+        return false;
+    }
+    
+    // Obter configurações de idioma e moeda
+    $locale_settings = viator_get_locale_settings();
+    
+    $url = "https://api.sandbox.viator.com/partner/attractions/$attraction_id";
+    
+    // Cabeçalhos da requisição
+    $headers = [
+        'Accept-Language' => $locale_settings['accept_language'],
+        'Accept' => 'application/json;version=2.0',
+        'exp-api-key' => $api_key
+    ];
+    
+    // Configurar argumentos da requisição
+    $args = [
+        'method' => 'GET',
+        'headers' => $headers,
+        'timeout' => 30
+    ];
+    
+    viator_debug_log('Fazendo requisição para detalhes da atração:', $url);
+    viator_debug_log('Headers da requisição:', $headers);
+    
+    // Fazer a requisição
+    $response = wp_remote_request($url, $args);
+    
+    if (is_wp_error($response)) {
+        viator_debug_log('Erro na requisição de detalhes da atração:', $response->get_error_message());
+        return false;
+    }
+    
+    $response_code = wp_remote_retrieve_response_code($response);
+    $body = wp_remote_retrieve_body($response);
+    
+    viator_debug_log('Código de resposta para detalhes da atração:', $response_code);
+    viator_debug_log('Corpo da resposta para detalhes da atração (primeiros 500 chars):', substr($body, 0, 500));
+    
+    if ($response_code !== 200) {
+        viator_debug_log('Erro HTTP ao buscar detalhes da atração:', [
+            'response_code' => $response_code,
+            'body' => $body
+        ]);
+        return false;
+    }
+    
+    $data = json_decode($body, true);
+    
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        viator_debug_log('Erro ao decodificar JSON dos detalhes da atração:', [
+            'error' => json_last_error_msg(),
+            'body' => $body
+        ]);
+        return false;
+    }
+    
+    viator_debug_log('Dados da atração decodificados com sucesso:', !empty($data));
+    
+    return $data;
+}
+
+// Função para exibir detalhes da atração
+function viator_show_attraction_details($attraction_id) {
+    viator_debug_log('Iniciando exibição de detalhes para atração:', $attraction_id);
+    
+    $attraction_data = viator_get_attraction_details($attraction_id);
+    
+    if (!$attraction_data) {
+        $error_message = viator_t('attraction_not_found', 'Atração não encontrada');
+        viator_debug_log('Atração não encontrada, mensagem de erro:', $error_message);
+        return '<p class="viator-error">' . esc_html($error_message) . '</p>';
+    }
+    
+    viator_debug_log('Dados da atração encontrados:', $attraction_data);
+    
+    // Obter configurações de idioma e moeda
+    $locale_settings = viator_get_locale_settings();
+    $language = get_option('viator_language', 'pt-BR');
+    
+    $output = '<div class="viator-attraction-details">';
+    
+    // Header profissional com layout horizontal (imagem + informações)
+    $output .= '<div class="viator-attraction-header-container">';
+    
+    // Imagem principal (melhor qualidade)
+    $best_image_url = '';
+    if (isset($attraction_data['images']) && !empty($attraction_data['images'])) {
+        $best_image_url = viator_get_best_attraction_image($attraction_data['images']);
+    }
+    
+    $output .= '<div class="viator-attraction-header-image">';
+    if ($best_image_url) {
+        $output .= '<img src="' . esc_url($best_image_url) . '" alt="' . esc_attr($attraction_data['name']) . '" class="main-attraction-hero-image">';
+    } else {
+        $output .= '<div class="attraction-placeholder-image">📍</div>';
+    }
+    $output .= '</div>';
+    
+    // Informações principais à direita
+    $output .= '<div class="viator-attraction-header-info">';
+    
+    // Título
+    $output .= '<h1 class="viator-attraction-name">' . esc_html($attraction_data['name']) . '</h1>';
+    
+    // Avaliações
+    if (isset($attraction_data['reviews']['combinedAverageRating']) && $attraction_data['reviews']['combinedAverageRating'] > 0) {
+        $rating = number_format($attraction_data['reviews']['combinedAverageRating'], 1);
+        $total_reviews = isset($attraction_data['reviews']['totalReviews']) ? $attraction_data['reviews']['totalReviews'] : 0;
+        
+        $output .= '<div class="viator-attraction-rating-header">';
+        
+        // Estrelas visuais
+        $full_stars = floor($rating);
+        $has_half_star = ($rating - $full_stars) >= 0.5;
+        $output .= '<div class="stars-display">';
+        for ($i = 1; $i <= 5; $i++) {
+            if ($i <= $full_stars) {
+                $output .= '<span class="star full">★</span>';
+            } elseif ($i == $full_stars + 1 && $has_half_star) {
+                $output .= '<span class="star half">★</span>';
+            } else {
+                $output .= '<span class="star empty">☆</span>';
+            }
+        }
+        $output .= '</div>';
+        
+        $output .= '<span class="rating-text">' . $rating . '</span>';
+        if ($total_reviews > 0) {
+            $output .= '<span class="rating-count">(' . number_format($total_reviews) . ' ' . ($language === 'pt-BR' ? 'avaliações' : 'reviews') . ')</span>';
+        }
+        $output .= '</div>';
+    }
+    
+    // Descrição gerada por IA
+    $location_text = '';
+    if (isset($attraction_data['destinations']) && !empty($attraction_data['destinations'])) {
+        $destination = $attraction_data['destinations'][0];
+        $location_text = isset($destination['destinationName']) ? $destination['destinationName'] : '';
+    }
+    
+    $ai_description = viator_get_attraction_ai_description($attraction_data['name'], $location_text, $language);
+    if ($ai_description) {
+        $output .= '<div class="viator-attraction-description">';
+        $output .= '<p>' . esc_html($ai_description) . '</p>';
+        $output .= '</div>';
+    }
+    
+    // Localização
+    if (!empty($location_text)) {
+        $output .= '<div class="viator-attraction-location">';
+        $output .= '<span class="location-icon">📍</span>';
+        $output .= '<span class="location-text">' . esc_html($location_text) . '</span>';
+        $output .= '</div>';
+    }
+    
+    // Link "Saiba mais" se houver conteúdo adicional
+    if (isset($attraction_data['viatorUniqueContent']['introduction']) || isset($attraction_data['viatorUniqueContent']['overview']['sections'])) {
+        $output .= '<div class="viator-attraction-more-info">';
+        $output .= '<a href="#more-details" class="saiba-mais-btn">' . ($language === 'pt-BR' ? 'Saiba mais' : 'Learn more') . '</a>';
+        $output .= '</div>';
+    }
+    
+    $output .= '</div>'; // fim header-info
+    $output .= '</div>'; // fim header-container
+    
+    // Conteúdo principal
+    $output .= '<div class="viator-attraction-content" id="more-details">';
+    
+    // Introdução
+    if (isset($attraction_data['viatorUniqueContent']['introduction'])) {
+        $output .= '<div class="viator-attraction-introduction">';
+        $output .= '<h2>' . ($language === 'pt-BR' ? 'Sobre a Atração' : 'About the Attraction') . '</h2>';
+        $output .= '<p>' . esc_html($attraction_data['viatorUniqueContent']['introduction']) . '</p>';
+        $output .= '</div>';
+    }
+    
+    // Visão geral
+    if (isset($attraction_data['viatorUniqueContent']['overview']['sections']) && !empty($attraction_data['viatorUniqueContent']['overview']['sections'])) {
+        $output .= '<div class="viator-attraction-overview">';
+        $output .= '<h2>' . ($language === 'pt-BR' ? 'Informações Detalhadas' : 'Detailed Information') . '</h2>';
+        foreach ($attraction_data['viatorUniqueContent']['overview']['sections'] as $section) {
+            if (isset($section['title']) && isset($section['text'])) {
+                $output .= '<div class="overview-section">';
+                $output .= '<h3>' . esc_html($section['title']) . '</h3>';
+                $output .= '<p>' . esc_html($section['text']) . '</p>';
+                $output .= '</div>';
+            }
+        }
+        $output .= '</div>';
+    }
+    
+    // Informações adicionais
+    $output .= '<div class="viator-attraction-info">';
+    
+    // Horários de funcionamento
+    if (isset($attraction_data['openingHours']) && !empty($attraction_data['openingHours'])) {
+        $output .= '<div class="info-section">';
+        $output .= '<h3>' . ($language === 'pt-BR' ? 'Horários de Funcionamento' : 'Opening Hours') . '</h3>';
+        $output .= '<p>' . esc_html($attraction_data['openingHours']) . '</p>';
+        $output .= '</div>';
+    }
+    
+    // Endereço
+    if (isset($attraction_data['address'])) {
+        $address = $attraction_data['address'];
+        $address_parts = array_filter([
+            isset($address['street']) ? $address['street'] : '',
+            isset($address['city']) ? $address['city'] : '',
+            isset($address['state']) ? $address['state'] : '',
+            isset($address['postcode']) ? $address['postcode'] : ''
+        ]);
+        
+        if (!empty($address_parts)) {
+            $output .= '<div class="info-section">';
+            $output .= '<h3>' . ($language === 'pt-BR' ? 'Endereço' : 'Address') . '</h3>';
+            $output .= '<p>' . esc_html(implode(', ', $address_parts)) . '</p>';
+            $output .= '</div>';
+        }
+    }
+    
+    // Atração gratuita
+    if (isset($attraction_data['freeAttraction']) && $attraction_data['freeAttraction']) {
+        $output .= '<div class="info-section free-attraction">';
+        $output .= '<h3>' . ($language === 'pt-BR' ? 'Atração Gratuita' : 'Free Attraction') . '</h3>';
+        $output .= '<p>✅ ' . ($language === 'pt-BR' ? 'Acesso gratuito disponível' : 'Free access available') . '</p>';
+        $output .= '</div>';
+    }
+    
+    $output .= '</div>'; // fim viator-attraction-info
+    
+    // Produtos relacionados (passeios e ingressos)
+    if (isset($attraction_data['productCodes']) && !empty($attraction_data['productCodes'])) {
+        $output .= '<div class="viator-attraction-products">';
+        $output .= '<h2>' . ($language === 'pt-BR' ? 'Passeios e Ingressos Disponíveis' : 'Available Tours and Tickets') . '</h2>';
+        $output .= '<p>' . ($language === 'pt-BR' ? 'Produtos disponíveis' : 'Available products') . ': ' . (isset($attraction_data['productCount']) ? $attraction_data['productCount'] : count($attraction_data['productCodes'])) . '</p>';
+        
+        // Aqui você pode adicionar uma chamada para buscar e exibir os produtos relacionados
+        // Por enquanto, vamos apenas mostrar que existem produtos disponíveis
+        $output .= '<div class="products-note">';
+        $output .= '<p>' . ($language === 'pt-BR' ? 'Para ver os passeios e ingressos disponíveis para esta atração, use nossa busca.' : 'To see available tours and tickets for this attraction, use our search.') . '</p>';
+        $output .= '</div>';
+        $output .= '</div>';
+    }
+    
+    $output .= '</div>'; // fim viator-attraction-content
+    $output .= '</div>'; // fim viator-attraction-details
+    
+    return $output;
+}
+
+// Hook para interceptar páginas de atração
+function viator_handle_attraction_page() {
+    global $wp_query;
+    
+    // Verificar se estamos numa página de atração
+    if (isset($wp_query->query_vars['pagename']) && $wp_query->query_vars['pagename'] === 'atracoes') {
+        $attraction_id = get_query_var('attraction_id');
+        
+        if (!empty($attraction_id)) {
+            // Buscar dados da atração para o título
+            $attraction_data = viator_get_attraction_details($attraction_id);
+            $attraction_name = $attraction_data ? $attraction_data['name'] : 'Atração';
+            
+            // Definir título da página com múltiplos hooks para WordPress
+            add_filter('wp_title', function($title) use ($attraction_name) {
+                return esc_html($attraction_name) . ' | ' . get_bloginfo('name');
+            }, 10, 2);
+            
+            add_filter('document_title_parts', function($title_parts) use ($attraction_name) {
+                $title_parts['title'] = esc_html($attraction_name);
+                return $title_parts;
+            });
+            
+            add_filter('pre_get_document_title', function($title) use ($attraction_name) {
+                return esc_html($attraction_name) . ' | ' . get_bloginfo('name');
+            });
+            
+            // Adicionar meta tags no head e forçar o título com JavaScript
+            add_action('wp_head', function() use ($attraction_name) {
+                echo '<title>' . esc_html($attraction_name) . ' | ' . get_bloginfo('name') . '</title>' . "\n";
+                echo '<script>document.title = "' . esc_js($attraction_name) . ' | ' . esc_js(get_bloginfo('name')) . '";</script>' . "\n";
+            }, 1);
+            
+            // Carregamento do cabeçalho
+            get_header();
+            
+            echo '<div class="container viator-attraction-page">';
+            echo viator_show_attraction_details($attraction_id);
+            echo '</div>';
+            
+            // Carregamento do rodapé
+            get_footer();
+            exit;
+        }
+    }
+}
+add_action('template_redirect', 'viator_handle_attraction_page');
+
+// Função para limpar e recriar regras de reescrita
+function viator_flush_rewrite_rules() {
+    viator_rewrite_rules();
+    flush_rewrite_rules();
+}
+
+// Ativar na ativação do plugin
+register_activation_hook(__FILE__, 'viator_flush_rewrite_rules');
+
+// Função para testar uma atração específica (para debug)
+function viator_test_attraction() {
+    if (isset($_GET['test_attraction']) && current_user_can('manage_options')) {
+        $attraction_id = sanitize_text_field($_GET['test_attraction']);
+        echo '<div style="background: #f0f0f0; padding: 20px; margin: 20px; border-left: 4px solid #04846b;">';
+        echo '<h3>Teste de Atração: ' . esc_html($attraction_id) . '</h3>';
+        echo '<p><strong>URL gerada:</strong> ' . esc_url(home_url('/atracoes/' . $attraction_id . '/')) . '</p>';
+        
+        $attraction_data = viator_get_attraction_details($attraction_id);
+        if ($attraction_data) {
+            echo '<p style="color: green;"><strong>✅ Dados da API encontrados!</strong></p>';
+            echo '<p><strong>Nome:</strong> ' . esc_html($attraction_data['name'] ?? 'N/A') . '</p>';
+            echo '<p><strong>Número de produtos:</strong> ' . esc_html($attraction_data['productCount'] ?? 'N/A') . '</p>';
+        } else {
+            echo '<p style="color: red;"><strong>❌ Erro ao buscar dados da API</strong></p>';
+        }
+        
+        echo '<p><em>Para testar, adicione ?test_attraction=ID_DA_ATRACAO à URL</em></p>';
+        echo '</div>';
+    }
+}
+add_action('wp_head', 'viator_test_attraction');
+
+// Executar flush das regras imediatamente se for admin
+if (is_admin()) {
+    add_action('init', function() {
+        static $flushed = false;
+        if (!$flushed && current_user_can('manage_options')) {
+            viator_flush_rewrite_rules();
+            $flushed = true;
+        }
+    });
+}
+
+// Função para testar atrações conhecidas
+function viator_test_attraction_known() {
+    if (isset($_GET['test_known_attraction']) && current_user_can('manage_options')) {
+        // IDs de teste comuns da API Viator (sandbox)
+        $test_attractions = [
+            '2177' => 'Torre Eiffel',
+            '31' => 'Loch Ness',
+            '123' => 'Exemplo genérico'
+        ];
+        
+        echo '<div style="background: #f0f0f0; padding: 20px; margin: 20px; border-left: 4px solid #04846b;">';
+        echo '<h3>Teste de Atrações Conhecidas</h3>';
+        
+        foreach ($test_attractions as $id => $name) {
+            echo '<div style="margin-bottom: 15px; padding: 10px; background: white; border-radius: 5px;">';
+            echo '<h4>Testando: ' . esc_html($name) . ' (ID: ' . esc_html($id) . ')</h4>';
+            echo '<p><strong>URL:</strong> <a href="' . esc_url(home_url('/atracoes/' . $id . '/')) . '" target="_blank">' . esc_url(home_url('/atracoes/' . $id . '/')) . '</a></p>';
+            
+            $attraction_data = viator_get_attraction_details($id);
+            if ($attraction_data) {
+                echo '<p style="color: green;"><strong>✅ Dados encontrados!</strong></p>';
+                echo '<p><strong>Nome real:</strong> ' . esc_html($attraction_data['name'] ?? 'N/A') . '</p>';
+            } else {
+                echo '<p style="color: red;"><strong>❌ Não encontrado</strong></p>';
+            }
+            echo '</div>';
+        }
+        
+        echo '<p><em>Para testar, adicione ?test_known_attraction=1 à URL</em></p>';
+        echo '</div>';
+    }
+}
+add_action('wp_head', 'viator_test_attraction_known');
+
+// Função para gerar descrição de atração usando IA
+function viator_get_attraction_ai_description($attraction_name, $location = '', $language = null) {
+    if (!$language) {
+        $language = get_option('viator_language', 'pt-BR');
+    }
+    
+    $groq_api_key = get_option('viator_groq_api_key');
+    
+    if (empty($groq_api_key)) {
+        // Fallback para descrição genérica
+        return viator_get_fallback_attraction_description($attraction_name, $language);
+    }
+    
+    // Preparar prompt baseado no idioma (reduzido para 1-2 frases)
+    if ($language === 'pt-BR') {
+        $prompt = "Escreva uma descrição turística envolvente de 1-2 frases sobre a atração '{$attraction_name}'";
+        if (!empty($location)) {
+            $prompt .= " em {$location}";
+        }
+        $prompt .= ". Destaque os principais atrativos de forma cativante.";
+    } else {
+        $prompt = "Write an engaging tourist description of 1-2 sentences about the attraction '{$attraction_name}'";
+        if (!empty($location)) {
+            $prompt .= " in {$location}";
+        }
+        $prompt .= ". Highlight the main attractions in a captivating way.";
+    }
+    
+    $url = 'https://api.groq.com/openai/v1/chat/completions';
+    
+    $data = [
+        'model' => 'llama3-8b-8192',
+        'messages' => [
+            [
+                'role' => 'user',
+                'content' => $prompt
+            ]
+        ],
+        'max_tokens' => 120,
+        'temperature' => 0.7
+    ];
+    
+    $args = [
+        'method' => 'POST',
+        'headers' => [
+            'Authorization' => 'Bearer ' . $groq_api_key,
+            'Content-Type' => 'application/json'
+        ],
+        'body' => json_encode($data),
+        'timeout' => 30
+    ];
+    
+    $response = wp_remote_request($url, $args);
+    
+    if (is_wp_error($response)) {
+        viator_debug_log('Erro na requisição Groq para descrição da atração:', $response->get_error_message());
+        return viator_get_fallback_attraction_description($attraction_name, $language);
+    }
+    
+    $response_code = wp_remote_retrieve_response_code($response);
+    $body = wp_remote_retrieve_body($response);
+    
+    if ($response_code !== 200) {
+        viator_debug_log('Erro HTTP na requisição Groq para descrição da atração:', $response_code);
+        return viator_get_fallback_attraction_description($attraction_name, $language);
+    }
+    
+    $data = json_decode($body, true);
+    
+    if (isset($data['choices'][0]['message']['content'])) {
+        $description = trim($data['choices'][0]['message']['content']);
+        viator_debug_log('Descrição IA gerada para atração:', $description);
+        return $description;
+    }
+    
+    return viator_get_fallback_attraction_description($attraction_name, $language);
+}
+
+// Função para descrição fallback
+function viator_get_fallback_attraction_description($attraction_name, $language = null) {
+    if (!$language) {
+        $language = get_option('viator_language', 'pt-BR');
+    }
+    
+    if ($language === 'pt-BR') {
+        return "Descubra {$attraction_name}, uma das atrações mais fascinantes do destino. Experimente momentos únicos e inesquecíveis.";
+    } else {
+        return "Discover {$attraction_name}, one of the most fascinating attractions. Experience unique and unforgettable moments.";
+    }
 }

@@ -338,6 +338,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     reinitializeRatingFilter();
                 }
                 
+                // Re-inicializar o Swiper das atrações
+                if (typeof reinitializeAttractionsSwiper === 'function') {
+                    reinitializeAttractionsSwiper();
+                }
+                
                 // Garantir que os filtros especiais sejam sincronizados corretamente
                 // Importante: chamar isso após o HTML ter sido atualizado
                 setTimeout(() => {
@@ -591,6 +596,11 @@ document.addEventListener('DOMContentLoaded', function () {
                             reinitializeRatingFilter();
                         }
                         
+                        // Re-inicializar o Swiper das atrações
+                        if (typeof reinitializeAttractionsSwiper === 'function') {
+                            reinitializeAttractionsSwiper();
+                        }
+                        
                         // Garantir que os filtros especiais sejam sincronizados corretamente
                         // Importante: chamar isso após o HTML ter sido atualizado
                         setTimeout(() => {
@@ -759,6 +769,11 @@ document.addEventListener('DOMContentLoaded', function () {
                                 reinitializeRatingFilter();
                             }
                             
+                            // Re-inicializar o Swiper das atrações
+                            if (typeof reinitializeAttractionsSwiper === 'function') {
+                                reinitializeAttractionsSwiper();
+                            }
+                            
                             // Garantir que os filtros especiais sejam sincronizados corretamente
                             // Importante: chamar isso após o HTML ter sido atualizado
                             setTimeout(() => {
@@ -879,6 +894,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 reinitializeRatingFilter();
                 reinitializeSpecialsFilter();
                 reinitializeClearAllButton();
+                // Re-inicializar o Swiper das atrações
+                if (typeof reinitializeAttractionsSwiper === 'function') {
+                    reinitializeAttractionsSwiper();
+                }
                 // Reinicializar o botão de filtros móveis após atualização AJAX
                 if (typeof window.initializeMobileFilterButton === 'function') {
                     window.initializeMobileFilterButton();
@@ -980,6 +999,56 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
     });
+
+    // Inicializar funcionalidades específicas para páginas de atrações
+    initializeAttractionPage();
+    
+    // Função para inicializar funcionalidades das páginas de atrações
+    function initializeAttractionPage() {
+        // Verificar se estamos numa página de atração
+        if (document.querySelector('.viator-attraction-details')) {
+            initializeAttractionGallery();
+        }
+    }
+    
+    // Função para inicializar a galeria de imagens das atrações
+    function initializeAttractionGallery() {
+        const mainImage = document.querySelector('.main-attraction-image');
+        const thumbnails = document.querySelectorAll('.attraction-thumbnail');
+        
+        if (mainImage && thumbnails.length > 0) {
+            thumbnails.forEach(thumbnail => {
+                thumbnail.addEventListener('click', function() {
+                    // Trocar a imagem principal
+                    const newSrc = this.src;
+                    const newAlt = this.alt;
+                    
+                    // Animação de fade
+                    mainImage.style.opacity = '0.5';
+                    
+                    setTimeout(() => {
+                        mainImage.src = newSrc;
+                        mainImage.alt = newAlt;
+                        mainImage.style.opacity = '1';
+                    }, 200);
+                    
+                    // Remover classe ativa de todas as miniaturas
+                    thumbnails.forEach(thumb => thumb.classList.remove('active'));
+                    
+                    // Adicionar classe ativa à miniatura clicada
+                    this.classList.add('active');
+                });
+            });
+            
+            // Definir primeira miniatura como ativa
+            if (thumbnails[0]) {
+                thumbnails[0].classList.add('active');
+            }
+        }
+    }
+    
+    // Expor as funções globalmente para poder serem chamadas
+    window.initializeAttractionPage = initializeAttractionPage;
 });
 
 function updateSort(value) {
@@ -1100,6 +1169,11 @@ function updateSort(value) {
         }
         if (typeof reinitializeRatingFilter === 'function') {
             reinitializeRatingFilter();
+        }
+        
+        // Re-inicializar o Swiper das atrações
+        if (typeof reinitializeAttractionsSwiper === 'function') {
+            reinitializeAttractionsSwiper();
         }
         
         // Garantir que os filtros especiais sejam sincronizados corretamente
@@ -1267,6 +1341,11 @@ function reinitializeDurationFilter() {
                 }
                 if (typeof reinitializeRatingFilter === 'function') {
                     reinitializeRatingFilter();
+                }
+                
+                // Re-inicializar o Swiper das atrações
+                if (typeof reinitializeAttractionsSwiper === 'function') {
+                    reinitializeAttractionsSwiper();
                 }
                 
                 // Garantir que os filtros especiais sejam sincronizados corretamente
@@ -1684,6 +1763,12 @@ function initializePriceSlider() {
                 if (typeof reinitializeRatingFilter === 'function') {
                     reinitializeRatingFilter();
                 }
+                
+                // Re-inicializar o Swiper das atrações
+                if (typeof reinitializeAttractionsSwiper === 'function') {
+                    reinitializeAttractionsSwiper();
+                }
+                
                 if (typeof reinitializeSpecialsFilter === 'function') {
                     reinitializeSpecialsFilter();
                 }
@@ -1878,6 +1963,11 @@ function initializeRatingFilter() {
                     reinitializeRatingFilter();
                 }
                 
+                // Re-inicializar o Swiper das atrações
+                if (typeof reinitializeAttractionsSwiper === 'function') {
+                    reinitializeAttractionsSwiper();
+                }
+                
                 // Garantir que os filtros especiais sejam sincronizados corretamente
                 // Importante: chamar isso após o HTML ter sido atualizado
                 setTimeout(() => {
@@ -2044,6 +2134,11 @@ function initializeSpecialsFilter() {
                     }
                     if (typeof reinitializeRatingFilter === 'function') {
                         reinitializeRatingFilter();
+                    }
+                    
+                    // Re-inicializar o Swiper das atrações
+                    if (typeof reinitializeAttractionsSwiper === 'function') {
+                        reinitializeAttractionsSwiper();
                     }
                     
                     // Garantir que os filtros especiais sejam sincronizados corretamente
@@ -2253,35 +2348,40 @@ function initializeClearAllButton() {
                 block: 'start' 
             });
             
-            // Reinicializar componentes
-            if (typeof reinitializeDatePicker === 'function') {
-                reinitializeDatePicker();
-            }
-            if (typeof reinitializeDurationFilter === 'function') {
-                reinitializeDurationFilter();
-            }
-            if (typeof reinitializePriceSlider === 'function') {
-                reinitializePriceSlider();
-            }
-            if (typeof reinitializeRatingFilter === 'function') {
-                reinitializeRatingFilter();
-            }
-            
-            // Garantir que os filtros especiais sejam sincronizados corretamente
-            // Importante: chamar isso após o HTML ter sido atualizado
-            setTimeout(() => {
-                if (typeof reinitializeSpecialsFilter === 'function') {
-                    reinitializeSpecialsFilter();
+                            // Reinicializar componentes
+                if (typeof reinitializeDatePicker === 'function') {
+                    reinitializeDatePicker();
                 }
-            }, 100);
-            
-            if (typeof reinitializeClearAllButton === 'function') {
-                reinitializeClearAllButton();
-            }
-            if (typeof window.initializeMobileFilterButton === 'function') {
-                window.initializeMobileFilterButton();
-            }
-            updateClearAllButtonState(); // Atualizar estado do botão
+                if (typeof reinitializeDurationFilter === 'function') {
+                    reinitializeDurationFilter();
+                }
+                if (typeof reinitializePriceSlider === 'function') {
+                    reinitializePriceSlider();
+                }
+                if (typeof reinitializeRatingFilter === 'function') {
+                    reinitializeRatingFilter();
+                }
+                
+                // Re-inicializar o Swiper das atrações
+                if (typeof reinitializeAttractionsSwiper === 'function') {
+                    reinitializeAttractionsSwiper();
+                }
+                
+                // Garantir que os filtros especiais sejam sincronizados corretamente
+                // Importante: chamar isso após o HTML ter sido atualizado
+                setTimeout(() => {
+                    if (typeof reinitializeSpecialsFilter === 'function') {
+                        reinitializeSpecialsFilter();
+                    }
+                }, 100);
+                
+                if (typeof reinitializeClearAllButton === 'function') {
+                    reinitializeClearAllButton();
+                }
+                if (typeof window.initializeMobileFilterButton === 'function') {
+                    window.initializeMobileFilterButton();
+                }
+                updateClearAllButtonState(); // Atualizar estado do botão
         })
         .catch(error => {
             console.error('Erro ao limpar todos os filtros:', error);
@@ -2444,5 +2544,48 @@ function updateClearAllButtonState() {
         } else {
             clearAllButton.disabled = true;
         }
+    }
+}
+
+// Função para re-inicializar o Swiper das atrações após atualizações AJAX
+function reinitializeAttractionsSwiper() {
+    // Destruir instância anterior se existir
+    if (window.attractionsSwiper) {
+        window.attractionsSwiper.destroy(true, true);
+        window.attractionsSwiper = null;
+    }
+    
+    // Verificar se o elemento existe antes de inicializar
+    const swiperElement = document.querySelector(".viator-attractions-swiper");
+    if (swiperElement) {
+        // Aguardar um pequeno delay para garantir que o DOM esteja totalmente renderizado
+        setTimeout(() => {
+            window.attractionsSwiper = new Swiper(".viator-attractions-swiper", {
+                slidesPerView: 4,
+                spaceBetween: 20,
+                navigation: {
+                    nextEl: ".attractions-next",
+                    prevEl: ".attractions-prev",
+                },
+                breakpoints: {
+                    320: {
+                        slidesPerView: 1,
+                        spaceBetween: 15
+                    },
+                    480: {
+                        slidesPerView: 2,
+                        spaceBetween: 15
+                    },
+                    768: {
+                        slidesPerView: 3,
+                        spaceBetween: 20
+                    },
+                    1024: {
+                        slidesPerView: 4,
+                        spaceBetween: 20
+                    }
+                }
+            });
+        }, 100);
     }
 }
