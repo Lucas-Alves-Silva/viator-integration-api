@@ -1111,10 +1111,7 @@
             content: "Sort by:\00a0\00a0\00a0\00a0\00a0\00a0\00a0\00a0";
         }
 
-        /* Tradução para espanhol */
-        body[data-viator-lang="es-ES"] .viator-sort:before {
-            content: "Ordenar por:\00a0\00a0\00a0";
-        }
+
 
         .viator-sort select {
             padding: 8px 12px 8px 115px; /* Ajustado para acomodar o novo espaçamento */
@@ -2917,6 +2914,222 @@ body[data-viator-lang="en-US"] .viator-attraction-card::before {
 .location-text {
     font-size: 1em;
     font-weight: 500;
+}
+
+/* Localização Enriquecida */
+.viator-attraction-location-rich {
+    background: linear-gradient(135deg, #f8f9ff, #e8f4fd);
+    border: 1px solid #e0e7ff;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.location-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.location-type {
+    color: #666;
+    font-size: 14px;
+    margin-left: 5px;
+    font-weight: 400;
+}
+
+.location-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-top: 8px;
+}
+
+.dest-timezone, .dest-currency, .dest-languages {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 13px;
+    color: #555;
+    background: rgba(255, 255, 255, 0.6);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+/* Seção de Localização e Coordenadas */
+.viator-attraction-location-section {
+    background: #fff;
+    border-radius: 8px;
+    padding: 25px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    border: 1px solid #f0f0f0;
+}
+
+.viator-attraction-location-section h2 {
+    color: #333;
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #007BFF;
+    padding-bottom: 8px;
+}
+
+.attraction-coordinates {
+    margin-bottom: 25px;
+}
+
+.attraction-coordinates h3 {
+    color: #333;
+    font-size: 18px;
+    font-weight: 500;
+    margin-bottom: 12px;
+}
+
+.coordinates-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    align-items: center;
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 6px;
+    border-left: 4px solid #007BFF;
+}
+
+.coord-lat, .coord-lng {
+    font-family: monospace;
+    font-size: 14px;
+    color: #333;
+    background: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+}
+
+.maps-link {
+    background: #4285f4;
+    color: white !important;
+    padding: 8px 16px;
+    border-radius: 5px;
+    text-decoration: none !important;
+    font-weight: 500;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+}
+
+.maps-link:hover {
+    background: #3367d6;
+    color: white !important;
+}
+
+.all-destinations {
+    margin-top: 20px;
+}
+
+.all-destinations h3 {
+    color: #333;
+    font-size: 18px;
+    font-weight: 500;
+    margin-bottom: 15px;
+}
+
+.destinations-list {
+    display: grid;
+    gap: 12px;
+}
+
+.destination-item {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 15px;
+    transition: all 0.3s ease;
+}
+
+.destination-item.primary {
+    background: linear-gradient(135deg, #e8f4fd, #cce7ff);
+    border-color: #007BFF;
+    box-shadow: 0 2px 4px rgba(0, 123, 179, 0.1);
+}
+
+.destination-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dest-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+}
+
+.dest-name strong {
+    color: #333;
+    font-weight: 600;
+}
+
+.primary-badge {
+    background: #007BFF;
+    color: white;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 6px;
+    border-radius: 10px;
+    text-transform: uppercase;
+}
+
+.dest-type {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.dest-info {
+    font-size: 12px;
+    color: #777;
+    font-family: monospace;
+}
+
+/* Responsividade para novas seções */
+@media (max-width: 768px) {
+    .viator-attraction-location-rich {
+        padding: 12px;
+    }
+    
+    .location-details {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .viator-attraction-location-section {
+        padding: 20px 15px;
+    }
+    
+    .coordinates-info {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+    
+    .coord-lat, .coord-lng {
+        text-align: center;
+    }
+    
+    .maps-link {
+        text-align: center;
+        width: 100%;
+    }
+    
+    .destinations-list {
+        gap: 10px;
+    }
+    
+    .destination-item {
+        padding: 12px;
+    }
 }
 
 /* Botão Saiba mais */

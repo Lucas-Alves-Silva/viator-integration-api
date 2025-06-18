@@ -84,6 +84,15 @@ function viator_debug_page() {
                 </tr>
                 
                 <tr>
+                    <th scope="row">🌍 Cache de Destinos</th>
+                    <td>
+                        <button type="button" id="refresh-destinations-cache" class="button button-secondary">Limpar Cache de Destinos</button>
+                        <p class="description">Remove o cache de destinos da API (timezone, moeda, idiomas). Cache renovado semanalmente.</p>
+                        <div id="destinations-cache-result" style="margin-top: 10px;"></div>
+                    </td>
+                </tr>
+                
+                <tr>
                     <th scope="row">⭐ Cache de Reviews</th>
                     <td>
                         <button type="button" id="refresh-reviews-cache" class="button button-secondary">Limpar Cache de Reviews</button>
@@ -180,6 +189,37 @@ function viator_debug_page() {
                         },
                         complete: function() {
                             button.prop('disabled', false).text('Limpar Cache de Produtos');
+                        }
+                    });
+                });
+                
+                // Cache de Destinos
+                $('#refresh-destinations-cache').on('click', function() {
+                    var button = $(this);
+                    var resultDiv = $('#destinations-cache-result');
+                    
+                    button.prop('disabled', true).text('Limpando...');
+                    resultDiv.html('<span style="color: #0073aa;">Limpando cache de destinos...</span>');
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'viator_clear_destinations_cache',
+                            nonce: '<?php echo wp_create_nonce('viator_admin_nonce'); ?>'
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                resultDiv.html('<span style="color: #46b450;">✓ ' + response.data.message + '</span>');
+                            } else {
+                                resultDiv.html('<span style="color: #dc3232;">✗ Erro: ' + response.data + '</span>');
+                            }
+                        },
+                        error: function() {
+                            resultDiv.html('<span style="color: #dc3232;">✗ Erro de conexão</span>');
+                        },
+                        complete: function() {
+                            button.prop('disabled', false).text('Limpar Cache de Destinos');
                         }
                     });
                 });

@@ -1673,7 +1673,7 @@ function viator_get_product_details($product_code) {
                             $language_names = [
                                 'pt' => 'Português',
                                 'en' => 'Inglês',
-                                'es' => 'Espanhol',
+                    
                                 'fr' => 'Francês',
                                 'de' => 'Alemão',
                                 'it' => 'Italiano',
@@ -2708,6 +2708,15 @@ function viator_clear_availability_cache() {
 }
 
 /**
+ * Clear destinations cache
+ */
+function viator_clear_destinations_cache() {
+    delete_transient('viator_destinations_data');
+    viator_debug_log('Destinations cache cleared');
+    return 1; // Um item removido
+}
+
+/**
  * Clear all Viator-related cache
  */
 function viator_clear_all_cache() {
@@ -2718,6 +2727,7 @@ function viator_clear_all_cache() {
         'products' => 0,
         'reviews' => 0,
         'availability' => 0,
+        'destinations' => 0,
         'total' => 0
     );
     
@@ -2735,6 +2745,8 @@ function viator_clear_all_cache() {
         // Categorizar por tipo
         if (strpos($transient_name, 'viator_all_tags') !== false) {
             $results['tags']++;
+        } elseif (strpos($transient_name, 'viator_destinations_data') !== false) {
+            $results['destinations']++;
         } elseif (strpos($transient_name, 'viator_product_') !== false) {
             $results['products']++;
         } elseif (strpos($transient_name, 'viator_reviews_') !== false) {
@@ -2824,6 +2836,31 @@ function viator_clear_availability_cache_ajax() {
     ));
 }
 add_action('wp_ajax_viator_clear_availability_cache', 'viator_clear_availability_cache_ajax');
+
+/**
+ * AJAX handler para limpar cache de destinos
+ */
+function viator_clear_destinations_cache_ajax() {
+    // Verificar nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'viator_admin_nonce')) {
+        wp_send_json_error('Erro de segurança');
+        return;
+    }
+    
+    // Verificar permissões
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error('Permissões insuficientes');
+        return;
+    }
+    
+    $cleared_count = viator_clear_destinations_cache();
+    
+    wp_send_json_success(array(
+        'message' => "Cache de destinos limpo com sucesso ({$cleared_count} item removido)",
+        'cleared_count' => $cleared_count
+    ));
+}
+add_action('wp_ajax_viator_clear_destinations_cache', 'viator_clear_destinations_cache_ajax');
 
 /**
  * AJAX handler para limpar todos os caches

@@ -2883,6 +2883,643 @@ function viator_get_attraction_details($attraction_id) {
     return $data;
 }
 
+// Função para buscar dados dos destinos da API
+function viator_get_destinations_data() {
+    // Verificar cache primeiro
+    $cached_destinations = get_transient('viator_destinations_data');
+    if ($cached_destinations !== false) {
+        return $cached_destinations;
+    }
+    
+    $api_key = get_option('viator_api_key');
+    
+    if (empty($api_key)) {
+        return false;
+    }
+    
+    // Obter configurações de idioma
+    $locale_settings = viator_get_locale_settings();
+    
+    $url = "https://api.sandbox.viator.com/partner/destinations";
+    
+    // Cabeçalhos da requisição
+    $headers = [
+        'Accept-Language' => $locale_settings['accept_language'],
+        'Accept' => 'application/json;version=2.0',
+        'exp-api-key' => $api_key
+    ];
+    
+    // Configurar argumentos da requisição
+    $args = [
+        'method' => 'GET',
+        'headers' => $headers,
+        'timeout' => 30
+    ];
+    
+    viator_debug_log('Fazendo requisição para dados de destinos:', $url);
+    
+    // Fazer a requisição
+    $response = wp_remote_request($url, $args);
+    
+    if (is_wp_error($response)) {
+        viator_debug_log('Erro na requisição de destinos:', $response->get_error_message());
+        return false;
+    }
+    
+    $response_code = wp_remote_retrieve_response_code($response);
+    $body = wp_remote_retrieve_body($response);
+    
+    if ($response_code !== 200) {
+        viator_debug_log('Erro HTTP ao buscar destinos:', [
+            'response_code' => $response_code,
+            'body' => substr($body, 0, 500)
+        ]);
+        return false;
+    }
+    
+    $data = json_decode($body, true);
+    
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        viator_debug_log('Erro ao decodificar JSON dos destinos:', json_last_error_msg());
+        return false;
+    }
+    
+    // Indexar destinos por ID para acesso rápido
+    $destinations_indexed = [];
+    if (isset($data['destinations']) && is_array($data['destinations'])) {
+        foreach ($data['destinations'] as $destination) {
+            if (isset($destination['destinationId'])) {
+                $destinations_indexed[$destination['destinationId']] = $destination;
+            }
+        }
+    }
+    
+    // Cachear por 7 dias (conforme recomendação da API)
+    set_transient('viator_destinations_data', $destinations_indexed, 7 * DAY_IN_SECONDS);
+    
+    viator_debug_log('Destinos obtidos e cacheados:', count($destinations_indexed) . ' destinos');
+    
+    return $destinations_indexed;
+}
+
+// Função para obter informações detalhadas de um destino
+function viator_get_destination_info($destination_id) {
+    $destinations_data = viator_get_destinations_data();
+    
+    if (!$destinations_data || !isset($destinations_data[$destination_id])) {
+        return null;
+    }
+    
+    return $destinations_data[$destination_id];
+}
+
+// Função para processar coordenadas e criar informações de localização
+function viator_get_location_info($attraction_data) {
+    $location_info = [
+        'destinations' => [],
+        'coordinates' => null,
+        'main_destination' => null
+    ];
+    
+    // Processar destinos
+    if (isset($attraction_data['destinations']) && !empty($attraction_data['destinations'])) {
+        foreach ($attraction_data['destinations'] as $destination_ref) {
+            if (isset($destination_ref['id'])) {
+                $destination_details = viator_get_destination_info($destination_ref['id']);
+                
+                if ($destination_details) {
+                    $destination_info = [
+                        'id' => $destination_ref['id'],
+                        'name' => $destination_details['name'] ?? '',
+                        'type' => $destination_details['type'] ?? '',
+                        'is_primary' => isset($destination_ref['primary']) ? $destination_ref['primary'] : false,
+                        'parent_id' => $destination_details['parentDestinationId'] ?? null,
+                        'timezone' => $destination_details['timeZone'] ?? null,
+                        'currency' => $destination_details['defaultCurrencyCode'] ?? null,
+                        'country_code' => $destination_details['countryCallingCode'] ?? null,
+                        'languages' => $destination_details['languages'] ?? [],
+                        'center' => $destination_details['center'] ?? null
+                    ];
+                    
+                    $location_info['destinations'][] = $destination_info;
+                    
+                    // Definir destino principal
+                    if ($destination_info['is_primary']) {
+                        $location_info['main_destination'] = $destination_info;
+                    }
+                }
+            }
+        }
+        
+        // Se não houver destino primário, usar o primeiro
+        if (!$location_info['main_destination'] && !empty($location_info['destinations'])) {
+            $location_info['main_destination'] = $location_info['destinations'][0];
+        }
+    }
+    
+    // Processar coordenadas da atração
+    if (isset($attraction_data['center']) && isset($attraction_data['center']['latitude']) && isset($attraction_data['center']['longitude'])) {
+        $location_info['coordinates'] = [
+            'latitude' => $attraction_data['center']['latitude'],
+            'longitude' => $attraction_data['center']['longitude']
+        ];
+    }
+    
+    return $location_info;
+}
+
+// Função para traduzir tipos de destinos
+function viator_translate_destination_type($type, $language = null) {
+    if (!$language) {
+        $language = get_option('viator_language', 'pt-BR');
+    }
+    
+    // Mapeamento de traduções para tipos de destinos
+    $translations = [
+        'pt-BR' => [
+            'country' => 'País',
+            'city' => 'Cidade',
+            'region' => 'Região',
+            'state' => 'Estado',
+            'province' => 'Província',
+            'district' => 'Distrito',
+            'area' => 'Área',
+            'neighborhood' => 'Bairro',
+            'island' => 'Ilha',
+            'continent' => 'Continente',
+            'territory' => 'Território',
+            'municipality' => 'Município',
+            'county' => 'Condado',
+            'town' => 'Cidade',
+            'village' => 'Vila',
+            'locality' => 'Localidade',
+            'zone' => 'Zona',
+            'sector' => 'Setor',
+            'capital' => 'Capital',
+            'port' => 'Porto',
+            'airport' => 'Aeroporto',
+            'landmark' => 'Marco',
+            'destination' => 'Destino',
+            'attraction' => 'Atração'
+        ],
+        'en-US' => [
+            'country' => 'Country',
+            'city' => 'City',
+            'region' => 'Region',
+            'state' => 'State',
+            'province' => 'Province',
+            'district' => 'District',
+            'area' => 'Area',
+            'neighborhood' => 'Neighborhood',
+            'island' => 'Island',
+            'continent' => 'Continent',
+            'territory' => 'Territory',
+            'municipality' => 'Municipality',
+            'county' => 'County',
+            'town' => 'Town',
+            'village' => 'Village',
+            'locality' => 'Locality',
+            'zone' => 'Zone',
+            'sector' => 'Sector',
+            'capital' => 'Capital',
+            'port' => 'Port',
+            'airport' => 'Airport',
+            'landmark' => 'Landmark',
+            'destination' => 'Destination',
+            'attraction' => 'Attraction'
+        ],
+
+    ];
+    
+    $type_lower = strtolower(trim($type));
+    
+    // Verificar se existe tradução para o idioma e tipo específicos
+    if (isset($translations[$language][$type_lower])) {
+        return $translations[$language][$type_lower];
+    }
+    
+    // Fallback para inglês se não houver tradução no idioma atual
+    if ($language !== 'en-US' && isset($translations['en-US'][$type_lower])) {
+        return $translations['en-US'][$type_lower];
+    }
+    
+    // Se não houver tradução, retornar o tipo original com primeira letra maiúscula
+    return ucfirst($type_lower);
+}
+
+// Função para traduzir rótulos de localização
+function viator_translate_location_label($label, $language = null) {
+    if (!$language) {
+        $language = get_option('viator_language', 'pt-BR');
+    }
+    
+    $translations = [
+        'pt-BR' => [
+            'type' => 'Tipo',
+            'timezone' => 'Fuso Horário',
+            'currency' => 'Moeda',
+            'languages' => 'Idiomas',
+            'coordinates' => 'Coordenadas',
+            'latitude' => 'Latitude',
+            'longitude' => 'Longitude',
+            'location_information' => 'Informações de Localização',
+            'related_destinations' => 'Destinos Relacionados',
+            'primary' => 'Principal',
+            'view_on_google_maps' => 'Ver no Google Maps'
+        ],
+        'en-US' => [
+            'type' => 'Type',
+            'timezone' => 'Timezone',
+            'currency' => 'Currency',
+            'languages' => 'Languages',
+            'coordinates' => 'Coordinates',
+            'latitude' => 'Latitude',
+            'longitude' => 'Longitude',
+            'location_information' => 'Location Information',
+            'related_destinations' => 'Related Destinations',
+            'primary' => 'Primary',
+            'view_on_google_maps' => 'View on Google Maps'
+        ],
+
+    ];
+    
+    $label_lower = strtolower(trim($label));
+    
+    if (isset($translations[$language][$label_lower])) {
+        return $translations[$language][$label_lower];
+    }
+    
+    // Fallback para inglês
+    if ($language !== 'en-US' && isset($translations['en-US'][$label_lower])) {
+        return $translations['en-US'][$label_lower];
+    }
+    
+    // Se não houver tradução, retornar o rótulo original
+    return ucfirst($label);
+}
+
+// Função para traduzir códigos de moeda para nomes amigáveis
+function viator_translate_currency_code($currency_code, $language = null) {
+    if (!$language) {
+        $language = get_option('viator_language', 'pt-BR');
+    }
+    
+    $currencies = [
+        'pt-BR' => [
+            'USD' => 'Dólar Americano',
+            'EUR' => 'Euro',
+            'GBP' => 'Libra Esterlina',
+            'BRL' => 'Real Brasileiro',
+            'CAD' => 'Dólar Canadense',
+            'AUD' => 'Dólar Australiano',
+            'JPY' => 'Iene Japonês',
+            'CHF' => 'Franco Suíço',
+            'CNY' => 'Yuan Chinês',
+            'INR' => 'Rupia Indiana',
+            'MXN' => 'Peso Mexicano',
+            'ARS' => 'Peso Argentino',
+            'CLP' => 'Peso Chileno',
+            'COP' => 'Peso Colombiano',
+            'PEN' => 'Sol Peruano',
+            'UYU' => 'Peso Uruguaio',
+            'BOB' => 'Boliviano',
+            'VES' => 'Bolívar Venezuelano',
+            'NZD' => 'Dólar Neozelandês',
+            'SGD' => 'Dólar de Singapura',
+            'HKD' => 'Dólar de Hong Kong',
+            'KRW' => 'Won Sul-Coreano',
+            'THB' => 'Baht Tailandês',
+            'MYR' => 'Ringgit Malaio',
+            'IDR' => 'Rupia Indonésia',
+            'PHP' => 'Peso Filipino',
+            'VND' => 'Dong Vietnamita',
+            'ZAR' => 'Rand Sul-Africano',
+            'EGP' => 'Libra Egípcia',
+            'MAD' => 'Dirham Marroquino',
+            'TRY' => 'Lira Turca',
+            'RUB' => 'Rublo Russo',
+            'PLN' => 'Zloty Polonês',
+            'CZK' => 'Coroa Tcheca',
+            'HUF' => 'Forint Húngaro',
+            'RON' => 'Leu Romeno',
+            'BGN' => 'Lev Búlgaro',
+            'HRK' => 'Kuna Croata',
+            'DKK' => 'Coroa Dinamarquesa',
+            'SEK' => 'Coroa Sueca',
+            'NOK' => 'Coroa Norueguesa',
+            'ISK' => 'Coroa Islandesa'
+        ],
+        'en-US' => [
+            'USD' => 'US Dollar',
+            'EUR' => 'Euro',
+            'GBP' => 'British Pound',
+            'BRL' => 'Brazilian Real',
+            'CAD' => 'Canadian Dollar',
+            'AUD' => 'Australian Dollar',
+            'JPY' => 'Japanese Yen',
+            'CHF' => 'Swiss Franc',
+            'CNY' => 'Chinese Yuan',
+            'INR' => 'Indian Rupee',
+            'MXN' => 'Mexican Peso',
+            'ARS' => 'Argentine Peso',
+            'CLP' => 'Chilean Peso',
+            'COP' => 'Colombian Peso',
+            'PEN' => 'Peruvian Sol',
+            'UYU' => 'Uruguayan Peso',
+            'BOB' => 'Bolivian Boliviano',
+            'VES' => 'Venezuelan Bolívar',
+            'NZD' => 'New Zealand Dollar',
+            'SGD' => 'Singapore Dollar',
+            'HKD' => 'Hong Kong Dollar',
+            'KRW' => 'South Korean Won',
+            'THB' => 'Thai Baht',
+            'MYR' => 'Malaysian Ringgit',
+            'IDR' => 'Indonesian Rupiah',
+            'PHP' => 'Philippine Peso',
+            'VND' => 'Vietnamese Dong',
+            'ZAR' => 'South African Rand',
+            'EGP' => 'Egyptian Pound',
+            'MAD' => 'Moroccan Dirham',
+            'TRY' => 'Turkish Lira',
+            'RUB' => 'Russian Ruble',
+            'PLN' => 'Polish Zloty',
+            'CZK' => 'Czech Koruna',
+            'HUF' => 'Hungarian Forint',
+            'RON' => 'Romanian Leu',
+            'BGN' => 'Bulgarian Lev',
+            'HRK' => 'Croatian Kuna',
+            'DKK' => 'Danish Krone',
+            'SEK' => 'Swedish Krona',
+            'NOK' => 'Norwegian Krone',
+            'ISK' => 'Icelandic Króna'
+        ],
+
+    ];
+    
+    $code_upper = strtoupper(trim($currency_code));
+    
+    if (isset($currencies[$language][$code_upper])) {
+        return $currencies[$language][$code_upper];
+    }
+    
+    // Fallback para inglês
+    if ($language !== 'en-US' && isset($currencies['en-US'][$code_upper])) {
+        return $currencies['en-US'][$code_upper];
+    }
+    
+    // Se não encontrar, retornar o código original
+    return $code_upper;
+}
+
+// Função para traduzir códigos de idioma para nomes amigáveis
+function viator_translate_language_code($language_code, $language = null) {
+    if (!$language) {
+        $language = get_option('viator_language', 'pt-BR');
+    }
+    
+    $languages = [
+        'pt-BR' => [
+            'en' => 'Inglês',
+            'en-US' => 'Inglês Americano',
+            'en-GB' => 'Inglês Britânico',
+            'en-AU' => 'Inglês Australiano',
+            'en-CA' => 'Inglês Canadense',
+            'pt' => 'Português',
+            'pt-BR' => 'Português Brasileiro',
+            'pt-PT' => 'Português Europeu',
+            'es' => 'Espanhol',
+            'es-ES' => 'Espanhol da Espanha',
+            'es-MX' => 'Espanhol Mexicano',
+            'es-AR' => 'Espanhol Argentino',
+            'es-CO' => 'Espanhol Colombiano',
+            'es-CL' => 'Espanhol Chileno',
+            'es-PE' => 'Espanhol Peruano',
+            'es-VE' => 'Espanhol Venezuelano',
+            'es-EC' => 'Espanhol Equatoriano',
+            'es-BO' => 'Espanhol Boliviano',
+            'es-UY' => 'Espanhol Uruguaio',
+            'es-PY' => 'Espanhol Paraguaio',
+            'fr' => 'Francês',
+            'fr-FR' => 'Francês da França',
+            'fr-CA' => 'Francês Canadense',
+            'fr-BE' => 'Francês Belga',
+            'fr-CH' => 'Francês Suíço',
+            'de' => 'Alemão',
+            'de-DE' => 'Alemão da Alemanha',
+            'de-AT' => 'Alemão Austríaco',
+            'de-CH' => 'Alemão Suíço',
+            'it' => 'Italiano',
+            'it-IT' => 'Italiano da Itália',
+            'it-CH' => 'Italiano Suíço',
+            'nl' => 'Holandês',
+            'nl-NL' => 'Holandês dos Países Baixos',
+            'nl-BE' => 'Holandês Belga',
+            'ru' => 'Russo',
+            'ru-RU' => 'Russo da Rússia',
+            'zh' => 'Chinês',
+            'zh-CN' => 'Chinês Simplificado',
+            'zh-TW' => 'Chinês Tradicional',
+            'zh-HK' => 'Chinês de Hong Kong',
+            'ja' => 'Japonês',
+            'ja-JP' => 'Japonês do Japão',
+            'ko' => 'Coreano',
+            'ko-KR' => 'Coreano da Coreia do Sul',
+            'ar' => 'Árabe',
+            'ar-SA' => 'Árabe Saudita',
+            'ar-EG' => 'Árabe Egípcio',
+            'hi' => 'Hindi',
+            'hi-IN' => 'Hindi da Índia',
+            'th' => 'Tailandês',
+            'th-TH' => 'Tailandês da Tailândia',
+            'vi' => 'Vietnamita',
+            'vi-VN' => 'Vietnamita do Vietnã',
+            'tr' => 'Turco',
+            'tr-TR' => 'Turco da Turquia',
+            'pl' => 'Polonês',
+            'pl-PL' => 'Polonês da Polônia',
+            'sv' => 'Sueco',
+            'sv-SE' => 'Sueco da Suécia',
+            'da' => 'Dinamarquês',
+            'da-DK' => 'Dinamarquês da Dinamarca',
+            'no' => 'Norueguês',
+            'no-NO' => 'Norueguês da Noruega',
+            'fi' => 'Finlandês',
+            'fi-FI' => 'Finlandês da Finlândia',
+            'cs' => 'Tcheco',
+            'cs-CZ' => 'Tcheco da República Tcheca',
+            'hu' => 'Húngaro',
+            'hu-HU' => 'Húngaro da Hungria',
+            'ro' => 'Romeno',
+            'ro-RO' => 'Romeno da Romênia',
+            'bg' => 'Búlgaro',
+            'bg-BG' => 'Búlgaro da Bulgária',
+            'hr' => 'Croata',
+            'hr-HR' => 'Croata da Croácia',
+            'sk' => 'Eslovaco',
+            'sk-SK' => 'Eslovaco da Eslováquia',
+            'sl' => 'Esloveno',
+            'sl-SI' => 'Esloveno da Eslovênia',
+            'et' => 'Estoniano',
+            'et-EE' => 'Estoniano da Estônia',
+            'lv' => 'Letão',
+            'lv-LV' => 'Letão da Letônia',
+            'lt' => 'Lituano',
+            'lt-LT' => 'Lituano da Lituânia',
+            'el' => 'Grego',
+            'el-GR' => 'Grego da Grécia',
+            'he' => 'Hebraico',
+            'he-IL' => 'Hebraico de Israel',
+            'is' => 'Islandês',
+            'is-IS' => 'Islandês da Islândia',
+            'mt' => 'Maltês',
+            'mt-MT' => 'Maltês de Malta'
+        ],
+        'en-US' => [
+            'en' => 'English',
+            'en-US' => 'American English',
+            'en-GB' => 'British English',
+            'en-AU' => 'Australian English',
+            'en-CA' => 'Canadian English',
+            'pt' => 'Portuguese',
+            'pt-BR' => 'Brazilian Portuguese',
+            'pt-PT' => 'European Portuguese',
+            'es' => 'Spanish',
+            'es-ES' => 'Spanish (Spain)',
+            'es-MX' => 'Mexican Spanish',
+            'es-AR' => 'Argentine Spanish',
+            'es-CO' => 'Colombian Spanish',
+            'es-CL' => 'Chilean Spanish',
+            'es-PE' => 'Peruvian Spanish',
+            'es-VE' => 'Venezuelan Spanish',
+            'es-EC' => 'Ecuadorian Spanish',
+            'es-BO' => 'Bolivian Spanish',
+            'es-UY' => 'Uruguayan Spanish',
+            'es-PY' => 'Paraguayan Spanish',
+            'fr' => 'French',
+            'fr-FR' => 'French (France)',
+            'fr-CA' => 'Canadian French',
+            'fr-BE' => 'Belgian French',
+            'fr-CH' => 'Swiss French',
+            'de' => 'German',
+            'de-DE' => 'German (Germany)',
+            'de-AT' => 'Austrian German',
+            'de-CH' => 'Swiss German',
+            'it' => 'Italian',
+            'it-IT' => 'Italian (Italy)',
+            'it-CH' => 'Swiss Italian',
+            'nl' => 'Dutch',
+            'nl-NL' => 'Dutch (Netherlands)',
+            'nl-BE' => 'Belgian Dutch',
+            'ru' => 'Russian',
+            'ru-RU' => 'Russian (Russia)',
+            'zh' => 'Chinese',
+            'zh-CN' => 'Simplified Chinese',
+            'zh-TW' => 'Traditional Chinese',
+            'zh-HK' => 'Chinese (Hong Kong)',
+            'ja' => 'Japanese',
+            'ja-JP' => 'Japanese (Japan)',
+            'ko' => 'Korean',
+            'ko-KR' => 'Korean (South Korea)',
+            'ar' => 'Arabic',
+            'ar-SA' => 'Saudi Arabic',
+            'ar-EG' => 'Egyptian Arabic',
+            'hi' => 'Hindi',
+            'hi-IN' => 'Hindi (India)',
+            'th' => 'Thai',
+            'th-TH' => 'Thai (Thailand)',
+            'vi' => 'Vietnamese',
+            'vi-VN' => 'Vietnamese (Vietnam)',
+            'tr' => 'Turkish',
+            'tr-TR' => 'Turkish (Turkey)',
+            'pl' => 'Polish',
+            'pl-PL' => 'Polish (Poland)',
+            'sv' => 'Swedish',
+            'sv-SE' => 'Swedish (Sweden)',
+            'da' => 'Danish',
+            'da-DK' => 'Danish (Denmark)',
+            'no' => 'Norwegian',
+            'no-NO' => 'Norwegian (Norway)',
+            'fi' => 'Finnish',
+            'fi-FI' => 'Finnish (Finland)',
+            'cs' => 'Czech',
+            'cs-CZ' => 'Czech (Czech Republic)',
+            'hu' => 'Hungarian',
+            'hu-HU' => 'Hungarian (Hungary)',
+            'ro' => 'Romanian',
+            'ro-RO' => 'Romanian (Romania)',
+            'bg' => 'Bulgarian',
+            'bg-BG' => 'Bulgarian (Bulgaria)',
+            'hr' => 'Croatian',
+            'hr-HR' => 'Croatian (Croatia)',
+            'sk' => 'Slovak',
+            'sk-SK' => 'Slovak (Slovakia)',
+            'sl' => 'Slovenian',
+            'sl-SI' => 'Slovenian (Slovenia)',
+            'et' => 'Estonian',
+            'et-EE' => 'Estonian (Estonia)',
+            'lv' => 'Latvian',
+            'lv-LV' => 'Latvian (Latvia)',
+            'lt' => 'Lithuanian',
+            'lt-LT' => 'Lithuanian (Lithuania)',
+            'el' => 'Greek',
+            'el-GR' => 'Greek (Greece)',
+            'he' => 'Hebrew',
+            'he-IL' => 'Hebrew (Israel)',
+            'is' => 'Icelandic',
+            'is-IS' => 'Icelandic (Iceland)',
+            'mt' => 'Maltese',
+            'mt-MT' => 'Maltese (Malta)'
+        ],
+
+    ];
+    
+    $code_lower = strtolower(trim($language_code));
+    
+    if (isset($languages[$language][$code_lower])) {
+        return $languages[$language][$code_lower];
+    }
+    
+    // Fallback para inglês
+    if ($language !== 'en-US' && isset($languages['en-US'][$code_lower])) {
+        return $languages['en-US'][$code_lower];
+    }
+    
+    // Fallback inteligente: tentar extrair partes do código (ex: es-CO -> es + CO)
+    if (strpos($code_lower, '-') !== false) {
+        $parts = explode('-', $code_lower);
+        $base_language = $parts[0];
+        $country_code = strtoupper($parts[1]);
+        
+        // Mapear códigos de país comuns
+        $country_names = [
+            'pt-BR' => [
+                'CO' => 'Colombiano', 'MX' => 'Mexicano', 'AR' => 'Argentino', 'CL' => 'Chileno',
+                'PE' => 'Peruano', 'VE' => 'Venezuelano', 'EC' => 'Equatoriano', 'BO' => 'Boliviano',
+                'UY' => 'Uruguaio', 'PY' => 'Paraguaio', 'US' => 'Americano', 'GB' => 'Britânico',
+                'CA' => 'Canadense', 'AU' => 'Australiano', 'FR' => 'da França', 'DE' => 'da Alemanha',
+                'IT' => 'da Itália', 'ES' => 'da Espanha', 'PT' => 'de Portugal', 'BR' => 'do Brasil'
+            ],
+            'en-US' => [
+                'CO' => 'Colombian', 'MX' => 'Mexican', 'AR' => 'Argentine', 'CL' => 'Chilean',
+                'PE' => 'Peruvian', 'VE' => 'Venezuelan', 'EC' => 'Ecuadorian', 'BO' => 'Bolivian',
+                'UY' => 'Uruguayan', 'PY' => 'Paraguayan', 'US' => 'American', 'GB' => 'British',
+                'CA' => 'Canadian', 'AU' => 'Australian', 'FR' => '(France)', 'DE' => '(Germany)',
+                'IT' => '(Italy)', 'ES' => '(Spain)', 'PT' => '(Portugal)', 'BR' => '(Brazil)'
+            ]
+        ];
+        
+        // Buscar tradução para o idioma base
+        if (isset($languages[$language][$base_language])) {
+            $base_lang_name = $languages[$language][$base_language];
+            $country_suffix = $country_names[$language][$country_code] ?? $country_code;
+            return $base_lang_name . ' ' . $country_suffix;
+        }
+    }
+    
+    // Se não encontrar, retornar o código original em maiúscula
+    return strtoupper($code_lower);
+}
+
 // Função para exibir detalhes da atração
 function viator_show_attraction_details($attraction_id) {
     viator_debug_log('Iniciando exibição de detalhes para atração:', $attraction_id);
@@ -2900,6 +3537,9 @@ function viator_show_attraction_details($attraction_id) {
     // Obter configurações de idioma e moeda
     $locale_settings = viator_get_locale_settings();
     $language = get_option('viator_language', 'pt-BR');
+    
+    // Processar informações de localização
+    $location_info = viator_get_location_info($attraction_data);
     
     $output = '<div class="viator-attraction-details">';
     
@@ -2957,9 +3597,8 @@ function viator_show_attraction_details($attraction_id) {
     
     // Descrição gerada por IA
     $location_text = '';
-    if (isset($attraction_data['destinations']) && !empty($attraction_data['destinations'])) {
-        $destination = $attraction_data['destinations'][0];
-        $location_text = isset($destination['destinationName']) ? $destination['destinationName'] : '';
+    if ($location_info['main_destination']) {
+        $location_text = $location_info['main_destination']['name'];
     }
     
     $ai_description = viator_get_attraction_ai_description($attraction_data['name'], $location_text, $language);
@@ -2969,11 +3608,46 @@ function viator_show_attraction_details($attraction_id) {
         $output .= '</div>';
     }
     
-    // Localização
-    if (!empty($location_text)) {
-        $output .= '<div class="viator-attraction-location">';
+    // Localização enriquecida
+    if ($location_info['main_destination']) {
+        $main_dest = $location_info['main_destination'];
+        $output .= '<div class="viator-attraction-location-rich">';
+        
+        // Nome do destino principal
+        $output .= '<div class="location-main">';
         $output .= '<span class="location-icon">📍</span>';
-        $output .= '<span class="location-text">' . esc_html($location_text) . '</span>';
+        $output .= '<span class="location-text">' . esc_html($main_dest['name']) . '</span>';
+        if (!empty($main_dest['type'])) {
+            $translated_type = viator_translate_destination_type($main_dest['type'], $language);
+            $output .= '<span class="location-type">(' . esc_html($translated_type) . ')</span>';
+        }
+        $output .= '</div>';
+        
+        // Informações adicionais do destino
+        $dest_details = [];
+        if (!empty($main_dest['timezone'])) {
+            $dest_details[] = '<span class="dest-timezone">🕐 ' . esc_html($main_dest['timezone']) . '</span>';
+        }
+        if (!empty($main_dest['currency'])) {
+            $currency_name = viator_translate_currency_code($main_dest['currency'], $language);
+            $dest_details[] = '<span class="dest-currency">💰 ' . esc_html($currency_name) . '</span>';
+        }
+        if (!empty($main_dest['languages'])) {
+            $language_codes = is_array($main_dest['languages']) ? $main_dest['languages'] : [$main_dest['languages']];
+            $translated_languages = [];
+            foreach ($language_codes as $lang_code) {
+                $translated_languages[] = viator_translate_language_code($lang_code, $language);
+            }
+            $languages_text = implode(', ', $translated_languages);
+            $dest_details[] = '<span class="dest-languages">🗣️ ' . esc_html($languages_text) . '</span>';
+        }
+        
+        if (!empty($dest_details)) {
+            $output .= '<div class="location-details">';
+            $output .= implode(' ', $dest_details);
+            $output .= '</div>';
+        }
+        
         $output .= '</div>';
     }
     
@@ -3010,6 +3684,80 @@ function viator_show_attraction_details($attraction_id) {
                 $output .= '</div>';
             }
         }
+        $output .= '</div>';
+    }
+    
+    // Seção de Localização e Coordenadas
+    if ($location_info['coordinates'] || count($location_info['destinations']) > 1) {
+        $output .= '<div class="viator-attraction-location-section">';
+        $output .= '<h2>' . viator_translate_location_label('location_information', $language) . '</h2>';
+        
+        // Coordenadas
+        if ($location_info['coordinates']) {
+            $coords = $location_info['coordinates'];
+            $output .= '<div class="attraction-coordinates">';
+            $output .= '<h3>' . viator_translate_location_label('coordinates', $language) . '</h3>';
+            $output .= '<div class="coordinates-info">';
+            $output .= '<span class="coord-lat">🧭 ' . viator_translate_location_label('latitude', $language) . ': ' . esc_html($coords['latitude']) . '</span>';
+            $output .= '<span class="coord-lng">🧭 ' . viator_translate_location_label('longitude', $language) . ': ' . esc_html($coords['longitude']) . '</span>';
+            
+            // Link para Google Maps
+            $maps_url = 'https://www.google.com/maps?q=' . urlencode($coords['latitude'] . ',' . $coords['longitude']);
+            $output .= '<a href="' . esc_url($maps_url) . '" target="_blank" class="maps-link">🗺️ ' . viator_translate_location_label('view_on_google_maps', $language) . '</a>';
+            $output .= '</div>';
+            $output .= '</div>';
+        }
+        
+        // Todos os destinos relacionados
+        if (count($location_info['destinations']) > 1) {
+            $output .= '<div class="all-destinations">';
+            $output .= '<h3>' . viator_translate_location_label('related_destinations', $language) . '</h3>';
+            $output .= '<div class="destinations-list">';
+            
+            foreach ($location_info['destinations'] as $destination) {
+                $output .= '<div class="destination-item' . ($destination['is_primary'] ? ' primary' : '') . '">';
+                $output .= '<div class="dest-name">';
+                $output .= '<strong>' . esc_html($destination['name']) . '</strong>';
+                if ($destination['is_primary']) {
+                    $output .= ' <span class="primary-badge">' . viator_translate_location_label('primary', $language) . '</span>';
+                }
+                $output .= '</div>';
+                
+                if (!empty($destination['type'])) {
+                    $translated_type = viator_translate_destination_type($destination['type'], $language);
+                    $output .= '<div class="dest-type">' . viator_translate_location_label('type', $language) . ': ' . esc_html($translated_type) . '</div>';
+                }
+                
+                // Informações do destino
+                $dest_info = [];
+                if (!empty($destination['timezone'])) {
+                    $dest_info[] = '🕐 ' . $destination['timezone'];
+                }
+                if (!empty($destination['currency'])) {
+                    $currency_name = viator_translate_currency_code($destination['currency'], $language);
+                    $dest_info[] = '💰 ' . $currency_name;
+                }
+                if (!empty($destination['languages'])) {
+                    $language_codes = is_array($destination['languages']) ? $destination['languages'] : [$destination['languages']];
+                    $translated_languages = [];
+                    foreach ($language_codes as $lang_code) {
+                        $translated_languages[] = viator_translate_language_code($lang_code, $language);
+                    }
+                    $languages_text = implode(', ', $translated_languages);
+                    $dest_info[] = '🗣️ ' . $languages_text;
+                }
+                
+                if (!empty($dest_info)) {
+                    $output .= '<div class="dest-info">' . implode(' • ', $dest_info) . '</div>';
+                }
+                
+                $output .= '</div>';
+            }
+            
+            $output .= '</div>';
+            $output .= '</div>';
+        }
+        
         $output .= '</div>';
     }
     
@@ -3327,3 +4075,203 @@ function viator_test_groq_model() {
     }
 }
 add_action('wp_head', 'viator_test_groq_model');
+
+// Função de teste das informações de destinos
+function viator_test_destinations_info() {
+    if (isset($_GET['test_destinations']) && current_user_can('manage_options')) {
+        echo '<div style="max-width: 1200px; margin: 20px auto; padding: 20px; font-family: Arial, sans-serif; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">';
+        echo '<h1 style="color: #0056B3; border-bottom: 2px solid #007BFF; padding-bottom: 10px;">Teste das Informações de Destinos - Viator API</h1>';
+        
+        // Testar requisição de destinos
+        echo '<h2 style="color: #333;">📍 Teste de Requisição dos Destinos</h2>';
+        $destinations_data = viator_get_destinations_data();
+        
+        if ($destinations_data) {
+            echo '<div style="background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 5px; margin: 10px 0;">';
+            echo '<strong>✅ Sucesso!</strong> Encontrados ' . count($destinations_data) . ' destinos.';
+            echo '</div>';
+            
+            // Mostrar alguns exemplos
+            echo '<h3 style="color: #333;">Exemplos de Destinos (primeiros 5):</h3>';
+            $count = 0;
+            foreach ($destinations_data as $id => $destination) {
+                if ($count >= 5) break;
+                
+                echo '<div style="background: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; margin: 10px 0; border-radius: 6px; border-left: 4px solid #007BFF;">';
+                echo '<div style="display: flex; flex-wrap: wrap; gap: 15px;">';
+                echo '<div style="min-width: 200px;"><strong>ID:</strong> ' . esc_html($id) . '</div>';
+                echo '<div style="min-width: 200px;"><strong>Nome:</strong> ' . esc_html($destination['name'] ?? 'N/A') . '</div>';
+                echo '<div style="min-width: 150px;"><strong>Tipo:</strong> ' . esc_html($destination['type'] ?? 'N/A') . '</div>';
+                echo '</div>';
+                
+                $extra_info = [];
+                if (isset($destination['timeZone'])) {
+                    $extra_info[] = '🕐 ' . esc_html($destination['timeZone']);
+                }
+                if (isset($destination['defaultCurrencyCode'])) {
+                    $currency_name = viator_translate_currency_code($destination['defaultCurrencyCode'], 'pt-BR');
+                    $extra_info[] = '💰 ' . esc_html($currency_name);
+                }
+                if (isset($destination['center']['latitude']) && isset($destination['center']['longitude'])) {
+                    $extra_info[] = '🧭 ' . esc_html($destination['center']['latitude']) . ', ' . esc_html($destination['center']['longitude']);
+                }
+                
+                if (!empty($extra_info)) {
+                    echo '<div style="margin-top: 8px; font-size: 14px; color: #666;">' . implode(' | ', $extra_info) . '</div>';
+                }
+                echo '</div>';
+                $count++;
+            }
+        } else {
+            echo '<div style="background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 5px; margin: 10px 0;">';
+            echo '<strong>❌ Erro!</strong> Não foi possível obter dados dos destinos.';
+            echo '</div>';
+        }
+        
+        // Testar com uma atração específica (exemplo)
+        echo '<h2 style="color: #333; margin-top: 30px;">🏛️ Teste com Atração Específica</h2>';
+        echo '<p>Digite um ID de atração para testar as informações de localização enriquecidas:</p>';
+        
+        if (isset($_GET['attraction_id']) && !empty($_GET['attraction_id'])) {
+            $attraction_id = sanitize_text_field($_GET['attraction_id']);
+            echo '<h3 style="color: #007BFF;">Testando atração ID: ' . esc_html($attraction_id) . '</h3>';
+            
+            $attraction_data = viator_get_attraction_details($attraction_id);
+            
+            if ($attraction_data) {
+                $location_info = viator_get_location_info($attraction_data);
+                
+                echo '<div style="background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 5px; margin: 10px 0;">';
+                echo '<strong>✅ Atração encontrada:</strong> ' . esc_html($attraction_data['name'] ?? 'N/A');
+                echo '</div>';
+                
+                // Preview da página como ficaria
+                echo '<h4 style="color: #333;">🎨 Preview da Seção de Localização:</h4>';
+                echo '<div style="border: 2px dashed #007BFF; padding: 20px; margin: 15px 0; border-radius: 8px; background: #f8f9ff;">';
+                
+                // Simular a localização enriquecida
+                if ($location_info['main_destination']) {
+                    $main_dest = $location_info['main_destination'];
+                    echo '<div style="background: linear-gradient(135deg, #f8f9ff, #e8f4fd); border: 1px solid #e0e7ff; border-radius: 8px; padding: 15px; margin-bottom: 20px;">';
+                    echo '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">';
+                    echo '<span style="color: #007BFF; font-size: 16px;">📍</span>';
+                                         echo '<span style="font-weight: 600; color: #333; font-size: 16px;">' . esc_html($main_dest['name']) . '</span>';
+                     if (!empty($main_dest['type'])) {
+                         $translated_type = viator_translate_destination_type($main_dest['type'], 'pt-BR');
+                         echo '<span style="color: #666; font-size: 14px; margin-left: 5px;">(' . esc_html($translated_type) . ')</span>';
+                     }
+                    echo '</div>';
+                    
+                                         $dest_details = [];
+                     if (!empty($main_dest['timezone'])) {
+                         $dest_details[] = '<span style="font-size: 13px; color: #555; background: rgba(255, 255, 255, 0.6); padding: 4px 8px; border-radius: 4px;">🕐 ' . esc_html($main_dest['timezone']) . '</span>';
+                     }
+                     if (!empty($main_dest['currency'])) {
+                         $currency_name = viator_translate_currency_code($main_dest['currency'], 'pt-BR');
+                         $dest_details[] = '<span style="font-size: 13px; color: #555; background: rgba(255, 255, 255, 0.6); padding: 4px 8px; border-radius: 4px;">💰 ' . esc_html($currency_name) . '</span>';
+                     }
+                    
+                    if (!empty($dest_details)) {
+                        echo '<div style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 8px;">';
+                        echo implode(' ', $dest_details);
+                        echo '</div>';
+                    }
+                    echo '</div>';
+                }
+                
+                // Coordenadas se disponíveis
+                if ($location_info['coordinates']) {
+                    $coords = $location_info['coordinates'];
+                    echo '<div style="background: #f8f9fa; padding: 15px; border-radius: 6px; border-left: 4px solid #007BFF; margin: 15px 0;">';
+                    echo '<h4 style="margin: 0 0 10px 0;">🧭 Coordenadas</h4>';
+                    echo '<div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center;">';
+                    echo '<span style="font-family: monospace; background: white; padding: 5px 10px; border-radius: 4px; border: 1px solid #e0e0e0;">Lat: ' . esc_html($coords['latitude']) . '</span>';
+                    echo '<span style="font-family: monospace; background: white; padding: 5px 10px; border-radius: 4px; border: 1px solid #e0e0e0;">Lng: ' . esc_html($coords['longitude']) . '</span>';
+                    $maps_url = 'https://www.google.com/maps?q=' . urlencode($coords['latitude'] . ',' . $coords['longitude']);
+                    echo '<a href="' . esc_url($maps_url) . '" target="_blank" style="background: #4285f4; color: white; padding: 8px 16px; border-radius: 5px; text-decoration: none; font-weight: 500;">🗺️ Ver no Google Maps</a>';
+                    echo '</div>';
+                    echo '</div>';
+                }
+                
+                echo '</div>';
+                
+                // Mostrar informações processadas (formato técnico)
+                echo '<h4 style="color: #333;">⚙️ Informações Técnicas Processadas:</h4>';
+                echo '<pre style="background: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto; border: 1px solid #dee2e6; font-size: 12px;">';
+                echo htmlspecialchars(json_encode($location_info, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+                echo '</pre>';
+                
+                // Mostrar dados brutos relevantes
+                echo '<h4 style="color: #333;">📡 Dados Brutos da API:</h4>';
+                $relevant_data = [
+                    'destinations' => $attraction_data['destinations'] ?? null,
+                    'center' => $attraction_data['center'] ?? null
+                ];
+                echo '<pre style="background: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto; border: 1px solid #dee2e6; font-size: 12px;">';
+                echo htmlspecialchars(json_encode($relevant_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+                echo '</pre>';
+            } else {
+                echo '<div style="background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 5px; margin: 10px 0;">';
+                echo '<strong>❌ Erro!</strong> Atração não encontrada ou erro na API.';
+                echo '</div>';
+            }
+        }
+        
+        // Formulário para testar
+        echo '<form method="GET" style="background: #e9ecef; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #ced4da;">';
+        echo '<input type="hidden" name="test_destinations" value="1">';
+        echo '<label for="attraction_id" style="font-weight: 600; color: #333;"><strong>ID da Atração:</strong></label><br>';
+        echo '<input type="text" name="attraction_id" id="attraction_id" placeholder="Ex: 2177 (Torre Eiffel), 31 (Loch Ness)" style="width: 300px; padding: 8px; margin: 8px 0; border: 1px solid #ced4da; border-radius: 4px;">';
+        echo '<button type="submit" style="padding: 8px 16px; background: #0056B3; color: white; border: none; border-radius: 4px; margin-left: 10px; cursor: pointer; font-weight: 500;">Testar Atração</button>';
+        echo '</form>';
+        
+        // Demonstração das traduções amigáveis
+        echo '<div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 20px; border-radius: 8px; margin: 20px 0;">';
+        echo '<h3 style="color: #856404; margin-top: 0;">✨ Demonstração das Traduções Amigáveis</h3>';
+        echo '<p style="color: #856404; margin-bottom: 15px;">Veja como as informações são exibidas de forma amigável ao usuário:</p>';
+        echo '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">';
+        
+        // Exemplo de antes e depois para moeda
+        echo '<div style="background: white; padding: 15px; border-radius: 6px; border-left: 4px solid #dc3545;">';
+        echo '<h4 style="margin: 0 0 8px 0; color: #dc3545;">❌ Antes (siglas):</h4>';
+        echo '<span style="font-family: monospace; background: #f8f9fa; padding: 4px 8px; border-radius: 3px;">💰 COP</span><br>';
+        echo '<span style="font-family: monospace; background: #f8f9fa; padding: 4px 8px; border-radius: 3px;">🗣️ es-CO</span>';
+        echo '</div>';
+        
+        echo '<div style="background: white; padding: 15px; border-radius: 6px; border-left: 4px solid #28a745;">';
+        echo '<h4 style="margin: 0 0 8px 0; color: #28a745;">✅ Depois (amigável):</h4>';
+        echo '<span style="background: #d4edda; padding: 4px 8px; border-radius: 3px;">💰 Peso Colombiano</span><br>';
+        echo '<span style="background: #d4edda; padding: 4px 8px; border-radius: 3px;">🗣️ Espanhol Colombiano</span>';
+        echo '</div>';
+        
+        echo '</div>';
+        
+        // Mais exemplos
+        echo '<div style="margin-top: 15px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">';
+        echo '<div style="background: white; padding: 10px; border-radius: 4px; text-align: center;"><strong>EUR</strong> → <span style="color: #007BFF;">Euro</span></div>';
+        echo '<div style="background: white; padding: 10px; border-radius: 4px; text-align: center;"><strong>USD</strong> → <span style="color: #007BFF;">Dólar Americano</span></div>';
+        echo '<div style="background: white; padding: 10px; border-radius: 4px; text-align: center;"><strong>es-CO</strong> → <span style="color: #007BFF;">Espanhol Colombiano</span></div>';
+        echo '<div style="background: white; padding: 10px; border-radius: 4px; text-align: center;"><strong>fr-FR</strong> → <span style="color: #007BFF;">Francês da França</span></div>';
+        echo '</div>';
+        echo '</div>';
+        
+        // Informações adicionais
+        echo '<div style="background: #d1ecf1; border: 1px solid #bee5eb; padding: 20px; border-radius: 8px; margin: 20px 0;">';
+        echo '<h3 style="color: #0c5460; margin-top: 0;">ℹ️ Informações sobre o Sistema</h3>';
+        echo '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">';
+        echo '<div><strong>🏷️ Cache:</strong> Destinos cacheados por 7 dias (recomendação API)</div>';
+        echo '<div><strong>🌐 Endpoint:</strong> /partner/destinations (todos os destinos)</div>';
+        echo '<div><strong>🎯 Uso:</strong> Enriquecer páginas de atrações com localização</div>';
+        echo '<div><strong>✨ Recursos:</strong> Coordenadas, timezone, moeda, idiomas, Google Maps</div>';
+        echo '<div><strong>🌍 Traduções:</strong> +100 moedas e +50 idiomas traduzidos</div>';
+        echo '<div><strong>🔄 Idiomas:</strong> PT-BR, EN-US com fallbacks automáticos</div>';
+        echo '</div>';
+        echo '</div>';
+        
+        echo '<p style="text-align: center; color: #666; font-style: italic; margin-top: 30px;">Para testar, adicione ?test_destinations=1 à URL (apenas administradores)</p>';
+        
+        echo '</div>';
+        exit;
+    }
+}
+add_action('wp_head', 'viator_test_destinations_info');
