@@ -218,58 +218,7 @@ function viator_settings_page() {
             <?php submit_button(); ?>
         </form>
         
-        <!-- Seção de Gerenciamento de Cache -->
-        <div style="margin-top: 40px; border-top: 1px solid #ddd; padding-top: 20px;">
-            <h2>Gerenciamento de Cache</h2>
-            <table class="form-table">
-                <tr>
-                    <th scope="row">Cache de Tags</th>
-                    <td>
-                        <button type="button" id="refresh-tags-cache" class="button button-secondary">Atualizar Cache de Tags</button>
-                        <p class="description">Atualiza o cache das tags dos produtos. O cache é renovado automaticamente a cada 7 dias.</p>
-                        <div id="tags-cache-result" style="margin-top: 10px;"></div>
-                    </td>
-                </tr>
 
-            </table>
-        </div>
-        
-
-        
-        <script>
-        jQuery(document).ready(function($) {
-            $('#refresh-tags-cache').on('click', function() {
-                var button = $(this);
-                var resultDiv = $('#tags-cache-result');
-                
-                button.prop('disabled', true).text('Atualizando...');
-                resultDiv.html('<span style="color: #0073aa;">Atualizando cache das tags...</span>');
-                
-                $.ajax({
-                    url: ajaxurl,
-                    type: 'POST',
-                    data: {
-                        action: 'viator_refresh_tags_cache',
-                        nonce: '<?php echo wp_create_nonce('viator_admin_nonce'); ?>'
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            resultDiv.html('<span style="color: #46b450;">✓ ' + response.data.message + ' (' + response.data.tags_count + ' tags carregadas)</span>');
-                        } else {
-                            resultDiv.html('<span style="color: #dc3232;">✗ Erro: ' + response.data + '</span>');
-                        }
-                    },
-                    error: function() {
-                        resultDiv.html('<span style="color: #dc3232;">✗ Erro de conexão</span>');
-                    },
-                    complete: function() {
-                        button.prop('disabled', false).text('Atualizar Cache de Tags');
-                    }
-                });
-            });
-            
-
-        });
         </script>
     </div>
     <?php

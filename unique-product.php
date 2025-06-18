@@ -2632,6 +2632,225 @@ function viator_refresh_tags_cache_ajax() {
 add_action('wp_ajax_viator_refresh_tags_cache', 'viator_refresh_tags_cache_ajax');
 
 /**
+ * Clear products cache (titles and durations)
+ */
+function viator_clear_products_cache() {
+    global $wpdb;
+    
+    $cleared_count = 0;
+    
+    // Buscar todos os transients relacionados a produtos
+    $transients = $wpdb->get_results("
+        SELECT option_name 
+        FROM {$wpdb->options} 
+        WHERE option_name LIKE '_transient_viator_product_%'
+    ");
+    
+    foreach ($transients as $transient) {
+        $transient_name = str_replace('_transient_', '', $transient->option_name);
+        delete_transient($transient_name);
+        $cleared_count++;
+    }
+    
+    viator_debug_log("Products cache cleared: {$cleared_count} items removed");
+    return $cleared_count;
+}
+
+/**
+ * Clear reviews cache
+ */
+function viator_clear_reviews_cache() {
+    global $wpdb;
+    
+    $cleared_count = 0;
+    
+    // Buscar todos os transients relacionados a reviews
+    $transients = $wpdb->get_results("
+        SELECT option_name 
+        FROM {$wpdb->options} 
+        WHERE option_name LIKE '_transient_viator_reviews_%'
+    ");
+    
+    foreach ($transients as $transient) {
+        $transient_name = str_replace('_transient_', '', $transient->option_name);
+        delete_transient($transient_name);
+        $cleared_count++;
+    }
+    
+    viator_debug_log("Reviews cache cleared: {$cleared_count} items removed");
+    return $cleared_count;
+}
+
+/**
+ * Clear availability cache
+ */
+function viator_clear_availability_cache() {
+    global $wpdb;
+    
+    $cleared_count = 0;
+    
+    // Buscar todos os transients relacionados a disponibilidade
+    $transients = $wpdb->get_results("
+        SELECT option_name 
+        FROM {$wpdb->options} 
+        WHERE option_name LIKE '_transient_viator_availability_%'
+        OR option_name LIKE '_transient_viator_booking_%'
+    ");
+    
+    foreach ($transients as $transient) {
+        $transient_name = str_replace('_transient_', '', $transient->option_name);
+        delete_transient($transient_name);
+        $cleared_count++;
+    }
+    
+    viator_debug_log("Availability cache cleared: {$cleared_count} items removed");
+    return $cleared_count;
+}
+
+/**
+ * Clear all Viator-related cache
+ */
+function viator_clear_all_cache() {
+    global $wpdb;
+    
+    $results = array(
+        'tags' => 0,
+        'products' => 0,
+        'reviews' => 0,
+        'availability' => 0,
+        'total' => 0
+    );
+    
+    // Buscar todos os transients do Viator
+    $transients = $wpdb->get_results("
+        SELECT option_name 
+        FROM {$wpdb->options} 
+        WHERE option_name LIKE '_transient_viator_%'
+    ");
+    
+    foreach ($transients as $transient) {
+        $transient_name = str_replace('_transient_', '', $transient->option_name);
+        delete_transient($transient_name);
+        
+        // Categorizar por tipo
+        if (strpos($transient_name, 'viator_all_tags') !== false) {
+            $results['tags']++;
+        } elseif (strpos($transient_name, 'viator_product_') !== false) {
+            $results['products']++;
+        } elseif (strpos($transient_name, 'viator_reviews_') !== false) {
+            $results['reviews']++;
+        } elseif (strpos($transient_name, 'viator_availability_') !== false || strpos($transient_name, 'viator_booking_') !== false) {
+            $results['availability']++;
+        }
+        
+        $results['total']++;
+    }
+    
+    viator_debug_log("All Viator cache cleared", $results);
+    return $results;
+}
+
+/**
+ * AJAX handler para limpar cache de produtos
+ */
+function viator_clear_products_cache_ajax() {
+    // Verificar nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'viator_admin_nonce')) {
+        wp_send_json_error('Erro de segurança');
+        return;
+    }
+    
+    // Verificar permissões
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error('Permissões insuficientes');
+        return;
+    }
+    
+    $cleared_count = viator_clear_products_cache();
+    
+    wp_send_json_success(array(
+        'message' => "Cache de produtos limpo com sucesso ({$cleared_count} itens removidos)",
+        'cleared_count' => $cleared_count
+    ));
+}
+add_action('wp_ajax_viator_clear_products_cache', 'viator_clear_products_cache_ajax');
+
+/**
+ * AJAX handler para limpar cache de reviews
+ */
+function viator_clear_reviews_cache_ajax() {
+    // Verificar nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'viator_admin_nonce')) {
+        wp_send_json_error('Erro de segurança');
+        return;
+    }
+    
+    // Verificar permissões
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error('Permissões insuficientes');
+        return;
+    }
+    
+    $cleared_count = viator_clear_reviews_cache();
+    
+    wp_send_json_success(array(
+        'message' => "Cache de reviews limpo com sucesso ({$cleared_count} itens removidos)",
+        'cleared_count' => $cleared_count
+    ));
+}
+add_action('wp_ajax_viator_clear_reviews_cache', 'viator_clear_reviews_cache_ajax');
+
+/**
+ * AJAX handler para limpar cache de disponibilidade
+ */
+function viator_clear_availability_cache_ajax() {
+    // Verificar nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'viator_admin_nonce')) {
+        wp_send_json_error('Erro de segurança');
+        return;
+    }
+    
+    // Verificar permissões
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error('Permissões insuficientes');
+        return;
+    }
+    
+    $cleared_count = viator_clear_availability_cache();
+    
+    wp_send_json_success(array(
+        'message' => "Cache de disponibilidade limpo com sucesso ({$cleared_count} itens removidos)",
+        'cleared_count' => $cleared_count
+    ));
+}
+add_action('wp_ajax_viator_clear_availability_cache', 'viator_clear_availability_cache_ajax');
+
+/**
+ * AJAX handler para limpar todos os caches
+ */
+function viator_clear_all_cache_ajax() {
+    // Verificar nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'viator_admin_nonce')) {
+        wp_send_json_error('Erro de segurança');
+        return;
+    }
+    
+    // Verificar permissões
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error('Permissões insuficientes');
+        return;
+    }
+    
+    $results = viator_clear_all_cache();
+    
+    wp_send_json_success(array(
+        'message' => "Todos os caches foram limpos com sucesso (Total: {$results['total']} itens removidos)",
+        'details' => $results
+    ));
+}
+add_action('wp_ajax_viator_clear_all_cache', 'viator_clear_all_cache_ajax');
+
+/**
  * Get the base URL for Viator API
  */
 function viator_get_api_base_url() {
