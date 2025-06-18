@@ -45,8 +45,8 @@ add_filter('query_vars', 'viator_query_vars');
 // Add admin menu and settings page
 function viator_admin_menu() {
     add_menu_page(
-        'API de Turismo',
-        'API Turismo',
+        'IEP Turismo',
+        'IEP Turismo',
         'manage_options',
         'viator-settings',
         'viator_settings_page',
@@ -60,6 +60,7 @@ add_action('admin_menu', 'viator_admin_menu');
 function viator_register_settings() {
     register_setting('viator_settings', 'viator_api_key');
     register_setting('viator_settings', 'viator_groq_api_key');
+    register_setting('viator_settings', 'viator_groq_model');
     register_setting('viator_settings', 'viator_language');
     register_setting('viator_settings', 'viator_currency');
 }
@@ -69,7 +70,7 @@ add_action('admin_init', 'viator_register_settings');
 function viator_settings_page() {
     ?>
     <div class="wrap">
-        <h1>API de Turismo - Configurações</h1>
+        <h1>IEP Turismo - Configurações</h1>
         <form method="post" action="options.php">
             <?php
             settings_fields('viator_settings');
@@ -95,6 +96,102 @@ function viator_settings_page() {
                                value="<?php echo esc_attr(get_option('viator_groq_api_key')); ?>" 
                                class="regular-text">
                         <p class="description">Insira sua chave API do Groq para gerar curiosidades inteligentes sobre os destinos pesquisados.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">Modelo Groq IA</th>
+                    <td>
+                        <select name="viator_groq_model" id="viator_groq_model">
+                            <option value="llama-3.1-8b-instant" <?php selected(get_option('viator_groq_model', 'llama-3.1-8b-instant'), 'llama-3.1-8b-instant'); ?>>Llama 3.1 8B Instant - Muito Rápido (Recomendado)</option>
+                            <option value="llama3-8b-8192" <?php selected(get_option('viator_groq_model', 'llama-3.1-8b-instant'), 'llama3-8b-8192'); ?>>Llama 3 8B - Rápido</option>
+                            <option value="llama-3.3-70b-versatile" <?php selected(get_option('viator_groq_model', 'llama-3.1-8b-instant'), 'llama-3.3-70b-versatile'); ?>>Llama 3.3 70B Versatile - Melhor Qualidade</option>
+                            <option value="llama3-70b-8192" <?php selected(get_option('viator_groq_model', 'llama-3.1-8b-instant'), 'llama3-70b-8192'); ?>>Llama 3 70B - Alta Qualidade</option>
+                            <option value="gemma2-9b-it" <?php selected(get_option('viator_groq_model', 'llama-3.1-8b-instant'), 'gemma2-9b-it'); ?>>Gemma 2 9B - Google AI</option>
+                            <option value="deepseek-r1-distill-llama-70b" <?php selected(get_option('viator_groq_model', 'llama-3.1-8b-instant'), 'deepseek-r1-distill-llama-70b'); ?>>DeepSeek R1 70B - Raciocínio Avançado</option>
+                            <option value="mistral-saba-24b" <?php selected(get_option('viator_groq_model', 'llama-3.1-8b-instant'), 'mistral-saba-24b'); ?>>Mistral Saba 24B - Equilibrado</option>
+                        </select>
+                        <p class="description">
+                            <strong>Modelos oficiais da Groq para gerar descrições das atrações:</strong><br>
+                            • <strong>Llama 3.1 8B Instant</strong>: Mais rápido, 6k tokens/min, ideal para alto volume<br>
+                            • <strong>Llama 3 8B</strong>: Rápido e confiável, 6k tokens/min<br>
+                            • <strong>Llama 3.3 70B Versatile</strong>: Melhor qualidade, 12k tokens/min<br>
+                            • <strong>Llama 3 70B</strong>: Alta qualidade, 6k tokens/min<br>
+                            • <strong>Gemma 2 9B</strong>: Google AI, 15k tokens/min, boa criatividade<br>
+                            • <strong>DeepSeek R1 70B</strong>: Especializado em raciocínio complexo<br>
+                            • <strong>Mistral Saba 24B</strong>: Equilibrio entre velocidade e qualidade
+                        </p>
+                        
+                        <details style="margin-top: 15px;">
+                            <summary style="cursor: pointer; font-weight: bold; color: #0056B3;">📊 Ver Limites de Rate da API Groq</summary>
+                            <div style="margin-top: 10px; background: #f9f9f9; padding: 15px; border-radius: 5px;">
+                                <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                                    <thead>
+                                        <tr style="background: #e0e0e0;">
+                                            <th style="padding: 8px; border: 1px solid #ccc; text-align: left;">Modelo</th>
+                                            <th style="padding: 8px; border: 1px solid #ccc; text-align: center;">Req/Min</th>
+                                            <th style="padding: 8px; border: 1px solid #ccc; text-align: center;">Req/Dia</th>
+                                            <th style="padding: 8px; border: 1px solid #ccc; text-align: center;">Tokens/Min</th>
+                                            <th style="padding: 8px; border: 1px solid #ccc; text-align: center;">Tokens/Dia</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td style="padding: 6px; border: 1px solid #ccc;"><strong>llama-3.1-8b-instant</strong></td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">30</td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">14.400</td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">6.000</td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">500.000</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px; border: 1px solid #ccc;"><strong>llama3-8b-8192</strong></td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">30</td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">14.400</td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">6.000</td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">500.000</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px; border: 1px solid #ccc;"><strong>llama-3.3-70b-versatile</strong></td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">30</td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">1.000</td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">12.000</td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">100.000</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px; border: 1px solid #ccc;"><strong>llama3-70b-8192</strong></td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">30</td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">14.400</td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">6.000</td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">500.000</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px; border: 1px solid #ccc;"><strong>gemma2-9b-it</strong></td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">30</td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">14.400</td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">15.000</td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">500.000</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px; border: 1px solid #ccc;"><strong>deepseek-r1-distill-llama-70b</strong></td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">30</td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">1.000</td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">6.000</td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">Sem limite</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 6px; border: 1px solid #ccc;"><strong>mistral-saba-24b</strong></td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">30</td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">1.000</td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">6.000</td>
+                                            <td style="padding: 6px; border: 1px solid #ccc; text-align: center;">500.000</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <p style="margin-top: 10px; font-size: 11px; color: #666;">
+                                    <strong>Fonte:</strong> Documentação oficial da Groq API - Consultado em 18/06/2025<br>
+                                    <strong>Dica:</strong> Para sites com muito tráfego, prefira modelos com maior limite de requisições por dia.
+                                </p>
+                            </div>
+                        </details>
                     </td>
                 </tr>
                 <tr>
@@ -2426,6 +2523,105 @@ function viator_format_duration($duration_fixed, $duration_from = null, $duratio
     }
 }
 
+// Função para garantir que a descrição está completa
+function viator_ensure_complete_description($description, $attraction_name, $location, $language) {
+    $last_char = substr($description, -1);
+    $last_word = substr($description, strrpos($description, ' ') + 1);
+    
+    // Verificar se termina com pontuação adequada
+    $ending_punctuation = ['.', '!', '?'];
+    $has_proper_ending = in_array($last_char, $ending_punctuation);
+    
+    // Verificar se a última palavra parece incompleta (muito curta ou com caracteres estranhos)
+    $seems_incomplete = strlen($last_word) < 3 && !$has_proper_ending;
+    
+    // Detectar palavras cortadas no meio (sem vogais ou caracteres incompletos)
+    $incomplete_patterns = [
+        '/\b\w{1,2}$/',  // Palavras muito curtas no final
+        '/[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]{3,}$/',  // Sequência de consoantes no final
+        '/\w+[^a-záàâãéèêíìîóòôõúùûçñüA-ZÁÀÂÃÉÈÊÍÌÎÓÒÔÕÚÙÛÇÑÜ\s\.\!\?]$/'  // Caracteres estranhos no final
+    ];
+    
+    $has_incomplete_word = false;
+    foreach ($incomplete_patterns as $pattern) {
+        if (preg_match($pattern, $description)) {
+            $has_incomplete_word = true;
+            break;
+        }
+    }
+    
+    if (!$has_proper_ending || $seems_incomplete || $has_incomplete_word) {
+        viator_debug_log('Descrição parece incompleta, tentando corrigir:', $description);
+        
+        // Tentar remover a última palavra incompleta e adicionar ponto final
+        $words = explode(' ', trim($description));
+        if (count($words) > 1) {
+            $last_word = end($words);
+            
+            // Remove a última palavra se parecer incompleta
+            if (!$has_proper_ending && (strlen($last_word) < 4 || $has_incomplete_word)) {
+                array_pop($words);
+                $description = implode(' ', $words);
+            }
+            
+            // Garantir que termina com ponto
+            $last_char = substr($description, -1);
+            if (!in_array($last_char, $ending_punctuation)) {
+                $description .= '.';
+            }
+        }
+        
+        viator_debug_log('Descrição corrigida:', $description);
+    }
+    
+    return $description;
+}
+
+// Função para garantir que textos curtos estão completos (para curiosidades)
+function viator_ensure_complete_text($text) {
+    $last_char = substr($text, -1);
+    $ending_punctuation = ['.', '!', '?'];
+    $has_proper_ending = in_array($last_char, $ending_punctuation);
+    
+    // Verificar se a última palavra parece incompleta
+    $words = explode(' ', trim($text));
+    $last_word = end($words);
+    
+    // Padrões que indicam texto incompleto
+    $incomplete_patterns = [
+        '/[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]{3,}$/',  // Muitas consoantes seguidas
+        '/\w+[^a-záàâãéèêíìîóòôõúùûçñüA-ZÁÀÂÃÉÈÊÍÌÎÓÒÔÕÚÙÛÇÑÜ\s\.\!\?]$/'  // Caracteres estranhos
+    ];
+    
+    $seems_incomplete = false;
+    foreach ($incomplete_patterns as $pattern) {
+        if (preg_match($pattern, $text)) {
+            $seems_incomplete = true;
+            break;
+        }
+    }
+    
+    // Se parece incompleto ou não tem pontuação final adequada
+    if (!$has_proper_ending || $seems_incomplete || (strlen($last_word) < 3 && !$has_proper_ending)) {
+        viator_debug_log('Texto parece incompleto:', $text);
+        
+        // Remover última palavra se parecer incompleta
+        if (count($words) > 1 && (strlen($last_word) < 3 || $seems_incomplete)) {
+            array_pop($words);
+            $text = implode(' ', $words);
+        }
+        
+        // Garantir ponto final
+        if (!in_array(substr($text, -1), $ending_punctuation)) {
+            $text .= '.';
+        }
+        
+        viator_debug_log('Texto corrigido:', $text);
+    }
+    
+    return $text;
+}
+
 // Função para gerar curiosidades usando a API do Groq
 function viator_get_groq_curiosity($searchTerm) {
     $groq_api_key = get_option('viator_groq_api_key');
@@ -2446,6 +2642,9 @@ function viator_get_groq_curiosity($searchTerm) {
     
     $prompt = isset($language_prompts[$language]) ? $language_prompts[$language] : $language_prompts['pt-BR'];
     
+    // Obter modelo selecionado nas configurações
+    $selected_model = get_option('viator_groq_model', 'llama-3.1-8b-instant');
+    
     // Preparar dados para a API do Groq
     $data = [
         'messages' => [
@@ -2454,9 +2653,9 @@ function viator_get_groq_curiosity($searchTerm) {
                 'content' => $prompt
             ]
         ],
-        'model' => 'llama-3.1-8b-instant',
+        'model' => $selected_model,
         'temperature' => 0.7,
-        'max_tokens' => 150,
+        'max_tokens' => 120,
         'top_p' => 1,
         'stream' => false
     ];
@@ -2495,11 +2694,15 @@ function viator_get_groq_curiosity($searchTerm) {
         $curiosity = preg_replace('/^(Curiosidade:|Did you know\?)/i', '', $curiosity);
         $curiosity = trim($curiosity);
         
+        // Verificar se a curiosidade está completa
+        $curiosity = viator_ensure_complete_text($curiosity);
+        
         // Limitar o tamanho se necessário
         if (str_word_count($curiosity) > 70) {
-            $curiosity = wp_trim_words($curiosity, 60, '...');
+            $curiosity = wp_trim_words($curiosity, 60, '.');
         }
         
+        error_log('Curiosidade gerada com modelo ' . $selected_model . ': ' . $curiosity);
         return $curiosity;
     }
     
@@ -3060,30 +3263,33 @@ function viator_get_attraction_ai_description($attraction_name, $location = '', 
     
     // Preparar prompt baseado no idioma (reduzido para 1-2 frases)
     if ($language === 'pt-BR') {
-        $prompt = "Escreva uma descrição turística envolvente de 1-2 frases sobre a atração '{$attraction_name}'";
+        $prompt = "Escreva uma descrição turística envolvente de EXATAMENTE 1-2 frases COMPLETAS sobre a atração '{$attraction_name}'";
         if (!empty($location)) {
             $prompt .= " em {$location}";
         }
-        $prompt .= ". Destaque os principais atrativos de forma cativante.";
+        $prompt .= ". Destaque os principais atrativos de forma cativante. SEMPRE termine com ponto final. NÃO corte palavras no meio.";
     } else {
-        $prompt = "Write an engaging tourist description of 1-2 sentences about the attraction '{$attraction_name}'";
+        $prompt = "Write an engaging tourist description of EXACTLY 1-2 COMPLETE sentences about the attraction '{$attraction_name}'";
         if (!empty($location)) {
             $prompt .= " in {$location}";
         }
-        $prompt .= ". Highlight the main attractions in a captivating way.";
+        $prompt .= ". Highlight the main attractions in a captivating way. ALWAYS end with a period. DO NOT cut words in the middle.";
     }
     
     $url = 'https://api.groq.com/openai/v1/chat/completions';
     
+    // Obter modelo selecionado nas configurações
+    $selected_model = get_option('viator_groq_model', 'llama-3.1-8b-instant');
+    
     $data = [
-        'model' => 'llama3-8b-8192',
+        'model' => $selected_model,
         'messages' => [
             [
                 'role' => 'user',
                 'content' => $prompt
             ]
         ],
-        'max_tokens' => 120,
+        'max_tokens' => 150,
         'temperature' => 0.7
     ];
     
@@ -3116,7 +3322,11 @@ function viator_get_attraction_ai_description($attraction_name, $location = '', 
     
     if (isset($data['choices'][0]['message']['content'])) {
         $description = trim($data['choices'][0]['message']['content']);
-        viator_debug_log('Descrição IA gerada para atração:', $description);
+        
+        // Verificar se a descrição está completa (não termina no meio de uma palavra)
+        $description = viator_ensure_complete_description($description, $attraction_name, $location, $language);
+        
+        viator_debug_log('Descrição IA gerada para atração com modelo ' . $selected_model . ':', $description);
         return $description;
     }
     
@@ -3135,3 +3345,36 @@ function viator_get_fallback_attraction_description($attraction_name, $language 
         return "Discover {$attraction_name}, one of the most fascinating attractions. Experience unique and unforgettable moments.";
     }
 }
+
+// Função de teste para verificar modelo Groq (apenas para admins)
+function viator_test_groq_model() {
+    if (isset($_GET['test_groq_model']) && current_user_can('manage_options')) {
+        $selected_model = get_option('viator_groq_model', 'llama-3.1-8b-instant');
+        $groq_api_key = get_option('viator_groq_api_key');
+        
+        echo '<div style="background: #f0f0f0; padding: 20px; margin: 20px; border-left: 4px solid #0056B3;">';
+        echo '<h3>Teste do Modelo Groq IA</h3>';
+        echo '<p><strong>Modelo selecionado:</strong> ' . esc_html($selected_model) . '</p>';
+        
+        if (empty($groq_api_key)) {
+            echo '<p style="color: red;"><strong>❌ Groq API Key não configurada!</strong></p>';
+        } else {
+            echo '<p style="color: green;"><strong>✅ Groq API Key configurada</strong></p>';
+            
+            // Teste de descrição de atração
+            $test_description = viator_get_attraction_ai_description('Cristo Redentor', 'Rio de Janeiro');
+            if ($test_description) {
+                echo '<p><strong>Teste de descrição gerada:</strong></p>';
+                echo '<div style="background: white; padding: 15px; border: 1px solid #ddd; border-radius: 5px;">';
+                echo '<em>"' . esc_html($test_description) . '"</em>';
+                echo '</div>';
+            } else {
+                echo '<p style="color: red;"><strong>❌ Erro ao gerar descrição com o modelo atual</strong></p>';
+            }
+        }
+        
+        echo '<p><em>Para testar, adicione ?test_groq_model=1 à URL (apenas para administradores)</em></p>';
+        echo '</div>';
+    }
+}
+add_action('wp_head', 'viator_test_groq_model');
