@@ -722,10 +722,42 @@ function viator_get_product_details($product_code) {
     $rating = isset($product['reviews']['combinedAverageRating']) ? number_format($product['reviews']['combinedAverageRating'], 1) : 0;
     $review_count = isset($product['reviews']['totalReviews']) ? intval($product['reviews']['totalReviews']) : 0;
     
-    // Try to get price from product API response first
-    $has_price_data = isset($product['pricing']['summary']['fromPrice']);
-    $price = $has_price_data ? $locale_settings['currency_symbol'] . ' ' . number_format($product['pricing']['summary']['fromPrice'], 2, ',', '.') : 'Preço não disponível';
-    $original_price = isset($pricing_summary['fromPriceBeforeDiscount']) ? $locale_settings['currency_symbol'] . ' ' . number_format($pricing_summary['fromPriceBeforeDiscount'], 2, ',', '.') : '';
+    // Try to get price from product API response first - multiple structures
+    $from_price = null;
+    $from_price_before_discount = null;
+    
+         // Tentar múltiplas estruturas de dados possíveis para preços (ordenadas por prioridade)
+     if (isset($product['pricingInfo']['summary']['fromPrice'])) {
+         $from_price = $product['pricingInfo']['summary']['fromPrice'];
+         $from_price_before_discount = isset($product['pricingInfo']['summary']['fromPriceBeforeDiscount']) ? $product['pricingInfo']['summary']['fromPriceBeforeDiscount'] : null;
+     } elseif (isset($pricing_summary['fromPrice'])) {
+         $from_price = $pricing_summary['fromPrice'];
+         $from_price_before_discount = isset($pricing_summary['fromPriceBeforeDiscount']) ? $pricing_summary['fromPriceBeforeDiscount'] : null;
+     } elseif (isset($product['pricing']['summary']['fromPrice'])) {
+         $from_price = $product['pricing']['summary']['fromPrice'];
+         $from_price_before_discount = isset($product['pricing']['summary']['fromPriceBeforeDiscount']) ? $product['pricing']['summary']['fromPriceBeforeDiscount'] : null;
+     } elseif (isset($product['price']['fromPrice'])) {
+         $from_price = $product['price']['fromPrice'];
+         $from_price_before_discount = isset($product['price']['fromPriceBeforeDiscount']) ? $product['price']['fromPriceBeforeDiscount'] : null;
+     } elseif (isset($product['fromPrice'])) {
+         $from_price = $product['fromPrice'];
+         $from_price_before_discount = isset($product['fromPriceBeforeDiscount']) ? $product['fromPriceBeforeDiscount'] : null;
+     }
+    
+         $has_price_data = ($from_price !== null);
+     $price = $has_price_data ? $locale_settings['currency_symbol'] . ' ' . number_format($from_price, 2, ',', '.') : 'Preço não disponível';
+     $original_price = ($from_price_before_discount !== null) ? $locale_settings['currency_symbol'] . ' ' . number_format($from_price_before_discount, 2, ',', '.') : '';
+     
+     // Debug: vamos logar as estruturas de dados que estão vindo da API para preços
+     if (!$has_price_data) {
+         viator_debug_log('Estruturas de preço não encontradas para produto ' . $product_code, [
+             'pricing_summary_exists' => isset($product['pricing']['summary']),
+             'pricingInfo_summary_exists' => isset($product['pricingInfo']['summary']),
+             'pricing_summary_content' => isset($pricing_summary) ? $pricing_summary : null,
+             'price_exists' => isset($product['price']),
+             'product_keys' => array_keys($product)
+         ]);
+     }
 
     // Determinar a nota de preço
     $price_note_text = ''; 
@@ -846,31 +878,47 @@ function viator_get_product_details($product_code) {
         // Usa a duração formatada que está em cache
         $duration = $cached_formatted_duration;
     }
-    // Se não encontrou no cache específico, tenta obter da resposta da API do produto
-    else if (isset($product['duration']['fixedDurationInMinutes'])) {
-        $minutes = $product['duration']['fixedDurationInMinutes'];
-        if ($minutes >= 1440) { // 24 hours or more
-            $days = floor($minutes / 1440);
-            $remaining_minutes = $minutes % 1440;
-            $hours = floor($remaining_minutes / 60);
-            
-            $duration = $days . ' dia' . ($days != 1 ? 's' : '');
-            if ($hours > 0) {
-                $duration .= ' e ' . $hours . ' hora' . ($hours != 1 ? 's' : '');
-            }
-        } elseif ($minutes < 60) {
-            $duration = $minutes . ' minutos';
-        } else {
-            $hours = floor($minutes / 60);
-            $remaining_minutes = $minutes % 60;
-            $duration = $hours . ' hora' . ($hours != 1 ? 's' : '') . 
-                       ($remaining_minutes > 0 ? ' e ' . $remaining_minutes . ' minuto' . ($remaining_minutes != 1 ? 's' : '') : '');
-        }
+    // Se não encontrou no cache específico, tenta obter da resposta da API do produto - múltiplas estruturas
+    else {
+        $duration_fixed = null;
+        $duration_from = null;
+        $duration_to = null;
+        $unstructured_duration = null;
         
-        // Armazena a duração formatada em cache para uso futuro
-        set_transient($formatted_duration_cache_key, $duration, 7 * DAY_IN_SECONDS);
-    } else {
-        // Verifica se existe duração bruta em cache
+                 // Tentar múltiplas estruturas de dados possíveis para duração (ordenadas por prioridade)
+         if (isset($product['duration']['fixedDurationInMinutes'])) {
+             $duration_fixed = $product['duration']['fixedDurationInMinutes'];
+             $duration_from = isset($product['duration']['variableDurationFromMinutes']) ? $product['duration']['variableDurationFromMinutes'] : null;
+             $duration_to = isset($product['duration']['variableDurationToMinutes']) ? $product['duration']['variableDurationToMinutes'] : null;
+             $unstructured_duration = isset($product['duration']['unstructuredDuration']) ? $product['duration']['unstructuredDuration'] : null;
+         } elseif (isset($product['itinerary']['duration']['fixedDurationInMinutes'])) {
+             $duration_fixed = $product['itinerary']['duration']['fixedDurationInMinutes'];
+             $duration_from = isset($product['itinerary']['duration']['variableDurationFromMinutes']) ? $product['itinerary']['duration']['variableDurationFromMinutes'] : null;
+             $duration_to = isset($product['itinerary']['duration']['variableDurationToMinutes']) ? $product['itinerary']['duration']['variableDurationToMinutes'] : null;
+             $unstructured_duration = isset($product['itinerary']['duration']['unstructuredDuration']) ? $product['itinerary']['duration']['unstructuredDuration'] : null;
+         } elseif (isset($product['durationInMinutes'])) {
+             $duration_fixed = $product['durationInMinutes'];
+         } elseif (isset($product['fixedDurationInMinutes'])) {
+             $duration_fixed = $product['fixedDurationInMinutes'];
+         }
+        
+        if ($duration_fixed !== null) {
+            // Usar a função existente de formatação de duração
+            $duration = viator_format_duration($duration_fixed, $duration_from, $duration_to, $unstructured_duration);
+            
+                         // Armazena a duração formatada em cache para uso futuro
+             set_transient($formatted_duration_cache_key, $duration, 7 * DAY_IN_SECONDS);
+                  } else {
+             // Debug: vamos logar as estruturas de dados que estão vindo da API
+             viator_debug_log('Estruturas de duração não encontradas para produto ' . $product_code, [
+                 'duration_exists' => isset($product['duration']),
+                 'itinerary_duration_exists' => isset($product['itinerary']['duration']),
+                 'durationInMinutes_exists' => isset($product['durationInMinutes']),
+                 'product_keys' => array_keys($product)
+             ]);
+         }
+         
+         // Verifica se existe duração bruta em cache
         $duration_cache_key = 'viator_product_' . $product_code . '_duration';
         $cached_duration = get_transient($duration_cache_key);
         
@@ -1673,7 +1721,7 @@ function viator_get_product_details($product_code) {
                             $language_names = [
                                 'pt' => 'Português',
                                 'en' => 'Inglês',
-                    
+                                'es' => 'Espanhol',
                                 'fr' => 'Francês',
                                 'de' => 'Alemão',
                                 'it' => 'Italiano',

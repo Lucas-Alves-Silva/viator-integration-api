@@ -195,9 +195,10 @@ document.addEventListener('DOMContentLoaded', function () {
             searchForm.submit();
         });
     }
-    // Adicionar evento para links de paginação
+    // Adicionar evento para links de paginação (APENAS para resultados de busca, NÃO para atrações)
     document.addEventListener('click', function(e) {
-        if (e.target.closest('.viator-pagination-btn') || e.target.closest('.viator-pagination-arrow')) {
+        if ((e.target.closest('.viator-pagination-btn') || e.target.closest('.viator-pagination-arrow')) 
+            && !e.target.closest('.viator-attraction-pagination')) {
             e.preventDefault();
             const link = e.target.closest('a');
             if (!link) return;
