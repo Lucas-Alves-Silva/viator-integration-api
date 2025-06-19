@@ -202,6 +202,25 @@ document.addEventListener('DOMContentLoaded', function () {
             const link = e.target.closest('a');
             if (!link) return;
 
+            // --- ATUALIZAR ESTADO VISUAL IMEDIATAMENTE (igual à paginação de busca) ---
+            const attractionPaginationButtons = document.querySelectorAll('.viator-attraction-pagination .viator-pagination-btn');
+            attractionPaginationButtons.forEach(btn => btn.classList.remove('active'));
+
+            // Se o clique foi diretamente em um botão de número
+            if (link.classList.contains('viator-pagination-btn')) {
+                link.classList.add('active');
+            } else if (link.classList.contains('viator-pagination-arrow')) {
+                // Se for uma seta, determinar qual botão numérico se tornará ativo
+                const targetPage = link.getAttribute('data-page');
+                if (targetPage) {
+                    const targetButton = document.querySelector(`.viator-attraction-pagination .viator-pagination-btn[data-page="${targetPage}"]`);
+                    if (targetButton) {
+                        targetButton.classList.add('active');
+                    }
+                }
+            }
+            // --- FIM DA ATUALIZAÇÃO DE ESTADO ---
+
             // Aplicar loading específico para a grid das atrações
             const gridElement = document.querySelector('.viator-attraction-products .viator-grid');
             if (gridElement) {
@@ -211,7 +230,10 @@ document.addEventListener('DOMContentLoaded', function () {
             
             // Navegação direta após um pequeno delay para mostrar o loading
             setTimeout(() => {
-                window.location.href = link.href;
+                // Adicionar parâmetro para scroll automático
+                const url = new URL(link.href);
+                url.searchParams.set('scroll_to_products', '1');
+                window.location.href = url.toString();
             }, 100);
             return;
         }

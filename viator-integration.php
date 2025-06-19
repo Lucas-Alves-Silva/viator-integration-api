@@ -4394,6 +4394,24 @@ function viator_show_attraction_details($attraction_id) {
     $output .= '</div>'; // fim viator-attraction-content
     $output .= '</div>'; // fim viator-attraction-details
     
+    // Adicionar script para scroll automático na paginação de produtos
+    $output .= '<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Verificar se existe parâmetro para scroll automático para produtos
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("scroll_to_products") === "1") {
+        const productsContainer = document.querySelector(".viator-attraction-products");
+        if (productsContainer) {
+            // Scroll suave para o início da seção de produtos
+            productsContainer.scrollIntoView({ 
+                behavior: "smooth", 
+                block: "start" 
+            });
+        }
+    }
+});
+</script>';
+    
     return $output;
 }
 

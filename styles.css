@@ -3500,31 +3500,20 @@ body[data-viator-lang="en-US"] .viator-attraction-card::before {
     justify-content: center;
 }
 
-/* Responsividade para produtos da atração */
+.viator-attraction-pagination .viator-pagination-btn:focus,
+.viator-attraction-pagination .viator-pagination-btn:active,
+.viator-attraction-pagination .viator-pagination-arrow:focus,
+.viator-attraction-pagination .viator-pagination-arrow:active {
+    background-color: #004a9e;
+    border-color: #003d82;
+    transform: scale(0.98);
+    transition: background-color 0.1s ease, transform 0.1s ease;
+    color: #fff;
+}
+
 @media (max-width: 1200px) {
     .viator-attraction-products .viator-grid {
         grid-template-columns: repeat(2, 1fr);
-        gap: 18px; /* Reduzido de 25px para 18px */
-    }
-}
-
-@media (max-width: 768px) {
-    .viator-attraction-products {
-        margin-top: 30px;
-        padding: 20px 15px;
-    }
-    
-    .viator-attraction-products h2 {
-        font-size: 20px;
-    }
-    
-    .viator-attraction-products p {
-        font-size: 14px;
-    }
-    
-    .viator-attraction-products .viator-grid {
-        grid-template-columns: 1fr;
-        gap: 15px; /* Reduzido de 20px para 15px */
     }
 }
 
@@ -3803,5 +3792,28 @@ body[data-viator-lang="en-US"] .viator-attraction-card::before {
 
     .viator-custom-attractions-section.extra-large .viator-custom-attraction-card img {
         height: 230px;
+    }
+}
+
+.viator-attraction-products .viator-pagination {
+    margin-top: 30px;
+}
+
+/* Adiciona feedback visual imediato ao clique na paginação da atração */
+.viator-attraction-pagination .viator-pagination-btn:focus,
+.viator-attraction-pagination .viator-pagination-btn:active,
+.viator-attraction-pagination .viator-pagination-arrow:focus,
+.viator-attraction-pagination .viator-pagination-arrow:active {
+    background-color: #004a9e;
+    border-color: #003d82;
+    transform: scale(0.98);
+    transition: background-color 0.1s ease, transform 0.1s ease;
+}
+
+/* Responsividade para produtos da atração */
+@media (max-width: 1200px) {
+    .viator-attraction-products .viator-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 18px; /* Reduzido de 25px para 18px */
     }
 }
