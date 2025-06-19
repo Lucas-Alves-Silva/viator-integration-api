@@ -1067,24 +1067,161 @@
         .viator-header-info {
             display: flex;
             align-items: center;
+            justify-content: space-between; /* Distribui espaço entre elementos */
             gap: 20px;
+            width: 100%;
         }
 
-        .viator-header-cancel {
+        /* Filtros de categoria horizontais */
+        .viator-category-filters-container {
+            position: relative;
+            width: 60%; /* Reduzido de 100% para 60% */
+            max-width: 800px; /* Limite máximo */
+            overflow: hidden;
+            border-radius: 30px;
+        }
+
+        .viator-category-filters-swiper {
+            padding: 8px 40px; /* Padding para as setas internas */
+            overflow: hidden; /* Mudado de visible para hidden */
+            /* margin removido para ajuste do layout */
+        }
+
+        .viator-category-filters-swiper .swiper-wrapper {
             display: flex;
             align-items: center;
-            gap: 8px;
-            font-size: 14px;
-            color: #333;
-            background-color: #d9fff6;
-            padding: 8px 12px;
-            border-radius: 4px;
         }
 
-        .viator-header-cancel img {
-            width: 15px;
-            height: 15px;
-            object-fit: contain;
+        .viator-category-filters-swiper .swiper-slide {
+            width: auto;
+            flex-shrink: 0;
+            margin-right: 12px;
+        }
+
+        .viator-category-btn {
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #4a5568;
+            border-radius: 25px;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #4a5568;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            font-family: inherit;
+            outline: none;
+            backdrop-filter: blur(10px);
+        }
+
+        .viator-category-btn:hover {
+            border-color: #0056B3 !important;
+            background: #f0f7ff !important;
+            color: #0056B3 !important;
+            transform: translateY(-1px);
+        }
+
+        .viator-category-btn.active {
+            background: #0056B3 !important;
+            border-color: #0056B3 !important;
+            color: white !important;
+            box-shadow: 0 2px 8px rgba(0, 86, 179, 0.3);
+        }
+
+        /* Garantir que botões ativos mantenham texto branco no hover */
+        .viator-category-btn.active:hover {
+            background: #0056B3 !important;
+            border-color: #0056B3 !important;
+            color: white !important;
+            transform: translateY(-1px);
+        }
+
+        /* Remover focus outline rosa do Elementor */
+        .viator-category-btn:focus {
+            outline: none !important;
+            box-shadow: 0 0 0 2px rgba(0, 86, 179, 0.3) !important;
+            background: #0056B3 !important;
+            border-color: #0056B3 !important;
+            color: #fff !important;
+        }
+
+        .viator-category-btn.active:focus {
+            outline: none !important;
+            box-shadow: 0 2px 8px rgba(0, 86, 179, 0.3) !important;
+        }
+
+        .viator-category-nav-prev,
+        .viator-category-nav-next {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #000;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 10;
+            box-shadow: 0 2px 8px rgba(0, 86, 179, 0.15);
+            color: #000;
+        }
+
+        .viator-category-nav-prev {
+            left: 5px; /* Mudado de -5px para 5px */
+        }
+
+        .viator-category-nav-next {
+            right: 5px; /* Mudado de -5px para 5px */
+        }
+
+        .viator-category-nav-prev:hover,
+        .viator-category-nav-next:hover {
+            background: #0056B3;
+            border-color: #0056B3;
+            color: white;
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        .viator-category-nav-prev.swiper-button-disabled,
+        .viator-category-nav-next.swiper-button-disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .viator-category-nav-prev.swiper-button-disabled:hover,
+        .viator-category-nav-next.swiper-button-disabled:hover {
+            background: rgba(255, 255, 255, 0.95);
+            border-color: #e1e5e9;
+            color: inherit;
+            transform: translateY(-50%);
+        }
+
+        /* Remover focus outline das setas */
+        .viator-category-nav-prev:focus,
+        .viator-category-nav-next:focus {
+            outline: none !important;
+        }
+
+        /* Prevenir estilos do Elementor nos filtros */
+        .viator-category-filters-container *:focus {
+            outline: none !important;
+            box-shadow: none !important;
+        }
+
+        .viator-category-filters-container button:focus {
+            outline: none !important;
+        }
+
+        /* Garantir especificidade alta para sobrescrever Elementor */
+        .elementor-section .viator-category-btn:focus,
+        .elementor-widget .viator-category-btn:focus,
+        body .viator-category-btn:focus {
+            outline: none !important;
+            box-shadow: 0 0 0 2px rgba(0, 86, 179, 0.3) !important;
         }
 
         .viator-sort {
@@ -1187,7 +1324,40 @@
                 display: flex;
                 flex-direction: column;
                 align-items: center;
+                justify-content: center; /* Centralizado no mobile */
                 gap: 10px;
+                width: 100%;
+            }
+
+            /* Filtros de categoria responsivos */
+            .viator-category-filters-container {
+                width: 90%; /* Ajustado para mobile */
+                max-width: none; /* Remove limite no mobile */
+                /* margin removido */
+            }
+
+            .viator-category-filters-swiper {
+                padding: 8px 28px; /* Ajustado para mobile */
+                /* margin removido para consistência */
+            }
+
+            .viator-category-btn {
+                padding: 6px 12px;
+                font-size: 13px;
+            }
+
+            .viator-category-nav-prev,
+            .viator-category-nav-next {
+                width: 28px;
+                height: 28px;
+            }
+
+            .viator-category-nav-prev {
+                left: 2px; /* Posição interna */
+            }
+
+            .viator-category-nav-next {
+                right: 2px; /* Posição interna */
             }
             
             /* Ajustes para layout responsivo */

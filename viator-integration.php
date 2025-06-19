@@ -823,6 +823,13 @@ function viator_get_search_results($searchTerm) {
             }
         }
     }
+    
+    // Adicionar filtro de categoria por tags, se existir
+    if (isset($_GET['category_tag']) && !empty($_GET['category_tag'])) {
+        $category_tag = intval($_GET['category_tag']);
+        $body_data['productFiltering']['tags'] = [$category_tag];
+        viator_debug_log('Adicionado filtro de categoria por tag:', $category_tag);
+    }
 
     $body = json_encode($body_data);
     viator_debug_log('Request Body:', $body);
@@ -1426,12 +1433,18 @@ function viator_get_search_results($searchTerm) {
     // Fechar a sidebar de filtros
     $output .= '</div>'; // Fechando viator-filters
 
+    // Extrair categorias dinâmicas dos produtos retornados
+    $dynamic_categories = viator_extract_dynamic_categories($data['products']);
+    
     // Header com total e ordenação
     $output .= '<div class="viator-results-container">
                 <div class="viator-header">
-                <div class="viator-header-info">
-                <span class="viator-header-cancel"><img src="https://img.icons8.com/?size=100&id=82742&format=png&color=000000" alt="Ícone" width="15" height="15"> ' . esc_html(viator_t('free_cancellation_note')) . '</span>
-                <div class="viator-header-info-filter">
+                <div class="viator-header-info">';
+    
+    // Gerar carrossel dinâmico de categorias
+    $output .= viator_generate_dynamic_category_carousel($dynamic_categories);
+    
+    $output .= '<div class="viator-header-info-filter">
                 <button class="viator-mobile-filter-button" id="mobile-filter-button">
                     <span class="filter-icon"><img width="25" height="25" src="https://img.icons8.com/ios-filled/50/sorting-options.png" alt="sorting-options"/></span>
                     <span class="filter-text">' . esc_html(viator_t('filters')) . '</span>
@@ -1900,6 +1913,14 @@ function viator_ajax_update_sort() {
         }
     }
     
+    // Processar filtro de categoria por tags
+    if (isset($_POST['category_tag']) && !empty($_POST['category_tag'])) {
+        $_GET['category_tag'] = sanitize_text_field($_POST['category_tag']);
+        viator_debug_log('Sort: Filtro de categoria recebido via POST:', $_GET['category_tag']);
+    } else {
+        unset($_GET['category_tag']);
+    }
+    
     // Debug dos parâmetros para solução de problemas
     viator_debug_log('Sort AJAX Parâmetros recebidos:', $_POST);
     viator_debug_log('Sort AJAX Parâmetros processados:', $_GET);
@@ -2006,6 +2027,14 @@ function viator_ajax_update_filter() {
         }
         $_GET['special_filter'][] = sanitize_text_field($_POST["special_filter[$i]"]);
         viator_debug_log('Filtro especial recebido via POST indexed:', $_POST["special_filter[$i]"]);
+    }
+    
+    // Processar filtro de categoria por tags
+    if (isset($_POST['category_tag']) && !empty($_POST['category_tag'])) {
+        $_GET['category_tag'] = sanitize_text_field($_POST['category_tag']);
+        viator_debug_log('Filtro de categoria recebido via POST:', $_GET['category_tag']);
+    } else {
+        unset($_GET['category_tag']);
     }
     
     // Debug dos parâmetros para solução de problemas
@@ -2202,7 +2231,38 @@ function viator_get_translation($key, $language = null) {
             // Elementos adicionais da interface
             'additional_info' => 'Informações Adicionais',
             'tooltip_support' => 'Cite este código ao falar com o suporte ao cliente.',
-            'searching' => 'Pesquisando...',
+            'searching' => 'Pesquisando',
+            
+            // Filtros de categoria (Tags da Viator)
+            'all_tours' => 'Todos os passeios',
+            'bus_tours' => 'Passeios de ônibus',
+            'day_trips' => 'Excursões de um dia',
+            'nature_wildlife' => 'Excursões pela natureza e vida selvagem',
+            'sightseeing_tours' => 'Passeios turísticos',
+            'helicopter_tours' => 'Passeios de helicóptero',
+            'adventure_tours' => 'Excursões de aventura',
+            'halfday_tours' => 'Excursões de meio dia',
+            'private_luxury' => 'Particular e de luxo',
+            'cultural_tours' => 'Excursões culturais',
+            'evening_tours' => 'Excursões noturnas',
+            'dinner_cruises' => 'Cruzeiros com jantar',
+            'private_tours' => 'Excursões turísticas privadas',
+            'holidays' => 'Feriados',
+            'weddings' => 'Casamentos e celebrações',
+            'seasonal' => 'Sazonal',
+            'christmas' => 'Natal',
+            'easter' => 'Páscoa',
+            'winter' => 'Inverno',
+            'summer' => 'Verão',
+            'concerts' => 'Concertos',
+            '4x4_tours' => 'Passeios de 4x4',
+            'extreme_sports' => 'Esportes radicais',
+            'afternoon_tours' => 'Tours da tarde',
+            'evening_entertainment' => 'Entretenimento noturno',
+            'walking_tours' => 'Caminhadas',
+            'hot_air_balloon' => 'Passeios de balão',
+            'boat_tours' => 'Passeios de barco',
+            'shore_excursions' => 'Excursões costeiras',
             'please_wait' => 'Por favor, aguarde!',
             'lets_go_searching' => 'Vamos lá! Pesquisando',
             'reset_button' => 'Redefinir',
@@ -2454,6 +2514,37 @@ function viator_get_translation($key, $language = null) {
             'senior' => 'Senior',
             'traveler' => 'Traveler',
             'boat' => 'Boat',
+            
+            // Filtros de categoria (Tags da Viator)
+            'all_tours' => 'All tours',
+            'bus_tours' => 'Bus tours',
+            'day_trips' => 'Day trips',
+            'nature_wildlife' => 'Nature & wildlife tours',
+            'sightseeing_tours' => 'Sightseeing tours',
+            'helicopter_tours' => 'Helicopter tours',
+            'adventure_tours' => 'Adventure tours',
+            'halfday_tours' => 'Half-day tours',
+            'private_luxury' => 'Private & luxury',
+            'cultural_tours' => 'Cultural tours',
+            'evening_tours' => 'Evening tours',
+            'dinner_cruises' => 'Dinner cruises',
+            'private_tours' => 'Private tours',
+            'holidays' => 'Holidays',
+            'weddings' => 'Weddings & celebrations',
+            'seasonal' => 'Seasonal',
+            'christmas' => 'Christmas',
+            'easter' => 'Easter',
+            'winter' => 'Winter',
+            'summer' => 'Summer',
+            'concerts' => 'Concerts',
+            '4x4_tours' => '4x4 tours',
+            'extreme_sports' => 'Extreme sports',
+            'afternoon_tours' => 'Afternoon tours',
+            'evening_entertainment' => 'Evening entertainment',
+            'walking_tours' => 'Walking tours',
+            'hot_air_balloon' => 'Hot air balloon rides',
+            'boat_tours' => 'Boat tours',
+            'shore_excursions' => 'Shore excursions',
             'vehicle' => 'Vehicle',
             'unit_type_vehicle_available' => 'Unit Type Vehicle Available',
             'unit_type_boat_available' => 'Unit Type Boat Available',
@@ -2627,6 +2718,208 @@ function viator_get_translation($key, $language = null) {
 // Função auxiliar para obter traduções
 function viator_t($key, $language = null) {
     return viator_get_translation($key, $language);
+}
+
+// Função para extrair categorias dinâmicas dos produtos retornados
+function viator_extract_dynamic_categories($products, $language = null) {
+    if (empty($products) || !isset($products['results'])) {
+        return [];
+    }
+    
+    $category_counts = [];
+    $excluded_tags = [
+        // Tags de qualidade que não são categorias
+        21972, 22143, 21074, 6226, 21971, 11940,
+        // Tags de recursos específicos
+        11283, 19089, 9176, 21949, 21956, 21955,
+        // Tags de público-alvo específico
+        18884, 11919, 20222,
+        // Tags de medidas de segurança
+        21953, 21958, 21956, 21951, 21955, 21949, 21959, 21954, 21948, 21950
+    ];
+    
+         // Mapear tags para nomes de categoria (baseado na documentação da Viator)
+     $tag_category_map = [
+         // Categorias principais baseadas na documentação
+         11930 => ['key' => 'bus_tours', 'name_pt' => 'Passeios de ônibus', 'name_en' => 'Bus tours'],
+         13018 => ['key' => 'bike_tours', 'name_pt' => 'Passeios de bicicleta', 'name_en' => 'Bike tours'],
+         21725 => ['key' => 'sightseeing_tours', 'name_pt' => 'Passeios turísticos', 'name_en' => 'Sightseeing tours'],
+         11922 => ['key' => 'day_trips', 'name_pt' => 'Excursões de um dia', 'name_en' => 'Day trips'],
+         21909 => ['key' => 'nature_wildlife', 'name_pt' => 'Excursões pela natureza e vida selvagem', 'name_en' => 'Nature & wildlife tours'],
+         12026 => ['key' => 'helicopter_tours', 'name_pt' => 'Passeios de helicóptero', 'name_en' => 'Helicopter tours'],
+         22046 => ['key' => 'adventure_tours', 'name_pt' => 'Excursões de aventura', 'name_en' => 'Adventure tours'],
+         18953 => ['key' => 'halfday_tours', 'name_pt' => 'Excursões de meio dia', 'name_en' => 'Half-day tours'],
+         21913 => ['key' => 'cultural_tours', 'name_pt' => 'Excursões culturais', 'name_en' => 'Cultural tours'],
+         21765 => ['key' => 'shows', 'name_pt' => 'Shows', 'name_en' => 'Shows'],
+         21701 => ['key' => 'cruises_sailing', 'name_pt' => 'Cruzeiros e navegação', 'name_en' => 'Cruises & sailing'],
+                  21911 => ['key' => 'food_drink', 'name_pt' => 'Gastronomia', 'name_en' => 'Food & drink'],
+          
+          // Categorias específicas observadas em diferentes destinos
+          11965 => ['key' => 'dinner_cruises', 'name_pt' => 'Cruzeiros com jantar', 'name_en' => 'Dinner cruises'],
+          12053 => ['key' => 'concerts', 'name_pt' => 'Concertos', 'name_en' => 'Concerts'],
+          13040 => ['key' => '4x4_tours', 'name_pt' => 'Passeios de 4x4', 'name_en' => '4x4 tours'],
+          21074 => ['key' => 'private_luxury', 'name_pt' => 'Particular e de luxo', 'name_en' => 'Private & luxury'],
+          11938 => ['key' => 'extreme_sports', 'name_pt' => 'Esportes radicais', 'name_en' => 'Extreme sports'],
+          
+          // Categorias de tempo (observadas na documentação)
+          13121 => ['key' => 'evening_tours', 'name_pt' => 'Excursões noturnas', 'name_en' => 'Evening tours'],
+          18953 => ['key' => 'halfday_tours', 'name_pt' => 'Excursões de meio dia', 'name_en' => 'Half-day tours'],
+         
+         // Tags da hierarquia mostrada na imagem
+         21584 => ['key' => 'holidays', 'name_pt' => 'Feriados', 'name_en' => 'Holidays'],
+         21593 => ['key' => 'weddings', 'name_pt' => 'Casamentos e celebrações', 'name_en' => 'Weddings & celebrations'],
+         21592 => ['key' => 'seasonal', 'name_pt' => 'Sazonal', 'name_en' => 'Seasonal'],
+         11892 => ['key' => 'christmas', 'name_pt' => 'Natal', 'name_en' => 'Christmas'],
+         11957 => ['key' => 'easter', 'name_pt' => 'Páscoa', 'name_en' => 'Easter'],
+         21590 => ['key' => 'winter', 'name_pt' => 'Inverno', 'name_en' => 'Winter'],
+         21588 => ['key' => 'summer', 'name_pt' => 'Verão', 'name_en' => 'Summer'],
+         
+         // Categorias de transporte e modalidades
+         13015 => ['key' => 'walking_tours', 'name_pt' => 'Caminhadas', 'name_en' => 'Walking tours'],
+         12027 => ['key' => 'hot_air_balloon', 'name_pt' => 'Passeios de balão', 'name_en' => 'Hot air balloon rides'],
+         11933 => ['key' => 'boat_tours', 'name_pt' => 'Passeios de barco', 'name_en' => 'Boat tours'],
+         11960 => ['key' => 'shore_excursions', 'name_pt' => 'Excursões costeiras', 'name_en' => 'Shore excursions'],
+     ];
+    
+    // Coleta todos os tags dos produtos
+    foreach ($products['results'] as $product) {
+        if (isset($product['tags']) && is_array($product['tags'])) {
+            foreach ($product['tags'] as $tag) {
+                if (!in_array($tag, $excluded_tags) && isset($tag_category_map[$tag])) {
+                    $category_info = $tag_category_map[$tag];
+                    $category_key = $category_info['key'];
+                    
+                    if (!isset($category_counts[$category_key])) {
+                        $category_counts[$category_key] = [
+                            'tag_id' => $tag,
+                            'key' => $category_key,
+                            'name_pt' => $category_info['name_pt'],
+                            'name_en' => $category_info['name_en'],
+                            'count' => 0
+                        ];
+                    }
+                    $category_counts[$category_key]['count']++;
+                }
+            }
+        }
+    }
+    
+    // Filtrar categorias com pelo menos 2 produtos e ordenar por relevância
+    $filtered_categories = array_filter($category_counts, function($category) {
+        return $category['count'] >= 2;
+    });
+    
+    // Ordenar por contagem (categorias com mais produtos primeiro)
+    uasort($filtered_categories, function($a, $b) {
+        return $b['count'] - $a['count'];
+    });
+    
+    // Limitar a 8 categorias para não sobrecarregar o UI
+    $final_categories = array_slice($filtered_categories, 0, 8, true);
+    
+    viator_debug_log('Categorias dinâmicas extraídas:', [
+        'total_produtos' => count($products['results']),
+        'categorias_encontradas' => count($category_counts),
+        'categorias_filtradas' => count($filtered_categories),
+        'categorias_finais' => count($final_categories),
+        'categorias_detalhes' => $final_categories
+    ]);
+    
+    return $final_categories;
+}
+
+// Função para gerar HTML do carrossel de categorias dinâmico
+function viator_generate_dynamic_category_carousel($categories, $language = null) {
+    if (empty($categories)) {
+        return viator_generate_fallback_category_carousel($language);
+    }
+    
+    $current_category = isset($_GET['category_tag']) ? $_GET['category_tag'] : '';
+    $locale_settings = viator_get_locale_settings();
+    $current_language = $locale_settings['language'];
+    
+    $html = '<div class="viator-category-filters-container">
+                <div class="viator-category-filters-swiper swiper">
+                    <div class="swiper-wrapper">
+                        <!-- Todos os produtos -->
+                        <div class="swiper-slide">
+                            <button class="viator-category-btn' . (empty($current_category) ? ' active' : '') . '" data-tag="" data-label="' . esc_attr(viator_t('all_tours')) . '">
+                                ' . esc_html(viator_t('all_tours')) . '
+                            </button>
+                        </div>';
+    
+    foreach ($categories as $category) {
+        $tag_id = $category['tag_id'];
+        $name = ($current_language === 'pt-BR') ? $category['name_pt'] : $category['name_en'];
+        $is_active = ($current_category == $tag_id) ? ' active' : '';
+        
+        $html .= '<div class="swiper-slide">
+                    <button class="viator-category-btn' . $is_active . '" data-tag="' . esc_attr($tag_id) . '" data-label="' . esc_attr($name) . '">
+                        ' . esc_html($name) . '
+                    </button>
+                  </div>';
+    }
+    
+    $html .= '    </div>
+                </div>
+                <div class="viator-category-nav-prev">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+                </div>
+                <div class="viator-category-nav-next">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                </div>
+            </div>';
+    
+    return $html;
+}
+
+// Função para gerar carrossel de fallback quando não há produtos suficientes
+function viator_generate_fallback_category_carousel($language = null) {
+    $current_category = isset($_GET['category_tag']) ? $_GET['category_tag'] : '';
+    
+    // Categorias populares como fallback
+    $fallback_categories = [
+        ['tag' => '11930', 'key' => 'bus_tours'],
+        ['tag' => '21725', 'key' => 'sightseeing_tours'],
+        ['tag' => '11922', 'key' => 'day_trips'],
+        ['tag' => '12026', 'key' => 'helicopter_tours'],
+        ['tag' => '22046', 'key' => 'adventure_tours'],
+        ['tag' => '21909', 'key' => 'nature_wildlife'],
+    ];
+    
+    $html = '<div class="viator-category-filters-container">
+                <div class="viator-category-filters-swiper swiper">
+                    <div class="swiper-wrapper">
+                        <!-- Todos os produtos -->
+                        <div class="swiper-slide">
+                            <button class="viator-category-btn' . (empty($current_category) ? ' active' : '') . '" data-tag="" data-label="' . esc_attr(viator_t('all_tours')) . '">
+                                ' . esc_html(viator_t('all_tours')) . '
+                            </button>
+                        </div>';
+    
+    foreach ($fallback_categories as $category) {
+        $tag_id = $category['tag'];
+        $category_key = $category['key'];
+        $is_active = ($current_category == $tag_id) ? ' active' : '';
+        
+        $html .= '<div class="swiper-slide">
+                    <button class="viator-category-btn' . $is_active . '" data-tag="' . esc_attr($tag_id) . '" data-label="' . esc_attr(viator_t($category_key)) . '">
+                        ' . esc_html(viator_t($category_key)) . '
+                    </button>
+                  </div>';
+    }
+    
+    $html .= '    </div>
+                </div>
+                <div class="viator-category-nav-prev">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+                </div>
+                <div class="viator-category-nav-next">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                </div>
+            </div>';
+    
+    return $html;
 }
 
 // Função para formatar duração com traduções
