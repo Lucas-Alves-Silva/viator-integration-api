@@ -195,6 +195,28 @@ document.addEventListener('DOMContentLoaded', function () {
             searchForm.submit();
         });
     }
+    // Adicionar evento para links de paginação das atrações
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.viator-attraction-pagination')) {
+            e.preventDefault();
+            const link = e.target.closest('a');
+            if (!link) return;
+
+            // Aplicar loading específico para a grid das atrações
+            const gridElement = document.querySelector('.viator-attraction-products .viator-grid');
+            if (gridElement) {
+                addCustomLoader(gridElement);
+                gridElement.style.opacity = '0.5';
+            }
+            
+            // Navegação direta após um pequeno delay para mostrar o loading
+            setTimeout(() => {
+                window.location.href = link.href;
+            }, 100);
+            return;
+        }
+    });
+
     // Adicionar evento para links de paginação (APENAS para resultados de busca, NÃO para atrações)
     document.addEventListener('click', function(e) {
         if ((e.target.closest('.viator-pagination-btn') || e.target.closest('.viator-pagination-arrow')) 

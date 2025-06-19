@@ -2814,7 +2814,7 @@ body[data-viator-lang="en-US"] .viator-attraction-card::before {
 /* Imagem principal do header */
 .viator-attraction-header-image {
     flex: 0 0 400px;
-    height: 300px;
+    height: auto;
     position: relative;
     overflow: hidden;
 }
@@ -3470,7 +3470,7 @@ body[data-viator-lang="en-US"] .viator-attraction-card::before {
     margin-top: 20px;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 30px;
+    gap: 20px; /* Reduzido de 30px para 20px */
 }
 
 /* Garantir que cards tenham aparência idêntica aos resultados de busca */
@@ -3488,6 +3488,12 @@ body[data-viator-lang="en-US"] .viator-attraction-card::before {
     box-shadow: 0 8px 25px rgba(4, 132, 107, 0.2);
 }
 
+/* Reduzir gap especificamente nos cards da página de atrações */
+.viator-attraction-products .viator-card .viator-card-content {
+    gap: 0px;
+    padding: 16px;
+}
+
 /* Paginação específica para produtos da atração */
 .viator-attraction-products .viator-pagination {
     margin-top: 30px;
@@ -3498,7 +3504,7 @@ body[data-viator-lang="en-US"] .viator-attraction-card::before {
 @media (max-width: 1200px) {
     .viator-attraction-products .viator-grid {
         grid-template-columns: repeat(2, 1fr);
-        gap: 25px;
+        gap: 18px; /* Reduzido de 25px para 18px */
     }
 }
 
@@ -3518,6 +3524,6 @@ body[data-viator-lang="en-US"] .viator-attraction-card::before {
     
     .viator-attraction-products .viator-grid {
         grid-template-columns: 1fr;
-        gap: 20px;
+        gap: 15px; /* Reduzido de 20px para 15px */
     }
 }
