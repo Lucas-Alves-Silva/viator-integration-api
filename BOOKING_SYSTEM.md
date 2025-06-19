@@ -1,4 +1,7 @@
 # Sistema de Booking Viator - Documentação
+> **Referente à Versão:** 1.5
+>
+> **Nota:** Esta documentação descreve o sistema de *booking*. As atualizações da versão 1.5 foram focadas nos novos carrosséis de atrações e não alteraram este fluxo.
 
 ## Visão Geral
 

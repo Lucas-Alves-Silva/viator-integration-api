@@ -1,68 +1,48 @@
-# Viator API Integration – WordPress Plugin
+# Viator API Integration – WordPress Plugin v1.5
 
-O **Viator API Integration** é um plugin avançado para WordPress que conecta seu site à API oficial da Viator, permitindo a busca, exibição e filtragem de passeios, atrações e experiências de viagem diretamente na sua plataforma. Ele oferece uma experiência rica e responsiva para seus usuários, com integração completa de avaliações, preços, duração, idiomas e muito mais.
+O **Viator API Integration** é um plugin avançado para WordPress que conecta seu site à API oficial da Viator, permitindo a busca, exibição e filtragem de passeios, atrações e experiências de viagem.
 
 ---
 
 ## ✨ Funcionalidades Principais
 
 ### 🔍 **Sistema de Busca Inteligente**
-- **Busca Dinâmica:** Pesquisa em tempo real por destino com auto-sugestão
-- **Detecção de Localização:** Sugestão automática de passeios próximos ao usuário
-- **Interface Responsiva:** Funciona perfeitamente em dispositivos móveis e desktop
+- **Busca Dinâmica:** Pesquisa em tempo real por destino.
+- **Detecção de Localização:** Sugestão automática de passeios próximos ao usuário.
+- **Interface Responsiva:** Funciona perfeitamente em todos os dispositivos.
+
+### 🎠 **Carrosséis de Atrações Personalizados**
+- **Shortcode `[viator_attractions]`**: Crie carrosséis com base em localização, cidade, ou ID de atração.
+- **Altamente Customizável**: Controle o número de cards, tamanho, navegação e título.
+- **Links Automáticos**: Cards levam diretamente para a página de detalhes da atração.
+- **Cache de 7 Dias**: Performance otimizada, com cache dedicado para cada carrossel.
 
 ### 🎯 **Filtros Avançados**
-- **Filtro por Data:** Seleção de período de viagem com calendário interativo
-- **Filtro por Duração:** Desde 1 hora até mais de 3 dias
-- **Filtro por Preço:** Controle deslizante para definir faixa de preço
-- **Filtro por Avaliação:** Filtrar por produtos 3⭐, 4⭐ ou 4.5⭐+
-- **Filtros Especiais:**
-  - Cancelamento Gratuito
-  - Produtos Prestes a Esgotar
-  - Evitar Fila (Skip the Line)
-  - Tours Privados
-  - Novidades na Viator
-
-### 📱 **Exibição em Cards Responsivos**
-- Cards detalhados com informações completas
-- Imagens de alta qualidade
-- Preços com suporte a ofertas especiais
-- Sistema de avaliações com estrelas
-- Badges informativos (cancelamento gratuito, prestes a esgotar, etc.)
-- Duração formatada inteligentemente
-
-### 🧠 **Curiosidades Inteligentes com IA**
-- **Integração com Groq AI:** Gera curiosidades personalizadas sobre destinos
-- **Fallback Inteligente:** Sistema de backup com curiosidades pré-definidas
-- **Suporte Multilíngue:** Curiosidades em português e inglês
-
-### 🌍 **Sistema Multilíngue Completo**
-- **Idiomas Suportados:** Português (pt-BR) e Inglês (en-US).
-- **Moedas Suportadas:** Real (BRL) e Dólar (USD).
-- **Traduções Automáticas:** Descrições e títulos de passeios traduzidos automaticamente pela API da Viator.
-- **Formatação Localizada:** Datas, números e moedas formatados por região
+- Filtros por Data, Duração, Preço, Avaliação e características especiais (Cancelamento Gratuito, Evitar Fila, etc.).
 
 ### 📄 **Páginas de Detalhes Avançadas**
-- URLs amigáveis (`/passeio/codigo-do-produto/`)
-- Galeria de imagens com zoom
-- Informações detalhadas (inclusões, exclusões, políticas)
-- Sistema de avaliações com filtros e paginação
-- Informações de acessibilidade
-- Tags e categorias
-- Mapas de localização
+- URLs amigáveis (`/passeio/...` e `/atracoes/...`).
+- Galeria de imagens, informações detalhadas, avaliações, e mais.
+
+### 🧠 **Curiosidades Inteligentes com IA**
+- **Integração com Groq AI:** Gera curiosidades personalizadas sobre destinos.
+- **Fallback Inteligente:** Sistema de backup com curiosidades pré-definidas.
+
+### 🌍 **Sistema Multilíngue e Multi-moeda**
+- **Idiomas:** Português (pt-BR) e Inglês (en-US).
+- **Moedas:** Real (BRL) e Dólar (USD).
+- Formatação localizada para datas, números e moedas.
+
+### 💳 **Sistema de Booking (Beta)**
+- **Fluxo de Reserva**: Implementa o fluxo de reserva da Viator, desde a checagem de disponibilidade até a confirmação.
+- **Formulários Dinâmicos**: Interface para inserir dados dos viajantes.
+- **Segurança**: Processamento de pagamento seguro, sem armazenar dados sensíveis localmente.
 
 ### ⚡ **Otimização e Performance**
-- **Sistema de Cache:** Reduz chamadas à API e melhora velocidade
-- **Paginação Avançada:** Navegação eficiente pelos resultados
-- **Carregamento Assíncrono:** Interface responsiva sem travamentos
-- **Otimização SEO:** URLs amigáveis e meta tags apropriadas
-
-### 🔧 **Recursos Técnicos**
-- **Shortcode Simples:** `[viator_search]` para inserir em qualquer lugar
-- **API Sandbox/Produção:** Suporte para ambos os ambientes
-- **Debug Integrado:** Sistema de logs para troubleshooting
-- **Proteção de Conteúdo:** Compliance com políticas da Viator
-- **Sanitização Completa:** Segurança contra XSS e injection
+- **Sistema de Cache Avançado:** Cache para resultados de busca e cache de 7 dias para carrosséis de atrações.
+- **Gerenciamento Centralizado:** Limpe todos os caches na página **IEP Turismo > Debug & Logs**.
+- **Carregamento Assíncrono:** Interface responsiva sem travamentos.
+- **Otimização SEO:** URLs amigáveis e meta tags apropriadas.
 
 ---
 
@@ -78,235 +58,66 @@ O **Viator API Integration** é um plugin avançado para WordPress que conecta s
 
 ## 📦 Instalação
 
-### 1. **Download e Upload**
-```bash
-1. Baixe o arquivo .zip do plugin
-2. Acesse WordPress Admin > Plugins > Adicionar Novo
-3. Clique em "Enviar Plugin" e selecione o arquivo .zip
-4. Clique em "Instalar Agora"
-```
-
-### 2. **Ativação**
-```bash
-Após a instalação, clique em "Ativar Plugin"
-```
-
-### 3. **Configuração**
-```bash
-1. Vá para Viator Integration no menu do WordPress
-2. Configure sua chave API da Viator
-3. (Opcional) Configure sua chave API do Groq
-4. Selecione idioma e moeda preferidos
-5. Salve as configurações
-```
-
----
-
-## ⚙️ Configuração
-
-### **Chaves de API**
-
-#### **Viator API (Obrigatória)**
-```
-1. Solicite acesso de parceiro à Viator
-2. Obtenha sua chave API
-3. Insira no campo "API Key" nas configurações
-```
-
-#### **Groq API (Opcional)**
-```
-1. Crie conta gratuita em https://groq.com
-2. Gere uma API key
-3. Insira no campo "Groq API Key" nas configurações
-4. Ativa curiosidades inteligentes sobre destinos
-```
-
-### **Configurações de Localização**
-
-#### **Idiomas Disponíveis**
-- 🇧🇷 **Português do Brasil** (pt-BR)
-- 🇺🇸 **Inglês Americano** (en-US)  
-
-#### **Moedas Suportadas**
-- **Real Brasileiro (BRL)** - R$
-- **Dólar Americano (USD)** - $
+1. Baixe o arquivo `.zip` do plugin.
+2. Acesse `WordPress Admin > Plugins > Adicionar Novo`.
+3. Clique em "Enviar Plugin", selecione o `.zip` e instale.
+4. Ative o plugin.
+5. Vá para `IEP Turismo` no menu do WordPress para configurar sua chave API e outras opções.
 
 ---
 
 ## 🚀 Como Usar
 
-### **Shortcode Básico**
+Este plugin oferece dois shortcodes principais para máxima flexibilidade.
+
+### **1. Busca Completa de Passeios**
+Use este shortcode para exibir a interface completa de busca e resultados.
 ```php
 [viator_search]
 ```
 
-### **Exemplos de Uso**
-
-#### **Em uma Página**
-```html
-<h2>Encontre Experiências Incríveis</h2>
-[viator_search]
-<p>Descubra os melhores passeios e atrações do mundo!</p>
-```
-
-#### **Em um Post**
-```html
-Planejando sua próxima viagem? Use nossa ferramenta de busca:
-
-[viator_search]
-
-Encontre milhares de experiências verificadas!
-```
-
-#### **Em um Widget**
-```html
-<!-- Widget de Texto -->
-<h3>Buscar Passeios</h3>
-[viator_search]
-```
-
----
-
-## 🎨 Personalização
-
-### **CSS Customizado**
-```css
-/* Personalizar cores do plugin */
-.viator-card {
-    border-radius: 15px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-.viator-search-wrapper input {
-    border: 2px solid #04846B;
-    border-radius: 25px;
-}
-
-/* Personalizar botões */
-#search-button {
-    background: linear-gradient(45deg, #04846B, #06A085);
-    border-radius: 25px;
-}
-```
-
-### **Hooks para Desenvolvedores**
+### **2. Carrosséis de Atrações Personalizados**
+Use este shortcode para inserir carrosséis de atrações em qualquer página.
 ```php
-// Personalizar resultados de busca
-add_filter('viator_search_results', 'minha_customizacao');
-
-// Modificar configurações de idioma
-add_filter('viator_locale_settings', 'meus_idiomas');
-
-// Customizar curiosidades
-add_filter('viator_fallback_curiosities', 'minhas_curiosidades');
+[viator_attractions location="Paris" title="Atrações em Paris"]
 ```
+> Para uma lista completa de parâmetros e exemplos, veja o arquivo `SHORTCODE_EXAMPLES.md`.
 
 ---
 
 ## 🔧 Funcionalidades Técnicas
 
 ### **Sistema de Cache**
-- Cache automático de produtos por 1 hora
-- Cache de avaliações por 30 minutos
-- Limpeza automática de cache expirado
-
-### **SEO Otimizado**
-- URLs amigáveis para produtos
-- Meta tags automáticas
-- Schema markup para rich snippets
-- Sitemap integration ready
+- Cache automático para resultados da busca de produtos.
+- **Cache de 7 dias** dedicado para carrosséis de atrações, garantindo carregamento ultrarrápido.
+- **Gerenciamento Centralizado**: Limpe todos os tipos de cache na página **IEP Turismo > Debug & Logs**.
 
 ### **Segurança**
-- Sanitização completa de inputs
-- Validação de nonces
-- Proteção contra XSS
-- Rate limiting nas APIs
+- Sanitização completa de inputs, validação de nonces e proteção contra XSS.
 
 ### **Debug e Logs**
-```php
-// Ativar debug mode
-define('VIATOR_DEBUG', true);
-
-// Localização dos logs
-wp-content/debug.log
-```
-
----
-
-## 📊 Analytics e Métricas
-
-O plugin registra automaticamente:
-- Termos de busca mais populares
-- Produtos mais visualizados
-- Taxa de cliques por destino
-- Performance de filtros
-
----
-
-## 🆘 Suporte e Troubleshooting
-
-### **Problemas Comuns**
-
-#### **"Nenhum resultado encontrado"**
-```
-✅ Verificar se a chave API está correta
-✅ Confirmar conectividade com a internet
-✅ Testar com termos de busca em inglês
-✅ Verificar logs de debug
-```
-
-#### **"Erro ao carregar"**
-```
-✅ Verificar se cURL está habilitado
-✅ Confirmar versão do PHP (7.4+)
-✅ Testar com timeout maior
-✅ Verificar firewall/proxy
-```
-
-#### **Curiosidades não funcionam**
-```
-✅ Verificar chave Groq API
-✅ Confirmar conexão com api.groq.com
-✅ Fallback automático está ativo
-```
-
-### **Logs de Debug**
-```php
-// Ativar logs detalhados
-add_action('init', function() {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        viator_debug_log('Debug ativado');
-    }
-});
-```
+- Ative o modo de debug em `wp-config.php` com `define('VIATOR_DEBUG', true);`.
+- A página **IEP Turismo > Debug & Logs** oferece ferramentas para testes de API e gerenciamento de cache.
 
 ---
 
 ## 🔄 Changelog
 
-### **Versão 1.0 (Atual)**
-- ✅ Integração completa com Viator API
-- ✅ Sistema de busca e filtros avançados
-- ✅ Suporte multilíngue (PT/EN)
-- ✅ Integração com Groq AI para curiosidades
-- ✅ Sistema de cache e otimização
-- ✅ Páginas de produto detalhadas
-- ✅ Sistema de avaliações
-- ✅ Interface responsiva
-- ✅ URLs amigáveis
+### **Versão 1.5 (Atual)**
+- ✅ **NOVO**: Shortcode `[viator_attractions]` para carrosséis de atrações personalizados.
+- ✅ **NOVO**: Sistema de cache de 7 dias para os carrosséis de atrações.
+- ✅ **NOVO**: Gerenciamento centralizado de cache na página de Debug.
+- ✅ **MELHORIA**: Lógica de captura de IDs de atrações para corrigir links.
+- ✅ **MELHORIA**: Reorganização do painel de administração para maior clareza.
+- ✅ **CORREÇÃO**: Links dos cards de atrações agora apontam para as URLs corretas.
 
-### **Próximas Versões**
-- 🔄 Sistema de favoritos
-- 🔄 Comparação de produtos
-- 🔄 Integração com WooCommerce
-- 🔄 Sistema de reservas
-- 🔄 Analytics dashboard
-
----
-
-## 📝 Licença
-
-Este plugin é distribuído sob a licença GPL v2 ou posterior.
+### **Versão 1.0**
+- ✅ Integração inicial com Viator API.
+- ✅ Shortcode `[viator_search]` com sistema de busca e filtros avançados.
+- ✅ Suporte multilíngue (PT/EN) e multi-moeda (BRL/USD).
+- ✅ Integração com Groq AI para curiosidades.
+- ✅ Páginas de produto detalhadas (`/passeio/...`).
+- ✅ Sistema de avaliações e interface responsiva.
 
 ---
 
@@ -316,27 +127,6 @@ Este plugin é distribuído sob a licença GPL v2 ou posterior.
 **Integração API:** Viator Official API  
 **IA Powered by:** Groq Cloud API  
 **Icons by:** Icons8  
-
----
-
-## 🌟 Contribuições
-
-Contribuições são bem-vindas! Para contribuir:
-
-1. Fork o repositório
-2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
-3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-4. Push para a branch (`git push origin feature/AmazingFeature`)
-5. Abra um Pull Request
-
----
-
-## 📞 Contato e Suporte
-
-- **Email:** [seu-email@exemplo.com]
-- **GitHub:** [link-do-repositorio]
-- **Documentação:** [link-documentacao]
-- **Demo:** [link-demo]
 
 ---
 

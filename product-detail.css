@@ -1145,19 +1145,16 @@
     border-radius: 20px;
     font-size: 12px;
     font-weight: 500;
-    color: #333;
+    color: #666;
     white-space: nowrap;
     flex-shrink: 0;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
-    transition: all 0.2s ease;
     cursor: default;
 }
 
 .viator-tag-chip:hover {
     background: #F5F5F5;
-    color: #666;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(102, 102, 102, 0.2);
+    color: #333;
+    border: 1px solid #2e2e2e;
 }
 
 .viator-tags-scroll-btn {

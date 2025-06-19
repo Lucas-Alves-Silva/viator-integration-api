@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Viator API Integration
  * Description: Integração com a API da Viator para exibição de produtos e passeios. Utilize o shortcode [viator_search]
- * Version: 1.0
+ * Version: 1.5
  * Author: Lucas Alves
  * Text Domain: viator-integration
  */
@@ -52,6 +52,16 @@ function viator_admin_menu() {
         'viator_settings_page',
         'dashicons-admin-site',
         100
+    );
+    
+    // Adicionar submenu para geração de shortcodes
+    add_submenu_page(
+        'viator-settings',
+        'Gerador de Shortcodes de Atrações',
+        'Shortcodes de Atrações',
+        'manage_options',
+        'viator-shortcodes',
+        'viator_shortcodes_page'
     );
 }
 add_action('admin_menu', 'viator_admin_menu');
@@ -194,6 +204,7 @@ function viator_settings_page() {
                         </details>
                     </td>
                 </tr>
+
                 <tr>
                     <th scope="row">Idioma</th>
                     <td>
@@ -217,8 +228,240 @@ function viator_settings_page() {
             </table>
             <?php submit_button(); ?>
         </form>
-        
+    </div>
+    
 
+    <?php
+}
+
+// Página de geração de shortcodes de atrações
+function viator_shortcodes_page() {
+    ?>
+    <div class="wrap">
+        <h1>🎯 Gerador de Shortcodes de Atrações</h1>
+        <p>Crie carrosséis personalizados de atrações para inserir em qualquer lugar do seu site!</p>
+        
+        <div style="background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin: 20px 0;">
+            
+            <h2>⚙️ Configurações do Carrossel</h2>
+            
+            <table class="form-table">
+                <tr>
+                    <th scope="row">
+                        <label for="location_search">🌍 Local / Destino</label>
+                    </th>
+                    <td>
+                        <input type="text" 
+                               id="location_search" 
+                               class="regular-text" 
+                               placeholder="Ex: Paris, Rio de Janeiro, Torre Eiffel ou ID específico"
+                               style="width: 400px;">
+                        <p class="description">
+                            Digite o nome de uma cidade, país, atração específica ou ID. 
+                            <strong>Exemplos:</strong> "Paris", "Rio de Janeiro", "Torre Eiffel", "2177"
+                        </p>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <th scope="row">
+                        <label for="cards_per_view">📱 Cards por Visualização</label>
+                    </th>
+                    <td>
+                        <div style="display: flex; gap: 20px; align-items: center;">
+                            <div>
+                                <label>Desktop:</label>
+                                <input type="number" id="cards_desktop" value="4" min="1" max="8" style="width: 60px;">
+                            </div>
+                            <div>
+                                <label>Tablet:</label>
+                                <input type="number" id="cards_tablet" value="3" min="1" max="6" style="width: 60px;">
+                            </div>
+                            <div>
+                                <label>Mobile:</label>
+                                <input type="number" id="cards_mobile" value="1" min="1" max="3" style="width: 60px;">
+                            </div>
+                        </div>
+                        <p class="description">Quantos cards serão exibidos simultaneamente em cada dispositivo.</p>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <th scope="row">
+                        <label for="card_size">📏 Tamanho dos Cards</label>
+                    </th>
+                    <td>
+                        <select id="card_size" style="width: 200px;">
+                            <option value="small">Pequeno (200px altura)</option>
+                            <option value="medium" selected>Médio (250px altura)</option>
+                            <option value="large">Grande (300px altura)</option>
+                            <option value="extra-large">Extra Grande (350px altura)</option>
+                        </select>
+                        <p class="description">As imagens se ajustam automaticamente ao tamanho selecionado.</p>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <th scope="row">
+                        <label for="show_navigation">🔄 Botões de Navegação</label>
+                    </th>
+                    <td>
+                        <label>
+                            <input type="checkbox" id="show_navigation" checked>
+                            Exibir botões de anterior/próximo
+                        </label>
+                        <p class="description">Marque para mostrar as setas de navegação do carrossel.</p>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <th scope="row">
+                        <label for="carousel_title">📝 Título do Carrossel</label>
+                    </th>
+                    <td>
+                        <input type="text" 
+                               id="carousel_title" 
+                               class="regular-text" 
+                               placeholder="Ex: Atrações em Paris, Melhores Passeios"
+                               style="width: 400px;">
+                        <p class="description">Título opcional que aparecerá acima do carrossel. Deixe vazio para não exibir.</p>
+                    </td>
+                </tr>
+                
+                <tr>
+                    <th scope="row">
+                        <label for="max_attractions">🔢 Máximo de Atrações</label>
+                    </th>
+                    <td>
+                        <input type="number" 
+                               id="max_attractions" 
+                               value="12" 
+                               min="4" 
+                               max="50" 
+                               style="width: 80px;">
+                        <p class="description">Número máximo de atrações a serem exibidas no carrossel.</p>
+                    </td>
+                </tr>
+            </table>
+            
+            <div style="margin: 30px 0;">
+                <button type="button" 
+                        id="generate_shortcode" 
+                        class="button button-primary button-large"
+                        style="background: #0056B3; border-color: #0056B3; padding: 10px 30px; font-size: 16px;">
+                    🚀 Gerar Shortcode
+                </button>
+            </div>
+            
+            <div id="shortcode_result" style="display: none; margin-top: 30px;">
+                <h3>✅ Seu Shortcode foi Gerado!</h3>
+                <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 20px;">
+                    <p><strong>Copie o código abaixo e cole onde quiser exibir o carrossel:</strong></p>
+                    <textarea id="generated_shortcode" 
+                              readonly 
+                              style="width: 100%; height: 120px; font-family: monospace; font-size: 14px; padding: 15px; border: 1px solid #ccd1d1; border-radius: 4px;"
+                              onclick="this.select(); document.execCommand('copy'); alert('Shortcode copiado para a área de transferência!');">
+                    </textarea>
+                    
+                    <div style="margin-top: 15px; padding: 15px; background: #e8f4fd; border-left: 4px solid #0073aa; border-radius: 4px;">
+                        <h4 style="margin: 0 0 10px 0;">💡 Como usar:</h4>
+                        <ol style="margin: 0; padding-left: 20px;">
+                            <li>Copie o shortcode acima</li>
+                            <li>Vá para qualquer página ou post do WordPress</li>
+                            <li>Cole o shortcode no editor (pode ser no editor clássico ou Gutenberg)</li>
+                            <li>Publique ou atualize a página</li>
+                            <li>O carrossel de atrações aparecerá automaticamente!</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="preview_section" style="display: none; margin-top: 30px;">
+                <h3>👀 Prévia do Carrossel</h3>
+                <div style="border: 1px solid #ddd; border-radius: 8px; padding: 20px; background: #fafafa;">
+                    <div id="carousel_preview">
+                        <!-- Prévia será inserida aqui via JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div style="background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin: 20px 0;">
+            <h2>📋 Exemplos de Shortcodes</h2>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px;">
+                <div style="padding: 15px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid #28a745;">
+                    <h4 style="margin: 0 0 10px 0; color: #28a745;">🏛️ Atrações de Paris</h4>
+                    <code style="background: #fff; padding: 8px; border-radius: 4px; display: block; font-size: 12px;">
+                        [viator_attractions location="Paris" cards_desktop="4" cards_tablet="3" cards_mobile="1" size="medium" navigation="true" title="Descubra Paris" max="10"]
+                    </code>
+                </div>
+                
+                <div style="padding: 15px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid #007cba;">
+                    <h4 style="margin: 0 0 10px 0; color: #007cba;">🏖️ Atrações do Rio</h4>
+                    <code style="background: #fff; padding: 8px; border-radius: 4px; display: block; font-size: 12px;">
+                        [viator_attractions location="Rio de Janeiro" cards_desktop="3" cards_tablet="2" cards_mobile="1" size="large" navigation="true" title="Explore o Rio" max="8"]
+                    </code>
+                </div>
+                
+                <div style="padding: 15px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid #dc3545;">
+                    <h4 style="margin: 0 0 10px 0; color: #dc3545;">🗽 Por ID Específico</h4>
+                    <code style="background: #fff; padding: 8px; border-radius: 4px; display: block; font-size: 12px;">
+                        [viator_attractions location="2177" cards_desktop="5" cards_tablet="3" cards_mobile="2" size="small" navigation="false" max="6"]
+                    </code>
+                </div>
+                
+                <div style="padding: 15px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid #ffc107;">
+                    <h4 style="margin: 0 0 10px 0; color: #e68900;">🌍 Carrossel Compacto</h4>
+                    <code style="background: #fff; padding: 8px; border-radius: 4px; display: block; font-size: 12px;">
+                        [viator_attractions location="Londres" cards_desktop="6" cards_tablet="4" cards_mobile="2" size="small" navigation="true" title="" max="15"]
+                    </code>
+                </div>
+            </div>
+        </div>
+        
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const generateBtn = document.getElementById('generate_shortcode');
+            
+            generateBtn.addEventListener('click', function() {
+                const location = document.getElementById('location_search').value.trim();
+                
+                if (!location) {
+                    alert('Por favor, insira um local, cidade ou ID de atração!');
+                    return;
+                }
+                
+                const cardsDesktop = document.getElementById('cards_desktop').value;
+                const cardsTablet = document.getElementById('cards_tablet').value;
+                const cardsMobile = document.getElementById('cards_mobile').value;
+                const cardSize = document.getElementById('card_size').value;
+                const showNavigation = document.getElementById('show_navigation').checked;
+                const title = document.getElementById('carousel_title').value.trim();
+                const maxAttractions = document.getElementById('max_attractions').value;
+                
+                // Gerar shortcode
+                let shortcode = `[viator_attractions location="${location}"`;
+                shortcode += ` cards_desktop="${cardsDesktop}"`;
+                shortcode += ` cards_tablet="${cardsTablet}"`;
+                shortcode += ` cards_mobile="${cardsMobile}"`;
+                shortcode += ` size="${cardSize}"`;
+                shortcode += ` navigation="${showNavigation ? 'true' : 'false'}"`;
+                if (title) {
+                    shortcode += ` title="${title}"`;
+                }
+                shortcode += ` max="${maxAttractions}"]`;
+                
+                // Exibir resultado
+                document.getElementById('generated_shortcode').value = shortcode;
+                document.getElementById('shortcode_result').style.display = 'block';
+                
+                // Scroll suave para o resultado
+                document.getElementById('shortcode_result').scrollIntoView({ 
+                    behavior: 'smooth' 
+                });
+            });
+        });
         </script>
     </div>
     <?php
@@ -4682,3 +4925,375 @@ function viator_test_destinations_info() {
     }
 }
 add_action('wp_head', 'viator_test_destinations_info');
+
+// Registrar shortcode de atrações personalizadas
+function viator_attractions_shortcode($atts) {
+    $atts = shortcode_atts(array(
+        'location' => '',
+        'cards_desktop' => '4',
+        'cards_tablet' => '3',
+        'cards_mobile' => '1',
+        'size' => 'medium',
+        'navigation' => 'true',
+        'title' => '',
+        'max' => '12'
+    ), $atts, 'viator_attractions');
+
+    if (empty($atts['location'])) {
+        return '<p class="viator-error">Erro: Parâmetro "location" é obrigatório no shortcode.</p>';
+    }
+
+    // Gerar HTML do carrossel personalizado
+    return viator_generate_custom_attractions_carousel($atts);
+}
+add_shortcode('viator_attractions', 'viator_attractions_shortcode');
+
+// Função para gerar o carrossel personalizado de atrações
+function viator_generate_custom_attractions_carousel($params) {
+    $location = sanitize_text_field($params['location']);
+    $cards_desktop = max(1, min(8, intval($params['cards_desktop'])));
+    $cards_tablet = max(1, min(6, intval($params['cards_tablet'])));
+    $cards_mobile = max(1, min(3, intval($params['cards_mobile'])));
+    $size = sanitize_text_field($params['size']);
+    $show_navigation = ($params['navigation'] === 'true' || $params['navigation'] === '1');
+    $title = sanitize_text_field($params['title']);
+    $max_attractions = max(4, min(50, intval($params['max'])));
+
+    // Validar tamanho
+    $valid_sizes = ['small', 'medium', 'large', 'extra-large'];
+    if (!in_array($size, $valid_sizes)) {
+        $size = 'medium';
+    }
+
+    // Buscar atrações baseadas no location
+    $attractions = viator_search_attractions_for_carousel($location, $max_attractions);
+    
+    if (empty($attractions)) {
+        return '<div class="viator-error">Nenhuma atração encontrada para: ' . esc_html($location) . '</div>';
+    }
+
+    // Gerar ID único para este carrossel
+    $carousel_id = 'viator-custom-carousel-' . uniqid();
+    $navigation_prev = $carousel_id . '-prev';
+    $navigation_next = $carousel_id . '-next';
+
+    ob_start();
+    ?>
+    <div class="viator-custom-attractions-section <?php echo esc_attr($size); ?>">
+        <?php if (!empty($title)): ?>
+            <div class="viator-custom-attractions-header">
+                <h2><?php echo esc_html($title); ?></h2>
+            </div>
+        <?php endif; ?>
+        
+        <div class="viator-custom-attractions-carousel-container">
+            <?php if ($show_navigation): ?>
+                <div class="viator-custom-swiper-button-prev <?php echo esc_attr($navigation_prev); ?>">
+                    <ion-icon name="chevron-back-outline"></ion-icon>
+                </div>
+                <div class="viator-custom-swiper-button-next <?php echo esc_attr($navigation_next); ?>">
+                    <ion-icon name="chevron-forward-outline"></ion-icon>
+                </div>
+            <?php endif; ?>
+            
+            <div class="viator-custom-attractions-swiper <?php echo esc_attr($carousel_id); ?>">
+                <div class="swiper-wrapper">
+                    <?php foreach ($attractions as $attraction): ?>
+                        <div class="swiper-slide">
+                            <div class="viator-custom-attraction-card">
+                                <a href="<?php echo esc_url($attraction['url']); ?>" 
+                                   class="viator-custom-attraction-link" 
+                                   target="_blank" 
+                                   rel="noopener noreferrer"
+                                   title="Ver detalhes de <?php echo esc_attr($attraction['name']); ?> (abre em nova aba)">
+                                    <img src="<?php echo esc_url($attraction['image']); ?>" 
+                                         alt="<?php echo esc_attr($attraction['name']); ?>"
+                                         loading="lazy">
+                                    <div class="viator-custom-attraction-overlay">
+                                        <div class="viator-custom-attraction-title">
+                                            <?php echo esc_html($attraction['name']); ?>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Inicializar carrossel específico
+        if (typeof Swiper !== 'undefined') {
+            new Swiper('.<?php echo esc_js($carousel_id); ?>', {
+                slidesPerView: <?php echo $cards_mobile; ?>,
+                spaceBetween: 15,
+                <?php if ($show_navigation): ?>
+                navigation: {
+                    nextEl: '.<?php echo esc_js($navigation_next); ?>',
+                    prevEl: '.<?php echo esc_js($navigation_prev); ?>',
+                },
+                <?php endif; ?>
+                breakpoints: {
+                    480: {
+                        slidesPerView: Math.min(<?php echo $cards_mobile; ?> + 1, <?php echo $cards_tablet; ?>),
+                        spaceBetween: 15
+                    },
+                    768: {
+                        slidesPerView: <?php echo $cards_tablet; ?>,
+                        spaceBetween: 20
+                    },
+                    1024: {
+                        slidesPerView: <?php echo $cards_desktop; ?>,
+                        spaceBetween: 20
+                    }
+                }
+            });
+        }
+    });
+    </script>
+    <?php
+    return ob_get_clean();
+}
+
+// Função para buscar atrações baseadas no parâmetro location
+function viator_search_attractions_for_carousel($location, $max_results = 12) {
+    $api_key = get_option('viator_api_key');
+    if (empty($api_key)) {
+        return array();
+    }
+
+    // Obter configurações de idioma e moeda
+    $locale_settings = viator_get_locale_settings();
+    
+    // Criar chave de cache única baseada nos parâmetros
+    $cache_key = 'viator_attractions_carousel_' . md5($location . $max_results . $locale_settings['currency'] . $locale_settings['accept_language']);
+    
+    // Tentar obter dados do cache primeiro
+    $cached_data = get_transient($cache_key);
+    if ($cached_data !== false) {
+        return $cached_data;
+    }
+    
+    $url = "https://api.sandbox.viator.com/partner/search/freetext";
+
+    // Primeiro, tentar buscar como atração específica por ID
+    if (is_numeric($location)) {
+        $attractions_data = viator_search_by_attraction_id($location, $api_key, $locale_settings);
+        if (!empty($attractions_data)) {
+            return array_slice($attractions_data, 0, $max_results);
+        }
+    }
+
+    // Se não for ID ou não encontrou, buscar por texto livre
+    $body_data = [
+        "searchTerm" => $location,
+        "productSorting" => ['sort' => 'DEFAULT'],
+        "productFiltering" => [
+            "dateRange" => [
+                "from" => date('Y-m-d'),
+                "to" => date('Y-m-d', strtotime('+1 year'))
+            ]
+        ],
+        "searchTypes" => [
+            ["searchType" => "ATTRACTIONS", "pagination" => ["start" => 1, "count" => $max_results]]
+        ],
+        "currency" => $locale_settings['currency']
+    ];
+
+    $headers = [
+        'Accept' => 'application/json;version=2.0',
+        'Content-Type' => 'application/json;version=2.0',
+        'exp-api-key' => $api_key,
+        'Accept-Language' => $locale_settings['accept_language'],
+    ];
+
+    $args = [
+        'method' => 'POST',
+        'headers' => $headers,
+        'body' => json_encode($body_data),
+        'timeout' => 30
+    ];
+
+    $response = wp_remote_request($url, $args);
+
+    if (is_wp_error($response)) {
+        return array();
+    }
+
+    $response_code = wp_remote_retrieve_response_code($response);
+    $body = wp_remote_retrieve_body($response);
+
+    if ($response_code !== 200) {
+        return array();
+    }
+
+    $data = json_decode($body, true);
+
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        return array();
+    }
+
+    if (!isset($data['attractions']['results']) || empty($data['attractions']['results'])) {
+        return array();
+    }
+
+    // Processar resultados
+    $processed_attractions = array();
+    foreach ($data['attractions']['results'] as $attraction) {
+        $processed_attractions[] = viator_process_attraction_for_carousel($attraction);
+    }
+
+    // Salvar no cache por 7 dias (7 * 24 * 60 * 60 = 604800 segundos)
+    set_transient($cache_key, $processed_attractions, 7 * DAY_IN_SECONDS);
+
+    return $processed_attractions;
+}
+
+// Função para limpar cache dos carrosséis de atrações
+function viator_clear_attractions_cache() {
+    global $wpdb;
+    
+    // Limpar todos os transients relacionados aos carrosséis
+    $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_viator_attractions_carousel_%'");
+    $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_timeout_viator_attractions_carousel_%'");
+    $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_viator_attraction_id_%'");
+    $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_timeout_viator_attraction_id_%'");
+    
+    // Log para confirmar limpeza
+    viator_debug_log('Cache de carrosséis limpo manualmente via admin');
+    
+    return true;
+}
+
+// Hook para limpar cache via admin
+add_action('wp_ajax_viator_clear_cache', 'viator_ajax_clear_cache');
+function viator_ajax_clear_cache() {
+    // Verificar permissões
+    if (!current_user_can('manage_options')) {
+        wp_die('Permissão negada');
+    }
+    
+    // Verificar nonce para segurança
+    if (!wp_verify_nonce($_POST['nonce'], 'viator_clear_cache')) {
+        wp_die('Nonce inválido');
+    }
+    
+    $cleared = viator_clear_attractions_cache();
+    
+    if ($cleared) {
+        wp_send_json_success(array('message' => 'Cache limpo com sucesso!'));
+    } else {
+        wp_send_json_error(array('message' => 'Erro ao limpar cache.'));
+    }
+}
+
+// Função para buscar por ID específico de atração
+function viator_search_by_attraction_id($attraction_id, $api_key, $locale_settings) {
+    // Criar chave de cache para busca por ID específico
+    $cache_key = 'viator_attraction_id_' . md5($attraction_id . $locale_settings['currency'] . $locale_settings['accept_language']);
+    
+    // Tentar obter dados do cache primeiro
+    $cached_data = get_transient($cache_key);
+    if ($cached_data !== false) {
+        return $cached_data;
+    }
+    
+    // Buscar dados da atração específica
+    $attraction_data = viator_get_attraction_details($attraction_id);
+    
+    if (!$attraction_data) {
+        return array();
+    }
+
+    // Se encontrou a atração, procurar atrações relacionadas na mesma localização
+    $location_name = '';
+    if (isset($attraction_data['destinations']) && !empty($attraction_data['destinations'])) {
+        // Pegar o primeiro destino como referência
+        $main_destination = $attraction_data['destinations'][0];
+        $location_name = $main_destination['name'] ?? '';
+    }
+
+    if (empty($location_name)) {
+        // Se não conseguir determinar localização, retornar apenas a atração atual
+        $result = [viator_process_attraction_for_carousel($attraction_data)];
+        // Salvar no cache por 7 dias
+        set_transient($cache_key, $result, 7 * DAY_IN_SECONDS);
+        return $result;
+    }
+
+    // Buscar outras atrações na mesma localização
+    $result = viator_search_attractions_for_carousel($location_name, 12);
+    // Salvar no cache por 7 dias
+    set_transient($cache_key, $result, 7 * DAY_IN_SECONDS);
+    return $result;
+}
+
+// Função para processar dados de atração para o carrossel
+function viator_process_attraction_for_carousel($attraction_data) {
+    $name = $attraction_data['name'] ?? 'Atração';
+    
+    // Capturar o attractionId usando a mesma lógica do carrossel original
+    $attraction_id = isset($attraction_data['attractionId']) ? $attraction_data['attractionId'] : '';
+    
+    // Tentar diferentes caminhos para pegar o ID da atração
+    if (empty($attraction_id)) {
+        // Tentar outros campos possíveis para o ID
+        if (isset($attraction_data['id'])) {
+            $attraction_id = $attraction_data['id'];
+        } elseif (isset($attraction_data['attractionCode'])) {
+            $attraction_id = $attraction_data['attractionCode'];
+        } elseif (isset($attraction_data['code'])) {
+            $attraction_id = $attraction_data['code'];
+        }
+    }
+    
+    // Log para debug
+    viator_debug_log('Processando atração para carrossel personalizado:', [
+        'name' => $name,
+        'attractionId' => $attraction_id,
+        'attraction_keys' => array_keys($attraction_data),
+        'full_attraction_data' => $attraction_data
+    ]);
+    
+    // Obter melhor imagem usando a mesma lógica do carrossel original
+    $image_url = '';
+    if (isset($attraction_data['images']) && !empty($attraction_data['images'])) {
+        if (isset($attraction_data['images'][0]['url'])) {
+            $image_url = $attraction_data['images'][0]['url'];
+        } elseif (isset($attraction_data['images'][0]['variants'][0]['url'])) {
+            $image_url = $attraction_data['images'][0]['variants'][0]['url'];
+        } else {
+            // Usar função existente como fallback
+            $best_image = viator_get_best_attraction_image($attraction_data['images']);
+            if ($best_image) {
+                $image_url = $best_image;
+            }
+        }
+    }
+    
+    // Fallback para placeholder se não houver imagem
+    if (empty($image_url)) {
+        $image_url = 'https://via.placeholder.com/400x200/04846b/ffffff?text=' . urlencode($name);
+    }
+    
+    // Gerar URL da atração
+    $has_valid_id = !empty($attraction_id);
+    $url = $has_valid_id ? home_url('/atracoes/' . $attraction_id . '/') : '#';
+    
+    viator_debug_log('Link gerado para carrossel personalizado:', [
+        'name' => $name,
+        'id' => $attraction_id,
+        'has_valid_id' => $has_valid_id,
+        'url' => $url
+    ]);
+
+    return [
+        'name' => $name,
+        'image' => $image_url,
+        'url' => $url,
+        'id' => $attraction_id
+    ];
+}
