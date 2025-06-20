@@ -1697,7 +1697,8 @@ function viator_get_search_results($searchTerm) {
                 'min_price' => isset($_GET['min_price']) ? $_GET['min_price'] : '',
                 'max_price' => isset($_GET['max_price']) ? $_GET['max_price'] : '',
                 'rating_filter' => isset($_GET['rating_filter']) ? $_GET['rating_filter'] : '',
-                'special_filter' => isset($_GET['special_filter']) ? $_GET['special_filter'] : []
+                'special_filter' => isset($_GET['special_filter']) ? $_GET['special_filter'] : [],
+                'category_tag' => isset($_GET['category_tag']) ? $_GET['category_tag'] : ''
             ]);
             $prev_arrow = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/></svg>';
             $output .= '<a class="viator-pagination-arrow" href="' . esc_url($prev_url) . '" data-page="' . ($page - 1) . '">' . $prev_arrow . '</a>';
@@ -1777,6 +1778,11 @@ function viator_get_search_results($searchTerm) {
                     $pagination_params['special_filter'] = $_GET['special_filter'];
                 }
                 
+                // Adicionar filtro de categoria se existir
+                if (isset($_GET['category_tag']) && !empty($_GET['category_tag'])) {
+                    $pagination_params['category_tag'] = $_GET['category_tag'];
+                }
+                
                 $url = add_query_arg($pagination_params);
                 $active_class = ($page_num == $page) ? ' active' : '';
                 $output .= '<a class="viator-pagination-btn' . $active_class . '" href="' . esc_url($url) . '" data-page="' . $page_num . '">' . $page_num . '</a>';
@@ -1795,7 +1801,8 @@ function viator_get_search_results($searchTerm) {
                 'min_price' => isset($_GET['min_price']) ? $_GET['min_price'] : '',
                 'max_price' => isset($_GET['max_price']) ? $_GET['max_price'] : '',
                 'rating_filter' => isset($_GET['rating_filter']) ? $_GET['rating_filter'] : '',
-                'special_filter' => isset($_GET['special_filter']) ? $_GET['special_filter'] : []
+                'special_filter' => isset($_GET['special_filter']) ? $_GET['special_filter'] : [],
+                'category_tag' => isset($_GET['category_tag']) ? $_GET['category_tag'] : ''
             ]);
             $next_arrow = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/></svg>';
             $output .= '<a class="viator-pagination-arrow" href="' . esc_url($next_url) . '" data-page="' . ($page + 1) . '">' . $next_arrow . '</a>';

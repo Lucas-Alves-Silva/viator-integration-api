@@ -3,8 +3,9 @@ document.addEventListener('DOMContentLoaded', function () {
     // Inicializar o botão de filtros móveis
     initializeMobileFilterButton();
     
-    // Inicializar filtros de categoria
+    // Inicializar filtros de categoria (Swiper e eventos)
     initializeCategoryFilters();
+    initializeCategoryEvents();
     
     // Função para inicializar o botão de filtros móveis
     function initializeMobileFilterButton() {
@@ -305,6 +306,9 @@ document.addEventListener('DOMContentLoaded', function () {
             document.querySelectorAll('input[name="special_filter[]"]:checked').forEach(checkbox => {
                 specialFilters.push(checkbox.value);
             });
+            
+            // Filtro de categoria
+            const categoryTag = params.get('category_tag') || currentParams.get('category_tag') || '';
 
             // Preparar os parâmetros para a requisição AJAX
             const requestParams = {
@@ -318,6 +322,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 min_price: minPrice,
                 max_price: maxPrice,
                 rating_filter: ratingFilter,
+                category_tag: categoryTag,
                 nonce: viatorAjax.nonce
             };
             
@@ -339,6 +344,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (minPrice) newUrl.searchParams.set('min_price', minPrice);
             if (maxPrice) newUrl.searchParams.set('max_price', maxPrice);
             if (ratingFilter) newUrl.searchParams.set('rating_filter', ratingFilter);
+            if (categoryTag) newUrl.searchParams.set('category_tag', categoryTag);
             
             // Limpar parâmetros existentes de special_filter para evitar duplicatas na URL
             newUrl.searchParams.delete('special_filter[]');
@@ -396,6 +402,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 setTimeout(() => {
                     if (typeof reinitializeSpecialsFilter === 'function') {
                         reinitializeSpecialsFilter();
+                    }
+                    if (typeof initializeCategoryFilters === 'function') {
+                        initializeCategoryFilters();
                     }
                 }, 100);
                 
@@ -1316,6 +1325,7 @@ function reinitializeDurationFilter() {
             const minPrice = params.get('min_price') || '';
             const maxPrice = params.get('max_price') || '';
             const ratingFilter = params.get('rating_filter') || '';
+            const categoryTag = params.get('category_tag') || '';
             
             // Obter os filtros especiais ativos
             const specialFilters = [];
@@ -1334,6 +1344,7 @@ function reinitializeDurationFilter() {
             if (minPrice) newUrl.searchParams.set('min_price', minPrice);
             if (maxPrice) newUrl.searchParams.set('max_price', maxPrice);
             if (ratingFilter) newUrl.searchParams.set('rating_filter', ratingFilter);
+            if (categoryTag) newUrl.searchParams.set('category_tag', categoryTag);
             
             // Limpar parâmetros existentes de special_filter para evitar duplicatas na URL
             newUrl.searchParams.delete('special_filter[]');
@@ -1357,6 +1368,7 @@ function reinitializeDurationFilter() {
                 min_price: minPrice,
                 max_price: maxPrice,
                 rating_filter: ratingFilter,
+                category_tag: categoryTag,
                 nonce: viatorAjax.nonce
             };
             
@@ -1390,20 +1402,34 @@ function reinitializeDurationFilter() {
                 });
                 
                 // Reinicializar componentes
-                if (typeof reinitializeDatePicker === 'function') {
-                    reinitializeDatePicker();
-                }
-                if (typeof reinitializePriceSlider === 'function') {
-                    reinitializePriceSlider();
-                }
-                if (typeof reinitializeRatingFilter === 'function') {
-                    reinitializeRatingFilter();
-                }
-                
-                // Re-inicializar o Swiper das atrações
-                if (typeof reinitializeAttractionsSwiper === 'function') {
-                    reinitializeAttractionsSwiper();
-                }
+                setTimeout(() => {
+                    // Primeiro reinicializar filtros de categoria para garantir estado correto
+                    if (typeof initializeCategoryFilters === 'function') {
+                        initializeCategoryFilters();
+                    }
+                    if (typeof reinitializeDatePicker === 'function') {
+                        reinitializeDatePicker();
+                    }
+                    if (typeof reinitializePriceSlider === 'function') {
+                        reinitializePriceSlider();
+                    }
+                    if (typeof reinitializeRatingFilter === 'function') {
+                        reinitializeRatingFilter();
+                    }
+                    
+                    // Re-inicializar o Swiper das atrações
+                    if (typeof reinitializeAttractionsSwiper === 'function') {
+                        reinitializeAttractionsSwiper();
+                    }
+                    
+                    if (typeof reinitializeClearAllButton === 'function') {
+                        reinitializeClearAllButton();
+                    }
+                    if (typeof window.initializeMobileFilterButton === 'function') {
+                        window.initializeMobileFilterButton();
+                    }
+                    updateClearAllButtonState(); // Atualizar estado do botão
+                }, 100);
                 
                 // Garantir que os filtros especiais sejam sincronizados corretamente
                 // Importante: chamar isso após o HTML ter sido atualizado
@@ -1411,15 +1437,7 @@ function reinitializeDurationFilter() {
                     if (typeof reinitializeSpecialsFilter === 'function') {
                         reinitializeSpecialsFilter();
                     }
-                }, 100);
-                
-                if (typeof reinitializeClearAllButton === 'function') {
-                    reinitializeClearAllButton();
-                }
-                if (typeof window.initializeMobileFilterButton === 'function') {
-                    window.initializeMobileFilterButton();
-                }
-                updateClearAllButtonState(); // Atualizar estado do botão
+                }, 300);
             })
             .catch(error => {
                 console.error('Erro ao atualizar filtro de duração:', error);
@@ -1720,6 +1738,7 @@ function initializePriceSlider() {
             const dateEnd = params.get('viator_date_end') || '';
             const durationFilter = params.get('duration_filter') || '';
             const ratingFilter = params.get('rating_filter') || '';
+            const categoryTag = params.get('category_tag') || '';
             
             // Usar os valores dos campos hidden para min_price e max_price, pois eles são atualizados em tempo real pelos sliders
             const currentMinPrice = document.getElementById('min_price_hidden').value;
@@ -1742,6 +1761,7 @@ function initializePriceSlider() {
             if (dateEnd) newUrl.searchParams.set('viator_date_end', dateEnd);
             if (durationFilter) newUrl.searchParams.set('duration_filter', durationFilter);
             if (ratingFilter) newUrl.searchParams.set('rating_filter', ratingFilter);
+            if (categoryTag) newUrl.searchParams.set('category_tag', categoryTag);
             
             // Limpar parâmetros existentes de special_filter para evitar duplicatas na URL
             newUrl.searchParams.delete('special_filter[]');
@@ -1765,6 +1785,7 @@ function initializePriceSlider() {
                 min_price: currentMinPrice,
                 max_price: currentMaxPrice,
                 rating_filter: ratingFilter,
+                category_tag: categoryTag,
                 nonce: viatorAjax.nonce
             };
             
@@ -1811,31 +1832,37 @@ function initializePriceSlider() {
                 maxPriceHidden.value = newMaxPrice;
 
                 // Reinicializar componentes
-                if (typeof reinitializeDatePicker === 'function') {
-                    reinitializeDatePicker();
-                }
-                if (typeof reinitializeDurationFilter === 'function') {
-                    reinitializeDurationFilter();
-                }
-                if (typeof reinitializeRatingFilter === 'function') {
-                    reinitializeRatingFilter();
-                }
-                
-                // Re-inicializar o Swiper das atrações
-                if (typeof reinitializeAttractionsSwiper === 'function') {
-                    reinitializeAttractionsSwiper();
-                }
-                
-                if (typeof reinitializeSpecialsFilter === 'function') {
-                    reinitializeSpecialsFilter();
-                }
-                if (typeof reinitializeClearAllButton === 'function') {
-                    reinitializeClearAllButton();
-                }
-                if (typeof window.initializeMobileFilterButton === 'function') {
-                    window.initializeMobileFilterButton();
-                }
-                updateClearAllButtonState(); // Atualizar estado do botão
+                setTimeout(() => {
+                    // Primeiro reinicializar filtros de categoria para garantir estado correto
+                    if (typeof initializeCategoryFilters === 'function') {
+                        initializeCategoryFilters();
+                    }
+                    if (typeof reinitializeDatePicker === 'function') {
+                        reinitializeDatePicker();
+                    }
+                    if (typeof reinitializeDurationFilter === 'function') {
+                        reinitializeDurationFilter();
+                    }
+                    if (typeof reinitializeRatingFilter === 'function') {
+                        reinitializeRatingFilter();
+                    }
+                    
+                    // Re-inicializar o Swiper das atrações
+                    if (typeof reinitializeAttractionsSwiper === 'function') {
+                        reinitializeAttractionsSwiper();
+                    }
+                    
+                    if (typeof reinitializeSpecialsFilter === 'function') {
+                        reinitializeSpecialsFilter();
+                    }
+                    if (typeof reinitializeClearAllButton === 'function') {
+                        reinitializeClearAllButton();
+                    }
+                    if (typeof window.initializeMobileFilterButton === 'function') {
+                        window.initializeMobileFilterButton();
+                    }
+                    updateClearAllButtonState(); // Atualizar estado do botão
+                }, 100);
             })
             .catch(error => {
                 console.error('Erro ao atualizar filtro de preço:', error);
@@ -1932,6 +1959,7 @@ function initializeRatingFilter() {
             const durationFilter = params.get('duration_filter') || '';
             const minPrice = params.get('min_price') || '';
             const maxPrice = params.get('max_price') || '';
+            const categoryTag = params.get('category_tag') || '';
             const ratingValue = this.value; // O valor selecionado do rating
             
             // Obter os filtros especiais ativos
@@ -1951,6 +1979,7 @@ function initializeRatingFilter() {
             if (durationFilter) newUrl.searchParams.set('duration_filter', durationFilter);
             if (minPrice) newUrl.searchParams.set('min_price', minPrice);
             if (maxPrice) newUrl.searchParams.set('max_price', maxPrice);
+            if (categoryTag) newUrl.searchParams.set('category_tag', categoryTag);
             
             // Limpar parâmetros existentes de special_filter para evitar duplicatas na URL
             newUrl.searchParams.delete('special_filter[]');
@@ -1974,6 +2003,7 @@ function initializeRatingFilter() {
                 min_price: minPrice,
                 max_price: maxPrice,
                 rating_filter: ratingValue,
+                category_tag: categoryTag,
                 nonce: viatorAjax.nonce
             };
             
@@ -2007,23 +2037,37 @@ function initializeRatingFilter() {
                 });
                 
                 // Reinicializar componentes
-                if (typeof reinitializeDatePicker === 'function') {
-                    reinitializeDatePicker();
-                }
-                if (typeof reinitializeDurationFilter === 'function') {
-                    reinitializeDurationFilter();
-                }
-                if (typeof reinitializePriceSlider === 'function') {
-                    reinitializePriceSlider();
-                }
-                if (typeof reinitializeRatingFilter === 'function') {
-                    reinitializeRatingFilter();
-                }
-                
-                // Re-inicializar o Swiper das atrações
-                if (typeof reinitializeAttractionsSwiper === 'function') {
-                    reinitializeAttractionsSwiper();
-                }
+                setTimeout(() => {
+                    // Primeiro reinicializar filtros de categoria para garantir estado correto
+                    if (typeof initializeCategoryFilters === 'function') {
+                        initializeCategoryFilters();
+                    }
+                    if (typeof reinitializeDatePicker === 'function') {
+                        reinitializeDatePicker();
+                    }
+                    if (typeof reinitializeDurationFilter === 'function') {
+                        reinitializeDurationFilter();
+                    }
+                    if (typeof reinitializePriceSlider === 'function') {
+                        reinitializePriceSlider();
+                    }
+                    if (typeof reinitializeRatingFilter === 'function') {
+                        reinitializeRatingFilter();
+                    }
+                    
+                    // Re-inicializar o Swiper das atrações
+                    if (typeof reinitializeAttractionsSwiper === 'function') {
+                        reinitializeAttractionsSwiper();
+                    }
+                    
+                    if (typeof reinitializeClearAllButton === 'function') {
+                        reinitializeClearAllButton();
+                    }
+                    if (typeof window.initializeMobileFilterButton === 'function') {
+                        window.initializeMobileFilterButton();
+                    }
+                    updateClearAllButtonState(); // Atualizar estado do botão
+                }, 100);
                 
                 // Garantir que os filtros especiais sejam sincronizados corretamente
                 // Importante: chamar isso após o HTML ter sido atualizado
@@ -2031,15 +2075,7 @@ function initializeRatingFilter() {
                     if (typeof reinitializeSpecialsFilter === 'function') {
                         reinitializeSpecialsFilter();
                     }
-                }, 100);
-                
-                if (typeof reinitializeClearAllButton === 'function') {
-                    reinitializeClearAllButton();
-                }
-                if (typeof window.initializeMobileFilterButton === 'function') {
-                    window.initializeMobileFilterButton();
-                }
-                updateClearAllButtonState(); // Atualizar estado do botão
+                }, 300);
             })
             .catch(error => {
                 console.error('Erro ao atualizar filtro de avaliação:', error);
@@ -2100,6 +2136,7 @@ function initializeSpecialsFilter() {
                 const minPrice = params.get('min_price') || '';
                 const maxPrice = params.get('max_price') || '';
                 const ratingFilter = params.get('rating_filter') || '';
+                const categoryTag = params.get('category_tag') || '';
                 
                 // Obter todos os valores de special_filter selecionados
                 const specialFilters = [];
@@ -2129,6 +2166,7 @@ function initializeSpecialsFilter() {
                 if (minPrice) newUrl.searchParams.set('min_price', minPrice);
                 if (maxPrice) newUrl.searchParams.set('max_price', maxPrice);
                 if (ratingFilter) newUrl.searchParams.set('rating_filter', ratingFilter);
+                if (categoryTag) newUrl.searchParams.set('category_tag', categoryTag);
                 
                 history.replaceState({}, '', newUrl);
                 
@@ -2144,6 +2182,7 @@ function initializeSpecialsFilter() {
                     min_price: minPrice,
                     max_price: maxPrice,
                     rating_filter: ratingFilter,
+                    category_tag: categoryTag,
                     nonce: viatorAjax.nonce
                 };
                 
@@ -2180,23 +2219,37 @@ function initializeSpecialsFilter() {
                     });
                     
                     // Reinicializar componentes
-                    if (typeof reinitializeDatePicker === 'function') {
-                        reinitializeDatePicker();
-                    }
-                    if (typeof reinitializeDurationFilter === 'function') {
-                        reinitializeDurationFilter();
-                    }
-                    if (typeof reinitializePriceSlider === 'function') {
-                        reinitializePriceSlider();
-                    }
-                    if (typeof reinitializeRatingFilter === 'function') {
-                        reinitializeRatingFilter();
-                    }
-                    
-                    // Re-inicializar o Swiper das atrações
-                    if (typeof reinitializeAttractionsSwiper === 'function') {
-                        reinitializeAttractionsSwiper();
-                    }
+                    setTimeout(() => {
+                        // Primeiro reinicializar filtros de categoria para garantir estado correto
+                        if (typeof initializeCategoryFilters === 'function') {
+                            initializeCategoryFilters();
+                        }
+                        if (typeof reinitializeDatePicker === 'function') {
+                            reinitializeDatePicker();
+                        }
+                        if (typeof reinitializeDurationFilter === 'function') {
+                            reinitializeDurationFilter();
+                        }
+                        if (typeof reinitializePriceSlider === 'function') {
+                            reinitializePriceSlider();
+                        }
+                        if (typeof reinitializeRatingFilter === 'function') {
+                            reinitializeRatingFilter();
+                        }
+                        
+                        // Re-inicializar o Swiper das atrações
+                        if (typeof reinitializeAttractionsSwiper === 'function') {
+                            reinitializeAttractionsSwiper();
+                        }
+                        
+                        if (typeof reinitializeClearAllButton === 'function') {
+                            reinitializeClearAllButton();
+                        }
+                        if (typeof window.initializeMobileFilterButton === 'function') {
+                            window.initializeMobileFilterButton();
+                        }
+                        updateClearAllButtonState(); // Atualizar estado do botão
+                    }, 100);
                     
                     // Garantir que os filtros especiais sejam sincronizados corretamente
                     // Importante: chamar isso após o HTML ter sido atualizado
@@ -2204,15 +2257,7 @@ function initializeSpecialsFilter() {
                         if (typeof reinitializeSpecialsFilter === 'function') {
                             reinitializeSpecialsFilter();
                         }
-                    }, 100);
-                    
-                    if (typeof reinitializeClearAllButton === 'function') {
-                        reinitializeClearAllButton();
-                    }
-                    if (typeof window.initializeMobileFilterButton === 'function') {
-                        window.initializeMobileFilterButton();
-                    }
-                    updateClearAllButtonState(); // Atualizar estado do botão
+                    }, 300);
                 })
                 .catch(error => {
                     console.error('Erro ao atualizar filtro de especiais:', error);
@@ -2616,11 +2661,17 @@ function updateClearAllButtonState() {
 }
 
 // Função para re-inicializar o Swiper das atrações após atualizações AJAX
-// Função para inicializar o carrossel de filtros de categoria
+// Função para inicializar APENAS o carrossel de filtros de categoria (Swiper)
 function initializeCategoryFilters() {
-    // Inicializar Swiper para o carrossel de filtros
+    // Destruir instância anterior do Swiper se existir
+    if (window.categorySwiper) {
+        window.categorySwiper.destroy(true, true);
+        window.categorySwiper = null;
+    }
+    
+    // Inicializar APENAS o Swiper para o carrossel de filtros
     if (document.querySelector('.viator-category-filters-swiper')) {
-        const categorySwiper = new Swiper('.viator-category-filters-swiper', {
+        window.categorySwiper = new Swiper('.viator-category-filters-swiper', {
             slidesPerView: 'auto',
             spaceBetween: 12,
             navigation: {
@@ -2632,8 +2683,19 @@ function initializeCategoryFilters() {
             freeModeSticky: false
         });
     }
+}
 
-    // Adicionar eventos de clique aos botões de categoria
+// Função para inicializar eventos dos filtros de categoria (chamada apenas uma vez)
+function initializeCategoryEvents() {
+    // Evitar múltiplos event listeners
+    if (window.categoryEventsInitialized) {
+        return;
+    }
+    
+    // Marcar como inicializado
+    window.categoryEventsInitialized = true;
+    
+    // Event listener único usando delegação de eventos
     document.addEventListener('click', function(e) {
         if (e.target.classList.contains('viator-category-btn')) {
             e.preventDefault();
@@ -2718,9 +2780,9 @@ function initializeCategoryFilters() {
                     block: 'start' 
                 });
                 
-                // Reinicializar componentes
+                // Reinicializar componentes (SEM reinicializar eventos de categoria!)
                 setTimeout(() => {
-                    // Primeiro reinicializar filtros de categoria para garantir estado correto
+                    // APENAS reinicializar o Swiper dos filtros de categoria
                     initializeCategoryFilters();
                     if (typeof reinitializeDatePicker === 'function') {
                         reinitializeDatePicker();
