@@ -713,7 +713,7 @@ class ViatorBookingManager {
                     
                     <div class="security-notice">
                         <div class="security-badge">
-                            🔒 Suas informações são criptografadas e processadas com segurança pela Viator
+                            🔒 Suas informações são criptografadas e processadas com segurança
                         </div>
                     </div>
                     
