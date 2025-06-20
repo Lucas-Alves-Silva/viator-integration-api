@@ -2811,9 +2811,9 @@ function viator_extract_dynamic_categories($products, $language = null) {
         }
     }
     
-    // Filtrar categorias com pelo menos 2 produtos e ordenar por relevância
+    // Filtrar categorias com pelo menos 1 produto e ordenar por relevância
     $filtered_categories = array_filter($category_counts, function($category) {
-        return $category['count'] >= 2;
+        return $category['count'] >= 1;
     });
     
     // Ordenar por contagem (categorias com mais produtos primeiro)
@@ -2821,8 +2821,8 @@ function viator_extract_dynamic_categories($products, $language = null) {
         return $b['count'] - $a['count'];
     });
     
-    // Limitar a 8 categorias para não sobrecarregar o UI
-    $final_categories = array_slice($filtered_categories, 0, 8, true);
+    // Limitar a 12 categorias para mostrar mais opções sem sobrecarregar o UI
+    $final_categories = array_slice($filtered_categories, 0, 12, true);
     
     viator_debug_log('Categorias dinâmicas extraídas:', [
         'total_produtos' => count($products['results']),
