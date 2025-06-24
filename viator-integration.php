@@ -5973,16 +5973,12 @@ function viator_generate_tours_carousel($params) {
         
         <div class="viator-tours-carousel-container">
             <?php if ($show_navigation): ?>
-                <button class="viator-tours-nav-prev <?php echo esc_attr($navigation_prev); ?>" aria-label="Anterior">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="15,18 9,12 15,6"></polyline>
-                    </svg>
-                </button>
-                <button class="viator-tours-nav-next <?php echo esc_attr($navigation_next); ?>" aria-label="Próximo">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="9,18 15,12 9,6"></polyline>
-                    </svg>
-                </button>
+                <div class="viator-tours-nav-prev <?php echo esc_attr($navigation_prev); ?>">
+                    <ion-icon name="chevron-back-outline"></ion-icon>
+                </div>
+                <div class="viator-tours-nav-next <?php echo esc_attr($navigation_next); ?>">
+                    <ion-icon name="chevron-forward-outline"></ion-icon>
+                </div>
             <?php endif; ?>
             
             <div class="viator-tours-swiper swiper <?php echo esc_attr($carousel_id); ?>">
@@ -6336,6 +6332,17 @@ function viator_generate_tour_card($product) {
         $price_html = viator_t('price_not_available');
     }
     
+    // Processar flags para badges (igual aos cards de busca)
+    $flag_output = '';
+    if (isset($product['flags']) && is_array($product['flags'])) {
+        if (in_array('LIKELY_TO_SELL_OUT', $product['flags'])) {
+            $flag_output .= '<span class="viator-badge" data-type="sell-out">' . esc_html(viator_t('likely_to_sell_out_badge')) . '</span>';
+        }
+        if (in_array('SPECIAL_OFFER', $product['flags'])) {
+            $flag_output .= '<span class="viator-badge" data-type="special-offer">' . esc_html(viator_t('special_offer_badge')) . '</span>';
+        }
+    }
+    
     ob_start();
     ?>
     <div class="viator-card">
@@ -6343,6 +6350,10 @@ function viator_generate_tour_card($product) {
             <img src="<?php echo esc_url($product['image_url']); ?>" 
                  alt="<?php echo esc_attr($product['title']); ?>" 
                  loading="lazy">
+            
+            <?php if (!empty($flag_output)): ?>
+                <div class="viator-badge-container"><?php echo $flag_output; ?></div>
+            <?php endif; ?>
         </div>
         
         <div class="viator-card-content">
@@ -6351,6 +6362,14 @@ function viator_generate_tour_card($product) {
             
             <?php if (!empty($product['description'])): ?>
                 <p><?php echo esc_html(wp_trim_words($product['description'], 15, '...')); ?></p>
+            <?php endif; ?>
+            
+            <?php if (isset($product['flags']) && is_array($product['flags']) && in_array('FREE_CANCELLATION', $product['flags'])): ?>
+                <p class="viator-card-duration">
+                    <img src="https://img.icons8.com/?size=100&id=85097&format=png&color=04846b" 
+                         alt="Cancelamento gratuito" title="Política de cancelamento" width="15" height="15"> 
+                    <?php echo esc_html(viator_t('free_cancellation_badge')); ?>
+                </p>
             <?php endif; ?>
             
             <?php if ($product['duration']): ?>
