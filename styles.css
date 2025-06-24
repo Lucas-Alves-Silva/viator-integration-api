@@ -3688,6 +3688,188 @@ body[data-viator-lang="en-US"] .viator-attraction-card::before {
 }
 
 /* ========================================
+   CARROSSEL DE TOURS/PRODUTOS - SHORTCODE
+======================================== */
+
+/* Seção principal do carrossel de tours */
+.viator-tours-section {
+    margin: 30px 0;
+    padding: 0;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+/* Cabeçalho do carrossel de tours */
+.viator-tours-header {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 0 20px;
+}
+
+.viator-tours-title {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0;
+    color: #2c3e50;
+    text-align: left;
+    flex: 1;
+}
+
+/* Container do carrossel de tours */
+.viator-tours-container {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+/* Container do carrossel com setas para tours */
+.viator-tours-carousel-container {
+    position: relative;
+    padding: 0 60px; /* Espaço para as setas */
+}
+
+/* Setas de navegação para tours (usando o mesmo padrão das atrações) */
+.viator-tours-nav-prev,
+.viator-tours-nav-next {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 10;
+    color: #666;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.viator-tours-nav-prev {
+    left: 10px;
+}
+
+.viator-tours-nav-next {
+    right: 10px;
+}
+
+.viator-tours-nav-prev:hover,
+.viator-tours-nav-next:hover {
+    background: #0056B3;
+    border-color: #0056B3;
+    color: white;
+    box-shadow: 0 4px 12px rgba(4, 132, 107, 0.2);
+}
+
+.viator-tours-nav-prev.swiper-button-disabled,
+.viator-tours-nav-next.swiper-button-disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: #f5f5f5;
+    color: #ccc;
+}
+
+.viator-tours-nav-prev.swiper-button-disabled:hover,
+.viator-tours-nav-next.swiper-button-disabled:hover {
+    background: #f5f5f5;
+    border-color: #e0e0e0;
+    color: #ccc;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Container do Swiper para tours */
+.viator-tours-swiper {
+    width: 100%;
+    padding: 0 20px;
+}
+
+/* Tamanhos das imagens dos cards de tours nos carrosséis */
+.viator-tours-section.small .viator-card .viator-card-img {
+    height: 150px;
+}
+
+.viator-tours-section.medium .viator-card .viator-card-img {
+    height: 200px;
+}
+
+.viator-tours-section.large .viator-card .viator-card-img {
+    height: 250px;
+}
+
+.viator-tours-section.extra-large .viator-card .viator-card-img {
+    height: 300px;
+}
+
+/* Responsividade para tours */
+@media (max-width: 768px) {
+    .viator-tours-section {
+        margin: 20px 0;
+    }
+    
+    .viator-tours-header {
+        padding: 0 15px;
+    }
+    
+    .viator-tours-title {
+        font-size: 20px;
+    }
+    
+    .viator-tours-carousel-container {
+        padding: 0 50px;
+    }
+    
+    .viator-tours-swiper {
+        padding: 0 15px;
+    }
+    
+    .viator-tours-nav-prev,
+    .viator-tours-nav-next {
+        width: 38px;
+        height: 38px;
+    }
+}
+
+@media (max-width: 480px) {
+    .viator-tours-carousel-container {
+        padding: 0 45px;
+    }
+    
+    .viator-tours-swiper {
+        padding: 0 15px;
+    }
+    
+    .viator-tours-header {
+        margin-bottom: 15px;
+    }
+    
+    .viator-tours-title {
+        font-size: 18px;
+    }
+    
+    .viator-tours-nav-prev,
+    .viator-tours-nav-next {
+        width: 34px;
+        height: 34px;
+    }
+    
+    .viator-tours-nav-prev {
+        left: 5px;
+    }
+    
+    .viator-tours-nav-next {
+        right: 5px;
+    }
+}
+
+/* ========================================
    SHORTCODES PERSONALIZADOS DE ATRAÇÕES
 ======================================== */
 

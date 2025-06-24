@@ -131,6 +131,18 @@ function viator_debug_page() {
                     </td>
                 </tr>
                 
+                <tr>
+                    <th scope="row">🎫 Cache de Passeios</th>
+                    <td>
+                        <button type="button" id="viator-clear-tours-cache" class="button button-secondary">🗑️ Limpar Cache de Tours (7 dias)</button>
+                        <p class="description">
+                            <strong>Cache Automático:</strong> Os carrosséis de produtos/passeios são armazenados em cache por 7 dias para melhor performance.<br>
+                            Use este botão se precisar atualizar os dados dos carrosséis de passeios imediatamente.
+                        </p>
+                        <div id="tours-cache-result" style="margin-top: 10px;"></div>
+                    </td>
+                </tr>
+                
                 <tr style="border-top: 2px solid #dc3545;">
                     <th scope="row">🔥 Limpeza Completa</th>
                     <td>
@@ -392,6 +404,42 @@ function viator_debug_page() {
                         },
                         complete: function() {
                             button.prop('disabled', false).text('🗑️ Limpar Cache de Carrosséis (7 dias)');
+                            
+                            // Limpar resultado após 5 segundos
+                            setTimeout(function() {
+                                resultDiv.fadeOut();
+                            }, 5000);
+                        }
+                    });
+                });
+                
+                // Cache de Tours
+                $('#viator-clear-tours-cache').on('click', function() {
+                    var button = $(this);
+                    var resultDiv = $('#tours-cache-result');
+                    
+                    button.prop('disabled', true).text('🔄 Limpando...');
+                    resultDiv.html('<span style="color: #0073aa;">Limpando cache de tours...</span>');
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'viator_clear_tours_cache',
+                            nonce: '<?php echo wp_create_nonce('viator_clear_cache'); ?>'
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                resultDiv.html('<span style="color: #46b450;">✓ ' + response.data.message + '</span>');
+                            } else {
+                                resultDiv.html('<span style="color: #dc3232;">✗ Erro: ' + response.data.message + '</span>');
+                            }
+                        },
+                        error: function() {
+                            resultDiv.html('<span style="color: #dc3232;">✗ Erro de conexão</span>');
+                        },
+                        complete: function() {
+                            button.prop('disabled', false).text('🗑️ Limpar Cache de Tours (7 dias)');
                             
                             // Limpar resultado após 5 segundos
                             setTimeout(function() {

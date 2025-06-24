@@ -57,8 +57,8 @@ function viator_admin_menu() {
     // Adicionar submenu para geração de shortcodes
     add_submenu_page(
         'viator-settings',
-        'Gerador de Shortcodes de Atrações',
-        'Shortcodes de Atrações',
+        'Gerador de Shortcodes',
+        'Shortcodes',
         'manage_options',
         'viator-shortcodes',
         'viator_shortcodes_page'
@@ -234,16 +234,33 @@ function viator_settings_page() {
     <?php
 }
 
-// Página de geração de shortcodes de atrações
+// Página de geração de shortcodes
 function viator_shortcodes_page() {
+    $active_tab = isset($_GET['tab']) ? $_GET['tab'] : 'attractions';
     ?>
     <div class="wrap">
-        <h1>🎯 Gerador de Shortcodes de Atrações</h1>
-        <p>Crie carrosséis personalizados de atrações para inserir em qualquer lugar do seu site!</p>
+        <h1>🎯 Gerador de Shortcodes</h1>
+        <p>Crie carrosséis personalizados de atrações e passeios para inserir em qualquer lugar do seu site!</p>
         
-        <div style="background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin: 20px 0;">
+        <!-- Navegação por abas -->
+        <h2 class="nav-tab-wrapper" style="margin-bottom: 20px;">
+            <a href="?page=viator-shortcodes&tab=attractions" class="nav-tab <?php echo $active_tab === 'attractions' ? 'nav-tab-active' : ''; ?>">
+                🏛️ Gerador de Atrações
+            </a>
+            <a href="?page=viator-shortcodes&tab=tours" class="nav-tab <?php echo $active_tab === 'tours' ? 'nav-tab-active' : ''; ?>">
+                🎫 Gerador de Passeios
+            </a>
+        </h2>
+        
+        <?php if ($active_tab === 'attractions'): ?>
+        <!-- ABA DE ATRAÇÕES -->
+        <div class="tab-content">
+            <h2 style="margin-top: 0;">Gerador de Shortcodes de Atrações</h2>
+            <p style="margin-bottom: 20px;">Crie carrosséis personalizados de atrações para inserir em qualquer lugar do seu site!</p>
             
-            <h2>⚙️ Configurações do Carrossel</h2>
+            <div style="background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin: 20px 0;">
+                
+                <h2>⚙️ Configurações do Carrossel</h2>
             
             <table class="form-table">
                 <tr>
@@ -463,6 +480,311 @@ function viator_shortcodes_page() {
             });
         });
         </script>
+        </div>
+        
+        <?php elseif ($active_tab === 'tours'): ?>
+        <!-- ABA DE PASSEIOS -->
+        <div class="tab-content">
+            <h2 style="margin-top: 0;">Gerador de Shortcodes de Passeios</h2>
+            <p style="margin-bottom: 20px;">Crie carrosséis personalizados de produtos/passeios para inserir em qualquer lugar do seu site!</p>
+            
+            <div style="background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin: 20px 0;">
+                
+                <h2>⚙️ Configurações do Carrossel de Passeios</h2>
+                
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">
+                            <label for="tour_search_type">🎯 Tipo de Busca</label>
+                        </th>
+                        <td>
+                            <select id="tour_search_type" onchange="toggleTourSearchFields()">
+                                <option value="search">Busca por texto (ex: "Helicóptero Las Vegas")</option>
+                                <option value="codes">Códigos específicos (ex: 5516ST5, 5847NIGHT)</option>
+                            </select>
+                            <p class="description">Escolha como buscar os passeios para o carrossel.</p>
+                        </td>
+                    </tr>
+                    
+                    <tr id="search_field_row">
+                        <th scope="row">
+                            <label for="tour_search_query">🔍 Termo de Busca</label>
+                        </th>
+                        <td>
+                            <input type="text" 
+                                   id="tour_search_query" 
+                                   class="regular-text" 
+                                   placeholder="Ex: Helicóptero Las Vegas, City Tour Paris, Mergulho Maldivas"
+                                   style="width: 400px;">
+                            <p class="description">
+                                Digite os termos para buscar passeios relacionados. 
+                                <strong>Exemplos:</strong> "Helicóptero Las Vegas", "Tour gastronômico Roma", "Passeio de barco"
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <tr id="codes_field_row" style="display: none;">
+                        <th scope="row">
+                            <label for="tour_product_codes">📝 Códigos dos Produtos</label>
+                        </th>
+                        <td>
+                            <textarea id="tour_product_codes" 
+                                      rows="4" 
+                                      class="regular-text" 
+                                      placeholder="Ex: 5516ST5, 5847NIGHT, 5847LASWIN"
+                                      style="width: 400px; height: 100px;"></textarea>
+                            <p class="description">
+                                Digite os códigos dos produtos separados por vírgula. 
+                                <strong>Exemplo:</strong> 5516ST5, 5847NIGHT, 5847LASWIN
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th scope="row">
+                            <label for="tour_cards_desktop">🖥️ Cards no Desktop</label>
+                        </th>
+                        <td>
+                            <select id="tour_cards_desktop">
+                                <option value="2">2 cards</option>
+                                <option value="3">3 cards</option>
+                                <option value="4" selected>4 cards</option>
+                                <option value="5">5 cards</option>
+                                <option value="6">6 cards</option>
+                            </select>
+                            <p class="description">Quantos cards exibir em telas de desktop (1200px+).</p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th scope="row">
+                            <label for="tour_cards_tablet">📱 Cards no Tablet</label>
+                        </th>
+                        <td>
+                            <select id="tour_cards_tablet">
+                                <option value="1">1 card</option>
+                                <option value="2">2 cards</option>
+                                <option value="3" selected>3 cards</option>
+                                <option value="4">4 cards</option>
+                            </select>
+                            <p class="description">Quantos cards exibir em tablets (768px - 1199px).</p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th scope="row">
+                            <label for="tour_cards_mobile">📱 Cards no Mobile</label>
+                        </th>
+                        <td>
+                            <select id="tour_cards_mobile">
+                                <option value="1" selected>1 card</option>
+                                <option value="2">2 cards</option>
+                            </select>
+                            <p class="description">Quantos cards exibir em dispositivos móveis (menos de 768px).</p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th scope="row">
+                            <label for="tour_card_size">📏 Tamanho dos Cards</label>
+                        </th>
+                        <td>
+                            <select id="tour_card_size">
+                                <option value="small">Pequeno (200px altura)</option>
+                                <option value="medium" selected>Médio (250px altura)</option>
+                                <option value="large">Grande (300px altura)</option>
+                                <option value="extra-large">Extra Grande (350px altura)</option>
+                            </select>
+                            <p class="description">Tamanho dos cards do carrossel.</p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th scope="row">
+                            <label for="tour_show_navigation">🧭 Navegação</label>
+                        </th>
+                        <td>
+                            <input type="checkbox" id="tour_show_navigation" checked>
+                            <label for="tour_show_navigation">Exibir botões de navegação (setas)</label>
+                            <p class="description">Mostrar setas para navegar pelo carrossel.</p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th scope="row">
+                            <label for="tour_carousel_title">🏷️ Título do Carrossel</label>
+                        </th>
+                        <td>
+                            <input type="text" 
+                                   id="tour_carousel_title" 
+                                   class="regular-text" 
+                                   placeholder="Ex: Melhores Passeios, Tours Imperdíveis"
+                                   style="width: 400px;">
+                            <p class="description">Título opcional que aparecerá acima do carrossel. Deixe vazio para não exibir.</p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th scope="row">
+                            <label for="tour_max_products">🔢 Máximo de Produtos</label>
+                        </th>
+                        <td>
+                            <input type="number" 
+                                   id="tour_max_products" 
+                                   value="12" 
+                                   min="4" 
+                                   max="50" 
+                                   style="width: 80px;">
+                            <p class="description">Número máximo de produtos a serem exibidos no carrossel (apenas para busca por texto).</p>
+                        </td>
+                    </tr>
+                </table>
+                
+                <div style="margin: 30px 0;">
+                    <button type="button" 
+                            id="generate_tour_shortcode" 
+                            class="button button-primary button-large"
+                            style="background: #dc3545; border-color: #dc3545; padding: 10px 30px; font-size: 16px;">
+                        🚀 Gerar Shortcode de Passeios
+                    </button>
+                </div>
+                
+                <div id="tour_shortcode_result" style="display: none; margin-top: 30px;">
+                    <h3>✅ Seu Shortcode de Passeios foi Gerado!</h3>
+                    <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 20px;">
+                        <p><strong>Copie o código abaixo e cole onde quiser exibir o carrossel:</strong></p>
+                        <textarea id="generated_tour_shortcode" 
+                                  readonly 
+                                  style="width: 100%; height: 120px; font-family: monospace; font-size: 14px; padding: 15px; border: 1px solid #ccd1d1; border-radius: 4px;"
+                                  onclick="this.select(); document.execCommand('copy'); alert('Shortcode copiado para a área de transferência!');">
+                        </textarea>
+                        
+                        <div style="margin-top: 15px; padding: 15px; background: #e8f4fd; border-left: 4px solid #0073aa; border-radius: 4px;">
+                            <h4 style="margin: 0 0 10px 0;">💡 Como usar:</h4>
+                            <ol style="margin: 0; padding-left: 20px;">
+                                <li>Copie o shortcode acima</li>
+                                <li>Vá para qualquer página ou post do WordPress</li>
+                                <li>Cole o shortcode no editor (pode ser no editor clássico ou Gutenberg)</li>
+                                <li>Publique ou atualize a página</li>
+                                <li>O carrossel de passeios aparecerá automaticamente!</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin: 20px 0;">
+                <h2>📋 Exemplos de Shortcodes de Passeios</h2>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px;">
+                    <div style="padding: 15px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid #dc3545;">
+                        <h4 style="margin: 0 0 10px 0; color: #dc3545;">🚁 Busca por Helicóptero</h4>
+                        <code style="background: #fff; padding: 8px; border-radius: 4px; display: block; font-size: 12px;">
+                            [viator_tours search="Helicóptero Las Vegas" cards_desktop="4" cards_tablet="2" cards_mobile="1" size="medium" title="Tours de Helicóptero" max="8"]
+                        </code>
+                    </div>
+                    
+                    <div style="padding: 15px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid #28a745;">
+                        <h4 style="margin: 0 0 10px 0; color: #28a745;">🏛️ City Tours Paris</h4>
+                        <code style="background: #fff; padding: 8px; border-radius: 4px; display: block; font-size: 12px;">
+                            [viator_tours search="City Tour Paris" cards_desktop="3" cards_tablet="2" cards_mobile="1" size="large" title="Explore Paris" max="12"]
+                        </code>
+                    </div>
+                    
+                    <div style="padding: 15px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid #007cba;">
+                        <h4 style="margin: 0 0 10px 0; color: #007cba;">📝 Produtos Específicos</h4>
+                        <code style="background: #fff; padding: 8px; border-radius: 4px; display: block; font-size: 12px;">
+                            [viator_tours codes="5516ST5,5847NIGHT,5847LASWIN" cards_desktop="3" size="medium" title="Tours Selecionados"]
+                        </code>
+                    </div>
+                    
+                    <div style="padding: 15px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid #ffc107;">
+                        <h4 style="margin: 0 0 10px 0; color: #e68900;">🌊 Tours Aquáticos</h4>
+                        <code style="background: #fff; padding: 8px; border-radius: 4px; display: block; font-size: 12px;">
+                            [viator_tours search="Mergulho" cards_desktop="4" navigation="true" size="large" title="Aventuras Aquáticas" max="10"]
+                        </code>
+                    </div>
+                </div>
+            </div>
+            
+            <script>
+            function toggleTourSearchFields() {
+                const searchType = document.getElementById('tour_search_type').value;
+                const searchRow = document.getElementById('search_field_row');
+                const codesRow = document.getElementById('codes_field_row');
+                const maxProductsRow = document.getElementById('tour_max_products').closest('tr');
+                
+                if (searchType === 'search') {
+                    searchRow.style.display = 'table-row';
+                    codesRow.style.display = 'none';
+                    maxProductsRow.style.display = 'table-row';
+                } else {
+                    searchRow.style.display = 'none';
+                    codesRow.style.display = 'table-row';
+                    maxProductsRow.style.display = 'none';
+                }
+            }
+            
+            document.addEventListener('DOMContentLoaded', function() {
+                const generateTourBtn = document.getElementById('generate_tour_shortcode');
+                
+                generateTourBtn.addEventListener('click', function() {
+                    const searchType = document.getElementById('tour_search_type').value;
+                    
+                    let shortcode = '[viator_tours';
+                    
+                    if (searchType === 'search') {
+                        const searchQuery = document.getElementById('tour_search_query').value.trim();
+                        if (!searchQuery) {
+                            alert('Por favor, insira um termo de busca!');
+                            return;
+                        }
+                        shortcode += ` search="${searchQuery}"`;
+                        
+                        const maxProducts = document.getElementById('tour_max_products').value;
+                        shortcode += ` max="${maxProducts}"`;
+                    } else {
+                        const productCodes = document.getElementById('tour_product_codes').value.trim();
+                        if (!productCodes) {
+                            alert('Por favor, insira os códigos dos produtos!');
+                            return;
+                        }
+                        shortcode += ` codes="${productCodes}"`;
+                    }
+                    
+                    const cardsDesktop = document.getElementById('tour_cards_desktop').value;
+                    const cardsTablet = document.getElementById('tour_cards_tablet').value;
+                    const cardsMobile = document.getElementById('tour_cards_mobile').value;
+                    const cardSize = document.getElementById('tour_card_size').value;
+                    const showNavigation = document.getElementById('tour_show_navigation').checked;
+                    const title = document.getElementById('tour_carousel_title').value.trim();
+                    
+                    shortcode += ` cards_desktop="${cardsDesktop}"`;
+                    shortcode += ` cards_tablet="${cardsTablet}"`;
+                    shortcode += ` cards_mobile="${cardsMobile}"`;
+                    shortcode += ` size="${cardSize}"`;
+                    shortcode += ` navigation="${showNavigation ? 'true' : 'false'}"`;
+                    
+                    if (title) {
+                        shortcode += ` title="${title}"`;
+                    }
+                    
+                    shortcode += ']';
+                    
+                    // Exibir resultado
+                    document.getElementById('generated_tour_shortcode').value = shortcode;
+                    document.getElementById('tour_shortcode_result').style.display = 'block';
+                    
+                    // Scroll suave para o resultado
+                    document.getElementById('tour_shortcode_result').scrollIntoView({ 
+                        behavior: 'smooth' 
+                    });
+                });
+            });
+            </script>
+        </div>
+        
+        <?php endif; ?>
     </div>
     <?php
 }
@@ -5486,6 +5808,38 @@ function viator_clear_attractions_cache() {
     return true;
 }
 
+// Função para limpar cache dos carrosséis de tours
+function viator_clear_tours_cache() {
+    global $wpdb;
+    
+    // Limpar todos os transients relacionados aos carrosséis de tours
+    $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_viator_tours_search_%'");
+    $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_timeout_viator_tours_search_%'");
+    $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_viator_tours_codes_%'");
+    $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_timeout_viator_tours_codes_%'");
+    
+    // Log para confirmar limpeza
+    viator_debug_log('Cache de carrosséis de tours limpo manualmente via admin');
+    
+    return true;
+}
+
+// Hook para limpar cache de tours via admin
+add_action('wp_ajax_viator_clear_tours_cache', 'viator_ajax_clear_tours_cache');
+function viator_ajax_clear_tours_cache() {
+    // Verificar permissões
+    if (!current_user_can('manage_options')) {
+        wp_die(json_encode(['success' => false, 'data' => ['message' => 'Sem permissão']]));
+    }
+    
+    try {
+        viator_clear_tours_cache();
+        wp_send_json_success(['message' => 'Cache de tours limpo com sucesso!']);
+    } catch (Exception $e) {
+        wp_send_json_error(['message' => 'Erro ao limpar cache: ' . $e->getMessage()]);
+    }
+}
+
 // Hook para limpar cache via admin
 add_action('wp_ajax_viator_clear_cache', 'viator_ajax_clear_cache');
 function viator_ajax_clear_cache() {
@@ -5547,6 +5901,502 @@ function viator_search_by_attraction_id($attraction_id, $api_key, $locale_settin
     // Salvar no cache por 7 dias
     set_transient($cache_key, $result, 7 * DAY_IN_SECONDS);
     return $result;
+}
+
+// Registrar shortcode de passeios/produtos
+function viator_tours_shortcode($atts) {
+    $atts = shortcode_atts(array(
+        'search' => '',
+        'codes' => '',
+        'cards_desktop' => '4',
+        'cards_tablet' => '3',
+        'cards_mobile' => '1',
+        'size' => 'medium',
+        'navigation' => 'true',
+        'title' => '',
+        'max' => '12'
+    ), $atts, 'viator_tours');
+
+    // Validar se pelo menos um parâmetro de busca foi fornecido
+    if (empty($atts['search']) && empty($atts['codes'])) {
+        return '<p class="viator-error">Erro: É necessário fornecer "search" ou "codes" no shortcode [viator_tours].</p>';
+    }
+
+    // Gerar HTML do carrossel de tours
+    return viator_generate_tours_carousel($atts);
+}
+add_shortcode('viator_tours', 'viator_tours_shortcode');
+
+// Função para gerar o carrossel de tours/produtos
+function viator_generate_tours_carousel($params) {
+    $search_term = sanitize_text_field($params['search']);
+    $product_codes = sanitize_text_field($params['codes']);
+    $cards_desktop = max(1, min(8, intval($params['cards_desktop'])));
+    $cards_tablet = max(1, min(6, intval($params['cards_tablet'])));
+    $cards_mobile = max(1, min(3, intval($params['cards_mobile'])));
+    $size = sanitize_text_field($params['size']);
+    $show_navigation = ($params['navigation'] === 'true' || $params['navigation'] === '1');
+    $title = sanitize_text_field($params['title']);
+    $max_products = max(4, min(50, intval($params['max'])));
+
+    // Validar tamanho
+    $valid_sizes = ['small', 'medium', 'large', 'extra-large'];
+    if (!in_array($size, $valid_sizes)) {
+        $size = 'medium';
+    }
+
+    // Buscar produtos baseados nos parâmetros
+    if (!empty($search_term)) {
+        $products = viator_search_products_for_carousel($search_term, $max_products);
+    } else {
+        $products = viator_get_products_by_codes($product_codes);
+    }
+    
+    if (empty($products)) {
+        $search_display = !empty($search_term) ? $search_term : 'códigos específicos';
+        return '<div class="viator-error">Nenhum produto encontrado para: ' . esc_html($search_display) . '</div>';
+    }
+
+    // Gerar ID único para este carrossel
+    $carousel_id = 'viator-tours-carousel-' . uniqid();
+    $navigation_prev = $carousel_id . '-prev';
+    $navigation_next = $carousel_id . '-next';
+
+    ob_start();
+    ?>
+    <div class="viator-tours-section <?php echo esc_attr($size); ?>">
+        <?php if (!empty($title)): ?>
+            <div class="viator-tours-header">
+                <h3 class="viator-tours-title"><?php echo esc_html($title); ?></h3>
+            </div>
+        <?php endif; ?>
+        
+        <div class="viator-tours-carousel-container">
+            <?php if ($show_navigation): ?>
+                <button class="viator-tours-nav-prev <?php echo esc_attr($navigation_prev); ?>" aria-label="Anterior">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15,18 9,12 15,6"></polyline>
+                    </svg>
+                </button>
+                <button class="viator-tours-nav-next <?php echo esc_attr($navigation_next); ?>" aria-label="Próximo">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9,18 15,12 9,6"></polyline>
+                    </svg>
+                </button>
+            <?php endif; ?>
+            
+            <div class="viator-tours-swiper swiper <?php echo esc_attr($carousel_id); ?>">
+                <div class="swiper-wrapper">
+                    <?php foreach ($products as $product): ?>
+                        <div class="swiper-slide">
+                            <?php echo viator_generate_tour_card($product); ?>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof Swiper !== 'undefined') {
+            new Swiper('.<?php echo esc_js($carousel_id); ?>', {
+                slidesPerView: <?php echo $cards_mobile; ?>,
+                spaceBetween: 15,
+                <?php if ($show_navigation): ?>
+                navigation: {
+                    nextEl: '.<?php echo esc_js($navigation_next); ?>',
+                    prevEl: '.<?php echo esc_js($navigation_prev); ?>',
+                },
+                <?php endif; ?>
+                breakpoints: {
+                    768: {
+                        slidesPerView: <?php echo $cards_tablet; ?>,
+                        spaceBetween: 20
+                    },
+                    1200: {
+                        slidesPerView: <?php echo $cards_desktop; ?>,
+                        spaceBetween: 20
+                    }
+                },
+                loop: <?php echo count($products) > $cards_desktop ? 'true' : 'false'; ?>,
+                autoplay: false,
+                grabCursor: true,
+                centeredSlides: false
+            });
+        }
+    });
+    </script>
+    <?php
+    return ob_get_clean();
+}
+
+// Função para buscar produtos via API baseado em termo de busca
+function viator_search_products_for_carousel($search_term, $max_results = 12) {
+    $api_key = get_option('viator_api_key');
+    if (empty($api_key)) {
+        return array();
+    }
+
+    // Obter configurações de idioma e moeda
+    $locale_settings = viator_get_locale_settings();
+    
+    // Criar chave de cache única
+    $cache_key = 'viator_tours_search_' . md5($search_term . $max_results . $locale_settings['currency'] . $locale_settings['accept_language']);
+    
+    // Tentar obter dados do cache primeiro
+    $cached_data = get_transient($cache_key);
+    if ($cached_data !== false) {
+        return $cached_data;
+    }
+    
+    $url = "https://api.sandbox.viator.com/partner/search/freetext";
+
+    $body_data = [
+        "searchTerm" => $search_term,
+        "productSorting" => ['sort' => 'DEFAULT'],
+        "productFiltering" => [
+            "dateRange" => [
+                "from" => date('Y-m-d'),
+                "to" => date('Y-m-d', strtotime('+1 year'))
+            ],
+            "includeAutomaticTranslations" => true
+        ],
+        "searchTypes" => [
+            ["searchType" => "PRODUCTS", "pagination" => ["start" => 1, "count" => $max_results]]
+        ],
+        "currency" => $locale_settings['currency']
+    ];
+
+    $headers = [
+        'Accept' => 'application/json;version=2.0',
+        'Content-Type' => 'application/json;version=2.0',
+        'exp-api-key' => $api_key,
+        'Accept-Language' => $locale_settings['accept_language'],
+    ];
+
+    $args = [
+        'method' => 'POST',
+        'headers' => $headers,
+        'body' => json_encode($body_data),
+        'timeout' => 30
+    ];
+
+    $response = wp_remote_request($url, $args);
+
+    if (is_wp_error($response)) {
+        return array();
+    }
+
+    $response_code = wp_remote_retrieve_response_code($response);
+    $body = wp_remote_retrieve_body($response);
+
+    if ($response_code !== 200) {
+        return array();
+    }
+
+    $data = json_decode($body, true);
+
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        return array();
+    }
+
+    if (!isset($data['products']['results']) || empty($data['products']['results'])) {
+        return array();
+    }
+
+    // Processar resultados
+    $processed_products = array();
+    foreach ($data['products']['results'] as $product) {
+        $processed_products[] = viator_process_product_for_carousel($product);
+    }
+
+    // Salvar no cache por 7 dias
+    set_transient($cache_key, $processed_products, 7 * DAY_IN_SECONDS);
+
+    return $processed_products;
+}
+
+// Função para buscar produtos específicos por códigos
+function viator_get_products_by_codes($codes_string) {
+    $api_key = get_option('viator_api_key');
+    if (empty($api_key)) {
+        return array();
+    }
+
+    // Limpar e separar códigos
+    $codes = array_map('trim', explode(',', $codes_string));
+    $codes = array_filter($codes); // Remove valores vazios
+    
+    if (empty($codes)) {
+        return array();
+    }
+
+    // Obter configurações de idioma e moeda
+    $locale_settings = viator_get_locale_settings();
+    
+    // Criar chave de cache única
+    $cache_key = 'viator_tours_codes_' . md5(implode(',', $codes) . $locale_settings['currency'] . $locale_settings['accept_language']);
+    
+    // Tentar obter dados do cache primeiro
+    $cached_data = get_transient($cache_key);
+    if ($cached_data !== false) {
+        return $cached_data;
+    }
+
+    $products = array();
+    
+    // Buscar cada produto individualmente
+    foreach ($codes as $product_code) {
+        $product_data = viator_get_product_data_for_carousel($product_code, $api_key, $locale_settings);
+        if ($product_data) {
+            $products[] = viator_process_product_for_carousel($product_data);
+        }
+    }
+
+    // Salvar no cache por 7 dias
+    set_transient($cache_key, $products, 7 * DAY_IN_SECONDS);
+
+    return $products;
+}
+
+// Função para buscar dados de um produto específico para o carrossel
+function viator_get_product_data_for_carousel($product_code, $api_key, $locale_settings) {
+    $url = "https://api.sandbox.viator.com/partner/search/freetext";
+    
+    // Buscar pelo código específico do produto
+    $body_data = [
+        "searchTerm" => $product_code,
+        "productSorting" => ['sort' => 'DEFAULT'],
+        "productFiltering" => [
+            "dateRange" => [
+                "from" => date('Y-m-d'),
+                "to" => date('Y-m-d', strtotime('+1 year'))
+            ],
+            "includeAutomaticTranslations" => true
+        ],
+        "searchTypes" => [
+            ["searchType" => "PRODUCTS", "pagination" => ["start" => 1, "count" => 10]]
+        ],
+        "currency" => $locale_settings['currency']
+    ];
+    
+    $headers = [
+        'Accept' => 'application/json;version=2.0',
+        'Content-Type' => 'application/json;version=2.0',
+        'exp-api-key' => $api_key,
+        'Accept-Language' => $locale_settings['accept_language'],
+    ];
+    
+    $args = [
+        'method' => 'POST',
+        'headers' => $headers,
+        'body' => json_encode($body_data),
+        'timeout' => 30
+    ];
+    
+    $response = wp_remote_request($url, $args);
+    
+    if (is_wp_error($response)) {
+        return false;
+    }
+    
+    $response_code = wp_remote_retrieve_response_code($response);
+    $body = wp_remote_retrieve_body($response);
+    
+    if ($response_code !== 200) {
+        return false;
+    }
+    
+    $data = json_decode($body, true);
+    
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        return false;
+    }
+    
+    if (!isset($data['products']['results']) || empty($data['products']['results'])) {
+        return false;
+    }
+    
+    // Procurar pelo produto específico
+    foreach ($data['products']['results'] as $product) {
+        if (isset($product['productCode']) && $product['productCode'] === $product_code) {
+            return $product;
+        }
+    }
+    
+    // Se não encontrou o exato, retornar o primeiro (fallback)
+    return $data['products']['results'][0];
+}
+
+// Função para processar dados de produto para o carrossel
+function viator_process_product_for_carousel($product_data) {
+    $title = $product_data['title'] ?? 'Produto';
+    $description = $product_data['description'] ?? '';
+    $product_code = $product_data['productCode'] ?? '';
+    
+    // Obter melhor imagem
+    $image_url = 'https://via.placeholder.com/400x200';
+    if (isset($product_data['images'][0]['variants'][3]['url'])) {
+        $image_url = $product_data['images'][0]['variants'][3]['url'];
+    } elseif (isset($product_data['images'][0]['variants'][0]['url'])) {
+        $image_url = $product_data['images'][0]['variants'][0]['url'];
+    } elseif (isset($product_data['images'][0]['url'])) {
+        $image_url = $product_data['images'][0]['url'];
+    }
+    
+    // Avaliações
+    $rating = isset($product_data['reviews']['combinedAverageRating']) ? 
+              number_format($product_data['reviews']['combinedAverageRating'], 1) : null;
+    $total_reviews = isset($product_data['reviews']['totalReviews']) ? 
+                     $product_data['reviews']['totalReviews'] : 0;
+    
+    // Preço
+    $price = null;
+    $original_price = null;
+    if (isset($product_data['pricing']['summary']['fromPrice'])) {
+        $price = $product_data['pricing']['summary']['fromPrice'];
+    }
+    if (isset($product_data['pricing']['summary']['fromPriceBeforeDiscount'])) {
+        $original_price = $product_data['pricing']['summary']['fromPriceBeforeDiscount'];
+    }
+    
+    // Duração
+    $duration = null;
+    $duration_data = null;
+    if (isset($product_data['duration'])) {
+        $duration_fixed = $product_data['duration']['fixedDurationInMinutes'] ?? null;
+        $duration_from = $product_data['duration']['variableDurationFromMinutes'] ?? null;
+        $duration_to = $product_data['duration']['variableDurationToMinutes'] ?? null;
+        $duration_unstructured = $product_data['duration']['unstructuredDuration'] ?? null;
+        
+        $duration = viator_format_duration($duration_fixed, $duration_from, $duration_to, $duration_unstructured);
+        
+        // Armazenar dados brutos de duração para salvar posteriormente
+        $duration_data = array(
+            'fixedDurationInMinutes' => $duration_fixed,
+            'variableDurationFromMinutes' => $duration_from,
+            'variableDurationToMinutes' => $duration_to,
+            'unstructuredDuration' => $duration_unstructured
+        );
+    }
+    
+    // Flags
+    $flags = isset($product_data['flags']) ? $product_data['flags'] : array();
+    
+    return [
+        'title' => $title,
+        'description' => $description,
+        'product_code' => $product_code,
+        'image_url' => $image_url,
+        'rating' => $rating,
+        'total_reviews' => $total_reviews,
+        'price' => $price,
+        'original_price' => $original_price,
+        'duration' => $duration,
+        'duration_data' => $duration_data,
+        'flags' => $flags,
+        'product_url' => home_url('/passeio/' . $product_code . '/')
+    ];
+}
+
+// Função para gerar um card de tour/produto usando estrutura padrão .viator-card
+function viator_generate_tour_card($product) {
+    $locale_settings = viator_get_locale_settings();
+    $currency_symbol = $locale_settings['currency_symbol'];
+    
+    // Processar avaliações
+    $rating_text = '';
+    $rating_count = '';
+    if ($product['rating'] && $product['total_reviews'] > 0) {
+        $rating_text = number_format($product['rating'], 1) . '⭐';
+        if ($product['total_reviews'] == 1) {
+            $rating_count = '(1 ' . viator_t('review') . ')';
+        } else {
+            $rating_count = '(' . $product['total_reviews'] . ' ' . viator_t('reviews') . ')';
+        }
+    } else {
+        $rating_text = viator_t('no_reviews');
+    }
+    
+    // Processar preços
+    $price_html = '';
+    if ($product['price']) {
+        if ($product['original_price'] && $product['original_price'] > $product['price']) {
+            // Com desconto
+            $original_price = number_format($product['original_price'], 2, ',', '.');
+            $discounted_price = number_format($product['price'], 2, ',', '.');
+            $price_html = '<span class="viator-original-price">' . $currency_symbol . ' ' . $original_price . '</span> <span class="viator-discount-price">' . $currency_symbol . ' ' . $discounted_price . '</span>';
+        } else {
+            // Preço normal
+            $price = number_format($product['price'], 2, ',', '.');
+            $price_html = '<strong>' . $currency_symbol . ' ' . $price . '</strong>';
+        }
+    } else {
+        $price_html = viator_t('price_not_available');
+    }
+    
+    ob_start();
+    ?>
+    <div class="viator-card">
+        <div class="viator-card-img">
+            <img src="<?php echo esc_url($product['image_url']); ?>" 
+                 alt="<?php echo esc_attr($product['title']); ?>" 
+                 loading="lazy">
+        </div>
+        
+        <div class="viator-card-content">
+            <p class="viator-card-rating"><?php echo esc_html($rating_text . ' ' . $rating_count); ?></p>
+            <h3><?php echo esc_html($product['title']); ?></h3>
+            
+            <?php if (!empty($product['description'])): ?>
+                <p><?php echo esc_html(wp_trim_words($product['description'], 15, '...')); ?></p>
+            <?php endif; ?>
+            
+            <?php if ($product['duration']): ?>
+                <p class="viator-card-duration">
+                    <img src="https://img.icons8.com/?size=100&id=82767&format=png&color=000000" 
+                         alt="Duração" title="Duração aproximada" width="15" height="15"> 
+                    <?php echo esc_html($product['duration']); ?>
+                </p>
+            <?php endif; ?>
+            
+            <p class="viator-card-price">
+                <img src="https://img.icons8.com/?size=100&id=ZXJaNFNjWGZF&format=png&color=000000" 
+                     alt="Preço" width="15" height="15"> 
+                <?php echo esc_html(viator_t('from_price')); ?> <?php echo $price_html; ?>
+            </p>
+            
+            <a href="<?php echo esc_url($product['product_url']); ?>" target="_blank" rel="noopener noreferrer">
+                <?php echo esc_html(viator_t('see_details')); ?>
+            </a>
+        </div>
+    </div>
+    <?php
+    
+    // CRÍTICO: Salvar dados do produto para uso na página de detalhes
+    if (!empty($product['product_code'])) {
+        // Filtrar flags NEW_ON_VIATOR (política da Viator)
+        $filtered_flags = array();
+        if (isset($product['flags']) && is_array($product['flags'])) {
+            $filtered_flags = array_filter($product['flags'], function($flag) {
+                return $flag !== 'NEW_ON_VIATOR';
+            });
+        }
+        
+        $product_storage_data = array(
+            'fromPrice' => $product['price'],
+            'fromPriceBeforeDiscount' => $product['original_price'],
+            'duration' => $product['duration'],
+            'duration_data' => $product['duration_data'] ?? array(),
+            'flags' => $filtered_flags,
+            'last_saved' => current_time('timestamp'),
+            'source' => 'tours_carousel'
+        );
+        update_option('viator_product_' . $product['product_code'] . '_price', $product_storage_data, false);
+    }
+    
+    return ob_get_clean();
 }
 
 // Função para processar dados de atração para o carrossel
