@@ -666,7 +666,7 @@ function viator_shortcodes_page() {
                             id="generate_tour_shortcode" 
                             class="button button-primary button-large"
                             style="background: #dc3545; border-color: #dc3545; padding: 10px 30px; font-size: 16px;">
-                        🚀 Gerar Shortcode de Passeios
+                        🚀 Gerar Shortcode
                     </button>
                 </div>
                 
