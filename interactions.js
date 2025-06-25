@@ -1567,6 +1567,12 @@ function updateNearbySuggestion() {
         nearbySuggestion.style.display = 'none';
     }
 
+    // Verificar se a geolocalização está ativada nas configurações
+    if (!viatorConfig.geolocationEnabled) {
+        console.log('Geolocalização desativada nas configurações do plugin.');
+        return;
+    }
+
     if (nearbySuggestion && suggestionText) {
         nearbySuggestion.addEventListener('click', function() {
             if (suggestionText.textContent !== 'Obtendo localização...') {
@@ -1665,8 +1671,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (searchInput && nearbySuggestion) {
         searchInput.addEventListener('focus', function() {
-            nearbySuggestion.style.display = 'flex';
-            updateNearbySuggestion();
+            // Verificar se a geolocalização está ativada antes de mostrar a sugestão
+            if (viatorConfig.geolocationEnabled) {
+                nearbySuggestion.style.display = 'flex';
+                updateNearbySuggestion();
+            }
         });
 
         nearbySuggestion.addEventListener('click', function() {
@@ -2483,6 +2492,10 @@ function initializeClearAllButton() {
                 // Garantir que os filtros especiais sejam sincronizados corretamente
                 // Importante: chamar isso após o HTML ter sido atualizado
                 setTimeout(() => {
+                    // Re-inicializar o Swiper dos filtros de categoria após atualização do DOM
+                    if (typeof initializeCategoryFilters === 'function') {
+                        initializeCategoryFilters();
+                    }
                     if (typeof reinitializeSpecialsFilter === 'function') {
                         reinitializeSpecialsFilter();
                     }
@@ -2669,20 +2682,28 @@ function initializeCategoryFilters() {
         window.categorySwiper = null;
     }
     
-    // Inicializar APENAS o Swiper para o carrossel de filtros
-    if (document.querySelector('.viator-category-filters-swiper')) {
-        window.categorySwiper = new Swiper('.viator-category-filters-swiper', {
-            slidesPerView: 'auto',
-            spaceBetween: 12,
-            navigation: {
-                nextEl: '.viator-category-nav-next',
-                prevEl: '.viator-category-nav-prev'
-            },
-            watchOverflow: true,
-            freeMode: true,
-            freeModeSticky: false
-        });
-    }
+    // Aguardar um pequeno delay para garantir que o DOM esteja totalmente renderizado
+    setTimeout(() => {
+        // Inicializar APENAS o Swiper para o carrossel de filtros
+        const swiperElement = document.querySelector('.viator-category-filters-swiper');
+        if (swiperElement) {
+            try {
+                window.categorySwiper = new Swiper('.viator-category-filters-swiper', {
+                    slidesPerView: 'auto',
+                    spaceBetween: 12,
+                    navigation: {
+                        nextEl: '.viator-category-nav-next',
+                        prevEl: '.viator-category-nav-prev'
+                    },
+                    watchOverflow: true,
+                    freeMode: true,
+                    freeModeSticky: false
+                });
+            } catch (error) {
+                // Silenciosamente capturar erros sem poluir o console
+            }
+        }
+    }, 50);
 }
 
 // Função para inicializar eventos dos filtros de categoria (chamada apenas uma vez)

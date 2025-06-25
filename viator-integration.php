@@ -73,6 +73,7 @@ function viator_register_settings() {
     register_setting('viator_settings', 'viator_groq_model');
     register_setting('viator_settings', 'viator_language');
     register_setting('viator_settings', 'viator_currency');
+    register_setting('viator_settings', 'viator_enable_geolocation');
 }
 add_action('admin_init', 'viator_register_settings');
 
@@ -223,6 +224,26 @@ function viator_settings_page() {
                             <option value="USD" <?php selected(get_option('viator_currency', 'BRL'), 'USD'); ?>>Dólar Americano (USD)</option>
                         </select>
                         <p class="description">Selecione a moeda para exibição dos preços dos produtos.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">Funcionalidade de Geolocalização</th>
+                    <td>
+                        <fieldset>
+                            <label for="viator_enable_geolocation">
+                                <input type="checkbox" 
+                                       name="viator_enable_geolocation" 
+                                       id="viator_enable_geolocation" 
+                                       value="1" 
+                                       <?php checked(get_option('viator_enable_geolocation', '1'), '1'); ?>>
+                                Ativar detecção automática de localização na busca
+                            </label>
+                            <p class="description">
+                                <strong>Quando ativada:</strong> O sistema tentará detectar automaticamente a localização do usuário (via GPS ou IP) e exibirá uma sugestão "Nos arredores" no campo de busca.<br>
+                                <strong>Quando desativada:</strong> O campo de busca funcionará normalmente, mas sem sugestões de localização automática.<br>
+                                <em>Nota: Esta funcionalidade utiliza a API do ipgeolocation.io como fallback quando a geolocalização do navegador não está disponível.</em>
+                            </p>
+                        </fieldset>
                     </td>
                 </tr>
             </table>
@@ -804,14 +825,21 @@ function viator_enqueue_scripts() {
     // Enqueue Swiper CSS
     wp_enqueue_style('swiper-css', 'https://cdn.jsdelivr.net/npm/swiper@8/swiper-bundle.min.css');
 
-    // Enqueue scripts
-    wp_enqueue_script('ipgeolocation-api', 'https://api.ipgeolocation.io/javascript/ipgeolocation.js', array(), '1.0.0', true);
+    // Verificar se a geolocalização está ativada
+    $geolocation_enabled = get_option('viator_enable_geolocation', '1');
+    $dependencies = array('jquery', 'swiper-js');
+    
+    // Carregar script de geolocalização apenas se estiver ativado
+    if ($geolocation_enabled === '1') {
+        wp_enqueue_script('ipgeolocation-api', 'https://api.ipgeolocation.io/javascript/ipgeolocation.js', array(), '1.0.0', true);
+        $dependencies[] = 'ipgeolocation-api';
+    }
     
     // Enqueue Swiper JS
     wp_enqueue_script('swiper-js', 'https://cdn.jsdelivr.net/npm/swiper@8/swiper-bundle.min.js', array('jquery'), '8.0.0', true);
     
-    // Enqueue interactions.js with Swiper as dependency
-    wp_enqueue_script('viator-interactions', $plugin_dir . 'interactions.js', array('jquery', 'ipgeolocation-api', 'swiper-js'), '1.0.2', true);
+    // Enqueue interactions.js with conditional dependencies
+    wp_enqueue_script('viator-interactions', $plugin_dir . 'interactions.js', $dependencies, '1.0.2', true);
 
     // Add JavaScript variables
     wp_localize_script('viator-interactions', 'viatorAjax', array(
@@ -838,6 +866,7 @@ function viator_enqueue_scripts() {
         'currencySymbol' => $locale_settings['currency_symbol'],
         'language' => $locale_settings['language'],
         'flatpickrLocale' => $flatpickr_locale,
+        'geolocationEnabled' => $geolocation_enabled === '1',
         'translations' => array(
             'search_button' => viator_t('search_button'),
             'search_placeholder' => viator_t('search_placeholder'),
@@ -2440,7 +2469,7 @@ function viator_get_translation($key, $language = null) {
     $translations = [
         'pt-BR' => [
             // Formulário de busca
-            'search_placeholder' => '🌍 Aonde você quer ir?',
+            'search_placeholder' => '🌍 Digite o nome ou o código do passeio desejado',
             'search_button' => 'Pesquisar',
             'search_nearby' => 'Nos arredores',
             
@@ -2733,7 +2762,7 @@ function viator_get_translation($key, $language = null) {
         ],
         'en-US' => [
             // Search form
-            'search_placeholder' => '🌍 Where do you want to go?',
+            'search_placeholder' => '🌍 Enter the desired tour name or code',
             'search_button' => 'Search',
             'search_nearby' => 'Nearby',
             
