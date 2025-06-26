@@ -2855,18 +2855,32 @@ function initializeCategoryEvents() {
     });
 }
 
+// Função melhorada para re-inicializar o Swiper das atrações
 function reinitializeAttractionsSwiper() {
     // Destruir instância anterior se existir
     if (window.attractionsSwiper) {
-        window.attractionsSwiper.destroy(true, true);
+        try {
+            window.attractionsSwiper.destroy(true, true);
+        } catch (e) {
+            console.warn('Erro ao destruir Swiper anterior:', e);
+        }
         window.attractionsSwiper = null;
     }
     
-    // Verificar se o elemento existe antes de inicializar
+    // Verificar se o elemento existe
     const swiperElement = document.querySelector(".viator-attractions-swiper");
-    if (swiperElement) {
-        // Aguardar um pequeno delay para garantir que o DOM esteja totalmente renderizado
-        setTimeout(() => {
+    if (!swiperElement) {
+        return; // Elemento não existe, não há nada para inicializar
+    }
+    
+    // Função para tentar inicializar o Swiper
+    function tryInitializeSwiper() {
+        if (typeof Swiper === 'undefined') {
+            console.warn('Swiper não está carregado ainda, tentando novamente...');
+            return false;
+        }
+        
+        try {
             window.attractionsSwiper = new Swiper(".viator-attractions-swiper", {
                 slidesPerView: 4,
                 spaceBetween: 20,
@@ -2893,6 +2907,26 @@ function reinitializeAttractionsSwiper() {
                     }
                 }
             });
-        }, 100);
+            console.log('Carrossel de atrações inicializado com sucesso');
+            return true;
+        } catch (error) {
+            console.error('Erro ao inicializar carrossel de atrações:', error);
+            return false;
+        }
     }
+    
+    // Tentar inicializar imediatamente
+    if (tryInitializeSwiper()) {
+        return;
+    }
+    
+    // Se falhou, tentar novamente após pequenos delays
+    const retryDelays = [100, 250, 500, 1000];
+    retryDelays.forEach((delay, index) => {
+        setTimeout(() => {
+            if (!window.attractionsSwiper && tryInitializeSwiper()) {
+                console.log(`Carrossel inicializado na tentativa ${index + 2} após ${delay}ms`);
+            }
+        }, delay);
+    });
 }

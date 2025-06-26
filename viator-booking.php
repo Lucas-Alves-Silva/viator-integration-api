@@ -16,6 +16,7 @@ class ViatorBookingSystem {
     
     private $api_key;
     private $base_url = 'https://api.sandbox.viator.com';
+    private $last_hold_response; // Armazenar resposta do último hold para uso posterior
     
     public function __construct() {
         $this->api_key = get_option('viator_api_key');
@@ -112,7 +113,7 @@ class ViatorBookingSystem {
                 )
             ),
             'paymentDataSubmissionMode' => 'PARTNER_FORM',
-            'hostingUrl' => 'https://www.ingressosepasseios.com'
+            'hostingUrl' => home_url()
         );
         
         // Log para debug
@@ -157,9 +158,22 @@ class ViatorBookingSystem {
             return array('error' => isset($data['errorMessage']) ? $data['errorMessage'] : 'Erro ao criar hold de reserva');
         }
         
-        // Adicionar referências ao retorno
+        // Adicionar referências ao retorno e extrair campos essenciais
         $data['partnerCartRef'] = $partner_cart_ref;
         $data['partnerBookingRef'] = $partner_booking_ref;
+        
+        // Extrair paymentSessionToken para inicialização do pagamento
+        if (isset($data['paymentSessionToken'])) {
+            $data['sessionToken'] = $data['paymentSessionToken'];
+        }
+        
+        // Extrair paymentDataSubmissionUrl conforme documentação
+        if (isset($data['paymentDataSubmissionUrl'])) {
+            viator_debug_log('Payment Data Submission URL recebida:', $data['paymentDataSubmissionUrl']);
+        }
+        
+        // Armazenar resposta completa para uso posterior no pagamento
+        $this->last_hold_response = $data;
         
         return $data;
     }
@@ -592,14 +606,14 @@ class ViatorBookingSystem {
             wp_send_json_error(array('message' => 'Nonce inválido'));
         }
         
-        $session_token = sanitize_text_field($_POST['session_token']);
         $payment_data = json_decode(stripslashes($_POST['payment_data']), true);
+        $payment_url = sanitize_text_field($_POST['payment_url']); // Receber URL do frontend
         
-        if (empty($session_token) || empty($payment_data)) {
+        if (empty($payment_data)) {
             wp_send_json_error(array('message' => 'Dados de pagamento incompletos'));
         }
         
-        $result = $this->submit_payment_to_viator($session_token, $payment_data);
+        $result = $this->submit_payment_to_viator($payment_url, $payment_data);
         
         if (isset($result['error'])) {
             wp_send_json_error(array('message' => $result['error']));
@@ -611,24 +625,22 @@ class ViatorBookingSystem {
     /**
      * Submeter dados de pagamento para API da Viator
      */
-    public function submit_payment_to_viator($session_token, $payment_data) {
+    public function submit_payment_to_viator($payment_url, $payment_data) {
         try {
-            // Construir URL usando o sessionToken - conforme documentação
-            $payment_url = "https://api.viator.com/v1/checkoutsessions/{$session_token}/paymentaccounts";
+            // ✅ CONFORME DOCUMENTAÇÃO: Usar paymentDataSubmissionUrl do hold
+            // A URL já vem completa do frontend (extraída da resposta do hold)
+            if (empty($payment_url)) {
+                return array('error' => 'paymentDataSubmissionUrl não disponível. Refaça o booking hold.');
+            }
             
-            $locale_settings = viator_get_locale_settings();
-            
-            // Headers conforme documentação
+            // Headers conforme documentação oficial - sem headers customizados
             $headers = array(
                 'Content-Type' => 'application/json',
-                'x-trip-clientid' => $this->api_key,
-                'x-trip-requestid' => wp_generate_uuid4(),
                 'User-Agent' => 'WordPress-Plugin/1.0'
             );
             
             viator_debug_log('Enviando dados de pagamento para API da Viator', array(
                 'url' => $payment_url,
-                'session_token' => $session_token,
                 'payment_structure' => array(
                     'creditCards_count' => count($payment_data['paymentAccounts']['creditCards']),
                     'first_card_last_four' => substr($payment_data['paymentAccounts']['creditCards'][0]['number'], -4),
@@ -809,7 +821,7 @@ class ViatorBookingSystem {
                 'paxMix' => [['ageBand' => 'ADULT', 'numberOfTravelers' => 1]]
             ]],
             'paymentDataSubmissionMode' => 'PARTNER_FORM',
-            'hostingUrl' => 'https://www.ingressosepasseios.com'
+            'hostingUrl' => home_url()
         ];
 
         $response3 = wp_remote_post($this->base_url . '/partner/bookings/cart/hold', [

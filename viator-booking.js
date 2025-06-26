@@ -1248,12 +1248,16 @@ class ViatorBookingManager {
      */
     initializeViatorPayment() {
         if (this.bookingData.holdData && this.bookingData.holdData.paymentSessionToken) {
-            // Inicializar detecção de fraude da Viator
+            // Inicializar detecção de fraude da Viator conforme documentação oficial
             if (window.Payment) {
                 this.payment = window.Payment.init(this.bookingData.holdData.paymentSessionToken);
+                console.log('✅ Sistema de pagamento da Viator inicializado com detecção de fraude');
             } else {
-                console.error('Biblioteca de pagamento da Viator não carregada');
+                console.error('❌ Biblioteca de pagamento da Viator não carregada');
+                console.error('🔗 Verifique se https://checkout-assets.payments.tamg.cloud/stable/v2/payment.js está carregado');
             }
+        } else {
+            console.error('❌ PaymentSessionToken não disponível para inicializar sistema de pagamento');
         }
     }
     
@@ -1893,6 +1897,15 @@ class ViatorBookingManager {
     
     async submitPayment() {
         try {
+            // OBRIGATÓRIO: Submeter dados de detecção de fraude ANTES do pagamento
+            if (this.payment) {
+                console.log('🔒 Submetendo dados de detecção de fraude...');
+                this.payment.submitDeviceData();
+                console.log('✅ Dados de detecção de fraude submetidos');
+            } else {
+                console.warn('⚠️ Sistema de detecção de fraude não inicializado');
+            }
+            
             // Coletar todos os dados necessários do formulário
             const cardNumber = document.getElementById('card-number').value.replace(/\s/g, ''); // Remove espaços
             const cvv = document.getElementById('security-code').value;
@@ -1935,7 +1948,12 @@ class ViatorBookingManager {
                 postalCode
             });
             
-            // Usar o endpoint correto da API de pagamentos da Viator
+            // Verificar se temos paymentDataSubmissionUrl conforme documentação
+            if (!this.bookingData.holdData.paymentDataSubmissionUrl) {
+                throw new Error('paymentDataSubmissionUrl não disponível. Refaça o booking hold.');
+            }
+            
+            // Usar paymentDataSubmissionUrl conforme documentação oficial da Viator
             const response = await fetch(viatorBookingAjax.ajaxurl, {
                 method: 'POST',
                 headers: {
@@ -1943,7 +1961,7 @@ class ViatorBookingManager {
                 },
                 body: new URLSearchParams({
                     action: 'viator_submit_payment',
-                    session_token: this.bookingData.holdData.sessionToken,
+                    payment_url: this.bookingData.holdData.paymentDataSubmissionUrl,
                     payment_data: JSON.stringify(paymentData),
                     nonce: viatorBookingAjax.nonce
                 })
