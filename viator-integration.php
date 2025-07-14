@@ -1572,12 +1572,12 @@ function viator_get_search_results($searchTerm) {
         $output .= '<div class="viator-suggestions-grid">';
         
         foreach ($destinos_aleatorios as $destino) {
-            $output .= '<button class="viator-suggestion-btn" onclick="setSearchDestination(\'' . esc_attr($destino) . '\')">';
-            $output .= '🌍 ' . esc_html($destino);
-            $output .= '</button>';
-        }
-        
-        $output .= '</div></div>';
+                $output .= '<button class="viator-suggestion-btn" onclick="setSearchDestination(\'' . esc_attr($destino) . '\')">';
+                $output .= '🌍 ' . esc_html($destino);
+                $output .= '</button>';
+            }
+            
+            $output .= '</div></div>';
         $output .= '</div>';
         return $output;
     }
@@ -2572,12 +2572,16 @@ function viator_get_translation($key, $language = null) {
             'boat' => 'barco',
             'vehicle' => 'veículo',
             'unit_type_vehicle_available' => 'Traslado disponível',
-            'unit_type_boat_available' => 'Passeo de barco disponível',
+            'unit_type_boat_available' => 'Passeio de barco disponível',
             'unit_type_generic_available' => 'Serviço de %s disponível',
             
             // Avaliações
             'reviews_title' => 'Avaliações',
             'all_reviews' => 'Todas',
+            'all_providers' => 'Todos os provedores',
+            'viator_only' => 'Apenas Viator',
+            'tripadvisor_only' => 'Apenas TripAdvisor',
+            'review_from' => 'Avaliação do',
             'stars' => 'estrelas',
             'star' => 'estrela',
             'most_recent' => 'Mais recentes',
@@ -2759,7 +2763,26 @@ function viator_get_translation($key, $language = null) {
             'incomplete_payment_data' => 'Dados de pagamento incompletos',
             'incomplete_confirmation_data' => 'Dados incompletos para confirmação',
             'invalid_nonce' => 'Nonce inválido',
-        ],
+            
+            // Locations section
+            'locations_info' => 'Localizações',
+            'location_start' => 'Ponto de Partida',
+            'location_end' => 'Ponto Final',
+            'location_unspecified' => 'Outros Locais',
+            'location_description' => 'Descrição',
+            'contact_supplier_later' => 'Entrar em contato com o fornecedor mais tarde',
+            'meet_at_departure_point' => 'Encontro no ponto de partida',
+            'pickup_point' => 'Ponto de embarque',
+            'pickup_hotel' => 'Busca no hotel',
+            'meet_at_start_point' => 'Encontro no ponto de partida',
+            'attraction_start_point' => 'Ponto de partida da atração',
+            'coordinates' => 'Coordenadas',
+                    'location_provided_by_supplier' => 'Local informado pelo fornecedor',
+        'view_on_maps' => 'Ver no Maps',
+        'clear_exchange_rates_cache' => 'Limpar Cache de Taxas de Câmbio',
+        'price_unavailable' => 'Preço indisponível',
+        'original_currency' => 'moeda original',
+    ],
         'en-US' => [
             // Search form
             'search_placeholder' => '🌍 Enter the desired tour name or code',
@@ -2911,6 +2934,10 @@ function viator_get_translation($key, $language = null) {
             // Reviews
             'reviews_title' => 'Reviews',
             'all_reviews' => 'All',
+            'all_providers' => 'All providers',
+            'viator_only' => 'Viator only',
+            'tripadvisor_only' => 'TripAdvisor only',
+            'review_from' => 'Review from',
             'stars' => 'stars',
             'star' => 'star',
             'most_recent' => 'Most Recent',
@@ -3062,15 +3089,34 @@ function viator_get_translation($key, $language = null) {
             'incomplete_payment_data' => 'Incomplete payment data',
             'incomplete_confirmation_data' => 'Incomplete data for confirmation',
             'invalid_nonce' => 'Invalid nonce',
-        ]
-    ];
-    
-    // Fallback para idiomas não suportados - usar inglês
-    if (!isset($translations[$language])) {
-        $language = 'en-US';
-    }
-    
-    return isset($translations[$language][$key]) ? $translations[$language][$key] : $key;
+            
+            // Locations section
+            'locations_info' => 'Locations',
+            'location_start' => 'Departure Point',
+            'location_end' => 'End Point',
+            'location_unspecified' => 'Other Locations',
+            'location_description' => 'Description',
+            'contact_supplier_later' => 'Contact supplier later',
+            'meet_at_departure_point' => 'Meet at departure point',
+            'pickup_point' => 'Pickup point',
+            'pickup_hotel' => 'Hotel pickup',
+            'meet_at_start_point' => 'Meet at start point',
+            'attraction_start_point' => 'Attraction start point',
+            'coordinates' => 'Coordinates',
+                    'location_provided_by_supplier' => 'Location provided by supplier',
+        'view_on_maps' => 'View on Maps',
+        'clear_exchange_rates_cache' => 'Clear Exchange Rates Cache',
+        'price_unavailable' => 'Price unavailable',
+        'original_currency' => 'original currency',
+    ]
+];
+
+// Fallback para idiomas não suportados - usar inglês
+if (!isset($translations[$language])) {
+    $language = 'en-US';
+}
+
+return isset($translations[$language][$key]) ? $translations[$language][$key] : $key;
 }
 
 // Função auxiliar para obter traduções
@@ -6512,4 +6558,295 @@ function viator_process_attraction_for_carousel($attraction_data) {
         'url' => $url,
         'id' => $attraction_id
     ];
+}
+
+/**
+ * AJAX handler for clearing exchange rates cache.
+ */
+function viator_clear_exchange_rates_cache_ajax() {
+    if (!wp_verify_nonce($_POST['nonce'], 'viator_admin_nonce')) {
+        wp_send_json_error('Security error');
+        return;
+    }
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error('Insufficient permissions');
+        return;
+    }
+    
+    delete_transient('viator_exchange_rates');
+    viator_debug_log("Exchange rates cache cleared manually.");
+    
+    wp_send_json_success([
+        'message' => 'Cache de taxas de câmbio limpo com sucesso.',
+    ]);
+}
+add_action('wp_ajax_viator_clear_exchange_rates_cache', 'viator_clear_exchange_rates_cache_ajax');
+
+/**
+ * AJAX handler for testing exchange rates API.
+ */
+function viator_test_exchange_rates_ajax() {
+    // Force error logging for debugging
+    error_log('[VIATOR TEST] Function viator_test_exchange_rates_ajax called');
+    
+    if (!wp_verify_nonce($_POST['nonce'], 'viator_admin_nonce')) {
+        error_log('[VIATOR TEST] Security error - nonce verification failed');
+        wp_send_json_error('Security error');
+        return;
+    }
+    if (!current_user_can('manage_options')) {
+        error_log('[VIATOR TEST] Insufficient permissions');
+        wp_send_json_error('Insufficient permissions');
+        return;
+    }
+    
+    error_log('[VIATOR TEST] Starting exchange rates test');
+    viator_debug_log('Exchange rates API test started');
+    
+    // Clear cache to force fresh fetch
+    delete_transient('viator_exchange_rates');
+    error_log('[VIATOR TEST] Cache cleared for fresh test');
+    
+    // Fetch fresh exchange rates
+    error_log('[VIATOR TEST] About to call viator_fetch_exchange_rates()');
+    $rates_data = viator_fetch_exchange_rates();
+    error_log('[VIATOR TEST] viator_fetch_exchange_rates() returned: ' . ($rates_data ? 'SUCCESS' : 'NULL/FALSE'));
+    
+    if (!$rates_data) {
+        error_log('[VIATOR TEST] Exchange rates test failed: No data returned from viator_fetch_exchange_rates()');
+        wp_send_json_error('Falha ao buscar taxas de câmbio da API. Verifique os logs para mais detalhes.');
+        return;
+    }
+    
+    viator_debug_log('Exchange rates test successful', ['data_keys' => array_keys($rates_data)]);
+    
+    // Extract info for display
+    $source_currencies = [];
+    $target_currencies = [];
+    $example_rate = 'N/A';
+    $earliest_expiry = null;
+    
+    foreach ($rates_data['rates'] as $rate_info) {
+        $source_currencies[] = $rate_info['sourceCurrency'];
+        $target_currencies[] = $rate_info['targetCurrency'];
+        
+        // Get USD to BRL example if available
+        if ($rate_info['sourceCurrency'] === 'USD' && $rate_info['targetCurrency'] === 'BRL') {
+            $example_rate = number_format($rate_info['rate'], 4);
+        }
+        
+        // Track earliest expiry
+        if (isset($rate_info['expiry'])) {
+            $rate_expiry = strtotime($rate_info['expiry']);
+            if (!$earliest_expiry || $rate_expiry < $earliest_expiry) {
+                $earliest_expiry = $rate_expiry;
+            }
+        }
+    }
+    
+    $response_data = [
+        'expiry' => $earliest_expiry ? date('Y-m-d H:i:s', $earliest_expiry) : 'N/A',
+        'rates_count' => count($rates_data['rates']),
+        'source_currencies' => array_values(array_unique($source_currencies)),
+        'target_currencies' => array_values(array_unique($target_currencies)),
+        'example_rate' => $example_rate
+    ];
+    
+    error_log('[VIATOR TEST] Sending response: ' . print_r($response_data, true));
+    wp_send_json_success($response_data);
+}
+add_action('wp_ajax_viator_test_exchange_rates', 'viator_test_exchange_rates_ajax');
+
+/**
+ * Fetches and caches exchange rates from the Viator API.
+ * This is a core function to comply with Viator Partner Program requirements.
+ *
+ * @return array The raw API response with rates and expiry.
+ */
+function viator_fetch_exchange_rates() {
+    error_log('[VIATOR TEST] viator_fetch_exchange_rates() function called');
+    
+    $api_key = get_option('viator_api_key');
+    error_log('[VIATOR TEST] API key check - Length: ' . strlen($api_key));
+    
+    if (empty($api_key)) {
+        error_log('[VIATOR TEST] Exchange rates fetch failed: API key not configured');
+        return null;
+    }
+
+    // Currencies supported by Viator for pricing
+    $source_currencies = ['AED', 'ARS', 'AUD', 'BRL', 'CAD', 'CHF', 'CLP', 'CNY', 'COP', 'DKK', 'EUR', 'FJD', 'GBP', 'HKD', 'IDR', 'ILS', 'INR', 'ISK', 'JPY', 'KRW', 'MXN', 'MYR', 'NOK', 'NZD', 'PEN', 'PHP', 'PLN', 'RUB', 'SEK', 'SGD', 'THB', 'TRY', 'TWD', 'USD', 'VND', 'ZAR'];
+    
+    // Currencies supported by Viator for payment/booking + BRL for your site
+    $target_currencies = ['GBP', 'EUR', 'USD', 'AUD', 'BRL'];
+
+    error_log('[VIATOR TEST] VIATOR PARTNER REQUIREMENT: Fetching exchange rates from /partner/exchange-rates');
+    
+    $url = viator_get_api_base_url() . '/partner/exchange-rates';
+    error_log('[VIATOR TEST] API URL: ' . $url);
+    
+    $request_body = [
+        'sourceCurrencies' => $source_currencies,
+        'targetCurrencies' => $target_currencies
+    ];
+    
+    error_log('[VIATOR TEST] Exchange rates request details - URL: ' . $url . ', Source currencies: ' . count($source_currencies) . ', Target currencies: ' . count($target_currencies) . ', API key length: ' . strlen($api_key));
+
+    error_log('[VIATOR TEST] About to make wp_remote_post call');
+    
+    $response = wp_remote_post($url, [
+        'headers' => [
+            'Accept' => 'application/json;version=2.0',
+            'Content-Type' => 'application/json;version=2.0',
+            'exp-api-key' => $api_key,
+        ],
+        'body' => json_encode($request_body),
+        'timeout' => 30
+    ]);
+
+    error_log('[VIATOR TEST] wp_remote_post completed');
+
+    if (is_wp_error($response)) {
+        error_log('[VIATOR TEST] Error fetching exchange rates - WP Error: ' . $response->get_error_message());
+        return null;
+    }
+
+    $response_code = wp_remote_retrieve_response_code($response);
+    $body = wp_remote_retrieve_body($response);
+    
+    error_log('[VIATOR TEST] Exchange rates API response - Code: ' . $response_code . ', Body length: ' . strlen($body));
+    error_log('[VIATOR TEST] Response body preview: ' . substr($body, 0, 500));
+
+    $data = json_decode($body, true);
+    $json_error = json_last_error();
+    
+    error_log('[VIATOR TEST] JSON decode result - Error code: ' . $json_error . ', Data type: ' . gettype($data));
+
+    if ($response_code !== 200) {
+        error_log('[VIATOR TEST] Exchange rates API returned non-200 status - Code: ' . $response_code . ', Body: ' . $body);
+        return null;
+    }
+
+    if (!isset($data['rates']) || !is_array($data['rates']) || empty($data['rates'])) {
+        $data_keys = is_array($data) ? implode(', ', array_keys($data)) : 'not_array';
+        error_log('[VIATOR TEST] Invalid response structure - Data keys: ' . $data_keys);
+        return null;
+    }
+
+    // Find the earliest expiry from all rates (most conservative approach)
+    $earliest_expiry = null;
+    foreach ($data['rates'] as $rate) {
+        if (isset($rate['expiry'])) {
+            $rate_expiry = strtotime($rate['expiry']);
+            if (!$earliest_expiry || $rate_expiry < $earliest_expiry) {
+                $earliest_expiry = $rate_expiry;
+            }
+        }
+    }
+
+    if (!$earliest_expiry) {
+        error_log('[VIATOR TEST] No expiry found in any exchange rate');
+        return null;
+    }
+
+    // Cache the entire response. Expiration is set from the earliest expiry found.
+    $ttl = $earliest_expiry - time(); // Time to live in seconds
+    $expiry_date = date('Y-m-d H:i:s', $earliest_expiry);
+
+    // Ensure TTL is positive and reasonable (max 25 hours)
+    if ($ttl > 0 && $ttl <= 90000) {
+        set_transient('viator_exchange_rates', $data, $ttl);
+        error_log('[VIATOR TEST] Exchange rates cached successfully - Expiry: ' . $expiry_date . ', TTL: ' . $ttl . ', Rates count: ' . count($data['rates']));
+    } else {
+        error_log('[VIATOR TEST] Invalid TTL for exchange rates cache - Expiry: ' . $expiry_date . ', TTL: ' . $ttl);
+        // Even with invalid TTL, cache for 1 hour as fallback
+        set_transient('viator_exchange_rates', $data, 3600);
+        error_log('[VIATOR TEST] Using fallback cache of 1 hour');
+    }
+
+    error_log('[VIATOR TEST] viator_fetch_exchange_rates() returning SUCCESS');
+    return $data;
+}
+
+/**
+ * Gets the exchange rate for a specific currency pair.
+ * It uses a cached version if available and valid.
+ *
+ * @param string $source_currency The source currency code (e.g., 'USD').
+ * @param string $target_currency The target currency code (e.g., 'BRL').
+ * @return float|null The exchange rate, or null if not found.
+ */
+function viator_get_exchange_rate($source_currency, $target_currency) {
+    if (empty($source_currency) || empty($target_currency)) {
+        return null;
+    }
+
+    if ($source_currency === $target_currency) {
+        return 1.0;
+    }
+
+    $rates_data = get_transient('viator_exchange_rates');
+
+    if (false === $rates_data) {
+        viator_debug_log('Exchange rates cache miss. Fetching new rates from API.');
+        $rates_data = viator_fetch_exchange_rates();
+    }
+
+    if (!$rates_data || !isset($rates_data['rates'])) {
+        viator_debug_log('No exchange rates data available.');
+        return null;
+    }
+
+    foreach ($rates_data['rates'] as $rate_info) {
+        if ($rate_info['sourceCurrency'] === $source_currency && isset($rate_info['rates'][$target_currency])) {
+            $rate = (float) $rate_info['rates'][$target_currency];
+            viator_debug_log('Exchange rate found.', ['from' => $source_currency, 'to' => $target_currency, 'rate' => $rate]);
+            return $rate;
+        }
+    }
+    
+    viator_debug_log('Exchange rate not found in cache.', ['from' => $source_currency, 'to' => $target_currency]);
+    return null;
+}
+
+/**
+ * Converts a price from a source currency to a target currency and formats it.
+ *
+ * @param float $amount The original price amount.
+ * @param string $source_currency The source currency code.
+ * @param array $locale_settings The user's locale settings.
+ * @return string The formatted price string (e.g., "R$ 123,45") or an error message.
+ */
+function viator_convert_and_format_price($amount, $source_currency, $locale_settings) {
+    if ($amount === null || $source_currency === null) {
+        return viator_t('price_unavailable');
+    }
+
+    $target_currency = $locale_settings['currency'];
+    $converted_amount = $amount;
+
+    if ($source_currency !== $target_currency) {
+        $rate = viator_get_exchange_rate($source_currency, $target_currency);
+        if ($rate !== null && $rate > 0) {
+            $converted_amount = $amount * $rate;
+            viator_debug_log('Currency conversion applied.', [
+                'original_amount' => $amount,
+                'source_currency' => $source_currency,
+                'target_currency' => $target_currency,
+                'rate' => $rate,
+                'converted_amount' => $converted_amount
+            ]);
+        } else {
+            // If conversion fails, log it but still show the original price with a note
+            viator_debug_log('Currency conversion failed. Rate not available or invalid.', [
+                'from' => $source_currency, 
+                'to' => $target_currency,
+                'rate' => $rate
+            ]);
+            // Show original price with currency note instead of hiding it
+            return $source_currency . ' ' . number_format($amount, 2, ',', '.') . ' (' . viator_t('original_currency') . ')';
+        }
+    }
+
+    return $locale_settings['currency_symbol'] . ' ' . number_format($converted_amount, 2, ',', '.');
 }

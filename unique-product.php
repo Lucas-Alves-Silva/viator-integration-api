@@ -745,8 +745,9 @@ function viator_get_product_details($product_code) {
      }
     
          $has_price_data = ($from_price !== null);
-     $price = $has_price_data ? $locale_settings['currency_symbol'] . ' ' . number_format($from_price, 2, ',', '.') : 'Preço não disponível';
-     $original_price = ($from_price_before_discount !== null) ? $locale_settings['currency_symbol'] . ' ' . number_format($from_price_before_discount, 2, ',', '.') : '';
+     $source_currency = $product['pricing']['summary']['fromPrice']['currency'] ?? ($product['pricingInfo']['summary']['currencyCode'] ?? 'USD');
+     $price = $has_price_data ? viator_convert_and_format_price($from_price, $source_currency, $locale_settings) : viator_t('price_unavailable');
+     $original_price = ($from_price_before_discount !== null) ? viator_convert_and_format_price($from_price_before_discount, $source_currency, $locale_settings) : '';
      
      // Debug: vamos logar as estruturas de dados que estão vindo da API para preços
      if (!$has_price_data) {
@@ -1393,6 +1394,106 @@ function viator_get_product_details($product_code) {
             </div>
         <?php endif; ?>
     
+        <!-- Locations Section -->
+        <?php 
+        $structured_locations = viator_get_structured_product_locations($product);
+        $all_location_refs = array_merge(
+            array_map(function($l) { return $l['ref']; }, $structured_locations['start']),
+            array_map(function($l) { return $l['ref']; }, $structured_locations['end']),
+            array_map(function($l) { return $l['ref']; }, $structured_locations['unspecified'])
+        );
+        $all_location_refs = array_unique($all_location_refs);
+
+        if (!empty($all_location_refs)):
+            $bulk_details_map = [];
+            $bulk_details = viator_get_bulk_locations($all_location_refs);
+            foreach ($bulk_details as $detail) {
+                $bulk_details_map[$detail['reference']] = $detail;
+            }
+        ?>
+            <div class="viator-locations-section">
+                <h2><?php echo esc_html(viator_t('locations_info')); ?></h2>
+                
+                <?php foreach (['start', 'end', 'unspecified'] as $group_key): ?>
+                    <?php if (!empty($structured_locations[$group_key])): ?>
+                        <div class="viator-location-group">
+                            <h3 class="viator-location-group-title">
+                                <?php 
+                                if ($group_key === 'start') echo esc_html(viator_t('location_start'));
+                                elseif ($group_key === 'end') echo esc_html(viator_t('location_end'));
+                                else echo esc_html(viator_t('location_unspecified'));
+                                ?>
+                            </h3>
+                            <div class="viator-locations-grid">
+                                <?php foreach ($structured_locations[$group_key] as $location_data): ?>
+                                    <?php 
+                                    $ref = $location_data['ref'];
+                                    $details = $bulk_details_map[$ref] ?? null;
+                                    
+                                    // If no details were fetched, skip displaying this location
+                                    if (!$details) continue;
+                                    
+                                    // Get user-friendly location name (never show LOC codes to users)
+                                    $location_name = '';
+                                    if (!empty($details['name'])) {
+                                        $location_name = $details['name'];
+                                    } else {
+                                        // Translate special references to user-friendly text
+                                        $location_name = viator_translate_location_reference($ref);
+                                        // If translation returns the same LOC code, skip this location entirely
+                                        if (strpos($location_name, 'LOC-') === 0) {
+                                            continue;
+                                        }
+                                    }
+                                    ?>
+                                    <div class="viator-location-item">
+                                        <div class="viator-location-icon">
+                                            <?php echo viator_get_location_icon($details); ?>
+                                        </div>
+                                        <div class="viator-location-content">
+                                            <div class="viator-location-name">
+                                                <?php echo esc_html($location_name); ?>
+                                            </div>
+
+                                            <?php if (!empty($location_data['description'])): ?>
+                                                <div class="viator-location-product-description">
+                                                    <p><?php echo esc_html($location_data['description']); ?></p>
+                                                </div>
+                                            <?php endif; ?>
+
+                                            <?php if (isset($details['address']) && !empty(viator_format_location_address($details['address']))): ?>
+                                                <div class="viator-location-address">
+                                                    <?php echo esc_html(viator_format_location_address($details['address'])); ?>
+                                                </div>
+                                            <?php endif; ?>
+                                            
+                                            <?php if (isset($details['center']) && !empty($details['center'])): ?>
+                                                <div class="viator-location-coordinates">
+                                                    <small>
+                                                        <?php echo esc_html(viator_t('coordinates')); ?>: 
+                                                        <?php echo esc_html($details['center']['latitude']); ?>, 
+                                                        <?php echo esc_html($details['center']['longitude']); ?>
+                                                    </small>
+                                                </div>
+                                                <div class="viator-location-actions">
+                                                    <a href="https://www.google.com/maps/search/?api=1&query=<?php echo esc_attr($details['center']['latitude']); ?>,<?php echo esc_attr($details['center']['longitude']); ?>" 
+                                                       target="_blank" 
+                                                       rel="noopener noreferrer" 
+                                                       class="viator-maps-link">
+                                                        <?php echo esc_html(viator_t('view_on_maps')); ?>
+                                                    </a>
+                                                </div>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    
         <!-- Inclusions and Exclusions -->
         <div class="viator-inclusions-exclusions">
             <?php if (!empty($inclusions)): ?>
@@ -1800,6 +1901,13 @@ function viator_get_product_details($product_code) {
                     <button data-rating="3">3 <?php echo esc_html(viator_t('stars')); ?></button>
                     <button data-rating="2">2 <?php echo esc_html(viator_t('stars')); ?></button>
                     <button data-rating="1">1 <?php echo esc_html(viator_t('star')); ?></button>
+                </div>
+                <div class="viator-filter-provider">
+                    <select id="viator-filter-provider">
+                        <option value="ALL"><?php echo esc_html(viator_t('all_providers')); ?></option>
+                        <option value="VIATOR"><?php echo esc_html(viator_t('viator_only')); ?></option>
+                        <option value="TRIPADVISOR"><?php echo esc_html(viator_t('tripadvisor_only')); ?></option>
+                    </select>
                 </div>
                 <div class="viator-filter-sort">
                     <select id="viator-sort-reviews">
@@ -2310,7 +2418,8 @@ function viator_enqueue_product_scripts() {
                 'try_again_later' => viator_t('try_again_later'),
                 'no_reviews_found' => viator_t('no_reviews_found_rating'),
                 'no_more_reviews' => viator_t('no_more_reviews_page'),
-                'anonymous_traveler' => viator_t('anonymous_traveler')
+                'anonymous_traveler' => viator_t('anonymous_traveler'),
+                'review_from' => viator_t('review_from', $locale_settings['language'])
             )
         ));
     }
@@ -2341,6 +2450,7 @@ function viator_get_reviews_ajax() {
     $start = isset($_POST['start']) ? intval($_POST['start']) : 1;
     $ratings = isset($_POST['ratings']) && is_array($_POST['ratings']) ? array_map('intval', $_POST['ratings']) : [5, 4, 3, 2, 1];
     $sort_by = isset($_POST['sort_by']) ? sanitize_text_field($_POST['sort_by']) : 'MOST_RECENT_PER_LOCALE';
+    $provider = isset($_POST['provider']) ? sanitize_text_field($_POST['provider']) : 'ALL';
 
     // Gerar chave única para o cache com base nos parâmetros da requisição AJAX
     // Usamos os parâmetros POST originais para garantir que diferentes filtros/páginas tenham caches distintos
@@ -2349,7 +2459,8 @@ function viator_get_reviews_ajax() {
         'count' => isset($_POST['count']) ? intval($_POST['count']) : 10, // Usar o count original do POST para a chave
         'start' => isset($_POST['start']) ? intval($_POST['start']) : 1, // Usar o start original do POST para a chave
         'ratings' => isset($_POST['ratings']) && is_array($_POST['ratings']) ? array_map('intval', $_POST['ratings']) : [5, 4, 3, 2, 1],
-        'sort_by' => $sort_by
+        'sort_by' => $sort_by,
+        'provider' => $provider
     );
     $cache_key = 'viator_reviews_' . md5(serialize($cache_key_params));
     $cached_data = get_transient($cache_key);
@@ -2368,7 +2479,7 @@ function viator_get_reviews_ajax() {
     // Prepare request data
     $request_data = array(
         'productCode' => $product_code,
-        'provider' => 'ALL',
+        'provider' => $provider,
         'count' => $count,
         'start' => $start,
         'showMachineTranslated' => true,
@@ -2756,6 +2867,31 @@ function viator_clear_availability_cache() {
 }
 
 /**
+ * Clear locations cache
+ */
+function viator_clear_locations_cache() {
+    global $wpdb;
+    
+    $cleared_count = 0;
+    
+    // Buscar todos os transients relacionados a localizações
+    $transients = $wpdb->get_results("
+        SELECT option_name 
+        FROM {$wpdb->options} 
+        WHERE option_name LIKE '_transient_viator_locations_%'
+    ");
+    
+    foreach ($transients as $transient) {
+        $transient_name = str_replace('_transient_', '', $transient->option_name);
+        delete_transient($transient_name);
+        $cleared_count++;
+    }
+    
+    viator_debug_log("Locations cache cleared: {$cleared_count} items removed");
+    return $cleared_count;
+}
+
+/**
  * Clear destinations cache
  */
 function viator_clear_destinations_cache() {
@@ -2775,6 +2911,7 @@ function viator_clear_all_cache() {
         'products' => 0,
         'reviews' => 0,
         'availability' => 0,
+        'locations' => 0,
         'destinations' => 0,
         'total' => 0
     );
@@ -2801,6 +2938,8 @@ function viator_clear_all_cache() {
             $results['reviews']++;
         } elseif (strpos($transient_name, 'viator_availability_') !== false || strpos($transient_name, 'viator_booking_') !== false) {
             $results['availability']++;
+        } elseif (strpos($transient_name, 'viator_locations_') !== false) {
+            $results['locations']++;
         }
         
         $results['total']++;
@@ -2936,11 +3075,407 @@ function viator_clear_all_cache_ajax() {
 add_action('wp_ajax_viator_clear_all_cache', 'viator_clear_all_cache_ajax');
 
 /**
+ * AJAX handler para limpar cache de localizações
+ */
+function viator_clear_locations_cache_ajax() {
+    // Verificar nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'viator_admin_nonce')) {
+        wp_send_json_error('Erro de segurança');
+        return;
+    }
+    
+    // Verificar permissões
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error('Permissões insuficientes');
+        return;
+    }
+    
+    $cleared_count = viator_clear_locations_cache();
+    
+    wp_send_json_success(array(
+        'message' => "Cache de localizações limpo com sucesso ({$cleared_count} itens removidos)",
+        'cleared_count' => $cleared_count
+    ));
+}
+add_action('wp_ajax_viator_clear_locations_cache', 'viator_clear_locations_cache_ajax');
+
+/**
  * Get the base URL for Viator API
  */
 function viator_get_api_base_url() {
     // Por enquanto usando sandbox, mas pode ser configurável no futuro
     return 'https://api.sandbox.viator.com';
+}
+
+/**
+ * Debug function to test location extraction and API calls
+ * Usage: add ?debug_locations=1 to any product page URL while logged in as admin
+ */
+function viator_debug_locations() {
+    if (!isset($_GET['debug_locations']) || !current_user_can('manage_options')) {
+        return;
+    }
+    
+    // Get product code from URL
+    $product_code = get_query_var('product_code', '');
+    if (empty($product_code)) {
+        $product_code = isset($_GET['product_code']) ? sanitize_text_field($_GET['product_code']) : '';
+    }
+    
+    if (empty($product_code)) {
+        echo '<div style="background: #fff; padding: 20px; margin: 20px; border: 1px solid #ccc;">
+                <h3>Debug de Localizações - Erro</h3>
+                <p>Código do produto não fornecido. Adicione ?product_code=CODIGO_DO_PRODUTO à URL.</p>
+              </div>';
+        return;
+    }
+    
+    // Get product details
+    $api_key = get_option('viator_api_key');
+    if (empty($api_key)) {
+        echo '<div style="background: #fff; padding: 20px; margin: 20px; border: 1px solid #ccc;">
+                <h3>Debug de Localizações - Erro</h3>
+                <p>Chave API não configurada.</p>
+              </div>';
+        return;
+    }
+    
+    $locale_settings = viator_get_locale_settings();
+    $url = viator_get_api_base_url() . "/partner/products/{$product_code}";
+    
+    $response = wp_remote_get($url, [
+        'headers' => [
+            'Accept' => 'application/json;version=2.0',
+            'Content-Type' => 'application/json;version=2.0',
+            'exp-api-key' => $api_key,
+            'Accept-Language' => $locale_settings['language'],
+        ],
+        'timeout' => 30,
+    ]);
+    
+    if (is_wp_error($response)) {
+        echo '<div style="background: #fff; padding: 20px; margin: 20px; border: 1px solid #ccc;">
+                <h3>Debug de Localizações - Erro</h3>
+                <p>Erro ao buscar produto: ' . esc_html($response->get_error_message()) . '</p>
+              </div>';
+        return;
+    }
+    
+    $body = wp_remote_retrieve_body($response);
+    $product = json_decode($body, true);
+    
+    if (empty($product)) {
+        echo '<div style="background: #fff; padding: 20px; margin: 20px; border: 1px solid #ccc;">
+                <h3>Debug de Localizações - Erro</h3>
+                <p>Produto não encontrado ou resposta inválida.</p>
+              </div>';
+        return;
+    }
+    
+    // Extract location references
+    $location_references = viator_get_structured_product_locations($product);
+    
+    echo '<div style="background: #fff; padding: 20px; margin: 20px; border: 1px solid #ccc; font-family: monospace;">
+            <h3>Debug de Localizações - Produto: ' . esc_html($product_code) . '</h3>
+            <h4>Referências de Localização Encontradas (Estruturado):</h4>';
+    
+    if (empty($location_references['start']) && empty($location_references['end']) && empty($location_references['unspecified'])) {
+        echo '<p>Nenhuma referência de localização encontrada neste produto.</p>';
+    } else {
+        echo '<pre>' . esc_html(print_r($location_references, true)) . '</pre>';
+        
+        // Get bulk location details
+        echo '<h4>Detalhes das Localizações (Bulk):</h4>';
+        
+        $all_refs = array_merge(
+            array_map(function($l){ return $l['ref']; }, $location_references['start']),
+            array_map(function($l){ return $l['ref']; }, $location_references['end']),
+            array_map(function($l){ return $l['ref']; }, $location_references['unspecified'])
+        );
+        $all_refs = array_unique($all_refs);
+
+        $location_details = viator_get_bulk_locations($all_refs);
+        
+        if (empty($location_details)) {
+            echo '<p>Nenhum detalhe de localização retornado pela API.</p>';
+        } else {
+            echo '<pre>' . esc_html(print_r($location_details, true)) . '</pre>';
+        }
+    }
+    
+    echo '<h4>Estrutura do Produto (campos relacionados a localização):</h4>';
+    $location_fields = [
+        'travelerPickup' => $product['travelerPickup'] ?? null,
+        'departurePoint' => $product['departurePoint'] ?? null,
+        'logistics' => $product['logistics'] ?? null,
+        'location' => $product['location'] ?? null
+    ];
+    
+    echo '<pre>' . esc_html(print_r($location_fields, true)) . '</pre>';
+    echo '</div>';
+}
+add_action('wp_footer', 'viator_debug_locations');
+
+/**
+ * Extract location references from product data
+ */
+function viator_get_structured_product_locations($product) {
+    $structured_locations = [
+        'start' => [],
+        'end' => [],
+        'unspecified' => [],
+    ];
+
+    $processed_refs = [];
+
+    // Helper to add a location if the ref hasn't been processed yet
+    $add_location = function($group, $location_data) use (&$structured_locations, &$processed_refs) {
+        if (isset($location_data['ref']) && !isset($processed_refs[$location_data['ref']])) {
+            $structured_locations[$group][] = $location_data;
+            $processed_refs[$location_data['ref']] = true; // Mark ref as processed
+        }
+    };
+    
+    // Helper to extract data from location nodes (e.g., in logistics, departurePoint)
+    $extract_from_node = function($node) {
+        if (isset($node['location']['ref'])) {
+            return [
+                'ref' => $node['location']['ref'],
+                'description' => $node['description'] ?? ''
+            ];
+        }
+        return null;
+    };
+
+    // 1. Process logistics (start/end points have priority)
+    if (!empty($product['logistics']['start']) && is_array($product['logistics']['start'])) {
+        foreach ($product['logistics']['start'] as $item) {
+            if ($location = $extract_from_node($item)) {
+                $add_location('start', $location);
+            }
+        }
+    }
+    if (!empty($product['logistics']['end']) && is_array($product['logistics']['end'])) {
+        foreach ($product['logistics']['end'] as $item) {
+            if ($location = $extract_from_node($item)) {
+                $add_location('end', $location);
+            }
+        }
+    }
+
+    // 2. Process other known location fields if not already processed
+    if (!empty($product['departurePoint'])) {
+        if ($location = $extract_from_node($product['departurePoint'])) {
+             $add_location('start', $location); // Departure point is a start point
+        } elseif (isset($product['departurePoint']['reference'])) {
+            $add_location('start', ['ref' => $product['departurePoint']['reference'], 'description' => '']);
+        }
+    }
+    
+    if (!empty($product['travelerPickup']['pickupOptions']) && is_array($product['travelerPickup']['pickupOptions'])) {
+        foreach ($product['travelerPickup']['pickupOptions'] as $option) {
+            if (!empty($option['pickupLocations']) && is_array($option['pickupLocations'])) {
+                foreach ($option['pickupLocations'] as $loc) {
+                    if(isset($loc['reference'])) {
+                        $add_location('start', [
+                            'ref' => $loc['reference'],
+                            'description' => $loc['name'] ?? ''
+                        ]);
+                    }
+                }
+            }
+        }
+    }
+
+    if (!empty($product['meetingPoint'])) {
+        if ($location = $extract_from_node($product['meetingPoint'])) {
+            $add_location('unspecified', $location);
+        } elseif (isset($product['meetingPoint']['reference'])) {
+             $add_location('unspecified', ['ref' => $product['meetingPoint']['reference'], 'description' => '']);
+        }
+    }
+    
+    if (!empty($product['itinerary']['itineraryItems']) && is_array($product['itinerary']['itineraryItems'])) {
+        foreach ($product['itinerary']['itineraryItems'] as $item) {
+            if (!empty($item['location']) && ($location = $extract_from_node($item['location']))) {
+                 $add_location('unspecified', $location);
+            }
+        }
+    }
+
+    return $structured_locations;
+}
+
+/**
+ * Get bulk location details from Viator API
+ * 
+ * IMPORTANTE: Este endpoint /locations/bulk é OBRIGATÓRIO para parceiros do programa Viator Partner.
+ * A Viator exige que usemos este endpoint para obter detalhes completos das localizações
+ * conforme especificado na documentação oficial do Partner Program.
+ * 
+ * Este endpoint deve ser usado sempre que location references são retornadas em produtos,
+ * para cache e refresh mensal conforme recomendações da Viator.
+ */
+function viator_get_bulk_locations($location_references) {
+    if (empty($location_references)) {
+        return [];
+    }
+    
+    // Cache key based on location references
+    $cache_key = 'viator_locations_' . md5(serialize($location_references));
+    $cached_data = get_transient($cache_key);
+    
+    if (false !== $cached_data) {
+        return $cached_data;
+    }
+    
+    $api_key = get_option('viator_api_key');
+    if (empty($api_key)) {
+        return [];
+    }
+    
+    $locale_settings = viator_get_locale_settings();
+    
+    // Limit to 500 items as per API specification
+    $location_references = array_slice($location_references, 0, 500);
+    
+    $request_data = [
+        'locations' => $location_references
+    ];
+    
+    // Log para confirmar uso obrigatório do endpoint /locations/bulk
+    viator_debug_log('VIATOR PARTNER REQUIREMENT: Usando endpoint /locations/bulk obrigatório', [
+        'endpoint' => '/partner/locations/bulk',
+        'location_count' => count($location_references),
+        'locations' => $location_references
+    ]);
+    
+    $response = wp_remote_post(viator_get_api_base_url() . '/partner/locations/bulk', [
+        'headers' => [
+            'Accept' => 'application/json;version=2.0',
+            'Content-Type' => 'application/json;version=2.0',
+            'exp-api-key' => $api_key,
+            'Accept-Language' => $locale_settings['language']
+        ],
+        'body' => json_encode($request_data),
+        'timeout' => 30
+    ]);
+    
+    if (is_wp_error($response)) {
+        viator_debug_log('Error fetching bulk locations:', $response->get_error_message());
+        return [];
+    }
+    
+    $response_code = wp_remote_retrieve_response_code($response);
+    if ($response_code !== 200) {
+        viator_debug_log('HTTP error fetching bulk locations:', $response_code);
+        return [];
+    }
+    
+    $body = wp_remote_retrieve_body($response);
+    $data = json_decode($body, true);
+    
+    if (!isset($data['locations']) || !is_array($data['locations'])) {
+        viator_debug_log('Invalid response format for bulk locations:', $data);
+        return [];
+    }
+    
+    // Process locations and add user-friendly names
+    $processed_locations = [];
+    foreach ($data['locations'] as $location) {
+        if (isset($location['reference'])) {
+            // Add translated name for special references
+            if (!isset($location['name']) || empty($location['name'])) {
+                $location['name'] = viator_translate_location_reference($location['reference']);
+            }
+            $processed_locations[] = $location;
+        }
+    }
+    
+    // Cache for 30 days as recommended in documentation
+    set_transient($cache_key, $processed_locations, 30 * DAY_IN_SECONDS);
+    
+    return $processed_locations;
+}
+
+/**
+ * Translate special location references to user-friendly names
+ * NUNCA retorna códigos LOC para o usuário final
+ */
+function viator_translate_location_reference($reference) {
+    $translations = [
+        'CONTACT_SUPPLIER_LATER' => viator_t('contact_supplier_later'),
+        'MEET_AT_DEPARTURE_POINT' => viator_t('meet_at_departure_point'),
+        'PICKUP_POINT' => viator_t('pickup_point'),
+        'PICKUP_HOTEL' => viator_t('pickup_hotel'),
+        'MEET_EVERYONE_AT_START_POINT' => viator_t('meet_at_start_point'),
+        'ATTRACTION_START_POINT' => viator_t('attraction_start_point')
+    ];
+    
+    // Se encontrar uma tradução conhecida, use ela
+    if (isset($translations[$reference])) {
+        return $translations[$reference];
+    }
+    
+    // Se for um código LOC (confuso para usuários), retorna texto genérico
+    if (strpos($reference, 'LOC-') === 0) {
+        return viator_t('location_provided_by_supplier'); // Nova tradução genérica
+    }
+    
+    // Para outros casos, retorna a referência original
+    return $reference;
+}
+
+/**
+ * Get appropriate icon for location type
+ */
+function viator_get_location_icon($location) {
+    $reference = $location['reference'] ?? '';
+    
+    if (strpos($reference, 'CONTACT_SUPPLIER') !== false) {
+        return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92V19a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h2.09a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9a16 16 0 006.92 6.92l.35-.35a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>';
+    } elseif (strpos($reference, 'MEET') !== false || strpos($reference, 'DEPARTURE') !== false) {
+        return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16v-6z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>';
+    } elseif (strpos($reference, 'PICKUP') !== false || strpos($reference, 'HOTEL') !== false) {
+        return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 010 8h-1M2 8h16l-4-4v8l4-4H2z"/></svg>';
+    } else {
+        // Default location pin icon
+        return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+    }
+}
+
+/**
+ * Format location address for display
+ */
+function viator_format_location_address($address) {
+    $parts = [];
+    
+    if (!empty($address['street'])) {
+        $parts[] = trim($address['street'], ', ');
+    }
+    
+    if (!empty($address['city'])) {
+        $parts[] = $address['city'];
+    }
+    
+    if (!empty($address['state'])) {
+        $parts[] = $address['state'];
+    }
+    
+    if (!empty($address['country'])) {
+        $parts[] = $address['country'];
+    }
+    
+    if (!empty($address['postcode'])) {
+        $parts[] = $address['postcode'];
+    }
+    
+    // Remove empty parts and join with commas
+    $parts = array_filter($parts, function($part) {
+        return !empty(trim($part));
+    });
+    
+    return implode(', ', $parts);
 }
 
 

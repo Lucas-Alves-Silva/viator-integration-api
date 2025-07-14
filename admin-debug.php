@@ -109,6 +109,25 @@ function viator_debug_page() {
                         <div id="availability-cache-result" style="margin-top: 10px;"></div>
                     </td>
                 </tr>
+
+                <tr>
+                    <th scope="row">📍 Cache de Localizações</th>
+                    <td>
+                        <button type="button" id="clear-locations-cache" class="button button-secondary">Limpar Cache de Localizações</button>
+                        <p class="description">Remove o cache de detalhes das localizações (endpoint /locations/bulk). Cache renovado a cada 30 dias.</p>
+                        <div id="locations-cache-result" style="margin-top: 10px;"></div>
+                    </td>
+                </tr>
+
+                <tr>
+                    <th scope="row">💱 Cache de Taxas de Câmbio</th>
+                    <td>
+                        <button type="button" id="clear-exchange-rates-cache" class="button button-secondary">Limpar Cache de Taxas de Câmbio</button>
+                        <button type="button" id="test-exchange-rates" class="button button-secondary" style="margin-left: 10px;">Testar API</button>
+                        <p class="description">Remove o cache de taxas de câmbio (endpoint /exchange-rates). Cache renovado conforme validade da API (24h).</p>
+                        <div id="exchange-rates-cache-result" style="margin-top: 10px;"></div>
+                    </td>
+                </tr>
                 
                 <tr>
                     <th scope="row">🌐 Cache do Navegador</th>
@@ -306,6 +325,148 @@ function viator_debug_page() {
                         },
                         complete: function() {
                             button.prop('disabled', false).text('Limpar Cache de Disponibilidade');
+                        }
+                    });
+                });
+
+                // Cache de Taxas de Câmbio
+                $('#clear-exchange-rates-cache').on('click', function() {
+                    var button = $(this);
+                    var resultDiv = $('#exchange-rates-cache-result');
+                    
+                    button.prop('disabled', true).text('Limpando...');
+                    resultDiv.html('<span style="color: #0073aa;">Limpando cache de taxas de câmbio...</span>');
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'viator_clear_exchange_rates_cache',
+                            nonce: '<?php echo wp_create_nonce("viator_admin_nonce"); ?>'
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                resultDiv.html('<span style="color: #46b450;">✓ ' + response.data.message + '</span>');
+                            } else {
+                                resultDiv.html('<span style="color: #dc3232;">✗ Erro: ' + response.data + '</span>');
+                            }
+                        },
+                        error: function() {
+                            resultDiv.html('<span style="color: #dc3232;">✗ Erro de conexão</span>');
+                        },
+                        complete: function() {
+                            button.prop('disabled', false).text('Limpar Cache de Taxas de Câmbio');
+                        }
+                    });
+                });
+
+                // Cache de Localizações
+                $('#clear-locations-cache').on('click', function() {
+                    var button = $(this);
+                    var resultDiv = $('#locations-cache-result');
+                    
+                    button.prop('disabled', true).text('Limpando...');
+                    resultDiv.html('<span style="color: #0073aa;">Limpando cache de localizações...</span>');
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'viator_clear_locations_cache',
+                            nonce: '<?php echo wp_create_nonce('viator_admin_nonce'); ?>'
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                resultDiv.html('<span style="color: #46b450;">✓ ' + response.data.message + '</span>');
+                            } else {
+                                resultDiv.html('<span style="color: #dc3232;">✗ Erro: ' + response.data + '</span>');
+                            }
+                        },
+                        error: function() {
+                            resultDiv.html('<span style="color: #dc3232;">✗ Erro de conexão</span>');
+                        },
+                        complete: function() {
+                            button.prop('disabled', false).text('Limpar Cache de Localizações');
+                        }
+                    });
+                });
+
+                // Cache de Taxas de Câmbio
+                $('#clear-exchange-rates-cache').on('click', function() {
+                    var button = $(this);
+                    var resultDiv = $('#exchange-rates-cache-result');
+                    
+                    button.prop('disabled', true).text('Limpando...');
+                    resultDiv.html('<span style="color: #0073aa;">Limpando cache de taxas de câmbio...</span>');
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'viator_clear_exchange_rates_cache',
+                            nonce: '<?php echo wp_create_nonce('viator_admin_nonce'); ?>'
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                resultDiv.html('<span style="color: #46b450;">✓ ' + response.data.message + '</span>');
+                            } else {
+                                resultDiv.html('<span style="color: #dc3232;">✗ Erro: ' + response.data + '</span>');
+                            }
+                        },
+                        error: function() {
+                            resultDiv.html('<span style="color: #dc3232;">✗ Erro de conexão</span>');
+                        },
+                        complete: function() {
+                            button.prop('disabled', false).text('Limpar Cache de Taxas de Câmbio');
+                        }
+                    });
+                });
+
+                // Teste de API de Taxas de Câmbio
+                $('#test-exchange-rates').on('click', function() {
+                    var button = $(this);
+                    var resultDiv = $('#exchange-rates-cache-result');
+                    
+                    button.prop('disabled', true).text('Testando...');
+                    resultDiv.html('<span style="color: #0073aa;">Testando endpoint /exchange-rates...</span>');
+                    
+                    var requestData = {
+                        action: 'viator_test_exchange_rates',
+                        nonce: '<?php echo wp_create_nonce('viator_admin_nonce'); ?>'
+                    };
+                    
+                    // Force cache clear and test
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: requestData,
+                        success: function(response) {
+                            if (response.success) {
+                                var data = response.data;
+                                
+                                var html = '<div style="background: #f0f9f0; padding: 10px; border-radius: 4px; margin-top: 10px;">';
+                                html += '<h4 style="color: #46b450; margin: 0 0 10px;">✓ Teste bem-sucedido!</h4>';
+                                html += '<p><strong>Expiry:</strong> ' + (data.expiry || 'N/A') + '</p>';
+                                html += '<p><strong>Total de taxas:</strong> ' + (data.rates_count || 0) + '</p>';
+                                
+                                // Safe array handling
+                                var sourceCurrencies = Array.isArray(data.source_currencies) ? data.source_currencies.join(', ') : (data.source_currencies || 'N/A');
+                                var targetCurrencies = Array.isArray(data.target_currencies) ? data.target_currencies.join(', ') : (data.target_currencies || 'N/A');
+                                
+                                html += '<p><strong>Moedas de origem:</strong> ' + sourceCurrencies + '</p>';
+                                html += '<p><strong>Moedas de destino:</strong> ' + targetCurrencies + '</p>';
+                                html += '<p><strong>Exemplo USD → BRL:</strong> ' + (data.example_rate || 'N/A') + '</p>';
+                                html += '</div>';
+                                resultDiv.html(html);
+                            } else {
+                                resultDiv.html('<span style="color: #dc3232;">✗ Erro: ' + response.data + '</span>');
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            resultDiv.html('<span style="color: #dc3232;">✗ Erro de conexão</span>');
+                        },
+                        complete: function() {
+                            button.prop('disabled', false).text('Testar API');
                         }
                     });
                 });
@@ -622,7 +783,7 @@ function viator_test_availability($api_key, $product_code, $test_date) {
         'paxMix' => [
             [
                 'ageBand' => 'ADULT',
-                'numberOfTravelers' => 2
+                'numberOfTravelers' => 1
             ]
         ]
     ];

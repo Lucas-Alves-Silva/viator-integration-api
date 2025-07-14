@@ -13,12 +13,14 @@ jQuery(document).ready(function($) {
     const $pagination = $('.viator-reviews-pagination');
     const $filterButtons = $('.viator-reviews-filter .viator-filter-ratings button');
     const $sortSelect = $('#viator-sort-reviews');
+    const $providerSelect = $('#viator-filter-provider');
     const $body = $('body');
     
     // State
     let currentPage = 1;
     let currentFilter = 'all';
     let currentSort = 'MOST_RECENT_PER_LOCALE';
+    let currentProvider = 'ALL';
     let totalReviews = 0;
     let totalPages = 0;
     let productCode = $reviewsList.data('product-code');
@@ -56,6 +58,16 @@ jQuery(document).ready(function($) {
         allReviews = []; // Limpa as avaliações ao mudar a ordenação
         
         // Reload reviews with new sort option
+        loadReviews(currentPage, currentFilter);
+    });
+    
+    // Event listener para o filtro de provider
+    $providerSelect.on('change', function() {
+        currentProvider = $(this).val();
+        currentPage = 1;
+        allReviews = []; // Limpa as avaliações ao mudar o provider
+        
+        // Reload reviews with new provider filter
         loadReviews(currentPage, currentFilter);
     });
     
@@ -273,8 +285,8 @@ jQuery(document).ready(function($) {
             count: REVIEWS_BATCH_SIZE, // Busca um lote maior da API
             start: apiStart,
             ratings: ratingsArray,
-            sort_by: currentSort
-            // Remove o 'limit' fixo, pois agora controlamos pelo 'count' e 'start'
+            sort_by: currentSort,
+            provider: currentProvider // Adiciona o filtro de provider
         };
 
         // Make AJAX request
@@ -378,6 +390,41 @@ jQuery(document).ready(function($) {
             }
         }
         
+        // Create provider badge HTML
+        let providerBadgeHtml = '';
+        if (review.provider) {
+            const provider = review.provider.toUpperCase();
+            let providerDisplayName = provider;
+            let providerClass = 'viator-review-provider-badge';
+            
+            // Map provider codes to display names and specific classes
+            switch (provider) {
+                case 'VIATOR':
+                    providerDisplayName = 'Viator';
+                    providerClass += ' viator-provider-viator';
+                    break;
+                case 'TRIPADVISOR':
+                    providerDisplayName = 'TripAdvisor';
+                    providerClass += ' viator-provider-tripadvisor';
+                    break;
+                case 'GETYOURGUIDE':
+                    providerDisplayName = 'GetYourGuide';
+                    providerClass += ' viator-provider-getyourguide';
+                    break;
+                case 'EXPEDIA':
+                    providerDisplayName = 'Expedia';
+                    providerClass += ' viator-provider-expedia';
+                    break;
+                default:
+                    providerDisplayName = provider.charAt(0).toUpperCase() + provider.slice(1).toLowerCase();
+                    providerClass += ' viator-provider-other';
+                    break;
+            }
+            
+            const reviewFromText = viatorReviewsData.translations.review_from || 'Avaliação do';
+            providerBadgeHtml = `<span class="${providerClass}" title="${reviewFromText} ${providerDisplayName}">${providerDisplayName}</span>`;
+        }
+        
         // Create photos HTML if available
         let photosHtml = '';
         
@@ -426,7 +473,10 @@ jQuery(document).ready(function($) {
         return `
             <div class="viator-review-item">
                 <div class="viator-review-header">
-                    <div class="viator-review-author">${review.userName || review.authorName || (viatorReviewsData.translations.anonymous_traveler || 'Viajante anônimo')}</div>
+                    <div class="viator-review-author-info">
+                        <div class="viator-review-author">${review.userName || review.authorName || (viatorReviewsData.translations.anonymous_traveler || 'Viajante anônimo')}</div>
+                        ${providerBadgeHtml}
+                    </div>
                     <div class="viator-review-date">${formattedDate}</div>
                 </div>
                 <div class="viator-review-rating">${starsHtml}</div>
