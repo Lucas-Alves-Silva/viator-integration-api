@@ -3260,3 +3260,846 @@
     font-size: 12px;
   }
 }
+
+/* ========================================
+   ESTILOS PARA PÁGINAS DE ATRAÇÕES VIATOR
+   Sobrescreve estilos do Elementor
+======================================== */
+
+/* Container principal da página de detalhes da atração */
+.viator-attraction-details,
+.elementor-widget-container .viator-attraction-details,
+.elementor-section .viator-attraction-details {
+    max-width: 1400px !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+    padding: 20px !important;
+    box-sizing: border-box !important;
+}
+
+/* Container principal do header da atração - Layout horizontal */
+.viator-attraction-header-container,
+.elementor-widget-container .viator-attraction-header-container,
+.elementor-section .viator-attraction-header-container {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 30px !important;
+    align-items: flex-start !important;
+    background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%) !important;
+    border-radius: 16px !important;
+    padding: 30px !important;
+    margin: 30px 0 !important;
+    box-shadow: 0 8px 32px rgba(0, 123, 179, 0.1) !important;
+    border: 1px solid rgba(0, 123, 179, 0.1) !important;
+    overflow: hidden !important;
+    position: relative !important;
+    min-height: 400px !important;
+}
+
+/* Efeito de overlay sutil */
+.viator-attraction-header-container::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: linear-gradient(45deg, transparent 0%, rgba(0, 123, 179, 0.02) 100%) !important;
+    pointer-events: none !important;
+    z-index: 1 !important;
+}
+
+/* Container da imagem - lado esquerdo */
+.viator-attraction-header-image {
+    flex: 0 0 45% !important;
+    max-width: 45% !important;
+    position: relative !important;
+    z-index: 2 !important;
+}
+
+/* Imagem principal da atração */
+.viator-attraction-header-image img.main-attraction-hero-image,
+.viator-attraction-header-image .main-attraction-hero-image {
+    width: 100% !important;
+    height: 350px !important;
+    object-fit: cover !important;
+    border-radius: 12px !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
+    transition: all 0.3s ease !important;
+    border: 3px solid rgba(255, 255, 255, 0.8) !important;
+}
+
+.viator-attraction-header-image img.main-attraction-hero-image:hover {
+    transform: scale(1.02) !important;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Placeholder para imagem quando não disponível */
+.attraction-placeholder-image {
+    width: 100% !important;
+    height: 350px !important;
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
+    border-radius: 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 64px !important;
+    color: #007bb3 !important;
+    border: 2px dashed #007bb3 !important;
+}
+
+/* Container das informações - lado direito */
+.viator-attraction-header-info {
+    flex: 1 !important;
+    padding-left: 20px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    gap: 20px !important;
+    position: relative !important;
+    z-index: 2 !important;
+}
+
+/* Título principal da atração */
+.viator-attraction-name,
+.viator-attraction-header-info h1 {
+    font-family: 'Poppins', sans-serif !important;
+    font-size: 32px !important;
+    font-weight: 700 !important;
+    color: #1a365d !important;
+    margin: 0 0 15px 0 !important;
+    line-height: 1.2 !important;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Avaliações no header */
+.viator-attraction-rating-header {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    margin-bottom: 20px !important;
+    padding: 15px 20px !important;
+    background: rgba(255, 193, 7, 0.1) !important;
+    border-radius: 10px !important;
+    border-left: 4px solid #ffc107 !important;
+}
+
+.viator-attraction-rating-header .stars-display {
+    display: flex !important;
+    gap: 2px !important;
+}
+
+.viator-attraction-rating-header .star {
+    font-size: 20px !important;
+    color: #ffc107 !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+}
+
+.viator-attraction-rating-header .rating-text {
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    color: #333 !important;
+}
+
+.viator-attraction-rating-header .rating-count {
+    color: #666 !important;
+    font-size: 14px !important;
+}
+
+/* Descrição da atração */
+.viator-attraction-description {
+    background: rgba(0, 123, 179, 0.05) !important;
+    padding: 20px !important;
+    border-radius: 10px !important;
+    border-left: 4px solid #007bb3 !important;
+    margin-bottom: 20px !important;
+}
+
+.viator-attraction-description p {
+    font-size: 16px !important;
+    line-height: 1.6 !important;
+    color: #4a5568 !important;
+    margin: 0 !important;
+    font-family: 'Poppins', sans-serif !important;
+}
+
+/* Localização enriquecida */
+.viator-attraction-location-rich {
+    background: linear-gradient(135deg, #e8f5e8 0%, #f0f8f0 100%) !important;
+    padding: 20px !important;
+    border-radius: 10px !important;
+    border-left: 4px solid #28a745 !important;
+}
+
+.location-main {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    margin-bottom: 15px !important;
+}
+
+.location-icon {
+    font-size: 20px !important;
+    color: #28a745 !important;
+}
+
+.location-text {
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    color: #1a365d !important;
+}
+
+.location-type {
+    color: #666 !important;
+    font-size: 14px !important;
+    font-style: italic !important;
+}
+
+.location-details {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 15px !important;
+    font-size: 14px !important;
+}
+
+/* Botão "Saiba mais" */
+.viator-attraction-more-info {
+    margin-top: auto !important;
+}
+
+.saiba-mais-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    padding: 12px 24px !important;
+    background: linear-gradient(135deg, #007bb3 0%, #0056b3 100%) !important;
+    color: white !important;
+    text-decoration: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    font-size: 16px !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 12px rgba(0, 123, 179, 0.3) !important;
+}
+
+.saiba-mais-btn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(0, 123, 179, 0.4) !important;
+    color: white !important;
+    text-decoration: none !important;
+}
+
+/* ========================================
+   SEÇÃO DE LOCALIZAÇÃO
+======================================== */
+
+.viator-attraction-location-section,
+.elementor-widget-container .viator-attraction-location-section,
+.elementor-section .viator-attraction-location-section {
+    background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%) !important;
+    border-radius: 16px !important;
+    padding: 30px !important;
+    margin: 30px 0 !important;
+    border: 1px solid rgba(0, 123, 179, 0.2) !important;
+    box-shadow: 0 6px 24px rgba(0, 123, 179, 0.08) !important;
+    position: relative !important;
+}
+
+.viator-attraction-location-section::before {
+    content: '🗺️' !important;
+    position: absolute !important;
+    top: 20px !important;
+    right: 25px !important;
+    font-size: 18px !important;
+    opacity: 0.3 !important;
+}
+
+.viator-attraction-location-section h2 {
+    font-family: 'Poppins', sans-serif !important;
+    font-size: 26px !important;
+    font-weight: 700 !important;
+    color: #1a365d !important;
+    margin: 0 0 25px 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+}
+
+.viator-attraction-location-section h2::before {
+    content: '📍' !important;
+    font-size: 24px !important;
+}
+
+/* ========================================
+   COORDENADAS GEOGRÁFICAS
+======================================== */
+
+.attraction-coordinates,
+.elementor-widget-container .attraction-coordinates,
+.elementor-section .attraction-coordinates {
+    background: linear-gradient(135deg, #fff9e6 0%, #fef5d0 100%) !important;
+    border-radius: 12px !important;
+    padding: 25px !important;
+    margin: 20px 0 !important;
+    border-left: 5px solid #ff8c00 !important;
+    box-shadow: 0 4px 16px rgba(255, 140, 0, 0.1) !important;
+    position: relative !important;
+}
+
+.attraction-coordinates::before {
+    content: '🧭' !important;
+    position: absolute !important;
+    top: 15px !important;
+    right: 20px !important;
+    font-size: 18px !important;
+    opacity: 0.4 !important;
+}
+
+.attraction-coordinates h3 {
+    font-family: 'Poppins', sans-serif !important;
+    font-size: 20px !important;
+    font-weight: 600 !important;
+    color: #d67e00 !important;
+    margin: 0 0 20px 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+.coordinates-info {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 15px !important;
+    margin-bottom: 20px !important;
+}
+
+.coord-lat,
+.coord-lng {
+    background: rgba(255, 255, 255, 0.7) !important;
+    padding: 12px 16px !important;
+    border-radius: 8px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    color: #5a5a5a !important;
+    border: 1px solid rgba(255, 140, 0, 0.2) !important;
+}
+
+.maps-link {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 12px 20px !important;
+    background: linear-gradient(135deg, #4285f4 0%, #34a853 100%) !important;
+    color: white !important;
+    text-decoration: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 3px 12px rgba(66, 133, 244, 0.3) !important;
+}
+
+.maps-link:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 5px 18px rgba(66, 133, 244, 0.4) !important;
+    color: white !important;
+    text-decoration: none !important;
+}
+
+/* ========================================
+   INFORMAÇÕES ADICIONAIS DA ATRAÇÃO
+======================================== */
+
+.viator-attraction-info,
+.elementor-widget-container .viator-attraction-info,
+.elementor-section .viator-attraction-info {
+    background: linear-gradient(135deg, #f8fff8 0%, #eaf7ea 100%) !important;
+    border-radius: 16px !important;
+    padding: 30px !important;
+    margin: 30px 0 !important;
+    border: 1px solid rgba(40, 167, 69, 0.2) !important;
+    box-shadow: 0 6px 24px rgba(40, 167, 69, 0.08) !important;
+    position: relative !important;
+}
+
+.viator-attraction-info::before {
+    content: 'ℹ️' !important;
+    position: absolute !important;
+    top: 20px !important;
+    right: 25px !important;
+    font-size: 18px !important;
+    opacity: 0.3 !important;
+}
+
+.viator-attraction-info .info-section {
+    margin-bottom: 25px !important;
+    padding: 20px !important;
+    background: rgba(255, 255, 255, 0.6) !important;
+    border-radius: 10px !important;
+    border-left: 4px solid #28a745 !important;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.1) !important;
+}
+
+.viator-attraction-info .info-section:last-child {
+    margin-bottom: 0 !important;
+}
+
+.viator-attraction-info .info-section h3 {
+    font-family: 'Poppins', sans-serif !important;
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    color: #155724 !important;
+    margin: 0 0 12px 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+.viator-attraction-info .info-section p {
+    font-size: 15px !important;
+    line-height: 1.6 !important;
+    color: #495057 !important;
+    margin: 0 !important;
+    font-family: 'Poppins', sans-serif !important;
+}
+
+/* Seção de atração gratuita - destaque especial */
+.viator-attraction-info .info-section.free-attraction {
+    background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%) !important;
+    border-left-color: #17a2b8 !important;
+}
+
+.viator-attraction-info .free-attraction h3 {
+    color: #0c5460 !important;
+}
+
+.viator-attraction-info .free-attraction p {
+    color: #0c5460 !important;
+    font-weight: 500 !important;
+}
+
+/* ========================================
+   RESPONSIVIDADE PARA MÓVEIS
+======================================== */
+
+@media (max-width: 768px) {
+    /* Header da atração em mobile - layout vertical */
+    .viator-attraction-header-container {
+        flex-direction: column !important;
+        gap: 20px !important;
+        padding: 20px !important;
+        min-height: auto !important;
+    }
+    
+    .viator-attraction-header-image {
+        flex: none !important;
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+    
+    .viator-attraction-header-image img.main-attraction-hero-image {
+        height: 250px !important;
+    }
+    
+    .viator-attraction-header-info {
+        padding-left: 0 !important;
+    }
+    
+    .viator-attraction-name {
+        font-size: 24px !important;
+        text-align: center !important;
+    }
+    
+    /* Coordenadas em mobile */
+    .coordinates-info {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+    }
+    
+    /* Seções em mobile */
+    .viator-attraction-location-section,
+    .viator-attraction-info {
+        padding: 20px !important;
+        margin: 20px 0 !important;
+    }
+    
+    .attraction-coordinates {
+        padding: 20px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .viator-attraction-header-container {
+        padding: 15px !important;
+        margin: 15px 0 !important;
+    }
+    
+    .viator-attraction-name {
+        font-size: 20px !important;
+        text-align: center !important;
+    }
+    
+    .viator-attraction-location-section h2,
+    .viator-attraction-info .info-section h3 {
+        font-size: 16px !important;
+    }
+    
+    .maps-link {
+        padding: 10px 16px !important;
+        font-size: 13px !important;
+    }
+}
+
+/* ========================================
+   CONTAINER PRINCIPAL DA PÁGINA DE ATRAÇÕES
+======================================== */
+
+/* Limitar largura e centralizar o container principal */
+.container.viator-attraction-page,
+.elementor-widget-container .container.viator-attraction-page,
+.elementor-section .container.viator-attraction-page {
+    max-width: 1200px !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+    padding: 20px !important;
+    box-sizing: border-box !important;
+}
+
+/* ========================================
+   SEÇÃO DE PRODUTOS RELACIONADOS
+======================================== */
+
+.viator-attraction-products,
+.elementor-widget-container .viator-attraction-products,
+.elementor-section .viator-attraction-products {
+    border-radius: 16px !important;
+    padding: 30px !important;
+    margin: 30px 0 !important;
+    border: 1px solid rgba(220, 53, 69, 0.2) !important;
+    box-shadow: 0 6px 24px rgba(220, 53, 69, 0.08) !important;
+    position: relative !important;
+}
+
+.viator-attraction-products::before {
+    content: '🎫' !important;
+    position: absolute !important;
+    top: 20px !important;
+    right: 25px !important;
+    font-size: 18px !important;
+    opacity: 0.3 !important;
+}
+
+/* Título da seção de produtos */
+.viator-attraction-products h2 {
+    font-family: 'Poppins', sans-serif !important;
+    font-size: 26px !important;
+    font-weight: 700 !important;
+    color: #721c24 !important;
+    margin: 0 0 15px 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+}
+
+.viator-attraction-products h2::before {
+    content: '🎟️' !important;
+    font-size: 24px !important;
+}
+
+/* Texto de contagem de produtos */
+.viator-attraction-products > p {
+    font-size: 16px !important;
+    color: #6c757d !important;
+    margin: 0 0 25px 0 !important;
+    padding: 12px 20px !important;
+    background: linear-gradient(135deg, #fff5f5 0%, #ffeaea 100%) !important;
+    border-radius: 8px !important;
+    border-left: 4px solid #dc3545 !important;
+    font-family: 'Poppins', sans-serif !important;
+    font-weight: 500 !important;
+}
+
+/* Grid de produtos - sobrescrever estilos existentes */
+.viator-attraction-products .viator-grid,
+.elementor-widget-container .viator-attraction-products .viator-grid,
+.elementor-section .viator-attraction-products .viator-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
+    gap: 25px !important;
+    margin: 25px 0 !important;
+    padding: 0 !important;
+}
+
+/* Cards de produtos dentro da seção */
+.viator-attraction-products .viator-card {
+    background: white !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
+    transition: all 0.3s ease !important;
+    border: 1px solid rgba(220, 53, 69, 0.1) !important;
+    position: relative !important;
+}
+
+.viator-attraction-products .viator-card:hover {
+    transform: translateY(-5px) !important;
+    box-shadow: 0 8px 25px rgba(220, 53, 69, 0.15) !important;
+    border-color: rgba(220, 53, 69, 0.3) !important;
+}
+
+/* Imagens dos cards de produtos */
+.viator-attraction-products .viator-card img {
+    object-fit: cover !important;
+    transition: transform 0.3s ease !important;
+}
+
+.viator-attraction-products .viator-card:hover img {
+    transform: scale(1.05) !important;
+}
+
+/* Conteúdo dos cards */
+.viator-attraction-products .viator-card-content {
+    padding: 20px !important;
+    background: white !important;
+}
+
+.viator-attraction-products .viator-card-content h3 {
+    font-family: 'Poppins', sans-serif !important;
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    color: #1a365d !important;
+    margin: 0 0 12px 0 !important;
+    line-height: 1.3 !important;
+    min-height: 2.6em !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+}
+
+/* Preços nos cards */
+.viator-attraction-products .viator-price {
+    font-size: 20px !important;
+    font-weight: 700 !important;
+    color: #dc3545 !important;
+    margin: 10px 0 !important;
+    font-family: 'Poppins', sans-serif !important;
+}
+
+/* Avaliações nos cards */
+.viator-attraction-products .viator-rating {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin: 10px 0 !important;
+    font-size: 14px !important;
+}
+
+.viator-attraction-products .viator-stars {
+    color: #ffc107 !important;
+    font-size: 16px !important;
+}
+
+/* Botões nos cards */
+.viator-attraction-products .viator-btn {
+    width: 100% !important;
+    padding: 12px 20px !important;
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    font-family: 'Poppins', sans-serif !important;
+}
+
+.viator-attraction-products .viator-btn:hover {
+    background: linear-gradient(135deg, #c82333 0%, #bd2130 100%) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3) !important;
+}
+
+/* Paginação da seção de produtos - sobrescrever estilos existentes */
+.viator-attraction-products .viator-pagination,
+.elementor-widget-container .viator-attraction-products .viator-pagination,
+.elementor-section .viator-attraction-products .viator-pagination {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 10px !important;
+    margin: 30px 0 0 0 !important;
+    padding: 20px 0 !important;
+    border-top: 2px solid rgba(220, 53, 69, 0.1) !important;
+}
+
+.viator-attraction-products .viator-pagination-btn {
+    padding: 10px 16px !important;
+    background: white !important;
+    border: 2px solid #dc3545 !important;
+    color: #dc3545 !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    font-family: 'Poppins', sans-serif !important;
+}
+
+.viator-attraction-products .viator-pagination-btn:hover,
+.viator-attraction-products .viator-pagination-btn.active {
+    background: #dc3545 !important;
+    color: white !important;
+    transform: scale(1.05) !important;
+}
+
+.viator-attraction-products .viator-pagination-arrow {
+    padding: 10px 12px !important;
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%) !important;
+    border: none !important;
+    color: white !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    font-size: 16px !important;
+}
+
+.viator-attraction-products .viator-pagination-arrow:hover {
+    background: linear-gradient(135deg, #c82333 0%, #bd2130 100%) !important;
+    transform: scale(1.1) !important;
+}
+
+.viator-attraction-products .viator-pagination-arrow:disabled {
+    background: #6c757d !important;
+    cursor: not-allowed !important;
+    opacity: 0.5 !important;
+}
+
+/* ========================================
+   RESPONSIVIDADE PARA DISPOSITIVOS MÓVEIS
+======================================== */
+
+@media (max-width: 1200px) {
+    /* Container da página de detalhes em telas menores */
+    .viator-attraction-details {
+        max-width: 100% !important;
+        padding: 15px !important;
+    }
+    
+    /* Container em telas menores */
+    .container.viator-attraction-page {
+        max-width: 100% !important;
+        padding: 15px !important;
+    }
+    
+    /* Grid de produtos em tablets */
+    .viator-attraction-products .viator-grid {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+        gap: 20px !important;
+    }
+}
+
+@media (max-width: 768px) {
+    /* Container da página de detalhes em mobile */
+    .viator-attraction-details {
+        padding: 10px !important;
+        margin: 0 !important;
+    }
+    
+    /* Container em mobile */
+    .container.viator-attraction-page {
+        padding: 10px !important;
+        margin: 0 !important;
+    }
+    
+    /* Seção de produtos em mobile */
+    .viator-attraction-products {
+        padding: 20px !important;
+        margin: 20px 0 !important;
+        border-radius: 12px !important;
+    }
+    
+    .viator-attraction-products h2 {
+        font-size: 22px !important;
+    }
+    
+    /* Grid de produtos em mobile */
+    .viator-attraction-products .viator-grid {
+        grid-template-columns: 1fr !important;
+        gap: 15px !important;
+        margin: 20px 0 !important;
+    }
+    
+    /* Cards de produtos em mobile */
+    .viator-attraction-products .viator-card {
+        border-radius: 10px !important;
+    }
+       
+    .viator-attraction-products .viator-card-content {
+        padding: 15px !important;
+    }
+    
+    .viator-attraction-products .viator-card-content h3 {
+        font-size: 16px !important;
+        min-height: 2.4em !important;
+    }
+    
+    /* Paginação em mobile */
+    .viator-attraction-products .viator-pagination {
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+        padding: 15px 0 !important;
+    }
+    
+    .viator-attraction-products .viator-pagination-btn {
+        padding: 8px 12px !important;
+        font-size: 14px !important;
+    }
+    
+    .viator-attraction-products .viator-pagination-arrow {
+        padding: 8px 10px !important;
+        font-size: 14px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    /* Container da página de detalhes em telas muito pequenas */
+    .viator-attraction-details {
+        padding: 8px !important;
+    }
+    
+    /* Container em telas muito pequenas */
+    .container.viator-attraction-page {
+        padding: 8px !important;
+    }
+    
+    /* Seção de produtos em telas pequenas */
+    .viator-attraction-products {
+        padding: 15px !important;
+        margin: 15px 0 !important;
+    }
+    
+    .viator-attraction-products h2 {
+        font-size: 20px !important;
+        flex-direction: column !important;
+        text-align: center !important;
+        gap: 8px !important;
+    }
+        
+    .viator-attraction-products .viator-card-content {
+        padding: 12px !important;
+    }
+    
+    .viator-attraction-products .viator-card-content h3 {
+        font-size: 15px !important;
+    }
+    
+    .viator-attraction-products .viator-btn {
+        padding: 10px 16px !important;
+        font-size: 13px !important;
+    }
+}
+
+
