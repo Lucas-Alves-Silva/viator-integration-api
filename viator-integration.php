@@ -3686,7 +3686,7 @@ function viator_enqueue_booking_scripts() {
             'viator-booking-js',
             plugin_dir_url(__FILE__) . 'viator-booking.js',
             array('jquery', 'viator-payment-lib'),
-            '1.0.0',
+            '1.0.1',
             true
         );
         
@@ -3694,7 +3694,7 @@ function viator_enqueue_booking_scripts() {
             'viator-booking-css',
             plugin_dir_url(__FILE__) . 'viator-booking.css',
             array(),
-            '1.0.0'
+            '1.0.1'
         );
         
         // Localizar script para AJAX

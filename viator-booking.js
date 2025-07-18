@@ -505,8 +505,8 @@ class ViatorBookingManager {
         // Attach modal events
         modal.querySelector('.viator-modal-close').addEventListener('click', () => this.closeModal());
         modal.querySelector('#booking-cancel-btn').addEventListener('click', () => this.closeModal());
-        modal.querySelector('#booking-back-btn').addEventListener('click', () => this.previousStep());
-        modal.querySelector('#booking-next-btn').addEventListener('click', () => this.nextStep());
+        modal.querySelector('#booking-back-btn').addEventListener('click', async () => await this.previousStep());
+        modal.querySelector('#booking-next-btn').addEventListener('click', async () => await this.nextStep());
         
         // Setup price details toggle
         this.setupPriceDetailsToggle();
@@ -519,7 +519,7 @@ class ViatorBookingManager {
         });
     }
     
-    showStep(stepNumber) {
+    async showStep(stepNumber) {
         this.currentStep = stepNumber;
         this.updateProgress();
         
@@ -543,7 +543,7 @@ class ViatorBookingManager {
                 break;
             case 3:
                 content.innerHTML = this.getPaymentStepHTML();
-                this.initializePaymentStep();
+                await this.initializePaymentStep();
                 break;
             case 4:
                 content.innerHTML = this.getConfirmationStepHTML();
@@ -1237,9 +1237,20 @@ class ViatorBookingManager {
         });
     }
     
-    initializePaymentStep() {
+    async initializePaymentStep() {
         this.generateBookingSummary();
         this.formatCardNumber();
+        
+        // Fazer hold da reserva antes de inicializar o sistema de pagamento
+        if (!this.bookingData.holdData) {
+            console.log('📋 Fazendo hold da reserva antes de inicializar pagamento...');
+            const holdResult = await this.requestBookingHoldForPayment();
+            if (!holdResult) {
+                console.error('❌ Falha ao fazer hold da reserva');
+                return;
+            }
+        }
+        
         this.initializeViatorPayment();
     }
     
@@ -1547,14 +1558,14 @@ class ViatorBookingManager {
     async nextStep() {
         if (await this.validateCurrentStep()) {
             if (this.currentStep < 4) {
-                this.showStep(this.currentStep + 1);
+                await this.showStep(this.currentStep + 1);
             }
         }
     }
     
-    previousStep() {
+    async previousStep() {
         if (this.currentStep > 1) {
-            this.showStep(this.currentStep - 1);
+            await this.showStep(this.currentStep - 1);
         }
     }
     
@@ -1745,6 +1756,26 @@ class ViatorBookingManager {
     }
     
     async processPayment() {
+        // Verificar se uma opção foi selecionada
+        if (!this.bookingData.selectedOption) {
+            console.warn('⚠️ Tentativa de pagamento sem opção selecionada:', {
+                availabilityData: this.bookingData.availabilityData,
+                selectedOption: this.bookingData.selectedOption,
+                travelDate: this.bookingData.travelDate
+            });
+            this.showDateError('Por favor, selecione uma opção antes de prosseguir com o pagamento.');
+            // Destacar visualmente as opções disponíveis
+            const optionsContainer = document.querySelector('.viator-options-container');
+            if (optionsContainer) {
+                optionsContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                optionsContainer.style.border = '2px solid #ff6b6b';
+                setTimeout(() => {
+                    optionsContainer.style.border = '';
+                }, 3000);
+            }
+            return false;
+        }
+        
         // Validar dados específicos de pagamento
         const cardNumber = document.getElementById('card-number');
         const cvv = document.getElementById('security-code');
@@ -1814,11 +1845,13 @@ class ViatorBookingManager {
         
         // Processar pagamento
         try {
-            // Primeiro, fazer hold da reserva
-            const holdResult = await this.requestBookingHold();
-            if (!holdResult) return false;
+            // Verificar se já temos um hold válido (feito na inicialização)
+            if (!this.bookingData.holdData || !this.bookingData.holdData.paymentDataSubmissionUrl) {
+                this.showDateError('Sessão de pagamento expirada. Por favor, recarregue a página e tente novamente.');
+                return false;
+            }
             
-            // Depois processar pagamento usando biblioteca Viator
+            // Processar pagamento usando o hold existente
             const paymentResult = await this.submitPayment();
             if (!paymentResult) return false;
             
@@ -1832,7 +1865,7 @@ class ViatorBookingManager {
         }
     }
     
-    async requestBookingHold() {
+    async requestBookingHoldForPayment() {
         try {
             const travelersDetails = this.collectDetailedTravelersData();
             
@@ -1844,7 +1877,7 @@ class ViatorBookingManager {
                 productCode: this.bookingData.productCode
             };
             
-            console.log('📋 Dados para hold:', {
+            console.log('📋 Dados para hold (inicialização pagamento):', {
                 availabilityData: availabilityDataWithSelection,
                 travelersDetails: travelersDetails
             });
@@ -1863,37 +1896,81 @@ class ViatorBookingManager {
             });
             
             const data = await response.json();
-            console.log('📥 Resposta do hold:', data);
+            console.log('📥 Resposta do hold (inicialização pagamento):', data);
             
             if (data.success) {
                 this.bookingData.holdData = data.data;
-                this.initializeViatorPayment(); // Reinitializar com token de pagamento
+                // Armazenar timestamp de quando o hold foi criado
+                this.bookingData.holdCreatedAt = new Date().toISOString();
+                console.log('✅ Hold realizado com sucesso para inicialização do pagamento');
                 return true;
             } else {
                 console.error('❌ Erro no hold:', data);
-                console.error('📋 Detalhes do erro:', {
-                    message: data.data?.message,
-                    isLocalhost: window.location.hostname === 'localhost' || window.location.hostname.includes('.local'),
-                    currentURL: window.location.href,
-                    recommendedAction: 'Para testes reais, use um domínio público com HTTPS'
-                });
-                
                 const errorMessage = data.data?.message || 'Erro desconhecido na criação da reserva';
-                const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname.includes('.local');
-                
-                if (isLocalhost) {
-                    this.showDateError(`⚠️ LOCALHOST DETECTADO: ${errorMessage}\n\n💡 Para testar o fluxo completo, use um domínio público com HTTPS ou configure um tunnel (ngrok).`);
-                } else {
-                    this.showDateError('Erro ao criar reserva: ' + errorMessage);
-                }
+                console.error('📋 Detalhes do erro:', errorMessage);
                 return false;
             }
         } catch (error) {
             console.error('❌ Erro de conexão no hold:', error);
-            this.showDateError('Erro de conexão ao criar reserva.');
             return false;
         }
     }
+    
+    /**
+     * Verifica se o hold da reserva expirou baseado nos timestamps validUntil
+     * Conforme documentação da Viator API
+     */
+    checkIfHoldExpired() {
+        if (!this.bookingData.holdData) {
+            console.log('🔍 Nenhum hold encontrado, necessário criar novo');
+            return true;
+        }
+        
+        const now = new Date();
+        const holdData = this.bookingData.holdData;
+        
+        // Verificar validUntil da availability se disponível
+        if (holdData.availability && holdData.availability.validUntil) {
+            const availabilityExpiry = new Date(holdData.availability.validUntil);
+            if (now >= availabilityExpiry) {
+                console.log('🕐 Hold expirado (availability validUntil):', holdData.availability.validUntil);
+                return true;
+            }
+        }
+        
+        // Verificar validUntil do pricing se disponível
+        if (holdData.pricing && holdData.pricing.validUntil) {
+            const pricingExpiry = new Date(holdData.pricing.validUntil);
+            if (now >= pricingExpiry) {
+                console.log('🕐 Hold expirado (pricing validUntil):', holdData.pricing.validUntil);
+                return true;
+            }
+        }
+        
+        // Verificar se há um campo validUntil geral no holdData
+        if (holdData.validUntil) {
+            const generalExpiry = new Date(holdData.validUntil);
+            if (now >= generalExpiry) {
+                console.log('🕐 Hold expirado (validUntil geral):', holdData.validUntil);
+                return true;
+            }
+        }
+        
+        // Fallback: verificar se o hold foi criado há mais de 10 minutos (tempo padrão da Viator)
+        if (this.bookingData.holdCreatedAt) {
+            const holdCreated = new Date(this.bookingData.holdCreatedAt);
+            const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000);
+            if (holdCreated < tenMinutesAgo) {
+                console.log('🕐 Hold expirado (mais de 10 minutos):', this.bookingData.holdCreatedAt);
+                return true;
+            }
+        }
+        
+        console.log('✅ Hold ainda válido');
+        return false;
+    }
+
+
     
     async submitPayment() {
         try {
@@ -1918,6 +1995,19 @@ class ViatorBookingManager {
             // Validar dados antes de enviar
             if (!cardNumber || !cvv || !expMonth || !expYear || !name || !country || !postalCode) {
                 throw new Error('Todos os campos obrigatórios devem ser preenchidos');
+            }
+            
+            // 🔄 SOLUÇÃO MELHORADA: Verificar validade do hold antes de renovar
+            const needsNewHold = this.checkIfHoldExpired();
+            if (needsNewHold) {
+                console.log('🔄 Hold expirado, criando novo hold...');
+                const freshHoldResult = await this.requestBookingHoldForPayment();
+                if (!freshHoldResult) {
+                    throw new Error('Falha ao renovar hold da reserva. Tente novamente.');
+                }
+                console.log('✅ Novo hold criado com sucesso');
+            } else {
+                console.log('✅ Hold ainda válido, prosseguindo com pagamento');
             }
             
             // Estrutura de dados conforme documentação da API da Viator
@@ -1950,7 +2040,7 @@ class ViatorBookingManager {
             
             // Verificar se temos paymentDataSubmissionUrl conforme documentação
             if (!this.bookingData.holdData.paymentDataSubmissionUrl) {
-                throw new Error('paymentDataSubmissionUrl não disponível. Refaça o booking hold.');
+                throw new Error('paymentDataSubmissionUrl não disponível após renovação do hold.');
             }
             
             // Usar paymentDataSubmissionUrl conforme documentação oficial da Viator
@@ -1983,11 +2073,23 @@ class ViatorBookingManager {
                 }
             } else {
                 const errorMessage = data.data?.message || 'Erro no processamento do pagamento';
+                console.error('❌ Detalhes do erro de pagamento:', {
+                    errorMessage,
+                    fullResponse: data,
+                    paymentUrl: this.bookingData.holdData.paymentDataSubmissionUrl,
+                    holdData: this.bookingData.holdData
+                });
                 throw new Error(errorMessage);
             }
             
         } catch (error) {
             console.error('❌ Erro no pagamento:', error);
+            console.error('📊 Estado atual dos dados de reserva:', {
+                hasHoldData: !!this.bookingData.holdData,
+                hasPaymentUrl: !!this.bookingData.holdData?.paymentDataSubmissionUrl,
+                hasSelectedOption: !!this.bookingData.selectedOption,
+                cartId: this.bookingData.holdData?.cartId
+            });
             this.showDateError('Erro no processamento do pagamento: ' + error.message);
             return false;
         }
