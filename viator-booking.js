@@ -1675,32 +1675,39 @@ class ViatorBookingManager {
     
     collectTravelersData() {
         console.log('👥 collectTravelersData chamado');
-        console.log('🔍 ageBands disponíveis:', this.ageBands);
-        
+
+        // Se os dados dos viajantes já foram coletados e armazenados, use-os.
+        if (this.bookingData.selectedTravelers && this.bookingData.selectedTravelers.length > 0) {
+            console.log('✅ Usando dados de viajantes armazenados:', this.bookingData.selectedTravelers);
+            return this.bookingData.selectedTravelers;
+        }
+
+        // Caso contrário, colete do DOM (relevante para a primeira etapa).
+        console.log('🔍 Coletando dados de viajantes do DOM (primeira etapa). ageBands disponíveis:', this.ageBands);
         const paxMix = [];
         if (this.ageBands && this.ageBands.length > 0) {
             this.ageBands.forEach(band => {
                 const id = band.ageBand.toLowerCase();
                 const qtyElement = document.getElementById(`${id}-qty`);
                 console.log(`🔢 Elemento quantidade para ${id}:`, qtyElement);
-                
+
                 if (qtyElement) {
                     const quantity = parseInt(qtyElement.value, 10);
                     console.log(`👥 Quantidade para ${band.ageBand}: ${quantity}`);
-                    
+
                     if (quantity > 0) {
-                        paxMix.push({ 
-                            ageBand: band.ageBand, // Usar ageBand diretamente
+                        paxMix.push({
+                            ageBand: band.ageBand,
                             numberOfTravelers: quantity
                         });
                     }
                 }
             });
         } else {
-            console.log('❌ Nenhum ageBand disponível');
+            console.log('❌ Nenhum ageBand disponível para coleta no DOM');
         }
-        
-        console.log('📊 PaxMix final:', paxMix);
+
+        console.log('📊 PaxMix final coletado do DOM:', paxMix);
         return paxMix;
     }
     
@@ -1869,15 +1876,16 @@ class ViatorBookingManager {
         try {
             const travelersDetails = this.collectDetailedTravelersData();
             
-            // Preparar dados de disponibilidade com a opção selecionada
+            // Simplificar o objeto enviado para o backend, passando apenas a opção selecionada
+            // que já contém o 'fullOption' com o 'totalPrice'.
             const availabilityDataWithSelection = {
-                ...this.bookingData.availabilityData,
                 selectedOption: this.bookingData.selectedOption,
                 travelDate: this.bookingData.travelDate,
-                productCode: this.bookingData.productCode
+                productCode: this.bookingData.productCode,
+                paxMix: this.collectTravelersData() // Adicionar paxMix para consistência
             };
-            
-            console.log('📋 Dados para hold (inicialização pagamento):', {
+
+            console.log('📋 Dados para hold (simplificado):', {
                 availabilityData: availabilityDataWithSelection,
                 travelersDetails: travelersDetails
             });
@@ -1899,10 +1907,33 @@ class ViatorBookingManager {
             console.log('📥 Resposta do hold (inicialização pagamento):', data);
             
             if (data.success) {
+                console.log('📋 Dados recebidos do PHP:', data.data);
+                console.log('🔍 partnerCartRef presente:', !!data.data.partnerCartRef);
+                console.log('🔍 Valor do partnerCartRef:', data.data.partnerCartRef);
+                
                 this.bookingData.holdData = data.data;
+                
+                // Mapear partnerCartRef para cartId para compatibilidade
+                if (data.data.partnerCartRef) {
+                    this.bookingData.holdData.cartId = data.data.partnerCartRef;
+                    console.log('✅ Mapeamento realizado - cartId:', this.bookingData.holdData.cartId);
+                } else {
+                    console.error('❌ partnerCartRef não encontrado nos dados recebidos');
+                }
+                
                 // Armazenar timestamp de quando o hold foi criado
                 this.bookingData.holdCreatedAt = new Date().toISOString();
                 console.log('✅ Hold realizado com sucesso para inicialização do pagamento');
+                console.log('🆔 Cart ID final definido:', this.bookingData.holdData.cartId);
+                
+                // Verificação adicional da estrutura dos dados
+                console.log('📊 Estrutura final do holdData:', {
+                    hasCartId: !!this.bookingData.holdData.cartId,
+                    hasPartnerCartRef: !!this.bookingData.holdData.partnerCartRef,
+                    hasPaymentSessionToken: !!this.bookingData.holdData.paymentSessionToken,
+                    hasPaymentDataSubmissionUrl: !!this.bookingData.holdData.paymentDataSubmissionUrl
+                });
+                
                 return true;
             } else {
                 console.error('❌ Erro no hold:', data);
@@ -1923,6 +1954,12 @@ class ViatorBookingManager {
     checkIfHoldExpired() {
         if (!this.bookingData.holdData) {
             console.log('🔍 Nenhum hold encontrado, necessário criar novo');
+            return true;
+        }
+        
+        // Verificar se o cartId está presente (indicador de hold válido)
+        if (!this.bookingData.holdData.cartId && !this.bookingData.holdData.partnerCartRef) {
+            console.log('🔍 Hold sem referência de carrinho válida, necessário criar novo');
             return true;
         }
         
@@ -2001,6 +2038,10 @@ class ViatorBookingManager {
             const needsNewHold = this.checkIfHoldExpired();
             if (needsNewHold) {
                 console.log('🔄 Hold expirado, criando novo hold...');
+                // Limpar dados de hold antigos para evitar conflitos
+                this.bookingData.holdData = null;
+                this.bookingData.holdCreatedAt = null;
+                
                 const freshHoldResult = await this.requestBookingHoldForPayment();
                 if (!freshHoldResult) {
                     throw new Error('Falha ao renovar hold da reserva. Tente novamente.');
@@ -2263,7 +2304,7 @@ class ViatorBookingManager {
             console.log('📥 Resposta HTTP recebida:', response.status, response.statusText);
             
             const data = await response.json();
-            console.log('📊 Dados da resposta:', data);
+            console.log('📊 Dados da resposta (disponibilidade completa):', JSON.stringify(data, null, 2));
 
             if (data.success) {
                 console.log('✅ Requisição bem-sucedida, exibindo preços');
@@ -2514,6 +2555,10 @@ class ViatorBookingManager {
                 opt.productOptionCode === optionCode && 
                 (opt.startTime === card.dataset.startTime || !opt.startTime)
             );
+            // Definir selectedTime a partir da opção encontrada
+            if (selectedFullOption && selectedFullOption.startTime) {
+                selectedTime = selectedFullOption.startTime;
+            }
         }
         
         // Atualizar footer com opção específica selecionada
@@ -2526,6 +2571,14 @@ class ViatorBookingManager {
                 startTime: selectedTime,
                 fullOption: selectedFullOption
             };
+            
+            // Debug: verificar se startTime está sendo definido corretamente
+            console.log('🕐 selectedOption definido:', {
+                productOptionCode: optionCode,
+                selectedTime: selectedTime,
+                fullOptionStartTime: selectedFullOption?.startTime,
+                cardStartTime: card.dataset.startTime
+            });
             
             // Limpar mensagem de erro agora que uma opção foi selecionada
             this.hideDateError();

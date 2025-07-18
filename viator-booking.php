@@ -93,22 +93,55 @@ class ViatorBookingSystem {
         $partner_booking_ref = 'BOOK_' . $this->generate_unique_id();
         
         // Log dados recebidos para debug
+        viator_debug_log('=== HOLD REQUEST DEBUG START ===');
         viator_debug_log('Hold - Travelers Details Received:', $travelers_details);
+        viator_debug_log('Hold - Availability Data Received:', $availability_data);
+        
+        // Validação rigorosa dos dados obrigatórios
+        $validation_errors = $this->validate_hold_data($availability_data, $travelers_details);
+        if (!empty($validation_errors)) {
+            viator_debug_log('Hold - Validation Errors:', $validation_errors);
+            return array('error' => 'Dados inválidos para hold: ' . implode(', ', $validation_errors));
+        }
         
         // Construir dados conforme a documentação da API
-        $pax_mix = $this->convert_travelers_to_pax_mix($travelers_details);
+        // O paxMix agora é extraído diretamente de availability_data
+        $pax_mix = $availability_data['paxMix'] ?? [];
         viator_debug_log('Hold - PaxMix Converted:', $pax_mix);
         
+        // Validar paxMix
+        if (empty($pax_mix)) {
+            viator_debug_log('Hold - ERROR: PaxMix está vazio ou ausente em availability_data');
+            return array('error' => 'Dados de viajantes (paxMix) inválidos ou ausentes.');
+        }
+        
+        // Extrair dados com logs detalhados
+        $product_code = $availability_data['productCode'] ?? $availability_data['product']['productCode'];
+        $product_option_code = $availability_data['selectedOption']['productOptionCode'];
+        $start_time = $availability_data['selectedOption']['startTime'] ?? null;
+        $travel_date = $availability_data['travelDate'];
+        
+        viator_debug_log('Hold - Extracted Data:', [
+            'productCode' => $product_code,
+            'productOptionCode' => $product_option_code,
+            'startTime' => $start_time,
+            'travelDate' => $travel_date,
+            'currency' => $locale_settings['currency'],
+            'paxMixCount' => count($pax_mix)
+        ]);
+        
+        // Estrutura da requisição conforme documentação oficial da Viator
+        // A API calcula automaticamente o valor total baseado nos itens e paxMix
         $request_data = array(
             'currency' => $locale_settings['currency'],
             'partnerCartRef' => $partner_cart_ref,
             'items' => array(
                 array(
                     'partnerBookingRef' => $partner_booking_ref,
-                    'productCode' => $availability_data['productCode'] ?? $availability_data['product']['productCode'],
-                    'productOptionCode' => $availability_data['selectedOption']['productOptionCode'],
-                    'startTime' => $availability_data['selectedOption']['startTime'] ?? null,
-                    'travelDate' => $availability_data['travelDate'],
+                    'productCode' => $product_code,
+                    'productOptionCode' => $product_option_code,
+                    'startTime' => $start_time,
+                    'travelDate' => $travel_date,
                     'paxMix' => $pax_mix
                 )
             ),
@@ -116,8 +149,34 @@ class ViatorBookingSystem {
             'hostingUrl' => home_url()
         );
         
-        // Log para debug
-        viator_debug_log('Hold Request Data:', $request_data);
+        // Extrair o valor total da opção selecionada para evitar amount: 0.0 no token
+        $total_price = null;
+        if (isset($availability_data['selectedOption']['fullOption']['totalPrice']['price']['recommendedRetailPrice'])) {
+            $total_price = $availability_data['selectedOption']['fullOption']['totalPrice']['price']['recommendedRetailPrice'];
+        } elseif (isset($availability_data['selectedOption']['totalPrice']['price']['recommendedRetailPrice'])) {
+            $total_price = $availability_data['selectedOption']['totalPrice']['price']['recommendedRetailPrice'];
+        }
+        
+        viator_debug_log('Total Price extraído para hold:', $total_price);
+        
+        // Log dos dados de precificação disponíveis para debug
+        if (isset($availability_data['selectedOption']['totalPrice'])) {
+            viator_debug_log('Hold - Pricing Data Available:', $availability_data['selectedOption']['totalPrice']);
+        }
+        
+        if (isset($availability_data['selectedOption']['pricing'])) {
+            viator_debug_log('Hold - Detailed Pricing:', $availability_data['selectedOption']['pricing']);
+        }
+        
+        // Adicionar totalPrice se disponível (necessário para evitar amount: 0.0 no token)
+        if ($total_price !== null) {
+            $request_data['totalPrice'] = $total_price;
+            viator_debug_log('Total Price adicionado à requisição de hold:', $total_price);
+        }
+        
+        // Log completo da requisição
+        viator_debug_log('Hold - Complete Request Data:', $request_data);
+        viator_debug_log('Hold - Request JSON:', json_encode($request_data, JSON_PRETTY_PRINT));
         
         $response = wp_remote_post($this->base_url . '/partner/bookings/cart/hold', array(
             'headers' => array(
@@ -139,10 +198,45 @@ class ViatorBookingSystem {
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
         
-        // Log detalhado da resposta
-        viator_debug_log('Hold Response Code:', $response_code);
-        viator_debug_log('Hold Response Body:', $body);
-        viator_debug_log('Hold Response Data:', $data);
+        // Log detalhado da resposta para debug
+        viator_debug_log('Hold - Response Code:', $response_code);
+        viator_debug_log('Hold - Response Body (Raw):', $body);
+        viator_debug_log('Hold - Response Data (Parsed):', $data);
+        
+        // Log específico do paymentSessionToken se presente
+        if (isset($data['paymentSessionToken'])) {
+            viator_debug_log('Hold - PaymentSessionToken Found:', $data['paymentSessionToken']);
+            
+            // Tentar decodificar o token para verificar o amount
+            $token_parts = explode('.', $data['paymentSessionToken']);
+            if (count($token_parts) >= 2) {
+                try {
+                    $payload = json_decode(base64_decode($token_parts[1]), true);
+                    viator_debug_log('Hold - PaymentSessionToken Payload:', $payload);
+                    
+                    if (isset($payload['amount'])) {
+                        viator_debug_log('Hold - Token Amount Found:', $payload['amount']);
+                    }
+                } catch (Exception $e) {
+                    viator_debug_log('Hold - Error decoding token:', $e->getMessage());
+                }
+            }
+        } else {
+            viator_debug_log('Hold - PaymentSessionToken NOT FOUND in response');
+        }
+        
+        // Log de outros campos importantes da resposta
+        if (isset($data['paymentDataSubmissionUrl'])) {
+            viator_debug_log('Hold - PaymentDataSubmissionUrl:', $data['paymentDataSubmissionUrl']);
+        }
+        
+        if (isset($data['cartId'])) {
+            viator_debug_log('Hold - CartId:', $data['cartId']);
+        }
+        
+        if (isset($data['totalPrice'])) {
+            viator_debug_log('Hold - Response TotalPrice:', $data['totalPrice']);
+        }
         
         // Verificar código de resposta HTTP
         if ($response_code === 403) {
@@ -162,6 +256,12 @@ class ViatorBookingSystem {
         $data['partnerCartRef'] = $partner_cart_ref;
         $data['partnerBookingRef'] = $partner_booking_ref;
         
+        // Log detalhado das referências geradas
+        viator_debug_log('Referências geradas:', [
+            'partnerCartRef' => $partner_cart_ref,
+            'partnerBookingRef' => $partner_booking_ref
+        ]);
+        
         // Extrair paymentSessionToken para inicialização do pagamento
         if (isset($data['paymentSessionToken'])) {
             $data['sessionToken'] = $data['paymentSessionToken'];
@@ -172,10 +272,73 @@ class ViatorBookingSystem {
             viator_debug_log('Payment Data Submission URL recebida:', $data['paymentDataSubmissionUrl']);
         }
         
+        // Log da estrutura final dos dados antes do retorno
+        viator_debug_log('Dados finais do hold (com referências):', [
+            'hasPartnerCartRef' => isset($data['partnerCartRef']),
+            'hasPartnerBookingRef' => isset($data['partnerBookingRef']),
+            'hasPaymentSessionToken' => isset($data['paymentSessionToken']),
+            'hasPaymentDataSubmissionUrl' => isset($data['paymentDataSubmissionUrl'])
+        ]);
+        
         // Armazenar resposta completa para uso posterior no pagamento
         $this->last_hold_response = $data;
         
         return $data;
+    }
+    
+    /**
+     * Validar dados obrigatórios para requisição de hold
+     */
+    private function validate_hold_data($availability_data, $travelers_details) {
+        $errors = array();
+        
+        // Validar dados de disponibilidade
+        if (empty($availability_data)) {
+            $errors[] = 'Dados de disponibilidade ausentes';
+            return $errors;
+        }
+        
+        // Validar productCode
+        $product_code = $availability_data['productCode'] ?? $availability_data['product']['productCode'] ?? null;
+        if (empty($product_code)) {
+            $errors[] = 'productCode ausente';
+        }
+        
+        // Validar productOptionCode
+        $product_option_code = $availability_data['selectedOption']['productOptionCode'] ?? null;
+        if (empty($product_option_code)) {
+            $errors[] = 'productOptionCode ausente';
+        }
+        
+        // Validar travelDate
+        $travel_date = $availability_data['travelDate'] ?? null;
+        if (empty($travel_date)) {
+            $errors[] = 'travelDate ausente';
+        } else {
+            // Validar formato da data
+            $date_obj = DateTime::createFromFormat('Y-m-d', $travel_date);
+            if (!$date_obj || $date_obj->format('Y-m-d') !== $travel_date) {
+                $errors[] = 'travelDate em formato inválido (esperado: Y-m-d)';
+            }
+        }
+        
+        // Validar dados dos viajantes
+        if (empty($travelers_details)) {
+            $errors[] = 'Dados de viajantes ausentes';
+        }
+        
+        // Log detalhado dos dados validados
+        viator_debug_log('Hold - Validation Details:', [
+            'productCode' => $product_code,
+            'productOptionCode' => $product_option_code,
+            'travelDate' => $travel_date,
+            'hasSelectedOption' => isset($availability_data['selectedOption']),
+            'selectedOptionKeys' => isset($availability_data['selectedOption']) ? array_keys($availability_data['selectedOption']) : [],
+            'travelersDetailsType' => gettype($travelers_details),
+            'travelersDetailsKeys' => is_array($travelers_details) ? array_keys($travelers_details) : 'not_array'
+        ]);
+        
+        return $errors;
     }
     
     /**
@@ -224,6 +387,7 @@ class ViatorBookingSystem {
     
     /**
      * Gerar ID único para referências
+     * Inclui timestamp, microsegundos e entropia adicional para evitar duplicação
      */
     private function generate_unique_id() {
         // Usar função nativa do WordPress se disponível
@@ -231,8 +395,16 @@ class ViatorBookingSystem {
             return str_replace('-', '', wp_generate_uuid4());
         }
         
-        // Fallback para geração manual
-        return strtoupper(substr(uniqid() . bin2hex(random_bytes(4)), 0, 8));
+        // Fallback melhorado com mais entropia
+        $timestamp = time();
+        $microseconds = microtime(true) * 1000000;
+        $random = bin2hex(random_bytes(8));
+        
+        // Combinar timestamp, microsegundos e bytes aleatórios
+        $unique_string = $timestamp . '_' . $microseconds . '_' . $random;
+        
+        // Gerar hash MD5 e pegar os primeiros 12 caracteres
+        return strtoupper(substr(md5($unique_string), 0, 12));
     }
     
     /**
@@ -633,9 +805,12 @@ class ViatorBookingSystem {
                 return array('error' => 'paymentDataSubmissionUrl não disponível. Refaça o booking hold.');
             }
             
-            // Headers conforme documentação oficial - sem headers customizados
+            // Headers conforme documentação oficial da API da Viator
+            // Incluindo todos os headers obrigatórios para o endpoint /v1/checkoutsessions/{sessionToken}/paymentaccounts
             $headers = array(
                 'Content-Type' => 'application/json',
+                'x-trip-clientid' => 'P00241467', // Seu partner identifier único
+                'x-trip-requestid' => wp_generate_uuid4(), // Identificador único por requisição
                 'User-Agent' => 'WordPress-Plugin/1.0'
             );
             
@@ -894,4 +1069,4 @@ if (!function_exists('viator_debug_log')) {
             error_log($log_message);
         }
     }
-} 
+}
