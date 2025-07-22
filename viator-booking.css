@@ -2776,4 +2776,312 @@ body.viator-modal-open {
     .total-amount {
         gap: 2px;
     }
-} 
+}
+
+/* ========================================
+   ESTILOS DA ETAPA DE CONFIRMAÇÃO
+   ======================================== */
+
+.confirmation-step {
+    text-align: center;
+    padding: 20px 0;
+}
+
+.confirmation-message {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+/* Status de Confirmação */
+.confirmation-status {
+    margin-bottom: 30px;
+    padding: 25px;
+    border-radius: 15px;
+    position: relative;
+    overflow: hidden;
+}
+
+.confirmation-status::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+    pointer-events: none;
+}
+
+.confirmation-status.confirmed {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    box-shadow: 0 8px 25px rgba(40, 167, 69, 0.3);
+}
+
+.confirmation-status.pending {
+    background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+    color: white;
+    box-shadow: 0 8px 25px rgba(255, 193, 7, 0.3);
+}
+
+.confirmation-status.failed {
+    background: linear-gradient(135deg, #dc3545 0%, #e83e8c 100%);
+    color: white;
+    box-shadow: 0 8px 25px rgba(220, 53, 69, 0.3);
+}
+
+.status-icon {
+    font-size: 3.5rem;
+    margin-bottom: 15px;
+    display: block;
+    animation: bounceIn 0.6s ease-out;
+}
+
+.status-title {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.status-message {
+    font-size: 1.1rem;
+    opacity: 0.95;
+    line-height: 1.5;
+}
+
+/* Detalhes da Reserva */
+.booking-details {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 25px;
+    margin: 25px 0;
+    border: 1px solid #e9ecef;
+}
+
+.booking-details h4 {
+    color: #0056b3;
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+    text-align: center;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 10px;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.detail-row:last-child {
+    border-bottom: none;
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: #0056b3;
+}
+
+.detail-label {
+    font-weight: 600;
+    color: #495057;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.detail-value {
+    font-weight: 500;
+    color: #212529;
+    text-align: right;
+}
+
+/* Próximos Passos */
+.next-steps {
+    background: white;
+    border: 2px solid #e3f2fd;
+    border-radius: 12px;
+    padding: 25px;
+    margin: 25px 0;
+    text-align: left;
+}
+
+.next-steps h4 {
+    color: #0056b3;
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.next-steps ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.next-steps li {
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 1rem;
+    line-height: 1.5;
+    color: #495057;
+}
+
+.next-steps li:last-child {
+    border-bottom: none;
+}
+
+.next-steps li strong {
+    color: #0056b3;
+}
+
+/* Aviso de Voucher Restrito */
+.voucher-warning {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    border: 2px solid #ffc107;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 20px 0;
+    text-align: left;
+}
+
+.voucher-warning h5 {
+    color: #856404;
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.voucher-warning p {
+    color: #856404;
+    margin: 8px 0;
+    line-height: 1.5;
+}
+
+.voucher-warning strong {
+    color: #533f03;
+}
+
+/* Animações */
+@keyframes bounceIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.3);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.05);
+    }
+    70% {
+        transform: scale(0.9);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.booking-details,
+.next-steps,
+.voucher-warning {
+    animation: fadeInUp 0.6s ease-out;
+    animation-fill-mode: both;
+}
+
+.booking-details {
+    animation-delay: 0.2s;
+}
+
+.next-steps {
+    animation-delay: 0.4s;
+}
+
+.voucher-warning {
+    animation-delay: 0.6s;
+}
+
+/* Responsividade para Confirmação */
+@media (max-width: 768px) {
+    .confirmation-message {
+        padding: 0 10px;
+    }
+    
+    .confirmation-status {
+        padding: 20px 15px;
+        margin-bottom: 20px;
+    }
+    
+    .status-icon {
+        font-size: 2.5rem;
+    }
+    
+    .status-title {
+        font-size: 1.4rem;
+    }
+    
+    .status-message {
+        font-size: 1rem;
+    }
+    
+    .booking-details,
+    .next-steps,
+    .voucher-warning {
+        padding: 20px 15px;
+        margin: 15px 0;
+    }
+    
+    .detail-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+    
+    .detail-value {
+        text-align: left;
+        font-weight: 600;
+    }
+}
+
+@media (max-width: 480px) {
+    .confirmation-status {
+        padding: 15px 10px;
+    }
+    
+    .status-icon {
+        font-size: 2rem;
+    }
+    
+    .status-title {
+        font-size: 1.2rem;
+    }
+    
+    .status-message {
+        font-size: 0.9rem;
+    }
+    
+    .booking-details h4,
+    .next-steps h4 {
+        font-size: 1.1rem;
+    }
+    
+    .next-steps li {
+        font-size: 0.9rem;
+    }
+}

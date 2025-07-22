@@ -168,12 +168,6 @@ class ViatorBookingSystem {
             viator_debug_log('Hold - Detailed Pricing:', $availability_data['selectedOption']['pricing']);
         }
         
-        // Adicionar totalPrice se disponível (necessário para evitar amount: 0.0 no token)
-        if ($total_price !== null) {
-            $request_data['totalPrice'] = $total_price;
-            viator_debug_log('Total Price adicionado à requisição de hold:', $total_price);
-        }
-        
         // Log completo da requisição
         viator_debug_log('Hold - Complete Request Data:', $request_data);
         viator_debug_log('Hold - Request JSON:', json_encode($request_data, JSON_PRETTY_PRINT));
@@ -230,8 +224,8 @@ class ViatorBookingSystem {
             viator_debug_log('Hold - PaymentDataSubmissionUrl:', $data['paymentDataSubmissionUrl']);
         }
         
-        if (isset($data['cartId'])) {
-            viator_debug_log('Hold - CartId:', $data['cartId']);
+        if (isset($data['cartRef'])) {
+            viator_debug_log('Hold - CartRef:', $data['cartRef']);
         }
         
         if (isset($data['totalPrice'])) {
@@ -431,13 +425,57 @@ class ViatorBookingSystem {
         
         $locale_settings = viator_get_locale_settings();
         
-        // Dados do corpo da requisição para a API
+        // Usar cart_id passado diretamente como cart_ref (é o cartRef da Viator)
+        $cart_ref = $cart_id;
+        
+        // Obter partner_booking_ref se passado, senão gerar novo
+        $booking_ref = isset($_POST['partner_booking_ref']) ? sanitize_text_field($_POST['partner_booking_ref']) : ('BOOK_' . $this->generate_unique_id());
+        
+        if (empty($cart_ref)) {
+            viator_debug_log('ERRO CRÍTICO: cart_ref não fornecido na requisição de confirmação');
+            return array('error' => 'Referência do carrinho não encontrada. Tente fazer a reserva novamente.');
+        }
+        
+        // Log para depuração das referências
+        viator_debug_log('Booking Confirmation References:', [
+            'cart_ref' => $cart_ref,
+            'booking_ref' => $booking_ref
+        ]);
+        
+        // Obter referências da resposta do hold salva
+        $hold_response = $this->last_hold_response ?? [];
+        $hold_items = $hold_response['items'] ?? [];
+        
+        // Construir array items para confirmação
+        $confirm_items = [];
+        foreach ($hold_items as $item) {
+            $confirm_items[] = [
+                'bookingRef' => $item['bookingRef'],
+                'partnerBookingRef' => $item['partnerBookingRef'] ?? ('BOOK_' . $this->generate_unique_id())
+            ];
+        }
+        
+        // Se não houver itens do hold, usar fallback
+        if (empty($confirm_items)) {
+            $booking_ref = isset($_POST['partner_booking_ref']) ? sanitize_text_field($_POST['partner_booking_ref']) : ('BOOK_' . $this->generate_unique_id());
+            $confirm_items = [[
+                'partnerBookingRef' => $booking_ref
+            ]];
+        }
+        
+        // Estruturar dados conforme documentação da API da Viator
         $request_data = array(
-            'partnerCartRef' => $cart_id,
-            'bookerInfo' => $booker_info,
-            'paymentDetails' => array(
-                'paymentToken' => $payment_token
-            )
+            'cartRef' => $cart_ref,
+            'bookerInfo' => array(
+                'firstName' => $booker_info['firstname'],
+                'lastName' => $booker_info['lastname']
+            ),
+            'communication' => array(
+                'email' => $booker_info['email'],
+                'phone' => $booker_info['phone']
+            ),
+            'items' => $confirm_items,
+            'paymentToken' => $payment_token
         );
         
         // Log para depuração

@@ -547,6 +547,17 @@ class ViatorBookingManager {
                 break;
             case 4:
                 content.innerHTML = this.getConfirmationStepHTML();
+                // Se já temos dados de confirmação, exibir imediatamente
+                if (this.bookingData.confirmationData) {
+                    console.log('🎨 Exibindo confirmação na etapa 4 com dados existentes');
+                    this.displayConfirmationMessage(this.bookingData.confirmationData);
+                } else if (this.bookingData.paymentToken) {
+                    // Se temos token de pagamento mas não confirmação, fazer confirmação agora
+                    console.log('🎯 Iniciando confirmação na etapa 4');
+                    this.confirmBooking();
+                } else {
+                    console.error('❌ Chegou na etapa 4 sem token de pagamento!');
+                }
                 break;
         }
         
@@ -1732,6 +1743,7 @@ class ViatorBookingManager {
         const bookerFirstname = document.getElementById('booker-firstname');
         const bookerLastname = document.getElementById('booker-lastname');
         const bookerEmail = document.getElementById('booker-email');
+        const bookerPhone = document.getElementById('booker-phone');
         
         if (!bookerFirstname?.value.trim()) {
             this.showDateError('Por favor, informe o nome do responsável pela reserva.');
@@ -1758,6 +1770,16 @@ class ViatorBookingManager {
             bookerEmail?.focus();
             return false;
         }
+        
+        // Armazenar dados do booker no bookingData para uso posterior
+        this.bookingData.bookerInfo = {
+            firstname: bookerFirstname.value.trim(),
+            lastname: bookerLastname.value.trim(),
+            email: bookerEmail.value.trim(),
+            phone: bookerPhone?.value.trim() || ''
+        };
+        
+        console.log('✅ Dados do responsável armazenados:', this.bookingData.bookerInfo);
         
         return true;
     }
@@ -1862,9 +1884,8 @@ class ViatorBookingManager {
             const paymentResult = await this.submitPayment();
             if (!paymentResult) return false;
             
-            // Finalmente, confirmar a reserva
-            const confirmResult = await this.confirmBooking();
-            return confirmResult;
+            console.log('✅ Pagamento processado com sucesso, pronto para confirmação na etapa 4');
+            return true;
             
         } catch (error) {
             this.showDateError('Erro no processamento do pagamento: ' + error.message);
@@ -1908,21 +1929,36 @@ class ViatorBookingManager {
             
             if (data.success) {
                 console.log('📋 Dados recebidos do PHP:', data.data);
+                console.log('🔍 cartRef da API presente:', !!data.data.cartRef);
+                console.log('🔍 Valor do cartRef da API:', data.data.cartRef);
                 console.log('🔍 partnerCartRef presente:', !!data.data.partnerCartRef);
                 console.log('🔍 Valor do partnerCartRef:', data.data.partnerCartRef);
                 
                 this.bookingData.holdData = data.data;
                 
-                // Mapear partnerCartRef para cartId para compatibilidade
-                if (data.data.partnerCartRef) {
+                // CRÍTICO: Usar o cartRef real retornado pela API da Viator, não o partnerCartRef
+                if (data.data.cartRef) {
+                    // O cartRef já está correto na resposta da API
+                    console.log('✅ CartRef da API encontrado:', data.data.cartRef);
+                    this.bookingData.holdData.cartId = data.data.cartRef;
+                } else if (data.data.partnerCartRef) {
+                    // Fallback: usar partnerCartRef se cartRef não estiver disponível
                     this.bookingData.holdData.cartId = data.data.partnerCartRef;
-                    console.log('✅ Mapeamento realizado - cartId:', this.bookingData.holdData.cartId);
+                    console.log('⚠️ Usando partnerCartRef como fallback:', data.data.partnerCartRef);
                 } else {
-                    console.error('❌ partnerCartRef não encontrado nos dados recebidos');
+                    console.error('❌ Nem cartRef nem partnerCartRef encontrados nos dados recebidos');
                 }
                 
                 // Armazenar timestamp de quando o hold foi criado
                 this.bookingData.holdCreatedAt = new Date().toISOString();
+                
+                // Extrair bookingRef da resposta (assumindo estrutura com items[0].bookingRef)
+                if (data.data.items && data.data.items.length > 0 && data.data.items[0].bookingRef) {
+                    this.bookingData.holdData.bookingRef = data.data.items[0].bookingRef;
+                    console.log('✅ BookingRef extraído:', this.bookingData.holdData.bookingRef);
+                } else {
+                    console.warn('⚠️ BookingRef não encontrado na resposta do hold');
+                }
                 console.log('✅ Hold realizado com sucesso para inicialização do pagamento');
                 console.log('🆔 Cart ID final definido:', this.bookingData.holdData.cartId);
                 
@@ -2138,9 +2174,17 @@ class ViatorBookingManager {
     
     async confirmBooking() {
         try {
+            console.log('🎯 confirmBooking iniciado');
+            
             // Usar dados do responsável coletados na segunda etapa
             const travelersData = this.collectDetailedTravelersData();
             const bookerInfo = travelersData.bookerInfo;
+            
+            console.log('📋 Dados para confirmação:', {
+                cartId: this.bookingData.holdData.cartId,
+                hasPaymentToken: !!this.bookingData.paymentToken,
+                bookerInfo: bookerInfo
+            });
 
             const response = await fetch(viatorBookingAjax.ajaxurl, {
                 method: 'POST',
@@ -2150,6 +2194,7 @@ class ViatorBookingManager {
                 body: new URLSearchParams({
                     action: 'viator_confirm_booking',
                     cart_id: this.bookingData.holdData.cartId,
+                    partner_booking_ref: this.bookingData.holdData.bookingRef || '',
                     payment_token: this.bookingData.paymentToken,
                     booker_info: JSON.stringify(bookerInfo),
                     nonce: viatorBookingAjax.nonce
@@ -2157,89 +2202,242 @@ class ViatorBookingManager {
             });
             
             const data = await response.json();
+            console.log('📥 Resposta da confirmação:', data);
             
             if (data.success) {
+                console.log('✅ Confirmação bem-sucedida, exibindo mensagem');
                 this.bookingData.confirmationData = data.data;
                 this.displayConfirmationMessage(data.data);
                 return true;
             } else {
+                console.error('❌ Erro na confirmação:', data);
                 const reasons = data.data.reasons ? data.data.reasons.map(r => r.message).join(', ') : 'Detalhes não fornecidos.';
                 this.showDateError(`Erro na confirmação: ${data.data.message} (${reasons})`);
                 return false;
             }
         } catch (error) {
+            console.error('❌ Erro de conexão na confirmação:', error);
             this.showDateError('Erro de conexão na confirmação.');
             return false;
         }
     }
     
     displayConfirmationMessage(data) {
+        console.log('🎨 displayConfirmationMessage chamado com dados:', data);
+        
         const container = document.querySelector('.confirmation-message');
-        if (!container) return;
+        console.log('📦 Container encontrado:', !!container);
+        
+        if (!container) {
+            console.error('❌ Container .confirmation-message não encontrado!');
+            return;
+        }
 
         const status = data.custom_data?.confirmationStatus || 'UNKNOWN';
         const isRestricted = data.custom_data?.isVoucherRestrictionRequired || false;
-        const bookingRef = data.bookingInfo?.bookingRef || 'N/A';
-
+        const bookingInfo = data.bookingInfo || {};
+        const bookingRef = bookingInfo.bookingRef || 'N/A';
+        const voucherInfo = bookingInfo.voucherInfo || {};
+        const itemSummary = bookingInfo.itemSummary || {};
+        
+        console.log('📊 Status da confirmação:', status);
+        console.log('🔒 Voucher restrito:', isRestricted);
+        console.log('📋 Referência da reserva:', bookingRef);
+        
+        // Extrair informações adicionais
+        const productName = this.bookingData?.productTitle || 'Experiência';
+        const travelDate = this.bookingData?.travelDate || 'Data não especificada';
+        const totalPrice = itemSummary.totalPrice || this.bookingData?.selectedOption?.totalPrice;
+        const currency = totalPrice?.currency || 'USD';
+        const amount = totalPrice?.price?.recommendedRetailPrice || totalPrice?.recommendedRetailPrice || 0;
+        
+        // Informações do responsável
+        const bookerData = this.collectDetailedTravelersData()?.bookerInfo || {};
+        const bookerEmail = bookerData.email || 'Email não informado';
+        
         let html = '';
 
         if (status === 'CONFIRMED') {
             html = `
                 <div class="confirmation-success">
-                    <div class="success-icon">✓</div>
-                    <h3>Reserva Confirmada!</h3>
-                    <p>Sua reserva foi processada com sucesso. Um email de confirmação foi enviado para você.</p>
-                    <p><strong>Referência da Reserva:</strong> ${bookingRef}</p>
+                    <div class="confirmation-header">
+                        <div class="success-icon">✓</div>
+                        <h3>🎉 Reserva Confirmada!</h3>
+                        <p class="confirmation-subtitle">Sua experiência foi reservada com sucesso</p>
+                    </div>
+                    
+                    <div class="booking-details-card">
+                        <div class="detail-row">
+                            <span class="detail-label">📋 Referência da Reserva:</span>
+                            <span class="detail-value booking-ref">${bookingRef}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">🎯 Experiência:</span>
+                            <span class="detail-value">${productName}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">📅 Data da Viagem:</span>
+                            <span class="detail-value">${this.formatDate(travelDate)}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">💰 Valor Total:</span>
+                            <span class="detail-value price">${currency} ${amount.toFixed(2)}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">📧 Email de Confirmação:</span>
+                            <span class="detail-value">${bookerEmail}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="next-steps">
+                        <h4>📋 Próximos Passos:</h4>
+                        <ul>
+                            <li>✅ Um email de confirmação foi enviado para <strong>${bookerEmail}</strong></li>
+                            <li>📱 Você receberá seu voucher por email em breve</li>
+                            <li>🎫 Apresente o voucher no dia da experiência</li>
+                            <li>📞 Em caso de dúvidas, entre em contato conosco</li>
+                        </ul>
+                    </div>
             `;
+            
             if (isRestricted) {
-                html += `<p class="voucher-notice"><strong>Atenção:</strong> Por motivos de segurança, seu voucher será enviado para o seu email e não está disponível para download imediato.</p>`;
+                html += `
+                    <div class="voucher-restriction-notice">
+                        <div class="restriction-icon">🔒</div>
+                        <div class="restriction-content">
+                            <h5>Voucher com Restrição de Segurança</h5>
+                            <p>Por motivos de segurança, seu voucher será enviado diretamente para seu email e não estará disponível para download imediato. Isso é uma medida de proteção contra fraudes.</p>
+                        </div>
+                    </div>
+                `;
             }
+            
             html += `</div>`;
+            
         } else if (status === 'PENDING') {
             html = `
                 <div class="confirmation-pending">
-                    <div class="pending-icon">…</div>
-                    <h3>Reserva Pendente!</h3>
-                    <p>Sua reserva foi recebida e está aguardando confirmação do fornecedor. Isso pode levar até 48 horas.</p>
-                    <p>Você receberá um email assim que o status for atualizado. Seu cartão <strong>não foi cobrado</strong> ainda, apenas uma pré-autorização foi feita.</p>
-                    <p><strong>Referência da Reserva:</strong> ${bookingRef}</p>
+                    <div class="confirmation-header">
+                        <div class="pending-icon">⏳</div>
+                        <h3>⏰ Reserva Pendente</h3>
+                        <p class="confirmation-subtitle">Aguardando confirmação do fornecedor</p>
+                    </div>
+                    
+                    <div class="booking-details-card">
+                        <div class="detail-row">
+                            <span class="detail-label">📋 Referência da Reserva:</span>
+                            <span class="detail-value booking-ref">${bookingRef}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">🎯 Experiência:</span>
+                            <span class="detail-value">${productName}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">📅 Data da Viagem:</span>
+                            <span class="detail-value">${this.formatDate(travelDate)}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">💳 Status do Pagamento:</span>
+                            <span class="detail-value">Pré-autorizado (não cobrado ainda)</span>
+                        </div>
+                    </div>
+                    
+                    <div class="pending-info">
+                        <h4>ℹ️ Informações Importantes:</h4>
+                        <ul>
+                            <li>⏱️ A confirmação pode levar até <strong>48 horas</strong></li>
+                            <li>💳 Seu cartão foi apenas <strong>pré-autorizado</strong>, não cobrado</li>
+                            <li>📧 Você receberá um email assim que o status for atualizado</li>
+                            <li>✅ A cobrança só será efetivada após a confirmação</li>
+                        </ul>
+                    </div>
                 </div>
             `;
+            
         } else { // FAILED, CANCELLED, etc.
-             html = `
+            html = `
                 <div class="confirmation-error">
-                    <div class="error-icon">!</div>
-                    <h3>Falha na Reserva</h3>
-                    <p>Não foi possível completar sua reserva. Por favor, verifique os detalhes e tente novamente.</p>
+                    <div class="confirmation-header">
+                        <div class="error-icon">❌</div>
+                        <h3>❌ Falha na Reserva</h3>
+                        <p class="confirmation-subtitle">Não foi possível completar sua reserva</p>
+                    </div>
+                    
+                    <div class="error-details">
+                        <p>Ocorreu um problema durante o processamento da sua reserva. Por favor, verifique os detalhes e tente novamente.</p>
+                        
+                        <div class="error-actions">
+                            <h4>💡 O que você pode fazer:</h4>
+                            <ul>
+                                <li>🔄 Tente novamente em alguns minutos</li>
+                                <li>💳 Verifique os dados do seu cartão</li>
+                                <li>📞 Entre em contato conosco se o problema persistir</li>
+                            </ul>
+                        </div>
+                    </div>
                 </div>
             `;
         }
         
         container.innerHTML = html;
+        
+        // Adicionar animação de entrada
+        setTimeout(() => {
+            container.classList.add('confirmation-loaded');
+        }, 100);
     }
     
     collectDetailedTravelersData() {
-        // Coletar informações do responsável pela reserva
-        const bookerFirstname = document.getElementById('booker-firstname')?.value || '';
-        const bookerLastname = document.getElementById('booker-lastname')?.value || '';
-        const bookerEmail = document.getElementById('booker-email')?.value || '';
-        const bookerPhone = document.getElementById('booker-phone')?.value || '';
-        
         // Usar dados dos viajantes já armazenados (paxMix)
         const paxMix = this.bookingData.selectedTravelers || this.collectTravelersData();
+        
+        // Usar dados do booker armazenados ou tentar coletar do DOM (fallback)
+        let bookerInfo = this.bookingData.bookerInfo;
+        
+        if (!bookerInfo) {
+            // Fallback: tentar coletar do DOM se ainda não foram armazenados
+            const bookerFirstname = document.getElementById('booker-firstname')?.value || '';
+            const bookerLastname = document.getElementById('booker-lastname')?.value || '';
+            const bookerEmail = document.getElementById('booker-email')?.value || '';
+            const bookerPhone = document.getElementById('booker-phone')?.value || '';
+            
+            bookerInfo = {
+                firstname: bookerFirstname,
+                lastname: bookerLastname,
+                email: bookerEmail,
+                phone: bookerPhone
+            };
+        }
+        
+        console.log('📋 Dados coletados do responsável:', bookerInfo);
         
         return {
             // Informações dos viajantes (apenas quantidades por faixa etária)
             paxMix: paxMix,
             
             // Informações do responsável principal pela reserva
-            bookerInfo: {
-                firstname: bookerFirstname,
-                lastname: bookerLastname,
-                email: bookerEmail,
-                phone: bookerPhone
-            }
+            bookerInfo: bookerInfo
         };
+    }
+    
+    /**
+     * Formatar data para exibição amigável
+     */
+    formatDate(dateString) {
+        if (!dateString) return 'Data não especificada';
+        
+        try {
+            const date = new Date(dateString);
+            const options = {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            };
+            return date.toLocaleDateString('pt-BR', options);
+        } catch (error) {
+            return dateString; // Retorna a string original se não conseguir formatar
+        }
     }
     
     setupPriceUpdater() {
