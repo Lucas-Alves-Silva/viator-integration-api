@@ -2253,10 +2253,147 @@ function viator_get_product_details($product_code) {
 }
 
 /**
+ * Get raw product data for JavaScript
+ */
+function viator_get_product_data($product_code) {
+    // Get API key from settings
+    $api_key = get_option('viator_api_key');
+    if (empty($api_key)) {
+        error_log('🔍 [BOOKING QUESTIONS DEBUG] API key not found');
+        return null;
+    }
+    
+    // Obter configurações de idioma e moeda
+    $locale_settings = viator_get_locale_settings();
+    
+    // API endpoint
+    $url = add_query_arg('currencyCode', $locale_settings['currency'], "https://api.sandbox.viator.com/partner/products/{$product_code}");
+    error_log('🔍 [BOOKING QUESTIONS DEBUG] Fetching product data from: ' . $url);
+    
+    // Make API request
+    $response = wp_remote_get($url, [
+        'headers' => [
+            'Accept'           => 'application/json;version=2.0',
+            'Content-Type'     => 'application/json;version=2.0',
+            'exp-api-key'      => $api_key,
+            'Accept-Language'  => $locale_settings['language'],
+        ],
+        'timeout' => 120,
+    ]);
+    
+    // Check for errors
+    if (is_wp_error($response)) {
+        error_log('🔍 [BOOKING QUESTIONS DEBUG] API request error: ' . $response->get_error_message());
+        return null;
+    }
+    
+    // Parse response
+    $body = wp_remote_retrieve_body($response);
+    $product = json_decode($body, true);
+    
+    // Check if product exists
+    if (empty($product) || isset($product['error'])) {
+        error_log('🔍 [BOOKING QUESTIONS DEBUG] Product not found or API error for code: ' . $product_code);
+        return null;
+    }
+    
+    error_log('🔍 [BOOKING QUESTIONS DEBUG] Product data retrieved successfully for: ' . $product_code);
+    error_log('🔍 [BOOKING QUESTIONS DEBUG] Product data keys: ' . implode(', ', array_keys($product)));
+    
+    return $product;
+}
+
+/**
  * Add timezone formatter script and reviews script
  */
 function viator_enqueue_product_scripts() {
+    global $post;
+    error_log('🔍 [BOOKING QUESTIONS DEBUG] viator_enqueue_product_scripts called');
+    error_log('🔍 [BOOKING QUESTIONS DEBUG] Post object: ' . (is_a($post, 'WP_Post') ? 'WP_Post' : 'not WP_Post'));
+    if (is_a($post, 'WP_Post')) {
+        error_log('🔍 [BOOKING QUESTIONS DEBUG] Post content has viator_product shortcode: ' . (has_shortcode($post->post_content, 'viator_product') ? 'YES' : 'NO'));
+        error_log('🔍 [BOOKING QUESTIONS DEBUG] Post content preview: ' . substr($post->post_content, 0, 200));
+    }
+    if (is_a($post, 'WP_Post') && has_shortcode($post->post_content, 'viator_product')) {
+        error_log('🔍 [BOOKING QUESTIONS DEBUG] Inside shortcode detection block - enqueuing scripts');
+        wp_enqueue_script(
+            'viator-booking-js',
+            plugin_dir_url(__FILE__) . 'viator-booking.js',
+            array('jquery', 'viator-payment-lib'),
+            '1.0.1',
+            true
+        );
+
+        wp_enqueue_style(
+            'viator-booking-css',
+            plugin_dir_url(__FILE__) . 'viator-booking.css',
+            array(),
+            '1.0.1'
+        );
+
+        wp_localize_script('viator-booking-js', 'viatorBookingAjax', array(
+            'ajaxurl' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('viator_booking_nonce'),
+            'environment' => 'sandbox' // Change to 'production' when ready
+        ));
+        error_log('🔍 [BOOKING QUESTIONS DEBUG] Scripts enqueued successfully');
+    }
     wp_enqueue_script('timezone-formatter', plugin_dir_url(__FILE__) . 'timezone-formatter.js', array('jquery'), '1.0.0', true);
+
+    // Adicionar dados de booking questions para o JavaScript se estivermos em uma página de produto
+    if (is_a($post, 'WP_Post') && has_shortcode($post->post_content, 'viator_product')) {
+        error_log('🔍 [BOOKING QUESTIONS DEBUG] Starting product data extraction');
+        // Extrair o código do produto do shortcode
+        $pattern = '/\[viator_product\s+product_code=["\']([^"\'\']+)["\'][^\]]*\]/i';
+        error_log('🔍 [BOOKING QUESTIONS DEBUG] Regex pattern: ' . $pattern);
+        error_log('🔍 [BOOKING QUESTIONS DEBUG] Post content for regex: ' . $post->post_content);
+        if (preg_match($pattern, $post->post_content, $matches)) {
+            $product_code = $matches[1];
+            error_log('🔍 [BOOKING QUESTIONS DEBUG] Product code extracted: ' . $product_code);
+            
+            // Obter dados do produto
+            $product_data = viator_get_product_data($product_code);
+            if ($product_data) {
+                // Log de depuração
+                error_log('🔍 [BOOKING QUESTIONS DEBUG] Product Code: ' . $product_code);
+                error_log('🔍 [BOOKING QUESTIONS DEBUG] Product data keys: ' . implode(', ', array_keys($product_data)));
+                error_log('🔍 [BOOKING QUESTIONS DEBUG] Has bookingQuestions: ' . (isset($product_data['bookingQuestions']) ? 'YES' : 'NO'));
+                if (isset($product_data['bookingQuestions'])) {
+                    error_log('🔍 [BOOKING QUESTIONS DEBUG] BookingQuestions count: ' . count($product_data['bookingQuestions']));
+                    error_log('🔍 [BOOKING QUESTIONS DEBUG] BookingQuestions data: ' . json_encode($product_data['bookingQuestions']));
+                }
+                
+                // Preparar dados para JavaScript
+                $js_data = [];
+                
+                // Adicionar booking questions se disponíveis
+                if (isset($product_data['bookingQuestions'])) {
+                    $js_data['bookingQuestions'] = $product_data['bookingQuestions'];
+                    error_log('🔍 [BOOKING QUESTIONS DEBUG] Added to js_data: ' . json_encode($js_data['bookingQuestions']));
+                }
+                
+                // Adicionar language guides se disponíveis
+                if (isset($product_data['languageGuides'])) {
+                    $js_data['languageGuides'] = $product_data['languageGuides'];
+                }
+                
+                // Adicionar script inline com os dados do produto
+                if (!empty($js_data)) {
+                    $script = 'window.productData = ' . json_encode($js_data) . ';';
+                    $script .= 'console.log("📋 Dados do produto disponibilizados para JavaScript:", window.productData);';
+                    $script .= 'console.log("🔍 [BOOKING QUESTIONS DEBUG] BookingQuestions available:", window.productData.bookingQuestions ? "YES (" + window.productData.bookingQuestions.length + ")" : "NO");';
+                    wp_add_inline_script('viator-booking-js', $script, 'before');
+                } else {
+                    error_log('🔍 [BOOKING QUESTIONS DEBUG] js_data is empty, no script added');
+                }
+            } else {
+                error_log('🔍 [BOOKING QUESTIONS DEBUG] Product data is null for code: ' . $product_code);
+            }
+        } else {
+            error_log('🔍 [BOOKING QUESTIONS DEBUG] Product code NOT extracted from shortcode. Regex failed.');
+            error_log('🔍 [BOOKING QUESTIONS DEBUG] Post content length: ' . strlen($post->post_content));
+        }
+    }
     
     // Adicionar script inline para função de cópia
     wp_add_inline_script('timezone-formatter', '

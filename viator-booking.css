@@ -3085,3 +3085,298 @@ body.viator-modal-open {
         font-size: 0.9rem;
     }
 }
+
+/* ===== ESTILOS PARA PERGUNTAS DE RESERVA ===== */
+
+/* Container das perguntas de reserva */
+.booking-questions-section {
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 25px;
+    margin: 20px 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.booking-questions-section h4 {
+    color: #0056b3;
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin: 0 0 20px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Grupos de perguntas */
+.booking-question-group {
+    margin-bottom: 20px;
+}
+
+.booking-question-group:last-child {
+    margin-bottom: 0;
+}
+
+.booking-question-group label {
+    display: block;
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.booking-question-group label .required-mark {
+    color: #dc3545;
+    margin-left: 2px;
+}
+
+/* Campos de entrada padrão */
+.booking-question-group input[type="text"],
+.booking-question-group input[type="number"],
+.booking-question-group input[type="date"],
+.booking-question-group select,
+.booking-question-group textarea {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #495057;
+    background: white;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+
+.booking-question-group input:focus,
+.booking-question-group select:focus,
+.booking-question-group textarea:focus {
+    outline: none;
+    border-color: #0056b3;
+    box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.1);
+}
+
+.booking-question-group textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+/* Campos com unidade */
+.question-with-unit {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.question-with-unit input {
+    flex: 1;
+}
+
+.question-with-unit select {
+    flex: 0 0 120px;
+}
+
+/* ===== ESTILOS PARA PICKUP POINTS ===== */
+
+.pickup-point-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.pickup-option {
+    position: relative;
+}
+
+.pickup-option input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.pickup-option label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: white;
+    font-weight: 500;
+    margin-bottom: 0;
+}
+
+.pickup-option label:hover {
+    border-color: #0056b3;
+    background: #f8f9ff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 86, 179, 0.1);
+}
+
+.pickup-option input[type="radio"]:checked + label {
+    border-color: #28a745;
+    background: #f8fff9;
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.15);
+}
+
+.pickup-option input[type="radio"]:checked + label .pickup-icon {
+    transform: scale(1.2);
+}
+
+.pickup-icon {
+    font-size: 18px;
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+}
+
+.pickup-text {
+    flex: 1;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+/* Campo "Outro local" */
+.other-pickup-input {
+    margin-top: 12px;
+    padding: 16px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+}
+
+.other-pickup-field {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e9ecef;
+    border-radius: 6px;
+    font-size: 14px;
+    background: white;
+    transition: border-color 0.2s ease;
+}
+
+.other-pickup-field:focus {
+    outline: none;
+    border-color: #0056b3;
+    box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.1);
+}
+
+/* ===== ESTILOS PARA SELEÇÃO DE IDIOMA ===== */
+
+.language-guide-selector {
+    position: relative;
+}
+
+.language-guide-selector select {
+    padding-left: 45px;
+    background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23495057"><path d="M12.87 15.07l-2.54-2.51.03-.03c1.74-1.94 2.98-4.17 3.71-6.53H17V4h-7V2H8v2H1v1.99h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg>');
+    background-repeat: no-repeat;
+    background-position: 16px center;
+    background-size: 20px;
+}
+
+/* Seções de viajantes */
+.traveler-questions-section {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.traveler-questions-section:last-child {
+    margin-bottom: 0;
+}
+
+.traveler-questions-section h5 {
+    color: #0056b3;
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0 0 15px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.traveler-booking-questions {
+    background: white;
+    border-radius: 8px;
+    padding: 15px;
+}
+
+.traveler-booking-questions h5 {
+    color: #495057;
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 15px 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Mensagens de erro */
+.booking-question-group .error-message {
+    color: #dc3545;
+    font-size: 12px;
+    margin-top: 5px;
+    display: none;
+}
+
+.booking-question-group .error-message.show {
+    display: block;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .booking-questions-section {
+        padding: 20px 15px;
+        margin: 15px 0;
+    }
+    
+    .pickup-option label {
+        padding: 14px 16px;
+        gap: 10px;
+    }
+    
+    .pickup-text {
+        font-size: 13px;
+    }
+    
+    .question-with-unit {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .question-with-unit select {
+        flex: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .booking-questions-section {
+        padding: 15px 10px;
+    }
+    
+    .pickup-option label {
+        padding: 12px 14px;
+        gap: 8px;
+    }
+    
+    .pickup-icon {
+        font-size: 16px;
+    }
+    
+    .pickup-text {
+        font-size: 12px;
+    }
+    
+    .other-pickup-input {
+        padding: 12px;
+    }
+    
+    .traveler-questions-section {
+        padding: 15px;
+    }
+}

@@ -3682,27 +3682,7 @@ function viator_enqueue_booking_scripts() {
             return $tag;
         }, 10, 3);
         
-        wp_enqueue_script(
-            'viator-booking-js',
-            plugin_dir_url(__FILE__) . 'viator-booking.js',
-            array('jquery', 'viator-payment-lib'),
-            '1.0.1',
-            true
-        );
-        
-        wp_enqueue_style(
-            'viator-booking-css',
-            plugin_dir_url(__FILE__) . 'viator-booking.css',
-            array(),
-            '1.0.1'
-        );
-        
-        // Localizar script para AJAX
-        wp_localize_script('viator-booking-js', 'viatorBookingAjax', array(
-            'ajaxurl' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('viator_booking_nonce'),
-            'environment' => 'sandbox' // Change to 'production' when ready
-        ));
+
     }
 }
 add_action('wp_enqueue_scripts', 'viator_enqueue_booking_scripts');

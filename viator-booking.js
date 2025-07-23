@@ -21,9 +21,9 @@ class CustomCalendar {
             onChange: () => {},
             onReady: () => {},
             ...options
-        };
-        
-        this.selectedDate = null;
+        }
+          
+          this.selectedDate = null;
         this.currentMonth = new Date().getMonth();
         this.currentYear = new Date().getFullYear();
         this.isVisible = false;
@@ -330,6 +330,8 @@ class ViatorBookingManager {
         this.availableDates = new Set(); // Armazenar datas disponíveis
         this.steps = ['availability', 'travelers', 'payment', 'confirmation'];
         this.ageBands = []; // Array para armazenar as regras de viajantes
+        this.bookingQuestions = []; // Armazenar perguntas de reserva do endpoint /products/booking-questions
+        this.pageBookingQuestions = []; // Armazenar perguntas de reserva da página de produto único
     }
     
     init() {
@@ -412,11 +414,14 @@ class ViatorBookingManager {
     }
     
     /**
-     * Raspa os dados das faixas etárias da página de produto único
+     * Raspa os dados das faixas etárias e perguntas de reserva da página de produto único
      */
     scrapeAgeBandsFromPage() {
         console.log('🔍 scrapeAgeBandsFromPage chamado');
         this.ageBands = []; // Limpa dados anteriores
+        this.pageBookingQuestions = []; // Limpa dados anteriores de perguntas
+        
+        // Extrair age bands
         const bandElements = document.querySelectorAll('.age-bands-list li');
         console.log('📋 Elementos de age bands encontrados:', bandElements.length);
         
@@ -436,7 +441,159 @@ class ViatorBookingManager {
             this.ageBands.push(bandData);
         });
         
+        // Extrair booking questions da página
+        this.extractBookingQuestionsFromPage();
+        
         console.log('✅ AgeBands extraídos:', this.ageBands);
+        console.log('✅ Booking Questions da página extraídos:', this.pageBookingQuestions);
+    }
+
+    /**
+     * Extrai os dados de booking questions da página de produto único
+     */
+    extractBookingQuestionsFromPage() {
+        console.log('🔍 extractBookingQuestionsFromPage chamado');
+        
+        // Procurar por um elemento que contenha os dados de booking questions
+        // Pode estar em um script tag ou data attribute
+        const bookingQuestionsElement = document.querySelector('[data-booking-questions]');
+        
+        if (bookingQuestionsElement) {
+            try {
+                const bookingQuestionsData = bookingQuestionsElement.getAttribute('data-booking-questions');
+                this.pageBookingQuestions = JSON.parse(bookingQuestionsData);
+                console.log('📋 Booking Questions extraídos do data attribute:', this.pageBookingQuestions);
+                return;
+            } catch (error) {
+                console.error('❌ Erro ao parsear booking questions do data attribute:', error);
+            }
+        }
+        
+        // Alternativa: procurar em scripts inline
+        const scripts = document.querySelectorAll('script');
+        for (const script of scripts) {
+            const scriptContent = script.textContent || script.innerHTML;
+            if (scriptContent.includes('bookingQuestions')) {
+                try {
+                    // Tentar extrair dados de variáveis JavaScript
+                    const match = scriptContent.match(/bookingQuestions[\s]*:[\s]*\[(.*?)\]/s);
+                    if (match) {
+                        const questionsJson = '[' + match[1] + ']';
+                        this.pageBookingQuestions = JSON.parse(questionsJson);
+                        console.log('📋 Booking Questions extraídos do script:', this.pageBookingQuestions);
+                        return;
+                    }
+                } catch (error) {
+                    console.error('❌ Erro ao parsear booking questions do script:', error);
+                }
+            }
+        }
+        
+        // Se não encontrou, tentar buscar em window object
+        if (window.productData && window.productData.bookingQuestions) {
+            this.pageBookingQuestions = window.productData.bookingQuestions;
+            console.log('📋 Booking Questions extraídos do window.productData:', this.pageBookingQuestions);
+            return;
+        }
+        
+        console.log('⚠️ Nenhum booking question encontrado na página');
+    }
+    
+    /**
+     * Combina os dados de booking questions da página com os dados em cache
+     * para criar um array completo com todas as informações necessárias
+     */
+    async combinePageQuestionsWithCache() {
+        try {
+            // Obter dados em cache se disponíveis
+            const cachedData = this.getCachedBookingQuestions();
+            
+            if (!cachedData || !cachedData.length) {
+                console.log('📋 Sem dados em cache, usando apenas dados da página');
+                return this.pageBookingQuestions;
+            }
+            
+            console.log('🔄 Combinando dados da página com cache...');
+            
+            // Criar um mapa dos dados da página por ID para acesso rápido
+            const pageQuestionsMap = new Map();
+            this.pageBookingQuestions.forEach(question => {
+                if (question.id) {
+                    pageQuestionsMap.set(question.id, question);
+                }
+            });
+            
+            // Combinar dados: priorizar dados da página, complementar com cache
+            const combinedQuestions = [];
+            
+            // Primeiro, adicionar todas as perguntas da página
+            this.pageBookingQuestions.forEach(pageQuestion => {
+                combinedQuestions.push(pageQuestion);
+            });
+            
+            // Depois, adicionar perguntas do cache que não estão na página
+            cachedData.forEach(cachedQuestion => {
+                if (!pageQuestionsMap.has(cachedQuestion.id)) {
+                    combinedQuestions.push(cachedQuestion);
+                }
+            });
+            
+            console.log('✅ Dados combinados:', combinedQuestions);
+            return combinedQuestions;
+            
+        } catch (error) {
+            console.error('❌ Erro ao combinar dados da página com cache:', error);
+            return this.pageBookingQuestions || [];
+        }
+    }
+    
+    /**
+     * Obtém dados de booking questions do cache local
+     */
+    getCachedBookingQuestions() {
+        try {
+            const cacheKey = `viator_booking_questions_${this.bookingData.productCode}`;
+            const cachedData = localStorage.getItem(cacheKey);
+            
+            if (cachedData) {
+                const parsed = JSON.parse(cachedData);
+                // Verificar se o cache não expirou (24 horas)
+                const cacheTime = parsed.timestamp || 0;
+                const now = Date.now();
+                const cacheExpiry = 24 * 60 * 60 * 1000; // 24 horas
+                
+                if (now - cacheTime < cacheExpiry) {
+                    console.log('📦 Dados encontrados no cache local');
+                    return parsed.data || [];
+                } else {
+                    console.log('⏰ Cache expirado, removendo...');
+                    localStorage.removeItem(cacheKey);
+                }
+            }
+            
+            return null;
+        } catch (error) {
+            console.error('❌ Erro ao acessar cache local:', error);
+            return null;
+        }
+    }
+    
+    /**
+     * Salva dados de booking questions no cache local
+     */
+    saveCachedBookingQuestions(questions) {
+        try {
+            const cacheKey = `viator_booking_questions_${this.bookingData.productCode}`;
+            const cacheData = {
+                data: questions,
+                timestamp: Date.now()
+            };
+            
+            localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+            console.log('💾 Dados de booking questions salvos no cache local');
+        } catch (error) {
+            console.error('❌ Erro ao salvar no cache local:', error);
+        }
     }
     
     createBookingModal() {
@@ -539,7 +696,7 @@ class ViatorBookingManager {
                 break;
             case 2:
                 content.innerHTML = this.getTravelersStepHTML();
-                this.initializeTravelersStep();
+                await this.initializeTravelersStep();
                 break;
             case 3:
                 content.innerHTML = this.getPaymentStepHTML();
@@ -704,6 +861,12 @@ class ViatorBookingManager {
                             <input type="tel" id="booker-phone" name="booker_phone" class="form-control" maxlength="20" placeholder="(11) 99999-9999">
                         </div>
                     </div>
+                </div>
+                
+                <div class="booking-questions-section" id="booking-questions-container" style="display: none;">
+                    <h4>📝 Informações Adicionais</h4>
+                    <div id="general-booking-questions"></div>
+                    <div id="traveler-booking-questions"></div>
                 </div>
             </div>
         `;
@@ -979,7 +1142,7 @@ class ViatorBookingManager {
         }, 50);
     }
     
-    initializeTravelersStep() {
+    async initializeTravelersStep() {
         console.log('🚀 initializeTravelersStep chamado');
         console.log('📊 Dados armazenados:', {
             selectedTravelers: this.bookingData.selectedTravelers,
@@ -987,7 +1150,20 @@ class ViatorBookingManager {
             travelDate: this.bookingData.travelDate
         });
         
+        // Buscar perguntas de reserva se ainda não foram carregadas
+        if (this.bookingQuestions.length === 0) {
+            console.log('🔍 Buscando perguntas de reserva...');
+            await this.fetchBookingQuestions();
+        }
+        
         this.generateTravelersForm();
+        
+        // Renderizar perguntas de reserva após gerar o formulário
+        console.log('🔍 [DEBUG] Antes de chamar renderBookingQuestionsInTravelersStep');
+        console.log('🔍 [DEBUG] this.bookingQuestions antes da chamada:', this.bookingQuestions);
+        console.log('🔍 [DEBUG] window.productData antes da chamada:', window.productData);
+        this.renderBookingQuestionsInTravelersStep();
+        console.log('🔍 [DEBUG] Após chamar renderBookingQuestionsInTravelersStep');
         
         // Verificar se o resumo foi gerado
         const container = document.getElementById('travelers-summary');
@@ -1400,6 +1576,604 @@ class ViatorBookingManager {
         container.innerHTML = html;
         console.log('📋 Resumo dos viajantes gerado');
     }
+
+    /**
+     * Buscar perguntas de reserva do produto
+     */
+    async fetchBookingQuestions() {
+        console.log('🔍 [BOOKING QUESTIONS DEBUG] Iniciando fetchBookingQuestions...');
+        console.log('🔍 [BOOKING QUESTIONS DEBUG] pageBookingQuestions:', this.pageBookingQuestions);
+        console.log('🔍 [BOOKING QUESTIONS DEBUG] window.productData:', window.productData);
+        console.log('🔍 [BOOKING QUESTIONS DEBUG] productCode:', this.bookingData?.productCode);
+        
+        try {
+            // Primeiro, tentar usar os dados da página se disponíveis
+            if (this.pageBookingQuestions && this.pageBookingQuestions.length > 0) {
+                console.log('📋 [BOOKING QUESTIONS DEBUG] Usando booking questions da página:', this.pageBookingQuestions);
+                
+                // Combinar com dados em cache para obter informações completas
+                const combinedQuestions = await this.combinePageQuestionsWithCache();
+                this.bookingQuestions = combinedQuestions;
+                console.log('✅ [BOOKING QUESTIONS DEBUG] Perguntas de reserva combinadas (página + cache):', this.bookingQuestions);
+                return this.bookingQuestions;
+            }
+            
+            // Verificar se temos um código de produto válido
+            if (!this.bookingData?.productCode) {
+                console.error('❌ [BOOKING QUESTIONS DEBUG] Código do produto não disponível');
+                this.bookingQuestions = [];
+                return [];
+            }
+            
+            // Fallback: buscar via AJAX se não há dados na página
+            console.log('📡 [BOOKING QUESTIONS DEBUG] Buscando perguntas de reserva via AJAX...');
+            console.log('🔍 [BOOKING QUESTIONS DEBUG] viatorBookingAjax:', typeof viatorBookingAjax !== 'undefined' ? viatorBookingAjax : 'undefined');
+            
+            // Verificar se viatorBookingAjax está disponível
+            if (typeof viatorBookingAjax === 'undefined') {
+                console.error('❌ [BOOKING QUESTIONS DEBUG] viatorBookingAjax não está definido. Verifique se o script foi carregado corretamente.');
+                this.bookingQuestions = [];
+                return [];
+            }
+            
+            console.log('📡 [BOOKING QUESTIONS DEBUG] Fazendo requisição AJAX para:', viatorBookingAjax.ajaxurl);
+            console.log('📡 [BOOKING QUESTIONS DEBUG] Parâmetros da requisição:', {
+                action: 'viator_get_booking_questions',
+                product_code: this.bookingData.productCode,
+                nonce: viatorBookingAjax.nonce
+            });
+            
+            const response = await fetch(viatorBookingAjax.ajaxurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    action: 'viator_get_booking_questions',
+                    product_code: this.bookingData.productCode,
+                    nonce: viatorBookingAjax.nonce
+                })
+            });
+            
+            console.log('📡 [BOOKING QUESTIONS DEBUG] Status da resposta:', response.status, response.statusText);
+            
+            if (!response.ok) {
+                console.error('❌ [BOOKING QUESTIONS DEBUG] Resposta HTTP não OK:', response.status, response.statusText);
+                this.bookingQuestions = [];
+                return [];
+            }
+            
+            const data = await response.json();
+            console.log('🔍 [BOOKING QUESTIONS DEBUG] Resposta AJAX completa:', data);
+            
+            if (data.success) {
+                this.bookingQuestions = data.data.bookingQuestions || [];
+                console.log('🔍 [BOOKING QUESTIONS DEBUG] Perguntas extraídas da resposta:', this.bookingQuestions);
+                console.log('🔍 [BOOKING QUESTIONS DEBUG] Número de perguntas:', this.bookingQuestions.length);
+                
+                // Salvar no cache local para futuras consultas
+                this.saveCachedBookingQuestions(this.bookingQuestions);
+                
+                console.log('✅ [BOOKING QUESTIONS DEBUG] Perguntas de reserva carregadas via AJAX:', this.bookingQuestions);
+                return this.bookingQuestions;
+            } else {
+                console.error('❌ [BOOKING QUESTIONS DEBUG] Erro na resposta AJAX:', data.data?.message || 'Erro desconhecido');
+                console.error('❌ [BOOKING QUESTIONS DEBUG] Dados completos da resposta de erro:', data);
+                this.bookingQuestions = [];
+                return [];
+            }
+        } catch (error) {
+            console.error('❌ [BOOKING QUESTIONS DEBUG] Erro na requisição de perguntas de reserva:', error);
+            console.error('❌ [BOOKING QUESTIONS DEBUG] Stack trace:', error.stack);
+            this.bookingQuestions = [];
+            return [];
+        }
+    }
+
+    /**
+     * Renderizar perguntas de reserva gerais (PER_BOOKING)
+     */
+    renderGeneralBookingQuestions(perBookingQuestions = null) {
+        if (!perBookingQuestions) {
+            perBookingQuestions = this.bookingQuestions.filter(q => q.group === 'PER_BOOKING');
+        }
+        
+        if (perBookingQuestions.length === 0) {
+            return '';
+        }
+        
+        let html = '<div class="booking-questions-section"><h4>📝 Informações Adicionais da Reserva</h4>';
+        
+        perBookingQuestions.forEach(question => {
+            const questionId = `booking_question_${question.id}`;
+            const isRequired = question.required === 'MANDATORY';
+            const requiredMark = isRequired ? ' *' : '';
+            
+            html += '<div class="booking-question-group">';
+            html += `<label for="${questionId}">${question.label}${requiredMark}</label>`;
+            
+            html += this.renderQuestionField(question, questionId, isRequired, false, null);
+            
+            html += `<div class="error-message" id="error_${questionId}"></div>`;
+            html += '</div>';
+        });
+        
+        html += '</div>';
+        return html;
+    }
+
+    /**
+     * Renderizar perguntas de reserva por viajante (PER_TRAVELER)
+     */
+    renderTravelerBookingQuestions(travelerIndex) {
+        const perTravelerQuestions = this.bookingQuestions.filter(q => q.group === 'PER_TRAVELER');
+        
+        if (perTravelerQuestions.length === 0) {
+            return '';
+        }
+        
+        let html = '<div class="traveler-booking-questions"><h5>📋 Informações Específicas do Viajante</h5>';
+        
+        perTravelerQuestions.forEach(question => {
+            const questionId = `traveler_${travelerIndex}_question_${question.id}`;
+            const isRequired = question.required === 'MANDATORY';
+            const requiredMark = isRequired ? ' *' : '';
+            
+            html += '<div class="booking-question-group">';
+            html += `<label for="${questionId}">${question.label}${requiredMark}</label>`;
+            
+            html += this.renderQuestionField(question, questionId, isRequired, true, travelerIndex);
+            
+            html += `<div class="error-message" id="error_${questionId}"></div>`;
+            html += '</div>';
+        });
+        
+        html += '</div>';
+        return html;
+    }
+
+    /**
+     * Renderizar um campo de pergunta individual
+     */
+    renderQuestionField(question, questionId, isRequired, isTraveler, travelerIndex) {
+        let html = '';
+        const dataAttrs = `data-question-id="${question.id}" data-group="${question.group}" ${isTraveler ? `data-traveler="${travelerIndex}"` : ''}`;
+        const requiredAttr = isRequired ? 'required' : '';
+
+        switch (question.type) {
+            case 'STRING':
+                // Verificar se é uma pergunta de seleção de idioma
+                if (question.subType === 'LANGUAGE_GUIDE' || question.label.toLowerCase().includes('idioma') || question.label.toLowerCase().includes('language')) {
+                    html += this.renderLanguageGuideSelection(questionId, dataAttrs, requiredAttr);
+                } else if (question.allowedAnswers && question.allowedAnswers.length > 0) {
+                    html += `<select id="${questionId}" name="${questionId}" ${dataAttrs} ${requiredAttr}>`;
+                    html += '<option value="">Selecione uma opção</option>';
+                    question.allowedAnswers.forEach(answer => {
+                        html += `<option value="${answer}">${answer}</option>`;
+                    });
+                    html += '</select>';
+                } else {
+                    html += `<input type="text" id="${questionId}" name="${questionId}" ${dataAttrs} ${requiredAttr} maxlength="${question.maxLength || ''}">`;
+                }
+                break;
+
+            case 'NUMBER_AND_UNIT':
+                html += `<div class="question-with-unit">`;
+                html += `<input type="number" id="${questionId}" name="${questionId}" ${dataAttrs} ${requiredAttr}>`;
+                if (question.units && question.units.length > 0) {
+                    html += `<select name="${questionId}_unit" data-question-id="${question.id}" ${isTraveler ? `data-traveler="${travelerIndex}"` : ''}>`;
+                    question.units.forEach(unit => {
+                        html += `<option value="${unit}">${unit}</option>`;
+                    });
+                    html += `</select>`;
+                }
+                html += `</div>`;
+                break;
+
+            case 'LOCATION_REF_OR_FREE_TEXT':
+                // Verificar se é uma pergunta de ponto de encontro (PICKUP_POINT)
+                if (question.subType === 'PICKUP_POINT' || question.label.toLowerCase().includes('pickup') || question.label.toLowerCase().includes('encontro')) {
+                    html += this.renderPickupPointSelection(question, questionId, dataAttrs, requiredAttr);
+                } else {
+                    // Campo de texto livre para outras localizações
+                    html += `<input type="text" id="${questionId}" name="${questionId}" ${dataAttrs} ${requiredAttr} placeholder="${question.hint || 'Digite o local ou endereço'}">`;
+                }
+                break;
+
+            case 'DATE':
+                html += `<input type="date" id="${questionId}" name="${questionId}" ${dataAttrs} ${requiredAttr}>`;
+                break;
+
+            case 'TEXTAREA':
+                 html += `<textarea id="${questionId}" name="${questionId}" ${dataAttrs} rows="3" ${requiredAttr} placeholder="${question.hint || ''}"></textarea>`;
+                 break;
+
+            default:
+                html += `<input type="text" id="${questionId}" name="${questionId}" ${dataAttrs} ${requiredAttr} maxlength="${question.maxLength || ''}">`;
+        }
+
+        return html;
+    }
+
+    /**
+     * Renderizar seleção de guia de idioma
+     */
+    renderLanguageGuideSelection(questionId, dataAttrs, requiredAttr) {
+        let html = '';
+        
+        // Verificar se há languageGuides disponíveis
+        const languageGuides = window.productData?.languageGuides || [];
+        
+        if (languageGuides.length > 0) {
+            html += `<select id="${questionId}" name="${questionId}" ${dataAttrs} ${requiredAttr}>`;
+            html += '<option value="">Selecione o idioma da excursão</option>';
+            
+            languageGuides.forEach(guide => {
+                const languageName = this.getLanguageName(guide.language);
+                const serviceType = guide.type === 'AUDIO' ? '(Áudio)' : guide.type === 'GUIDE' ? '(Guia)' : '';
+                const optionText = `${languageName} ${serviceType}`.trim();
+                
+                html += `<option value="${guide.language}" data-type="${guide.type}">${optionText}</option>`;
+            });
+            
+            html += '</select>';
+        } else {
+            // Fallback para campo de texto se não há languageGuides
+            html += `<input type="text" id="${questionId}" name="${questionId}" ${dataAttrs} ${requiredAttr} placeholder="Digite o idioma preferido">`;
+        }
+        
+        return html;
+    }
+
+    /**
+     * Renderizar seleção de ponto de encontro
+     */
+    renderPickupPointSelection(question, questionId, dataAttrs, requiredAttr) {
+        let html = '';
+        
+        // Verificar se há opções predefinidas de pickup points
+        if (question.allowedAnswers && question.allowedAnswers.length > 0) {
+            html += `<div class="pickup-point-options">`;
+            
+            question.allowedAnswers.forEach((option, index) => {
+                const radioId = `${questionId}_${index}`;
+                html += `
+                    <div class="pickup-option">
+                        <input type="radio" id="${radioId}" name="${questionId}" value="${option}" ${dataAttrs} ${requiredAttr}>
+                        <label for="${radioId}">
+                            <span class="pickup-icon">📍</span>
+                            <span class="pickup-text">${option}</span>
+                        </label>
+                    </div>
+                `;
+            });
+            
+            // Adicionar opção "Outro local"
+            const otherRadioId = `${questionId}_other`;
+            html += `
+                <div class="pickup-option">
+                    <input type="radio" id="${otherRadioId}" name="${questionId}" value="other" ${dataAttrs}>
+                    <label for="${otherRadioId}">
+                        <span class="pickup-icon">✏️</span>
+                        <span class="pickup-text">Outro local</span>
+                    </label>
+                </div>
+            `;
+            
+            html += `</div>`;
+            
+            // Campo de texto para "Outro local"
+            html += `
+                <div class="other-pickup-input" style="display: none; margin-top: 10px;">
+                    <input type="text" id="${questionId}_other_text" placeholder="Digite o endereço ou ponto de referência" class="other-pickup-field">
+                </div>
+            `;
+            
+            // Adicionar script para mostrar/ocultar campo "Outro local"
+            html += `
+                <script>
+                (function() {
+                    const otherRadio = document.getElementById('${otherRadioId}');
+                    const otherInput = document.querySelector('.other-pickup-input');
+                    const otherTextField = document.getElementById('${questionId}_other_text');
+                    const allRadios = document.querySelectorAll('input[name="${questionId}"]');
+                    
+                    allRadios.forEach(radio => {
+                        radio.addEventListener('change', function() {
+                            if (this.value === 'other') {
+                                otherInput.style.display = 'block';
+                                otherTextField.required = ${requiredAttr ? 'true' : 'false'};
+                            } else {
+                                otherInput.style.display = 'none';
+                                otherTextField.required = false;
+                                otherTextField.value = '';
+                            }
+                        });
+                    });
+                })();
+                </script>
+            `;
+        } else {
+            // Campo de texto livre se não há opções predefinidas
+            html += `<input type="text" id="${questionId}" name="${questionId}" ${dataAttrs} ${requiredAttr} placeholder="${question.hint || 'Digite o local de encontro preferido'}">`;
+        }
+        
+        return html;
+    }
+
+    /**
+     * Obter nome amigável do idioma
+     */
+    getLanguageName(languageCode) {
+        const languageNames = {
+            'en': 'Inglês',
+            'es': 'Espanhol',
+            'fr': 'Francês',
+            'de': 'Alemão',
+            'it': 'Italiano',
+            'pt': 'Português',
+            'ru': 'Russo',
+            'ja': 'Japonês',
+            'ko': 'Coreano',
+            'zh': 'Chinês',
+            'ar': 'Árabe',
+            'hi': 'Hindi',
+            'th': 'Tailandês',
+            'vi': 'Vietnamita',
+            'tr': 'Turco',
+            'pl': 'Polonês',
+            'nl': 'Holandês',
+            'sv': 'Sueco',
+            'da': 'Dinamarquês',
+            'no': 'Norueguês',
+            'fi': 'Finlandês',
+            'cs': 'Tcheco',
+            'hu': 'Húngaro',
+            'ro': 'Romeno',
+            'bg': 'Búlgaro',
+            'hr': 'Croata',
+            'sk': 'Eslovaco',
+            'sl': 'Esloveno',
+            'et': 'Estoniano',
+            'lv': 'Letão',
+            'lt': 'Lituano',
+            'mt': 'Maltês',
+            'ga': 'Irlandês',
+            'cy': 'Galês',
+            'eu': 'Basco',
+            'ca': 'Catalão',
+            'gl': 'Galego'
+        };
+        
+        return languageNames[languageCode] || languageCode.toUpperCase();
+    }
+
+    /**
+     * Coletar respostas das perguntas de reserva
+     */
+    collectBookingQuestionAnswers() {
+        const answers = [];
+        
+        this.bookingQuestions.forEach(question => {
+            if (question.group === 'PER_BOOKING') {
+                // Perguntas gerais da reserva
+                const questionId = `booking_question_${question.id}`;
+                const answer = this.collectQuestionAnswer(question, questionId, false, null);
+                
+                if (answer) {
+                    answers.push(answer);
+                }
+            } else if (question.group === 'PER_TRAVELER') {
+                // Perguntas por viajante
+                if (this.bookingData.selectedTravelers) {
+                    this.bookingData.selectedTravelers.forEach((travelerGroup, groupIndex) => {
+                        for (let i = 0; i < travelerGroup.numberOfTravelers; i++) {
+                            const travelerIndex = groupIndex * 10 + i; // Índice único para cada viajante
+                            const questionId = `traveler_${travelerIndex}_question_${question.id}`;
+                            const answer = this.collectQuestionAnswer(question, questionId, true, travelerIndex);
+                            
+                            if (answer) {
+                                answer.travelerNum = travelerIndex + 1;
+                                answers.push(answer);
+                            }
+                        }
+                    });
+                }
+            }
+        });
+        
+        console.log('📝 Respostas das perguntas de reserva coletadas:', answers);
+        return answers;
+    }
+
+    /**
+     * Coletar resposta de uma pergunta específica
+     */
+    collectQuestionAnswer(question, questionId, isTraveler, travelerIndex) {
+        let answerValue = null;
+        let answerObj = null;
+        
+        // Verificar tipo de pergunta e coletar resposta apropriada
+        switch (question.type) {
+            case 'LOCATION_REF_OR_FREE_TEXT':
+                // Verificar se é PICKUP_POINT com opções de rádio
+                if (question.subType === 'PICKUP_POINT' || question.label.toLowerCase().includes('pickup') || question.label.toLowerCase().includes('encontro')) {
+                    const radioElements = document.querySelectorAll(`input[name="${questionId}"]:checked`);
+                    if (radioElements.length > 0) {
+                        const selectedValue = radioElements[0].value;
+                        if (selectedValue === 'other') {
+                            // Coletar valor do campo "Outro local"
+                            const otherTextField = document.getElementById(`${questionId}_other_text`);
+                            if (otherTextField && otherTextField.value.trim()) {
+                                answerValue = otherTextField.value.trim();
+                            }
+                        } else {
+                            answerValue = selectedValue;
+                        }
+                    }
+                } else {
+                    // Campo de texto normal
+                    const element = document.getElementById(questionId);
+                    if (element && element.value.trim()) {
+                        answerValue = element.value.trim();
+                    }
+                }
+                break;
+                
+            case 'STRING':
+                // Verificar se é seleção de idioma ou campo normal
+                const element = document.getElementById(questionId);
+                if (element && element.value.trim()) {
+                    answerValue = element.value.trim();
+                    
+                    // Se for seleção de idioma, adicionar informações extras
+                    if (question.subType === 'LANGUAGE_GUIDE' || question.label.toLowerCase().includes('idioma') || question.label.toLowerCase().includes('language')) {
+                        const selectedOption = element.options[element.selectedIndex];
+                        if (selectedOption && selectedOption.dataset.type) {
+                            answerObj = {
+                                question: question.id,
+                                answer: answerValue,
+                                languageType: selectedOption.dataset.type
+                            };
+                        }
+                    }
+                }
+                break;
+                
+            case 'NUMBER_AND_UNIT':
+                const numberElement = document.getElementById(questionId);
+                if (numberElement && numberElement.value.trim()) {
+                    answerValue = numberElement.value.trim();
+                    
+                    // Coletar unidade se disponível
+                    const unitElement = document.querySelector(`select[name="${questionId}_unit"]`);
+                    if (unitElement && unitElement.value) {
+                        answerObj = {
+                            question: question.id,
+                            answer: answerValue,
+                            unit: unitElement.value
+                        };
+                    }
+                }
+                break;
+                
+            default:
+                // Campos padrão (DATE, TEXTAREA, etc.)
+                const defaultElement = document.getElementById(questionId);
+                if (defaultElement && defaultElement.value.trim()) {
+                    answerValue = defaultElement.value.trim();
+                }
+                break;
+        }
+        
+        // Criar objeto de resposta se não foi criado ainda
+        if (answerValue && !answerObj) {
+            answerObj = {
+                question: question.id,
+                answer: answerValue
+            };
+            
+            // Adicionar unit se disponível (para compatibilidade)
+            if (question.unit) {
+                answerObj.unit = question.unit;
+            }
+        }
+        
+        return answerObj;
+    }
+    
+    /**
+     * Renderizar perguntas de reserva na etapa de viajantes
+     */
+    renderBookingQuestionsInTravelersStep() {
+        console.log('📝 [DEBUG] renderBookingQuestionsInTravelersStep chamada');
+        console.log('📝 [DEBUG] this.bookingQuestions:', this.bookingQuestions);
+        console.log('📝 [DEBUG] window.productData:', window.productData);
+        console.log('📝 Renderizando perguntas de reserva na etapa de viajantes...');
+
+        const container = document.getElementById('booking-questions-container');
+        if (!container) {
+            console.error('❌ Container de perguntas de reserva não encontrado!');
+            return;
+        }
+
+        // Limpar container antes de renderizar
+        container.innerHTML = '<div id="general-booking-questions"></div><div id="traveler-booking-questions"></div>';
+        container.style.display = 'none';
+
+        if (!this.bookingQuestions || this.bookingQuestions.length === 0) {
+            console.log('ℹ️ [DEBUG] Nenhuma pergunta de reserva encontrada para este produto.');
+            console.log('ℹ️ [DEBUG] this.bookingQuestions:', this.bookingQuestions);
+            console.log('ℹ️ [DEBUG] window.productData.bookingQuestions:', window.productData?.bookingQuestions);
+            // Adicionar uma mensagem de depuração visível na UI
+            const debugMessage = document.createElement('div');
+            debugMessage.className = 'debug-message';
+            debugMessage.innerHTML = `
+                <strong>Debug: Nenhuma pergunta de reserva para renderizar.</strong><br>
+                this.bookingQuestions: ${JSON.stringify(this.bookingQuestions)}<br>
+                window.productData.bookingQuestions: ${JSON.stringify(window.productData?.bookingQuestions)}
+            `;
+            container.appendChild(debugMessage);
+            container.style.display = 'block';
+            return;
+        }
+        
+        const generalContainer = document.getElementById('general-booking-questions');
+        const travelerContainer = document.getElementById('traveler-booking-questions');
+
+        if (!generalContainer || !travelerContainer) {
+            console.error('❌ Containers de perguntas de reserva não encontrados!');
+            return;
+        }
+        
+        // Renderizar perguntas gerais (PER_BOOKING)
+        const generalQuestions = this.bookingQuestions.filter(q => q.group === 'PER_BOOKING');
+        if (generalQuestions.length > 0) {
+            generalContainer.innerHTML = this.renderGeneralBookingQuestions(generalQuestions);
+        }
+        
+        // Renderizar perguntas por viajante (PER_TRAVELER)
+        const travelerQuestions = this.bookingQuestions.filter(q => q.group === 'PER_TRAVELER');
+        if (travelerQuestions.length > 0) {
+            let travelerQuestionsHTML = '';
+            
+            // Gerar perguntas para cada viajante
+            if (this.bookingData.selectedTravelers) {
+                this.bookingData.selectedTravelers.forEach((travelerGroup, groupIndex) => {
+                    for (let i = 0; i < travelerGroup.numberOfTravelers; i++) {
+                        const travelerIndex = groupIndex * 10 + i; // Índice único para cada viajante
+                        const travelerNumber = travelerIndex + 1;
+                        
+                        travelerQuestionsHTML += `<div class="traveler-questions-section">`;
+                        travelerQuestionsHTML += `<h5>👤 Viajante ${travelerNumber}</h5>`;
+                        travelerQuestionsHTML += this.renderTravelerBookingQuestions(travelerIndex);
+                        travelerQuestionsHTML += `</div>`;
+                    }
+                });
+            }
+            
+            travelerContainer.innerHTML = travelerQuestionsHTML;
+        }
+        
+        // Mostrar o container se há perguntas
+        if (generalQuestions.length > 0 || travelerQuestions.length > 0) {
+            container.style.display = 'block';
+            console.log(`✅ ${generalQuestions.length} perguntas gerais e ${travelerQuestions.length} perguntas por viajante renderizadas.`);
+        }
+    }
+    
+    /**
+     * Obter total de viajantes
+     */
+    getTotalTravelersCount() {
+        if (!this.bookingData.selectedTravelers) {
+            return 0;
+        }
+        
+        return this.bookingData.selectedTravelers.reduce((total, travelerGroup) => {
+            return total + travelerGroup.numberOfTravelers;
+        }, 0);
+    }
     
     // Função removida - não precisamos mais de formulários individuais para cada viajante
     
@@ -1654,6 +2428,13 @@ class ViatorBookingManager {
         this.bookingData.travelDate = travelDate;
 
         try {
+            // Verificar se viatorBookingAjax está disponível
+            if (typeof viatorBookingAjax === 'undefined') {
+                console.error('❌ viatorBookingAjax não está definido. Verifique se o script foi carregado corretamente.');
+                this.showDateError('Erro de configuração. Recarregue a página.');
+                return false;
+            }
+            
             const response = await fetch(viatorBookingAjax.ajaxurl, {
                 method: 'POST',
                 headers: {
@@ -1911,6 +2692,12 @@ class ViatorBookingManager {
                 travelersDetails: travelersDetails
             });
             
+            // Verificar se viatorBookingAjax está disponível
+            if (typeof viatorBookingAjax === 'undefined') {
+                console.error('❌ viatorBookingAjax não está definido. Verifique se o script foi carregado corretamente.');
+                return false;
+            }
+            
             const response = await fetch(viatorBookingAjax.ajaxurl, {
                 method: 'POST',
                 headers: {
@@ -1920,6 +2707,7 @@ class ViatorBookingManager {
                     action: 'viator_request_hold',
                     availability_data: JSON.stringify(availabilityDataWithSelection),
                     travelers_details: JSON.stringify(travelersDetails),
+                    booking_question_answers: JSON.stringify(travelersDetails.bookingQuestionAnswers || []),
                     nonce: viatorBookingAjax.nonce
                 })
             });
@@ -2120,6 +2908,12 @@ class ViatorBookingManager {
                 throw new Error('paymentDataSubmissionUrl não disponível após renovação do hold.');
             }
             
+            // Verificar se viatorBookingAjax está disponível
+            if (typeof viatorBookingAjax === 'undefined') {
+                console.error('❌ viatorBookingAjax não está definido. Verifique se o script foi carregado corretamente.');
+                throw new Error('Erro de configuração. Recarregue a página.');
+            }
+            
             // Usar paymentDataSubmissionUrl conforme documentação oficial da Viator
             const response = await fetch(viatorBookingAjax.ajaxurl, {
                 method: 'POST',
@@ -2176,29 +2970,45 @@ class ViatorBookingManager {
         try {
             console.log('🎯 confirmBooking iniciado');
             
+            // Verificar se viatorBookingAjax está disponível
+            if (typeof viatorBookingAjax === 'undefined') {
+                console.error('❌ viatorBookingAjax não está definido. Verifique se o script foi carregado corretamente.');
+                this.showDateError('Erro de configuração. Recarregue a página.');
+                return false;
+            }
+            
             // Usar dados do responsável coletados na segunda etapa
             const travelersData = this.collectDetailedTravelersData();
             const bookerInfo = travelersData.bookerInfo;
+            const bookingQuestionAnswers = travelersData.bookingQuestionAnswers || [];
             
             console.log('📋 Dados para confirmação:', {
                 cartId: this.bookingData.holdData.cartId,
                 hasPaymentToken: !!this.bookingData.paymentToken,
-                bookerInfo: bookerInfo
+                bookerInfo: bookerInfo,
+                bookingQuestionAnswers: bookingQuestionAnswers
             });
+
+            const requestParams = {
+                action: 'viator_confirm_booking',
+                cart_id: this.bookingData.holdData.cartId,
+                partner_booking_ref: this.bookingData.holdData.bookingRef || '',
+                payment_token: this.bookingData.paymentToken,
+                booker_info: JSON.stringify(bookerInfo),
+                nonce: viatorBookingAjax.nonce
+            };
+            
+            // Incluir perguntas de reserva se existirem
+            if (bookingQuestionAnswers && bookingQuestionAnswers.length > 0) {
+                requestParams.bookingQuestionAnswers = JSON.stringify(bookingQuestionAnswers);
+            }
 
             const response = await fetch(viatorBookingAjax.ajaxurl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
-                body: new URLSearchParams({
-                    action: 'viator_confirm_booking',
-                    cart_id: this.bookingData.holdData.cartId,
-                    partner_booking_ref: this.bookingData.holdData.bookingRef || '',
-                    payment_token: this.bookingData.paymentToken,
-                    booker_info: JSON.stringify(bookerInfo),
-                    nonce: viatorBookingAjax.nonce
-                })
+                body: new URLSearchParams(requestParams)
             });
             
             const data = await response.json();
@@ -2409,14 +3219,21 @@ class ViatorBookingManager {
             };
         }
         
+        // Coletar respostas das perguntas de reserva
+        const bookingQuestionAnswers = this.collectBookingQuestionAnswers();
+        
         console.log('📋 Dados coletados do responsável:', bookerInfo);
+        console.log('📝 Respostas das perguntas de reserva:', bookingQuestionAnswers);
         
         return {
             // Informações dos viajantes (apenas quantidades por faixa etária)
             paxMix: paxMix,
             
             // Informações do responsável principal pela reserva
-            bookerInfo: bookerInfo
+            bookerInfo: bookerInfo,
+            
+            // Respostas das perguntas de reserva
+            bookingQuestionAnswers: bookingQuestionAnswers
         };
     }
     
@@ -2457,6 +3274,13 @@ class ViatorBookingManager {
 
     async updatePricesForCurrentSelection() {
         console.log('🔄 updatePricesForCurrentSelection chamada');
+        
+        // Verificar se viatorBookingAjax está disponível
+        if (typeof viatorBookingAjax === 'undefined') {
+            console.error('❌ viatorBookingAjax não está definido. Verifique se o script foi carregado corretamente.');
+            this.showDateError('Erro de configuração. Recarregue a página.');
+            return;
+        }
         
         const travelDate = document.getElementById('travel-date-value').value;
         console.log('📅 Data selecionada:', travelDate);
@@ -3079,6 +3903,12 @@ class ViatorBookingManager {
      */
     async testApiAccess() {
         console.log('🔍 Iniciando teste de acesso à API...');
+        
+        // Verificar se viatorBookingAjax está disponível
+        if (typeof viatorBookingAjax === 'undefined') {
+            console.error('❌ viatorBookingAjax não está definido. Verifique se o script foi carregado corretamente.');
+            return null;
+        }
         
         try {
             const response = await fetch(viatorBookingAjax.ajaxurl, {
