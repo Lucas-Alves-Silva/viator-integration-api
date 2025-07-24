@@ -921,6 +921,15 @@ class ViatorBookingSystem {
                 'units' => ['kg', 'lbs'],
                 'maxLength' => 50
             ],
+            'HEIGHT' => [
+                'id' => 'HEIGHT',
+                'label' => 'Altura do viajante (necessário por motivos de segurança)',
+                'type' => 'NUMBER_AND_UNIT',
+                'group' => 'PER_TRAVELER',
+                'required' => 'MANDATORY',
+                'units' => ['cm', 'ft'],
+                'maxLength' => 50
+            ],
             'TRANSFER_ARRIVAL_MODE' => [
                 'id' => 'TRANSFER_ARRIVAL_MODE',
                 'label' => 'Modo de Chegada',

@@ -12,6 +12,7 @@ const ViatorConditionalQuestions = {
         if (!this.dependencies[parentId]) {
             this.dependencies[parentId] = [];
         }
+        
         this.dependencies[parentId].push({
             dependentId: dependentId,
             showWhen: showWhen
@@ -2261,7 +2262,12 @@ class ViatorBookingManager {
                 html += `<div class="question-with-unit">`;
                 html += `<input type="number" id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr}>`;
                 if (question.units && question.units.length > 0) {
-                    html += `<select name="${questionId}_unit" class="${cssClass}" data-question-id="${question.id}" ${isTraveler ? `data-traveler="${travelerIndex}"` : ''}>`;
+                    // Verificar se é um campo de peso ou altura que deve ser sincronizado
+                    const isSyncField = (question.id === 'WEIGHT' || question.id === 'HEIGHT');
+                    const isFirstTraveler = isTraveler && travelerIndex === 1;
+                    const shouldDisable = isSyncField && isTraveler && !isFirstTraveler;
+                    
+                    html += `<select name="${questionId}_unit" class="${cssClass}" data-question-id="${question.id}" ${isTraveler ? `data-traveler="${travelerIndex}"` : ''} ${shouldDisable ? 'disabled' : ''}>`;
                     question.units.forEach(unit => {
                         html += `<option value="${unit}">${unit}</option>`;
                     });
@@ -2692,6 +2698,10 @@ class ViatorBookingManager {
         setTimeout(() => {
             ViatorConditionalQuestions.updateAllConditionalFields();
             console.log('✅ Campos condicionais atualizados após renderização');
+            
+            // Configurar sincronização de unidades para WEIGHT e HEIGHT
+            this.setupUnitSynchronization();
+            console.log('✅ Sincronização de unidades configurada');
         }, 100);
         
         // Adicionar listeners de validação após a renderização
@@ -4380,6 +4390,105 @@ class ViatorBookingManager {
                 toggleBtn.classList.add('collapsed');
             }
         });
+    }
+
+    /**
+     * Configurar sincronização de unidades para campos WEIGHT e HEIGHT
+     */
+    setupUnitSynchronization() {
+        console.log('🔄 Configurando sincronização de unidades...');
+        
+        // Encontrar todos os campos de peso e altura com data-traveler
+        const weightFields = document.querySelectorAll('select[data-question-id="WEIGHT"][data-traveler]');
+        const heightFields = document.querySelectorAll('select[data-question-id="HEIGHT"][data-traveler]');
+        
+        // Configurar sincronização para WEIGHT
+        if (weightFields.length > 0) {
+            // O primeiro campo na lista é sempre o primeiro viajante renderizado
+            const firstWeightField = weightFields[0];
+            const firstTravelerNumber = firstWeightField.getAttribute('data-traveler');
+            
+            console.log(`🎯 Primeiro viajante identificado: Viajante ${firstTravelerNumber}`);
+            
+            // Configurar todos os campos de peso
+            weightFields.forEach((field, index) => {
+                const travelerNumber = field.getAttribute('data-traveler');
+                
+                if (index === 0) {
+                    // Primeiro viajante: sempre habilitado
+                    field.disabled = false;
+                    console.log(`✅ Viajante ${travelerNumber} (primeiro) - Campo de peso habilitado`);
+                } else {
+                    // Demais viajantes: desabilitado e sincronizado
+                    field.disabled = true;
+                    // Sincronizar com o valor do primeiro viajante
+                    if (firstWeightField.value) {
+                        field.value = firstWeightField.value;
+                    }
+                    console.log(`🔒 Viajante ${travelerNumber} - Campo de peso desabilitado e sincronizado`);
+                }
+            });
+            
+            // Listener para o primeiro campo de peso
+            firstWeightField.addEventListener('change', (e) => {
+                const selectedUnit = e.target.value;
+                console.log(`📏 Primeiro viajante alterou unidade de peso para: ${selectedUnit}`);
+                
+                // Aplicar a mesma unidade para todos os outros viajantes
+                weightFields.forEach((field, index) => {
+                    if (index > 0) { // Pular o primeiro
+                        const travelerNumber = field.getAttribute('data-traveler');
+                        field.value = selectedUnit;
+                        console.log(`🔄 Sincronizado peso do Viajante ${travelerNumber} para: ${selectedUnit}`);
+                    }
+                });
+            });
+        }
+        
+        // Configurar sincronização para HEIGHT
+        if (heightFields.length > 0) {
+            // O primeiro campo na lista é sempre o primeiro viajante renderizado
+            const firstHeightField = heightFields[0];
+            const firstTravelerNumber = firstHeightField.getAttribute('data-traveler');
+            
+            console.log(`🎯 Primeiro viajante identificado: Viajante ${firstTravelerNumber}`);
+            
+            // Configurar todos os campos de altura
+            heightFields.forEach((field, index) => {
+                const travelerNumber = field.getAttribute('data-traveler');
+                
+                if (index === 0) {
+                    // Primeiro viajante: sempre habilitado
+                    field.disabled = false;
+                    console.log(`✅ Viajante ${travelerNumber} (primeiro) - Campo de altura habilitado`);
+                } else {
+                    // Demais viajantes: desabilitado e sincronizado
+                    field.disabled = true;
+                    // Sincronizar com o valor do primeiro viajante
+                    if (firstHeightField.value) {
+                        field.value = firstHeightField.value;
+                    }
+                    console.log(`🔒 Viajante ${travelerNumber} - Campo de altura desabilitado e sincronizado`);
+                }
+            });
+            
+            // Listener para o primeiro campo de altura
+            firstHeightField.addEventListener('change', (e) => {
+                const selectedUnit = e.target.value;
+                console.log(`📏 Primeiro viajante alterou unidade de altura para: ${selectedUnit}`);
+                
+                // Aplicar a mesma unidade para todos os outros viajantes
+                heightFields.forEach((field, index) => {
+                    if (index > 0) { // Pular o primeiro
+                        const travelerNumber = field.getAttribute('data-traveler');
+                        field.value = selectedUnit;
+                        console.log(`🔄 Sincronizado altura do Viajante ${travelerNumber} para: ${selectedUnit}`);
+                    }
+                });
+            });
+        }
+        
+        console.log(`✅ Sincronização configurada: ${weightFields.length} campos de peso, ${heightFields.length} campos de altura`);
     }
 
     closeModal() {
