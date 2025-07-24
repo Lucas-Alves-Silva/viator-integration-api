@@ -1205,6 +1205,12 @@ class ViatorBookingManager {
     initializeAvailabilityStep() {
         console.log('🚀 initializeAvailabilityStep chamado');
         
+        // Resetar dados dos viajantes para permitir nova seleção
+        // Isso garante que quando o usuário retorna da etapa 2 para a etapa 1,
+        // os dados sejam coletados do DOM atual em vez de usar dados armazenados
+        this.bookingData.selectedTravelers = null;
+        console.log('🔄 Dados de viajantes resetados para permitir nova seleção');
+        
         // Initialize date picker
         this.initializeBookingDatePicker();
         
