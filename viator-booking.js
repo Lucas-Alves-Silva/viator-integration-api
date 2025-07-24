@@ -3,7 +3,188 @@
  * Gerencia a interface do usuário para o processo de reserva
  */
 
+// Sistema de perguntas condicionais da Viator
+const ViatorConditionalQuestions = {
+    dependencies: {},
+    
+    // Registra uma dependência entre perguntas
+    registerDependency: function(dependentId, parentId, showWhen = null) {
+        if (!this.dependencies[parentId]) {
+            this.dependencies[parentId] = [];
+        }
+        this.dependencies[parentId].push({
+            dependentId: dependentId,
+            showWhen: showWhen
+        });
+    },
+    
+    // Verifica se uma pergunta deve ser exibida
+    shouldShowQuestion: function(questionId, parentValue = null) {
+        // Encontra a dependência para esta pergunta
+        for (const [parentId, dependents] of Object.entries(this.dependencies)) {
+            const dependent = dependents.find(d => d.dependentId === questionId);
+            if (dependent) {
+                const parentElements = document.querySelectorAll(`[data-question-id="${parentId}"]`);
+                if (parentElements.length === 0) return false;
+                
+                let currentValue = null;
+                parentElements.forEach(element => {
+                    if (element.value && element.value !== '') {
+                        currentValue = element.value;
+                    }
+                });
+                
+                if (!currentValue) return false;
+                
+                // Se showWhen está definido, verifica se o valor atual está na lista
+                if (dependent.showWhen && dependent.showWhen.length > 0) {
+                    return dependent.showWhen.includes(currentValue);
+                }
+                
+                // Se não há showWhen, mostra se o campo pai tem valor
+                return true;
+            }
+        }
+        return true; // Se não há dependência, sempre mostra
+    },
+    
+    // Atualiza a visibilidade de perguntas dependentes
+    updateDependentQuestions: function(parentId) {
+        if (!this.dependencies[parentId]) return;
+        
+        const parentElements = document.querySelectorAll(`[data-question-id="${parentId}"]`);
+        if (parentElements.length === 0) return;
+        
+        let parentValue = null;
+        parentElements.forEach(element => {
+            if (element.value && element.value !== '') {
+                parentValue = element.value;
+            }
+        });
+        
+        this.dependencies[parentId].forEach(dependent => {
+            const shouldShow = this.shouldShowQuestion(dependent.dependentId, parentValue);
+            const dependentElements = document.querySelectorAll(`[data-question-id="${dependent.dependentId}"]`);
+            
+            dependentElements.forEach(element => {
+                const formGroup = element.closest('.booking-question-group, .form-group');
+                if (formGroup) {
+                    if (shouldShow) {
+                        formGroup.style.display = 'block';
+                        // Marca como obrigatório se era condicional
+                        const input = formGroup.querySelector('input, select, textarea');
+                        if (input && input.dataset.originalRequired === 'CONDITIONAL') {
+                            input.required = true;
+                        }
+                    } else {
+                        formGroup.style.display = 'none';
+                        // Remove obrigatoriedade quando oculto
+                        const input = formGroup.querySelector('input, select, textarea');
+                        if (input) {
+                            input.required = false;
+                            input.value = ''; // Limpa o valor
+                        }
+                    }
+                }
+            });
+        });
+    },
+    
+    // Inicializa o sistema de dependências
+    initialize: function() {
+        console.log('Inicializando sistema de perguntas condicionais da Viator');
+        
+        // Registra dependências baseadas na documentação da Viator
+        this.registerDependency('TRANSFER_ARRIVAL_TIME', 'TRANSFER_ARRIVAL_MODE');
+        this.registerDependency('TRANSFER_DEPARTURE_DATE', 'TRANSFER_DEPARTURE_MODE');
+        this.registerDependency('TRANSFER_DEPARTURE_PICKUP', 'TRANSFER_DEPARTURE_MODE');
+        this.registerDependency('TRANSFER_DEPARTURE_TIME', 'TRANSFER_DEPARTURE_MODE');
+        
+        // Dependências específicas para transporte aéreo
+        this.registerDependency('TRANSFER_AIR_ARRIVAL_AIRLINE', 'TRANSFER_ARRIVAL_MODE', ['AIR']);
+        this.registerDependency('TRANSFER_AIR_ARRIVAL_FLIGHT_NO', 'TRANSFER_ARRIVAL_MODE', ['AIR']);
+        this.registerDependency('TRANSFER_AIR_DEPARTURE_AIRLINE', 'TRANSFER_DEPARTURE_MODE', ['AIR']);
+        this.registerDependency('TRANSFER_AIR_DEPARTURE_FLIGHT_NO', 'TRANSFER_DEPARTURE_MODE', ['AIR']);
+        
+        // Dependências específicas para transporte marítimo
+        this.registerDependency('TRANSFER_PORT_ARRIVAL_TIME', 'TRANSFER_ARRIVAL_MODE', ['SEA']);
+        this.registerDependency('TRANSFER_PORT_CRUISE_SHIP', 'TRANSFER_ARRIVAL_MODE', ['SEA']);
+        this.registerDependency('TRANSFER_PORT_DEPARTURE_TIME', 'TRANSFER_DEPARTURE_MODE', ['SEA']);
+        
+        // Dependências específicas para transporte ferroviário
+        this.registerDependency('TRANSFER_RAIL_ARRIVAL_LINE', 'TRANSFER_ARRIVAL_MODE', ['RAIL']);
+        this.registerDependency('TRANSFER_RAIL_ARRIVAL_STATION', 'TRANSFER_ARRIVAL_MODE', ['RAIL']);
+        this.registerDependency('TRANSFER_RAIL_DEPARTURE_LINE', 'TRANSFER_DEPARTURE_MODE', ['RAIL']);
+        this.registerDependency('TRANSFER_RAIL_DEPARTURE_STATION', 'TRANSFER_DEPARTURE_MODE', ['RAIL']);
+        
+        // Adiciona event listeners para campos que têm dependências
+        this.setupEventListeners();
+    },
+    
+    // Configura event listeners para campos com dependências
+    setupEventListeners: function() {
+        const self = this;
+        
+        // Adiciona listeners para todos os campos que são pais de dependências
+        Object.keys(this.dependencies).forEach(parentId => {
+            // Usar delegação de eventos para campos que podem ser criados dinamicamente
+            document.addEventListener('change', function(event) {
+                const element = event.target;
+                if (element.dataset.questionId === parentId) {
+                    console.log(`Campo ${parentId} alterado para: ${element.value}`);
+                    self.updateDependentQuestions(parentId);
+                }
+            });
+        });
+        
+        // Observer para detectar quando novos campos são adicionados ao DOM
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.type === 'childList') {
+                    mutation.addedNodes.forEach(function(node) {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            // Verifica se o novo elemento contém campos de pergunta
+                            const questionFields = node.querySelectorAll ? 
+                                node.querySelectorAll('[data-question-id]') : [];
+                            
+                            questionFields.forEach(field => {
+                                const questionId = field.dataset.questionId;
+                                if (self.dependencies[questionId]) {
+                                    // Adiciona listener para este campo específico
+                                    field.addEventListener('change', function() {
+                                        console.log(`Campo ${questionId} alterado para: ${field.value}`);
+                                        self.updateDependentQuestions(questionId);
+                                    });
+                                }
+                            });
+                            
+                            // Atualiza visibilidade inicial de campos condicionais
+                            self.updateAllConditionalFields();
+                        }
+                    });
+                }
+            });
+        });
+        
+        // Observa mudanças no DOM
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    },
+    
+    // Atualiza todos os campos condicionais
+    updateAllConditionalFields: function() {
+        Object.keys(this.dependencies).forEach(parentId => {
+            this.updateDependentQuestions(parentId);
+        });
+    }
+};
+
 document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar o sistema de perguntas condicionais
+    ViatorConditionalQuestions.initialize();
+    
     const bookingSystem = new ViatorBookingManager();
     bookingSystem.init();
 });
@@ -1873,7 +2054,12 @@ class ViatorBookingManager {
             const isRequired = question.required === 'MANDATORY';
             const requiredMark = isRequired ? ' *' : '';
             
-            html += '<div class="booking-question-group">';
+            // Determinar se o campo deve ser inicialmente oculto (para campos condicionais)
+            const isConditional = question.required === 'CONDITIONAL';
+            const shouldHideInitially = isConditional && !ViatorConditionalQuestions.shouldShowQuestion(question.id);
+            const displayStyle = shouldHideInitially ? 'style="display: none;"' : '';
+            
+            html += `<div class="booking-question-group" ${displayStyle}>`;
             html += `<label for="${questionId}">${question.label}${requiredMark}</label>`;
             
             html += this.renderQuestionField(question, questionId, isRequired, false, null);
@@ -1933,7 +2119,12 @@ class ViatorBookingManager {
                 const isRequired = question.required === 'MANDATORY';
                 const requiredMark = isRequired ? ' *' : '';
                 
-                html += '<div class="form-group col-md-6">';
+                // Verificar se deve ser oculto inicialmente
+                const isConditional = question.required === 'CONDITIONAL';
+                const shouldHideInitially = isConditional && !ViatorConditionalQuestions.shouldShowQuestion(question.id);
+                const displayStyle = shouldHideInitially ? 'style="display: none;"' : '';
+                
+                html += `<div class="form-group col-md-6" ${displayStyle}>`;
                 html += `<label for="${questionId}">${question.label}${requiredMark}</label>`;
                 html += this.renderQuestionField(question, questionId, isRequired, true, travelerIndex);
                 html += `<div class="error-message" id="error_${questionId}" style="display: none;"></div>`;
@@ -1947,7 +2138,12 @@ class ViatorBookingManager {
                 const isRequired = question.required === 'MANDATORY';
                 const requiredMark = isRequired ? ' *' : '';
                 
-                html += '<div class="form-group col-md-6">';
+                // Verificar se deve ser oculto inicialmente
+                const isConditional = question.required === 'CONDITIONAL';
+                const shouldHideInitially = isConditional && !ViatorConditionalQuestions.shouldShowQuestion(question.id);
+                const displayStyle = shouldHideInitially ? 'style="display: none;"' : '';
+                
+                html += `<div class="form-group col-md-6" ${displayStyle}>`;
                 html += `<label for="${questionId}">${question.label}${requiredMark}</label>`;
                 html += this.renderQuestionField(question, questionId, isRequired, true, travelerIndex);
                 html += `<div class="error-message" id="error_${questionId}" style="display: none;"></div>`;
@@ -1963,7 +2159,12 @@ class ViatorBookingManager {
             const isRequired = question.required === 'MANDATORY';
             const requiredMark = isRequired ? ' *' : '';
             
-            html += '<div class="booking-question-group">';
+            // Verificar se deve ser oculto inicialmente
+            const isConditional = question.required === 'CONDITIONAL';
+            const shouldHideInitially = isConditional && !ViatorConditionalQuestions.shouldShowQuestion(question.id);
+            const displayStyle = shouldHideInitially ? 'style="display: none;"' : '';
+            
+            html += `<div class="booking-question-group" ${displayStyle}>`;
             html += `<label for="${questionId}">${question.label}${requiredMark}</label>`;
             html += this.renderQuestionField(question, questionId, isRequired, true, travelerIndex);
             html += `<div class="error-message" id="error_${questionId}" style="display: none;"></div>`;
@@ -1976,7 +2177,12 @@ class ViatorBookingManager {
             const isRequired = question.required === 'MANDATORY';
             const requiredMark = isRequired ? ' *' : '';
             
-            html += '<div class="booking-question-group">';
+            // Verificar se deve ser oculto inicialmente
+            const isConditional = question.required === 'CONDITIONAL';
+            const shouldHideInitially = isConditional && !ViatorConditionalQuestions.shouldShowQuestion(question.id);
+            const displayStyle = shouldHideInitially ? 'style="display: none;"' : '';
+            
+            html += `<div class="booking-question-group" ${displayStyle}>`;
             html += `<label for="${questionId}">${question.label}${requiredMark}</label>`;
             html += this.renderQuestionField(question, questionId, isRequired, true, travelerIndex);
             html += `<div class="error-message" id="error_${questionId}" style="display: none;"></div>`;
@@ -1994,7 +2200,16 @@ class ViatorBookingManager {
         let html = '';
         // Usar classes CSS específicas para perguntas de reserva
         const cssClass = isTraveler ? 'form-control' : 'form-control';
-        const dataAttrs = `data-question-id="${question.id}" data-group="${question.group}" ${isTraveler ? `data-traveler="${travelerIndex}"` : ''}`;
+        
+        // Adicionar atributos para o sistema de perguntas condicionais
+        let dataAttrs = `data-question-id="${question.id}" data-group="${question.group}"`;
+        if (isTraveler) {
+            dataAttrs += ` data-traveler="${travelerIndex}"`;
+        }
+        if (question.required === 'CONDITIONAL') {
+            dataAttrs += ` data-original-required="CONDITIONAL"`;
+        }
+        
         const requiredAttr = isRequired ? 'required' : '';
 
         switch (question.type) {
@@ -2033,7 +2248,12 @@ class ViatorBookingManager {
                     
                     html += '</select>';
                 } else {
-                    html += `<input type="text" id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr} maxlength="${question.maxLength || ''}">`;
+                    // Placeholder específico para requisitos especiais
+                    let placeholderAttr = '';
+                    if (question.id === 'SPECIAL_REQUIREMENTS') {
+                        placeholderAttr = ' placeholder="Restrições alimentares, acessibilidade, etc."';
+                    }
+                    html += `<input type="text" id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr} maxlength="${question.maxLength || ''}"${placeholderAttr}>`;
                 }
                 break;
 
@@ -2065,11 +2285,21 @@ class ViatorBookingManager {
                 break;
 
             case 'TEXTAREA':
-                 html += `<textarea id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} rows="3" ${requiredAttr} placeholder="${question.hint || ''}"></textarea>`;
-                 break;
+                // Placeholder específico para requisitos especiais
+                let placeholderText = question.hint || '';
+                if (question.id === 'SPECIAL_REQUIREMENTS') {
+                    placeholderText = 'Restrições alimentares, acessibilidade, etc.';
+                }
+                html += `<textarea id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} rows="3" ${requiredAttr} placeholder="${placeholderText}"></textarea>`;
+                break;
 
             default:
-                html += `<input type="text" id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr} maxlength="${question.maxLength || ''}">`;
+                // Placeholder específico para requisitos especiais
+                let placeholderAttr = '';
+                if (question.id === 'SPECIAL_REQUIREMENTS') {
+                    placeholderAttr = ' placeholder="Restrições alimentares, acessibilidade, etc."';
+                }
+                html += `<input type="text" id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr} maxlength="${question.maxLength || ''}"${placeholderAttr}>`;
         }
 
         return html;
@@ -2421,19 +2651,22 @@ class ViatorBookingManager {
             
             // Gerar perguntas para cada viajante
             if (this.bookingData.selectedTravelers) {
+                let globalTravelerNumber = 1; // Contador sequencial global
+                
                 this.bookingData.selectedTravelers.forEach((travelerGroup, groupIndex) => {
                     for (let i = 0; i < travelerGroup.numberOfTravelers; i++) {
-                        const travelerIndex = groupIndex * 10 + i; // Índice único para cada viajante
-                        const travelerNumber = travelerIndex + 1;
+                        const travelerIndex = groupIndex * 10 + i; // Índice único para cada viajante (mantido para IDs)
                         
-                        console.log(`🔍 [DEBUG] Gerando perguntas para viajante ${travelerNumber} (índice ${travelerIndex})`);
+                        console.log(`🔍 [DEBUG] Gerando perguntas para viajante ${globalTravelerNumber} (índice ${travelerIndex})`);
                         
                         travelerQuestionsHTML += `<div class="traveler-questions-section">`;
-                        travelerQuestionsHTML += `<h5>👤 Viajante ${travelerNumber}</h5>`;
+                        travelerQuestionsHTML += `<h5>👤 Viajante ${globalTravelerNumber}</h5>`;
                         const travelerHTML = this.renderTravelerBookingQuestions(travelerIndex);
-                        console.log(`🔍 [DEBUG] HTML gerado para viajante ${travelerNumber}:`, travelerHTML);
+                        console.log(`🔍 [DEBUG] HTML gerado para viajante ${globalTravelerNumber}:`, travelerHTML);
                         travelerQuestionsHTML += travelerHTML;
                         travelerQuestionsHTML += `</div>`;
+                        
+                        globalTravelerNumber++; // Incrementar contador sequencial
                     }
                 });
             }
@@ -2455,6 +2688,12 @@ class ViatorBookingManager {
             console.log('ℹ️ [DEBUG] Nenhuma pergunta para renderizar, container permanece oculto');
         }
 
+        // Atualizar campos condicionais após renderização
+        setTimeout(() => {
+            ViatorConditionalQuestions.updateAllConditionalFields();
+            console.log('✅ Campos condicionais atualizados após renderização');
+        }, 100);
+        
         // Adicionar listeners de validação após a renderização
         const questionsContainer = document.getElementById('booking-questions-container');
         if (questionsContainer) {

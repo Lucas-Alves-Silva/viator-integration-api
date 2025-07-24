@@ -883,105 +883,240 @@ class ViatorBookingSystem {
      * Baseado na documentação: https://partnerresources.viator.com/travel-commerce/merchant/implementing-booking-questions/
      */
     private function create_booking_question_from_id($question_id) {
-        // Mapeamento dos tipos de perguntas conhecidos da API da Viator
+        // Mapeamento completo de perguntas de reserva conforme documentação da Viator
+        // https://partnerresources.viator.com/travel-commerce/merchant/implementing-booking-questions/
         $question_mapping = [
-            'PICKUP_POINT' => [
-                'id' => 'PICKUP_POINT',
-                'label' => 'Ponto de Encontro',
-                'type' => 'SELECT',
+            // Perguntas MANDATORY - Sempre obrigatórias
+            'AGEBAND' => [
+                'id' => 'AGEBAND',
+                'label' => 'Faixa Etária',
+                'type' => 'STRING',
+                'group' => 'PER_TRAVELER',
+                'required' => 'MANDATORY',
+                'allowedAnswers' => ['ADULT', 'SENIOR', 'YOUTH', 'CHILD', 'INFANT', 'TRAVELER'],
+                'maxLength' => 50
+            ],
+            'FULL_NAMES_FIRST' => [
+                'id' => 'FULL_NAMES_FIRST',
+                'label' => 'Nome',
+                'type' => 'STRING',
+                'group' => 'PER_TRAVELER',
+                'required' => 'MANDATORY',
+                'maxLength' => 50
+            ],
+            'FULL_NAMES_LAST' => [
+                'id' => 'FULL_NAMES_LAST',
+                'label' => 'Sobrenome',
+                'type' => 'STRING',
+                'group' => 'PER_TRAVELER',
+                'required' => 'MANDATORY',
+                'maxLength' => 50
+            ],
+            'WEIGHT' => [
+                'id' => 'WEIGHT',
+                'label' => 'Peso do viajante (necessário por motivos de segurança)',
+                'type' => 'NUMBER_AND_UNIT',
+                'group' => 'PER_TRAVELER',
+                'required' => 'MANDATORY',
+                'units' => ['kg', 'lbs'],
+                'maxLength' => 50
+            ],
+            'TRANSFER_ARRIVAL_MODE' => [
+                'id' => 'TRANSFER_ARRIVAL_MODE',
+                'label' => 'Modo de Chegada',
+                'type' => 'STRING',
                 'group' => 'PER_BOOKING',
                 'required' => 'MANDATORY',
-                'options' => [] // Será preenchido dinamicamente se necessário
+                'allowedAnswers' => ['AIR', 'RAIL', 'SEA', 'OTHER'],
+                'maxLength' => 50
             ],
-            'SPECIAL_REQUIREMENTS' => [
-                'id' => 'SPECIAL_REQUIREMENTS',
-                'label' => 'Requisitos Especiais',
-                'type' => 'TEXTAREA',
+            'TRANSFER_DEPARTURE_MODE' => [
+                'id' => 'TRANSFER_DEPARTURE_MODE',
+                'label' => 'Modo de Partida',
+                'type' => 'STRING',
                 'group' => 'PER_BOOKING',
-                'required' => 'OPTIONAL'
+                'required' => 'MANDATORY',
+                'allowedAnswers' => ['AIR', 'RAIL', 'SEA', 'OTHER'],
+                'maxLength' => 50
             ],
-            'TRANSFER_AIR_DEPARTURE_AIRLINE' => [
-                'id' => 'TRANSFER_AIR_DEPARTURE_AIRLINE',
-                'label' => 'Companhia Aérea de Partida',
-                'type' => 'TEXT',
+            
+            // Perguntas CONDITIONAL - Dependem de outras perguntas
+            'TRANSFER_ARRIVAL_TIME' => [
+                'id' => 'TRANSFER_ARRIVAL_TIME',
+                'label' => 'Horário de Chegada',
+                'type' => 'TIME',
                 'group' => 'PER_BOOKING',
-                'required' => 'MANDATORY'
-            ],
-            'TRANSFER_AIR_DEPARTURE_FLIGHT_NO' => [
-                'id' => 'TRANSFER_AIR_DEPARTURE_FLIGHT_NO',
-                'label' => 'Número do Voo de Partida',
-                'type' => 'TEXT',
-                'group' => 'PER_BOOKING',
-                'required' => 'MANDATORY'
+                'required' => 'CONDITIONAL',
+                'dependsOn' => 'TRANSFER_ARRIVAL_MODE',
+                'maxLength' => 100
             ],
             'TRANSFER_DEPARTURE_DATE' => [
                 'id' => 'TRANSFER_DEPARTURE_DATE',
                 'label' => 'Data de Partida',
                 'type' => 'DATE',
                 'group' => 'PER_BOOKING',
-                'required' => 'MANDATORY'
-            ],
-            'TRANSFER_DEPARTURE_MODE' => [
-                'id' => 'TRANSFER_DEPARTURE_MODE',
-                'label' => 'Modo de Partida',
-                'type' => 'SELECT',
-                'group' => 'PER_BOOKING',
-                'required' => 'MANDATORY',
-                'options' => [
-                    ['value' => 'FLIGHT', 'label' => 'Voo'],
-                    ['value' => 'TRAIN', 'label' => 'Trem'],
-                    ['value' => 'BUS', 'label' => 'Ônibus'],
-                    ['value' => 'CAR', 'label' => 'Carro'],
-                    ['value' => 'OTHER', 'label' => 'Outro']
-                ]
+                'required' => 'CONDITIONAL',
+                'dependsOn' => 'TRANSFER_DEPARTURE_MODE',
+                'maxLength' => 100
             ],
             'TRANSFER_DEPARTURE_PICKUP' => [
                 'id' => 'TRANSFER_DEPARTURE_PICKUP',
-                'label' => 'Local de Embarque',
-                'type' => 'TEXT',
+                'label' => 'Endereço de Embarque',
+                'type' => 'LOCATION_REF_OR_FREE_TEXT',
                 'group' => 'PER_BOOKING',
-                'required' => 'MANDATORY'
+                'required' => 'CONDITIONAL',
+                'dependsOn' => 'TRANSFER_DEPARTURE_MODE',
+                'hint' => 'Ex: Rua das Flores, 123, São Paulo SP 01234-567',
+                'units' => ['LOCATION_REFERENCE', 'FREETEXT'],
+                'maxLength' => 1000
             ],
             'TRANSFER_DEPARTURE_TIME' => [
                 'id' => 'TRANSFER_DEPARTURE_TIME',
                 'label' => 'Horário de Partida',
-                'type' => 'TEXT',
+                'type' => 'TIME',
                 'group' => 'PER_BOOKING',
-                'required' => 'MANDATORY'
+                'required' => 'CONDITIONAL',
+                'dependsOn' => 'TRANSFER_DEPARTURE_MODE',
+                'maxLength' => 100
             ],
-            'AGEBAND' => [
-                'id' => 'AGEBAND',
-                'label' => 'Faixa Etária',
-                'type' => 'SELECT',
-                'group' => 'PER_TRAVELER',
+            
+            // Perguntas condicionais específicas para transporte aéreo (AIR)
+            'TRANSFER_AIR_ARRIVAL_AIRLINE' => [
+                'id' => 'TRANSFER_AIR_ARRIVAL_AIRLINE',
+                'label' => 'Companhia Aérea de Chegada',
+                'type' => 'STRING',
+                'group' => 'PER_BOOKING',
+                'required' => 'CONDITIONAL',
+                'dependsOn' => 'TRANSFER_ARRIVAL_MODE',
+                'showWhen' => ['AIR'],
+                'maxLength' => 255
+            ],
+            'TRANSFER_AIR_ARRIVAL_FLIGHT_NO' => [
+                'id' => 'TRANSFER_AIR_ARRIVAL_FLIGHT_NO',
+                'label' => 'Número do Voo de Chegada',
+                'type' => 'STRING',
+                'group' => 'PER_BOOKING',
+                'required' => 'CONDITIONAL',
+                'dependsOn' => 'TRANSFER_ARRIVAL_MODE',
+                'showWhen' => ['AIR'],
+                'maxLength' => 255
+            ],
+            'TRANSFER_AIR_DEPARTURE_AIRLINE' => [
+                'id' => 'TRANSFER_AIR_DEPARTURE_AIRLINE',
+                'label' => 'Companhia Aérea de Partida',
+                'type' => 'STRING',
+                'group' => 'PER_BOOKING',
+                'required' => 'CONDITIONAL',
+                'dependsOn' => 'TRANSFER_DEPARTURE_MODE',
+                'showWhen' => ['AIR'],
+                'maxLength' => 255
+            ],
+            'TRANSFER_AIR_DEPARTURE_FLIGHT_NO' => [
+                'id' => 'TRANSFER_AIR_DEPARTURE_FLIGHT_NO',
+                'label' => 'Número do Voo de Partida',
+                'type' => 'STRING',
+                'group' => 'PER_BOOKING',
+                'required' => 'CONDITIONAL',
+                'dependsOn' => 'TRANSFER_DEPARTURE_MODE',
+                'showWhen' => ['AIR'],
+                'maxLength' => 255
+            ],
+            
+            // Perguntas condicionais específicas para transporte marítimo (SEA)
+            'TRANSFER_PORT_ARRIVAL_TIME' => [
+                'id' => 'TRANSFER_PORT_ARRIVAL_TIME',
+                'label' => 'Horário de Desembarque',
+                'type' => 'TIME',
+                'group' => 'PER_BOOKING',
+                'required' => 'CONDITIONAL',
+                'dependsOn' => 'TRANSFER_ARRIVAL_MODE',
+                'showWhen' => ['SEA'],
+                'maxLength' => 100
+            ],
+            'TRANSFER_PORT_CRUISE_SHIP' => [
+                'id' => 'TRANSFER_PORT_CRUISE_SHIP',
+                'label' => 'Nome do Navio de Cruzeiro',
+                'type' => 'STRING',
+                'group' => 'PER_BOOKING',
+                'required' => 'CONDITIONAL',
+                'dependsOn' => 'TRANSFER_ARRIVAL_MODE',
+                'showWhen' => ['SEA'],
+                'hint' => 'Ex: MSC Seaside',
+                'maxLength' => 255
+            ],
+            'TRANSFER_PORT_DEPARTURE_TIME' => [
+                'id' => 'TRANSFER_PORT_DEPARTURE_TIME',
+                'label' => 'Horário de Embarque',
+                'type' => 'TIME',
+                'group' => 'PER_BOOKING',
+                'required' => 'CONDITIONAL',
+                'dependsOn' => 'TRANSFER_DEPARTURE_MODE',
+                'showWhen' => ['SEA'],
+                'maxLength' => 100
+            ],
+            
+            // Perguntas condicionais específicas para transporte ferroviário (RAIL)
+            'TRANSFER_RAIL_ARRIVAL_LINE' => [
+                'id' => 'TRANSFER_RAIL_ARRIVAL_LINE',
+                'label' => 'Companhia Ferroviária de Chegada',
+                'type' => 'STRING',
+                'group' => 'PER_BOOKING',
+                'required' => 'CONDITIONAL',
+                'dependsOn' => 'TRANSFER_ARRIVAL_MODE',
+                'showWhen' => ['RAIL'],
+                'hint' => 'Ex: CPTM',
+                'maxLength' => 255
+            ],
+            'TRANSFER_RAIL_ARRIVAL_STATION' => [
+                'id' => 'TRANSFER_RAIL_ARRIVAL_STATION',
+                'label' => 'Estação de Chegada',
+                'type' => 'STRING',
+                'group' => 'PER_BOOKING',
+                'required' => 'CONDITIONAL',
+                'dependsOn' => 'TRANSFER_ARRIVAL_MODE',
+                'showWhen' => ['RAIL'],
+                'hint' => 'Ex: Estação da Luz',
+                'maxLength' => 255
+            ],
+            'TRANSFER_RAIL_DEPARTURE_LINE' => [
+                'id' => 'TRANSFER_RAIL_DEPARTURE_LINE',
+                'label' => 'Companhia Ferroviária de Partida',
+                'type' => 'STRING',
+                'group' => 'PER_BOOKING',
+                'required' => 'CONDITIONAL',
+                'dependsOn' => 'TRANSFER_DEPARTURE_MODE',
+                'showWhen' => ['RAIL'],
+                'hint' => 'Ex: CPTM',
+                'maxLength' => 255
+            ],
+            'TRANSFER_RAIL_DEPARTURE_STATION' => [
+                'id' => 'TRANSFER_RAIL_DEPARTURE_STATION',
+                'label' => 'Estação de Partida',
+                'type' => 'STRING',
+                'group' => 'PER_BOOKING',
+                'required' => 'CONDITIONAL',
+                'dependsOn' => 'TRANSFER_DEPARTURE_MODE',
+                'showWhen' => ['RAIL'],
+                'hint' => 'Ex: Estação da Luz',
+                'maxLength' => 255
+            ],
+            
+            // Perguntas gerais
+            'PICKUP_POINT' => [
+                'id' => 'PICKUP_POINT',
+                'label' => 'Ponto de Encontro',
+                'type' => 'LOCATION_REF_OR_FREE_TEXT',
+                'group' => 'PER_BOOKING',
                 'required' => 'MANDATORY',
-                'options' => [
-                    ['value' => 'ADULT', 'label' => 'Adulto'],
-                    ['value' => 'CHILD', 'label' => 'Criança'],
-                    ['value' => 'INFANT', 'label' => 'Bebê'],
-                    ['value' => 'SENIOR', 'label' => 'Idoso']
-                ]
+                'units' => ['LOCATION_REFERENCE', 'FREETEXT']
             ],
-            'FULL_NAMES_FIRST' => [
-                'id' => 'FULL_NAMES_FIRST',
-                'label' => 'Nome',
-                'type' => 'TEXT',
-                'group' => 'PER_TRAVELER',
-                'required' => 'MANDATORY'
-            ],
-            'FULL_NAMES_LAST' => [
-                'id' => 'FULL_NAMES_LAST',
-                'label' => 'Sobrenome',
-                'type' => 'TEXT',
-                'group' => 'PER_TRAVELER',
-                'required' => 'MANDATORY'
-            ],
-            'WEIGHT' => [
-                'id' => 'WEIGHT',
-                'label' => 'Peso (kg)',
-                'type' => 'NUMBER',
-                'group' => 'PER_TRAVELER',
-                'required' => 'MANDATORY'
+            'SPECIAL_REQUIREMENTS' => [
+                'id' => 'SPECIAL_REQUIREMENTS',
+                'label' => 'Requisitos Especiais',
+                'type' => 'STRING',
+                'group' => 'PER_BOOKING',
+                'required' => 'OPTIONAL',
+                'maxLength' => 1000
             ]
         ];
         
