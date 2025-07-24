@@ -2342,14 +2342,49 @@ function viator_enqueue_product_scripts() {
 
     // Adicionar dados de booking questions para o JavaScript se estivermos em uma página de produto
     if (is_a($post, 'WP_Post') && has_shortcode($post->post_content, 'viator_product')) {
-        error_log('🔍 [BOOKING QUESTIONS DEBUG] Starting product data extraction');
-        // Extrair o código do produto do shortcode
+        error_log('🔍 [BOOKING QUESTIONS DEBUG] ========== STARTING PRODUCT DATA EXTRACTION ==========');
+        error_log('🔍 [BOOKING QUESTIONS DEBUG] Post ID: ' . get_the_ID());
+        error_log('🔍 [BOOKING QUESTIONS DEBUG] Post title: ' . get_the_title());
+        error_log('🔍 [BOOKING QUESTIONS DEBUG] Current URL: ' . $_SERVER['REQUEST_URI']);
+        error_log('🔍 [BOOKING QUESTIONS DEBUG] Is main query: ' . (is_main_query() ? 'YES' : 'NO'));
+        error_log('🔍 [BOOKING QUESTIONS DEBUG] Post content preview: ' . substr($post->post_content, 0, 100));
+        
+        $product_code = null;
+        
+        // Primeiro, tentar extrair o código do produto do shortcode
         $pattern = '/\[viator_product\s+product_code=["\']([^"\'\']+)["\'][^\]]*\]/i';
         error_log('🔍 [BOOKING QUESTIONS DEBUG] Regex pattern: ' . $pattern);
         error_log('🔍 [BOOKING QUESTIONS DEBUG] Post content for regex: ' . $post->post_content);
         if (preg_match($pattern, $post->post_content, $matches)) {
             $product_code = $matches[1];
-            error_log('🔍 [BOOKING QUESTIONS DEBUG] Product code extracted: ' . $product_code);
+            error_log('🔍 [BOOKING QUESTIONS DEBUG] Product code extracted from shortcode: ' . $product_code);
+        } else {
+            error_log('🔍 [BOOKING QUESTIONS DEBUG] Product code NOT extracted from shortcode. Regex failed.');
+            error_log('🔍 [BOOKING QUESTIONS DEBUG] Trying URL extraction...');
+            
+            // Debug: verificar query vars disponíveis
+            global $wp_query;
+            error_log('🔍 [BOOKING QUESTIONS DEBUG] Available query vars: ' . print_r($wp_query->query_vars, true));
+            error_log('🔍 [BOOKING QUESTIONS DEBUG] Current URL: ' . $_SERVER['REQUEST_URI']);
+            error_log('🔍 [BOOKING QUESTIONS DEBUG] $_GET parameters: ' . print_r($_GET, true));
+            
+            // Se não conseguir do shortcode, tentar da URL
+            $product_code = get_query_var('product_code');
+            error_log('🔍 [BOOKING QUESTIONS DEBUG] get_query_var result: ' . ($product_code ? $product_code : 'EMPTY'));
+            
+            if (empty($product_code)) {
+                $product_code = isset($_GET['product_code']) ? sanitize_text_field($_GET['product_code']) : null;
+                error_log('🔍 [BOOKING QUESTIONS DEBUG] $_GET["product_code"] result: ' . ($product_code ? $product_code : 'EMPTY'));
+            }
+            
+            if ($product_code) {
+                error_log('🔍 [BOOKING QUESTIONS DEBUG] Product code extracted from URL: ' . $product_code);
+            } else {
+                error_log('🔍 [BOOKING QUESTIONS DEBUG] Product code NOT found in URL either');
+            }
+        }
+        
+        if ($product_code) {
             
             // Obter dados do produto
             $product_data = viator_get_product_data($product_code);
@@ -2390,7 +2425,7 @@ function viator_enqueue_product_scripts() {
                 error_log('🔍 [BOOKING QUESTIONS DEBUG] Product data is null for code: ' . $product_code);
             }
         } else {
-            error_log('🔍 [BOOKING QUESTIONS DEBUG] Product code NOT extracted from shortcode. Regex failed.');
+            error_log('🔍 [BOOKING QUESTIONS DEBUG] No product code found - shortcode without attributes and no URL parameter');
             error_log('🔍 [BOOKING QUESTIONS DEBUG] Post content length: ' . strlen($post->post_content));
         }
     }

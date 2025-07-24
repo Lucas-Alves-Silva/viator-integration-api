@@ -351,12 +351,25 @@ class ViatorBookingManager {
         document.addEventListener('click', (e) => {
             if (e.target.classList.contains('button-check-availability')) {
                 e.preventDefault();
+                // Extrair product_code do botão clicado
+                const productCode = e.target.dataset.productCode;
+                if (productCode) {
+                    this.bookingData.productCode = productCode;
+                    console.log('🔍 [BOOKING QUESTIONS DEBUG] Product code extraído do botão:', productCode);
+                }
                 this.openBookingModal();
             }
         });
     }
     
     openBookingModal() {
+        // Se ainda não temos product_code, tentar extrair novamente
+        if (!this.bookingData.productCode) {
+            this.extractProductCode();
+        }
+        
+        console.log('🔍 [BOOKING QUESTIONS DEBUG] Product code no openBookingModal:', this.bookingData.productCode);
+        
         this.scrapeAgeBandsFromPage(); // Raspa os dados da página primeiro
         this.createBookingModal();
         this.showStep(1);
@@ -831,11 +844,14 @@ class ViatorBookingManager {
         return `
             <div class="booking-step travelers-step">
                 <h3>Informações da Reserva</h3>
+                
+                <!-- 1) Resumo dos Viajantes -->
                 <div class="traveler-summary-section">
                     <h4>📋 Resumo dos Viajantes</h4>
                     <div id="travelers-summary"></div>
                 </div>
                 
+                <!-- 2) Informações do Responsável pela Reserva -->
                 <div class="booker-info-section">
                     <h4>👤 Informações do Responsável pela Reserva</h4>
                     <p class="booker-note">Apenas o responsável principal precisa fornecer seus dados pessoais:</p>
@@ -856,19 +872,44 @@ class ViatorBookingManager {
                             <label for="booker-email">Email *:</label>
                             <input type="email" id="booker-email" name="booker_email" class="form-control" required>
                         </div>
-                        <div class="form-group">
-                            <label for="booker-phone">Telefone (opcional):</label>
-                            <input type="tel" id="booker-phone" name="booker_phone" class="form-control" maxlength="20" placeholder="(11) 99999-9999">
+                        <div class="form-group phone-group">
+                            <label for="booker-phone">Telefone *:</label>
+                            <div class="phone-input-container">
+                                <select id="booker-country-code" name="booker_country_code" class="form-control country-code-select" required>
+                                    <option value="BR">(+55) Brasil</option>
+                                    <option value="US">(+1) Estados Unidos</option>
+                                    <option value="CA">(+1) Canadá</option>
+                                    <option value="AR">(+54) Argentina</option>
+                                    <option value="CL">(+56) Chile</option>
+                                    <option value="CO">(+57) Colômbia</option>
+                                    <option value="MX">(+52) México</option>
+                                    <option value="PE">(+51) Peru</option>
+                                    <option value="UY">(+598) Uruguai</option>
+                                    <option value="FR">(+33) França</option>
+                                    <option value="DE">(+49) Alemanha</option>
+                                    <option value="IT">(+39) Itália</option>
+                                    <option value="ES">(+34) Espanha</option>
+                                    <option value="PT">(+351) Portugal</option>
+                                    <option value="GB">(+44) Reino Unido</option>
+                                    <option value="AU">(+61) Austrália</option>
+                                    <option value="NZ">(+64) Nova Zelândia</option>
+                                    <option value="JP">(+81) Japão</option>
+                                    <option value="CN">(+86) China</option>
+                                    <option value="IN">(+91) Índia</option>
+                                </select>
+                                <input type="tel" id="booker-phone" name="booker_phone" class="form-control phone-input" required placeholder="(11) 99999-9999">
+                            </div>
                         </div>
                     </div>
                 </div>
                 
-                <div class="booking-questions-section" id="booking-questions-container" style="display: none;">
-                    <h4>📝 Informações Adicionais</h4>
-                    <div id="general-booking-questions"></div>
-                    <div id="traveler-booking-questions"></div>
-                </div>
-            </div>
+                <!-- 3) Informações dos Viajantes -->
+                <div id="traveler-booking-questions" style="display: none;">
+    <div id="traveler-booking-questions-inner"></div>
+    <div id="booking-questions-container">
+        <div id="general-booking-questions"></div>
+    </div>
+</div>
         `;
     }
     
@@ -1176,6 +1217,9 @@ class ViatorBookingManager {
         
         // Adicionar validações em tempo real para os campos do formulário
         this.setupBookerInfoValidation();
+        
+        // Configurar seletor de país e máscara de telefone
+        this.setupCountryCodeSelector();
     }
     
     setupBookerInfoValidation() {
@@ -1424,6 +1468,117 @@ class ViatorBookingManager {
         });
     }
     
+    setupCountryCodeSelector() {
+        const countrySelect = document.getElementById('booker-country-code');
+        const phoneInput = document.getElementById('booker-phone');
+        
+        if (!countrySelect || !phoneInput) {
+            console.log('⚠️ Elementos de país ou telefone não encontrados');
+            return;
+        }
+        
+        // Máscaras de telefone por país
+        const phoneMasks = {
+            'BR': '(##) #####-####',
+            'US': '(###) ###-####',
+            'CA': '(###) ###-####',
+            'AR': '(##) ####-####',
+            'CL': '# #### ####',
+            'CO': '(###) ###-####',
+            'MX': '(###) ###-####',
+            'PE': '### ### ###',
+            'UY': '#### ####',
+            'FR': '## ## ## ## ##',
+            'DE': '### #######',
+            'IT': '### ### ####',
+            'ES': '### ### ###',
+            'PT': '### ### ###',
+            'GB': '##### ######',
+            'AU': '#### ### ###',
+            'NZ': '### ### ####',
+            'JP': '###-####-####',
+            'CN': '### #### ####',
+            'IN': '##### #####'
+        };
+        
+        // Placeholders por país
+        const placeholders = {
+            'BR': '(11) 99999-9999',
+            'US': '(555) 123-4567',
+            'CA': '(416) 123-4567',
+            'AR': '(11) 1234-5678',
+            'CL': '9 1234 5678',
+            'CO': '(300) 123-4567',
+            'MX': '(55) 1234-5678',
+            'PE': '987 654 321',
+            'UY': '9876 5432',
+            'FR': '01 23 45 67 89',
+            'DE': '030 1234567',
+            'IT': '320 123 4567',
+            'ES': '612 345 678',
+            'PT': '912 345 678',
+            'GB': '07700 900123',
+            'AU': '0412 345 678',
+            'NZ': '021 123 4567',
+            'JP': '090-1234-5678',
+            'CN': '138 0013 8000',
+            'IN': '98765 43210'
+        };
+        
+        // Função para aplicar máscara
+        const applyMask = (value, mask) => {
+            const cleanValue = value.replace(/\D/g, '');
+            let maskedValue = '';
+            let valueIndex = 0;
+            
+            for (let i = 0; i < mask.length && valueIndex < cleanValue.length; i++) {
+                if (mask[i] === '#') {
+                    maskedValue += cleanValue[valueIndex];
+                    valueIndex++;
+                } else {
+                    maskedValue += mask[i];
+                }
+            }
+            
+            return maskedValue;
+        };
+        
+        // Função para atualizar máscara baseada no país
+        const updatePhoneMask = () => {
+            const selectedCountry = countrySelect.value;
+            const mask = phoneMasks[selectedCountry] || phoneMasks['BR'];
+            const placeholder = placeholders[selectedCountry] || placeholders['BR'];
+            
+            phoneInput.placeholder = placeholder;
+            
+            // Limpar valor atual e reaplicar máscara
+            const currentValue = phoneInput.value.replace(/\D/g, '');
+            phoneInput.value = applyMask(currentValue, mask);
+            
+            // Atualizar atributo data-mask para referência
+            phoneInput.setAttribute('data-mask', mask);
+        };
+        
+        // Event listener para mudança de país
+        countrySelect.addEventListener('change', updatePhoneMask);
+        
+        // Event listener para input de telefone
+        phoneInput.addEventListener('input', (e) => {
+            const selectedCountry = countrySelect.value;
+            const mask = phoneMasks[selectedCountry] || phoneMasks['BR'];
+            const value = e.target.value;
+            
+            // Aplicar máscara
+            const maskedValue = applyMask(value, mask);
+            e.target.value = maskedValue;
+        });
+        
+        // Aplicar máscara inicial
+        updatePhoneMask();
+        
+        console.log('✅ Seletor de país e máscara de telefone configurados');
+    }
+    
     async initializePaymentStep() {
         this.generateBookingSummary();
         this.formatCardNumber();
@@ -1587,8 +1742,25 @@ class ViatorBookingManager {
         console.log('🔍 [BOOKING QUESTIONS DEBUG] productCode:', this.bookingData?.productCode);
         
         try {
-            // Primeiro, tentar usar os dados da página se disponíveis
-            if (this.pageBookingQuestions && this.pageBookingQuestions.length > 0) {
+            // Verificar se temos IDs de perguntas no window.productData
+            if (window.productData && window.productData.bookingQuestions && window.productData.bookingQuestions.length > 0) {
+                console.log('📋 [BOOKING QUESTIONS DEBUG] IDs de perguntas encontrados no window.productData:', window.productData.bookingQuestions);
+                
+                // Se são apenas strings (IDs), precisamos buscar os dados completos via AJAX
+                if (typeof window.productData.bookingQuestions[0] === 'string') {
+                    console.log('📡 [BOOKING QUESTIONS DEBUG] IDs detectados, buscando dados completos via AJAX...');
+                    console.log('📡 [BOOKING QUESTIONS DEBUG] IDs encontrados:', window.productData.bookingQuestions);
+                    // Continuar para busca via AJAX
+                } else {
+                    // Se já são objetos completos, usar diretamente
+                    this.bookingQuestions = window.productData.bookingQuestions;
+                    console.log('✅ [BOOKING QUESTIONS DEBUG] Usando objetos completos do window.productData:', this.bookingQuestions);
+                    return this.bookingQuestions;
+                }
+            }
+            
+            // Primeiro, tentar usar os dados da página se disponíveis (objetos completos)
+            if (this.pageBookingQuestions && this.pageBookingQuestions.length > 0 && typeof this.pageBookingQuestions[0] === 'object') {
                 console.log('📋 [BOOKING QUESTIONS DEBUG] Usando booking questions da página:', this.pageBookingQuestions);
                 
                 // Combinar com dados em cache para obter informações completas
@@ -1651,6 +1823,18 @@ class ViatorBookingManager {
                 console.log('🔍 [BOOKING QUESTIONS DEBUG] Perguntas extraídas da resposta:', this.bookingQuestions);
                 console.log('🔍 [BOOKING QUESTIONS DEBUG] Número de perguntas:', this.bookingQuestions.length);
                 
+                // Verificar se todas as perguntas têm o campo 'group'
+                this.bookingQuestions.forEach((q, index) => {
+                    console.log(`🔍 [BOOKING QUESTIONS DEBUG] Pergunta ${index}: ID=${q.id}, group=${q.group}, label=${q.label}`);
+                });
+                
+                const questionsWithGroup = this.bookingQuestions.filter(q => q.group);
+                console.log(`✅ [BOOKING QUESTIONS DEBUG] Perguntas com campo group: ${questionsWithGroup.length}/${this.bookingQuestions.length}`);
+                
+                const perTravelerQuestions = this.bookingQuestions.filter(q => q.group === 'PER_TRAVELER');
+                const perBookingQuestions = this.bookingQuestions.filter(q => q.group === 'PER_BOOKING');
+                console.log(`✅ [BOOKING QUESTIONS DEBUG] PER_TRAVELER: ${perTravelerQuestions.length}, PER_BOOKING: ${perBookingQuestions.length}`);
+                
                 // Salvar no cache local para futuras consultas
                 this.saveCachedBookingQuestions(this.bookingQuestions);
                 
@@ -1694,7 +1878,7 @@ class ViatorBookingManager {
             
             html += this.renderQuestionField(question, questionId, isRequired, false, null);
             
-            html += `<div class="error-message" id="error_${questionId}"></div>`;
+            html += `<div class="error-message" id="error_${questionId}" style="display: none;"></div>`;
             html += '</div>';
         });
         
@@ -1706,25 +1890,96 @@ class ViatorBookingManager {
      * Renderizar perguntas de reserva por viajante (PER_TRAVELER)
      */
     renderTravelerBookingQuestions(travelerIndex) {
+        console.log(`🔍 [DEBUG] renderTravelerBookingQuestions chamada para viajante ${travelerIndex}`);
+        console.log('🔍 [DEBUG] this.bookingQuestions disponíveis:', this.bookingQuestions);
+        
+        // Verificar se as perguntas têm o campo 'group' definido
+        this.bookingQuestions.forEach((q, index) => {
+            console.log(`🔍 [DEBUG] Pergunta ${index}: ID=${q.id}, group=${q.group}, label=${q.label}`);
+        });
+        
         const perTravelerQuestions = this.bookingQuestions.filter(q => q.group === 'PER_TRAVELER');
+        console.log(`🔍 [DEBUG] Perguntas filtradas PER_TRAVELER:`, perTravelerQuestions);
         
         if (perTravelerQuestions.length === 0) {
+            console.log('ℹ️ [DEBUG] Nenhuma pergunta PER_TRAVELER encontrada, retornando string vazia');
             return '';
         }
         
         let html = '<div class="traveler-booking-questions"><h5>📋 Informações Específicas do Viajante</h5>';
         
-        perTravelerQuestions.forEach(question => {
+        // Separar perguntas por tipo para reorganização
+        const nameQuestions = perTravelerQuestions.filter(q => 
+            q.id === 'FULL_NAMES_FIRST' || q.id === 'FIRST_NAME' || q.label.toLowerCase().includes('nome') || q.label.toLowerCase().includes('first name')
+        );
+        const surnameQuestions = perTravelerQuestions.filter(q => 
+            q.id === 'FULL_NAMES_LAST' || q.id === 'LAST_NAME' || q.label.toLowerCase().includes('sobrenome') || q.label.toLowerCase().includes('last name')
+        );
+        const ageBandQuestions = perTravelerQuestions.filter(q => 
+            q.id === 'AGEBAND' || q.label.toLowerCase().includes('idade') || q.label.toLowerCase().includes('faixa')
+        );
+        const otherQuestions = perTravelerQuestions.filter(q => 
+            !nameQuestions.includes(q) && !surnameQuestions.includes(q) && !ageBandQuestions.includes(q)
+        );
+        
+        // 1. Nome e Sobrenome lado a lado
+        if (nameQuestions.length > 0 || surnameQuestions.length > 0) {
+            html += '<div class="form-row">';
+            
+            // Campo Nome
+            if (nameQuestions.length > 0) {
+                const question = nameQuestions[0];
+                const questionId = `traveler_${travelerIndex}_question_${question.id}`;
+                const isRequired = question.required === 'MANDATORY';
+                const requiredMark = isRequired ? ' *' : '';
+                
+                html += '<div class="form-group col-md-6">';
+                html += `<label for="${questionId}">${question.label}${requiredMark}</label>`;
+                html += this.renderQuestionField(question, questionId, isRequired, true, travelerIndex);
+                html += `<div class="error-message" id="error_${questionId}" style="display: none;"></div>`;
+                html += '</div>';
+            }
+            
+            // Campo Sobrenome
+            if (surnameQuestions.length > 0) {
+                const question = surnameQuestions[0];
+                const questionId = `traveler_${travelerIndex}_question_${question.id}`;
+                const isRequired = question.required === 'MANDATORY';
+                const requiredMark = isRequired ? ' *' : '';
+                
+                html += '<div class="form-group col-md-6">';
+                html += `<label for="${questionId}">${question.label}${requiredMark}</label>`;
+                html += this.renderQuestionField(question, questionId, isRequired, true, travelerIndex);
+                html += `<div class="error-message" id="error_${questionId}" style="display: none;"></div>`;
+                html += '</div>';
+            }
+            
+            html += '</div>';
+        }
+        
+        // 2. Faixa Etária
+        ageBandQuestions.forEach(question => {
             const questionId = `traveler_${travelerIndex}_question_${question.id}`;
             const isRequired = question.required === 'MANDATORY';
             const requiredMark = isRequired ? ' *' : '';
             
             html += '<div class="booking-question-group">';
             html += `<label for="${questionId}">${question.label}${requiredMark}</label>`;
-            
             html += this.renderQuestionField(question, questionId, isRequired, true, travelerIndex);
+            html += `<div class="error-message" id="error_${questionId}" style="display: none;"></div>`;
+            html += '</div>';
+        });
+        
+        // 3. Demais campos (peso, etc.)
+        otherQuestions.forEach(question => {
+            const questionId = `traveler_${travelerIndex}_question_${question.id}`;
+            const isRequired = question.required === 'MANDATORY';
+            const requiredMark = isRequired ? ' *' : '';
             
-            html += `<div class="error-message" id="error_${questionId}"></div>`;
+            html += '<div class="booking-question-group">';
+            html += `<label for="${questionId}">${question.label}${requiredMark}</label>`;
+            html += this.renderQuestionField(question, questionId, isRequired, true, travelerIndex);
+            html += `<div class="error-message" id="error_${questionId}" style="display: none;"></div>`;
             html += '</div>';
         });
         
@@ -1737,6 +1992,8 @@ class ViatorBookingManager {
      */
     renderQuestionField(question, questionId, isRequired, isTraveler, travelerIndex) {
         let html = '';
+        // Usar classes CSS específicas para perguntas de reserva
+        const cssClass = isTraveler ? 'form-control' : 'form-control';
         const dataAttrs = `data-question-id="${question.id}" data-group="${question.group}" ${isTraveler ? `data-traveler="${travelerIndex}"` : ''}`;
         const requiredAttr = isRequired ? 'required' : '';
 
@@ -1746,22 +2003,45 @@ class ViatorBookingManager {
                 if (question.subType === 'LANGUAGE_GUIDE' || question.label.toLowerCase().includes('idioma') || question.label.toLowerCase().includes('language')) {
                     html += this.renderLanguageGuideSelection(questionId, dataAttrs, requiredAttr);
                 } else if (question.allowedAnswers && question.allowedAnswers.length > 0) {
-                    html += `<select id="${questionId}" name="${questionId}" ${dataAttrs} ${requiredAttr}>`;
+                    // Verificar se é uma pergunta de faixa etária (AGEBAND)
+                    const isAgeBand = question.id === 'AGEBAND' || questionId.includes('AGEBAND');
+                    
+                    html += `<select id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr}>`;
                     html += '<option value="">Selecione uma opção</option>';
+                    
                     question.allowedAnswers.forEach(answer => {
-                        html += `<option value="${answer}">${answer}</option>`;
+                        let displayText = answer;
+                        
+                        // Aplicar traduções para faixas etárias
+                        if (isAgeBand) {
+                            const ageBandTranslations = {
+                                'ADULT': 'Adulto (18+ anos)',
+                                'CHILD': 'Criança (2-17 anos)',
+                                'INFANT': 'Bebê (0-1 anos)',
+                                'SENIOR': 'Idoso (65+ anos)',
+                                'YOUTH': 'Jovem (12-17 anos)',
+                                'TODDLER': 'Criança pequena (2-4 anos)',
+                                'STUDENT': 'Estudante',
+                                'MILITARY': 'Militar',
+                                'TRAVELER': 'Viajante'
+                            };
+                            displayText = ageBandTranslations[answer] || answer;
+                        }
+                        
+                        html += `<option value="${answer}">${displayText}</option>`;
                     });
+                    
                     html += '</select>';
                 } else {
-                    html += `<input type="text" id="${questionId}" name="${questionId}" ${dataAttrs} ${requiredAttr} maxlength="${question.maxLength || ''}">`;
+                    html += `<input type="text" id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr} maxlength="${question.maxLength || ''}">`;
                 }
                 break;
 
             case 'NUMBER_AND_UNIT':
                 html += `<div class="question-with-unit">`;
-                html += `<input type="number" id="${questionId}" name="${questionId}" ${dataAttrs} ${requiredAttr}>`;
+                html += `<input type="number" id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr}>`;
                 if (question.units && question.units.length > 0) {
-                    html += `<select name="${questionId}_unit" data-question-id="${question.id}" ${isTraveler ? `data-traveler="${travelerIndex}"` : ''}>`;
+                    html += `<select name="${questionId}_unit" class="${cssClass}" data-question-id="${question.id}" ${isTraveler ? `data-traveler="${travelerIndex}"` : ''}>`;
                     question.units.forEach(unit => {
                         html += `<option value="${unit}">${unit}</option>`;
                     });
@@ -1776,20 +2056,20 @@ class ViatorBookingManager {
                     html += this.renderPickupPointSelection(question, questionId, dataAttrs, requiredAttr);
                 } else {
                     // Campo de texto livre para outras localizações
-                    html += `<input type="text" id="${questionId}" name="${questionId}" ${dataAttrs} ${requiredAttr} placeholder="${question.hint || 'Digite o local ou endereço'}">`;
+                    html += `<input type="text" id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr} placeholder="${question.hint || 'Digite o local ou endereço'}">`;
                 }
                 break;
 
             case 'DATE':
-                html += `<input type="date" id="${questionId}" name="${questionId}" ${dataAttrs} ${requiredAttr}>`;
+                html += `<input type="date" id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr}>`;
                 break;
 
             case 'TEXTAREA':
-                 html += `<textarea id="${questionId}" name="${questionId}" ${dataAttrs} rows="3" ${requiredAttr} placeholder="${question.hint || ''}"></textarea>`;
+                 html += `<textarea id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} rows="3" ${requiredAttr} placeholder="${question.hint || ''}"></textarea>`;
                  break;
 
             default:
-                html += `<input type="text" id="${questionId}" name="${questionId}" ${dataAttrs} ${requiredAttr} maxlength="${question.maxLength || ''}">`;
+                html += `<input type="text" id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr} maxlength="${question.maxLength || ''}">`;
         }
 
         return html;
@@ -2091,35 +2371,33 @@ class ViatorBookingManager {
         console.log('📝 [DEBUG] window.productData:', window.productData);
         console.log('📝 Renderizando perguntas de reserva na etapa de viajantes...');
 
-        const container = document.getElementById('booking-questions-container');
-        if (!container) {
-            console.error('❌ Container de perguntas de reserva não encontrado!');
+        const mainContainer = document.getElementById('traveler-booking-questions');
+        if (!mainContainer) {
+            console.error('❌ Container principal de perguntas não encontrado!');
             return;
         }
 
-        // Limpar container antes de renderizar
-        container.innerHTML = '<div id="general-booking-questions"></div><div id="traveler-booking-questions"></div>';
-        container.style.display = 'none';
+        // Limpar containers antes de renderizar
+        const generalContainer = document.getElementById('general-booking-questions');
+        const travelerContainer = document.getElementById('traveler-booking-questions-inner');
+
+        if (generalContainer) {
+            generalContainer.innerHTML = '';
+        }
+        if (travelerContainer) {
+            travelerContainer.innerHTML = '';
+        }
+
+        mainContainer.style.display = 'none';
 
         if (!this.bookingQuestions || this.bookingQuestions.length === 0) {
             console.log('ℹ️ [DEBUG] Nenhuma pergunta de reserva encontrada para este produto.');
-            console.log('ℹ️ [DEBUG] this.bookingQuestions:', this.bookingQuestions);
-            console.log('ℹ️ [DEBUG] window.productData.bookingQuestions:', window.productData?.bookingQuestions);
-            // Adicionar uma mensagem de depuração visível na UI
-            const debugMessage = document.createElement('div');
-            debugMessage.className = 'debug-message';
-            debugMessage.innerHTML = `
-                <strong>Debug: Nenhuma pergunta de reserva para renderizar.</strong><br>
-                this.bookingQuestions: ${JSON.stringify(this.bookingQuestions)}<br>
-                window.productData.bookingQuestions: ${JSON.stringify(window.productData?.bookingQuestions)}
-            `;
-            container.appendChild(debugMessage);
-            container.style.display = 'block';
+            if (generalContainer) {
+                generalContainer.innerHTML = `<div class='debug-message'><strong>Debug:</strong> Nenhuma pergunta de reserva para renderizar.</div>`;
+                generalContainer.style.display = 'block';
+            }
             return;
         }
-        
-        const generalContainer = document.getElementById('general-booking-questions');
-        const travelerContainer = document.getElementById('traveler-booking-questions');
 
         if (!generalContainer || !travelerContainer) {
             console.error('❌ Containers de perguntas de reserva não encontrados!');
@@ -2134,6 +2412,10 @@ class ViatorBookingManager {
         
         // Renderizar perguntas por viajante (PER_TRAVELER)
         const travelerQuestions = this.bookingQuestions.filter(q => q.group === 'PER_TRAVELER');
+        console.log('🔍 [DEBUG] Perguntas PER_TRAVELER encontradas:', travelerQuestions.length);
+        console.log('🔍 [DEBUG] Detalhes das perguntas PER_TRAVELER:', travelerQuestions);
+        console.log('🔍 [DEBUG] this.bookingData.selectedTravelers:', this.bookingData.selectedTravelers);
+        
         if (travelerQuestions.length > 0) {
             let travelerQuestionsHTML = '';
             
@@ -2144,21 +2426,73 @@ class ViatorBookingManager {
                         const travelerIndex = groupIndex * 10 + i; // Índice único para cada viajante
                         const travelerNumber = travelerIndex + 1;
                         
+                        console.log(`🔍 [DEBUG] Gerando perguntas para viajante ${travelerNumber} (índice ${travelerIndex})`);
+                        
                         travelerQuestionsHTML += `<div class="traveler-questions-section">`;
                         travelerQuestionsHTML += `<h5>👤 Viajante ${travelerNumber}</h5>`;
-                        travelerQuestionsHTML += this.renderTravelerBookingQuestions(travelerIndex);
+                        const travelerHTML = this.renderTravelerBookingQuestions(travelerIndex);
+                        console.log(`🔍 [DEBUG] HTML gerado para viajante ${travelerNumber}:`, travelerHTML);
+                        travelerQuestionsHTML += travelerHTML;
                         travelerQuestionsHTML += `</div>`;
                     }
                 });
             }
             
+            console.log('🔍 [DEBUG] HTML completo das perguntas de viajantes:', travelerQuestionsHTML);
             travelerContainer.innerHTML = travelerQuestionsHTML;
+        } else {
+            console.log('ℹ️ [DEBUG] Nenhuma pergunta PER_TRAVELER encontrada');
         }
         
         // Mostrar o container se há perguntas
         if (generalQuestions.length > 0 || travelerQuestions.length > 0) {
-            container.style.display = 'block';
+            mainContainer.style.display = 'block';
             console.log(`✅ ${generalQuestions.length} perguntas gerais e ${travelerQuestions.length} perguntas por viajante renderizadas.`);
+            
+            console.log('✅ [DEBUG] Container principal de perguntas mostrado');
+            console.log('🔍 [DEBUG] Conteúdo do container:', mainContainer.innerHTML);
+        } else {
+            console.log('ℹ️ [DEBUG] Nenhuma pergunta para renderizar, container permanece oculto');
+        }
+
+        // Adicionar listeners de validação após a renderização
+        const questionsContainer = document.getElementById('booking-questions-container');
+        if (questionsContainer) {
+            const handleValidation = (target) => {
+                if (target.matches('input[required], select[required], textarea[required]')) {
+                    const questionId = target.id;
+                    const errorDiv = document.getElementById(`error_${questionId}`);
+                    if (!target.value) {
+                        target.classList.add('is-invalid');
+                        if (errorDiv) {
+                            errorDiv.textContent = 'Este campo é obrigatório.';
+                            errorDiv.classList.add('show');
+                        }
+                    } else {
+                        target.classList.remove('is-invalid');
+                        if (errorDiv) {
+                            errorDiv.classList.remove('show');
+                        }
+                    }
+                }
+            };
+
+            questionsContainer.addEventListener('blur', (event) => {
+                handleValidation(event.target);
+            }, true);
+
+            questionsContainer.addEventListener('input', (event) => {
+                const target = event.target;
+                if (target.matches('input[required], select[required], textarea[required]')) {
+                    if (target.value) {
+                        target.classList.remove('is-invalid');
+                        const errorDiv = document.getElementById(`error_${target.id}`);
+                        if (errorDiv) {
+                            errorDiv.classList.remove('show');
+                        }
+                    }
+                }
+            }, true);
         }
     }
     

@@ -1,0 +1,6 @@
+# Ignora o diretório Vercel
+.vercel/
+# Ignora arquivos .log
+*.log
+# Ignora arquivos .txt
+*.txt

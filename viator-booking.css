@@ -257,6 +257,52 @@ body.viator-modal-open {
     flex: 1;
 }
 
+/* Estilos para o campo de telefone com seletor de país */
+.phone-group {
+    flex: 1;
+}
+
+.phone-input-container {
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+}
+
+.country-code-select {
+    flex: 0 0 200px;
+    min-width: 200px;
+    padding: 14px 16px;
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    font-size: 15px;
+    transition: all 0.3s ease;
+    background: white;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.country-code-select:focus {
+    border-color: #0056b3;
+    box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.1);
+    outline: none;
+}
+
+.phone-input {
+    flex: 1;
+    min-width: 0;
+}
+
+@media (max-width: 768px) {
+    .phone-input-container {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .country-code-select {
+        flex: 1;
+        min-width: auto;
+    }
+}
+
 /* Datepicker personalizado para o booking */
 .viator-booking-date-selector {
     display: flex;
@@ -1153,14 +1199,15 @@ body.viator-modal-open {
 }
 
 .booker-info-section {
-    background: white;
+    background: #f8f9fa;
     border: 1px solid #e9ecef;
     border-radius: 8px;
-    padding: 25px;
+    padding: 20px;
+    margin-bottom: 25px;
 }
 
 .booker-info-section h4 {
-    margin: 0 0 10px 0;
+    margin: 0 0 15px 0;
     color: #495057;
     font-size: 1.1rem;
     display: flex;
@@ -3090,19 +3137,18 @@ body.viator-modal-open {
 
 /* Container das perguntas de reserva */
 .booking-questions-section {
-    background: white;
+    background: #f8f9fa;
     border: 1px solid #e9ecef;
-    border-radius: 12px;
-    padding: 25px;
-    margin: 20px 0;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 25px;
 }
 
 .booking-questions-section h4 {
-    color: #0056b3;
-    font-size: 1.2rem;
+    color: #495057;
+    font-size: 1.1rem;
     font-weight: 600;
-    margin: 0 0 20px 0;
+    margin: 0 0 15px 0;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -3135,7 +3181,8 @@ body.viator-modal-open {
 .booking-question-group input[type="number"],
 .booking-question-group input[type="date"],
 .booking-question-group select,
-.booking-question-group textarea {
+.booking-question-group textarea,
+.booking-question-group .form-control {
     width: 100%;
     padding: 12px 16px;
     border: 2px solid #e9ecef;
@@ -3150,7 +3197,8 @@ body.viator-modal-open {
 
 .booking-question-group input:focus,
 .booking-question-group select:focus,
-.booking-question-group textarea:focus {
+.booking-question-group textarea:focus,
+.booking-question-group .form-control:focus {
     outline: none;
     border-color: #0056b3;
     box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.1);
@@ -3168,12 +3216,51 @@ body.viator-modal-open {
     align-items: center;
 }
 
-.question-with-unit input {
+.question-with-unit input,
+.question-with-unit .form-control[type="number"] {
     flex: 1;
 }
 
-.question-with-unit select {
+.question-with-unit select,
+.question-with-unit .form-control[name*="_unit"] {
     flex: 0 0 120px;
+}
+
+/* ===== ESTILOS PARA CAMPOS DA SEÇÃO BOOKER INFO ===== */
+
+.booker-info-section input[type="text"],
+.booker-info-section input[type="email"],
+.booker-info-section input[type="tel"],
+.booker-info-section select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #495057;
+    background: white;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+
+.booker-info-section input:focus,
+.booker-info-section select:focus {
+    outline: none;
+    border-color: #0056b3;
+    box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.1);
+}
+
+.booker-info-section .form-group {
+    margin-bottom: 20px;
+}
+
+.booker-info-section label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #495057;
+    font-size: 14px;
 }
 
 /* ===== ESTILOS PARA PICKUP POINTS ===== */
@@ -3316,7 +3403,81 @@ body.viator-modal-open {
     gap: 6px;
 }
 
+/* Garantir formatação consistente nos campos dos viajantes */
+.traveler-booking-questions .form-control,
+.traveler-booking-questions input[type="text"],
+.traveler-booking-questions input[type="number"],
+.traveler-booking-questions input[type="date"],
+.traveler-booking-questions select,
+.traveler-booking-questions textarea {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #495057;
+    background: white;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+
+.traveler-booking-questions .form-control:focus,
+.traveler-booking-questions input:focus,
+.traveler-booking-questions select:focus,
+.traveler-booking-questions textarea:focus {
+    outline: none;
+    border-color: #0056b3;
+    box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.1);
+}
+
+/* Formatação específica para form-row dentro das seções de viajantes */
+.traveler-booking-questions .form-row {
+    display: flex;
+    flex-wrap: nowrap !important;
+    margin-right: -15px;
+    margin-left: -15px;
+    gap: 0;
+}
+
+.traveler-booking-questions .form-row .form-group {
+    padding-right: 15px;
+    padding-left: 15px;
+    margin-bottom: 20px;
+    flex-shrink: 0;
+}
+
+.traveler-booking-questions .form-row .col-md-6 {
+    flex: 0 0 50% !important;
+    max-width: 50% !important;
+    min-width: 0;
+}
+
+.traveler-booking-questions .form-group label {
+    display: block;
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.traveler-booking-questions .form-group label .required-mark {
+    color: #dc3545;
+    margin-left: 2px;
+}
+
 /* Mensagens de erro */
+.error-message {
+    color: #dc3545;
+    font-size: 12px;
+    margin-top: 5px;
+    display: none;
+}
+
+.error-message.show {
+    display: block;
+}
+
 .booking-question-group .error-message {
     color: #dc3545;
     font-size: 12px;
@@ -3326,6 +3487,33 @@ body.viator-modal-open {
 
 .booking-question-group .error-message.show {
     display: block;
+}
+
+/* Mensagens de erro para campos de viajantes */
+.form-group .error-message {
+    color: #dc3545;
+    font-size: 12px;
+    margin-top: 5px;
+    display: none;
+}
+
+.form-group .error-message.show {
+    display: block;
+}
+
+/* Estilos para campos de formulário inválidos */
+.form-control.is-invalid {
+    border-color: #dc3545;
+    padding-right: calc(1.5em + .75rem);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right calc(.375em + .1875rem) center;
+    background-size: calc(.75em + .375rem) calc(.75em + .375rem);
+}
+
+.form-control.is-invalid:focus {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 .25rem rgba(220, 53, 69, .25);
 }
 
 /* Responsividade */
@@ -3351,6 +3539,22 @@ body.viator-modal-open {
     
     .question-with-unit select {
         flex: none;
+    }
+    
+    /* Responsividade para seções de viajantes */
+    .traveler-booking-questions .form-row {
+        margin-right: -10px;
+        margin-left: -10px;
+    }
+    
+    .traveler-booking-questions .form-row .form-group {
+        padding-right: 10px;
+        padding-left: 10px;
+    }
+    
+    .traveler-booking-questions .form-row .col-md-6 {
+        flex: 0 0 100%;
+        max-width: 100%;
     }
 }
 
@@ -3378,5 +3582,42 @@ body.viator-modal-open {
     
     .traveler-questions-section {
         padding: 15px;
+    }
+    
+    /* Responsividade móvel para seções de viajantes */
+    .traveler-booking-questions {
+        padding: 10px;
+    }
+    
+    .traveler-booking-questions .form-row {
+        margin-right: -5px;
+        margin-left: -5px;
+    }
+    
+    .traveler-booking-questions .form-row .form-group {
+        padding-right: 5px;
+        padding-left: 5px;
+        margin-bottom: 15px;
+    }
+}
+
+/* Regras específicas para forçar campos lado a lado - Sobrescrever qualquer flex-wrap */
+.traveler-booking-questions .form-row,
+#traveler-booking-questions .form-row,
+.viator-booking-form .traveler-booking-questions .form-row,
+.elementor-widget-container .traveler-booking-questions .form-row,
+.elementor-section .traveler-booking-questions .form-row {
+    flex-wrap: nowrap !important;
+}
+
+/* Media query para manter lado a lado mesmo em telas menores */
+@media (min-width: 480px) {
+    .traveler-booking-questions .form-row .col-md-6,
+    #traveler-booking-questions .form-row .col-md-6,
+    .viator-booking-form .traveler-booking-questions .form-row .col-md-6,
+    .elementor-widget-container .traveler-booking-questions .form-row .col-md-6,
+    .elementor-section .traveler-booking-questions .form-row .col-md-6 {
+        flex: 0 0 50% !important;
+        max-width: 50% !important;
     }
 }

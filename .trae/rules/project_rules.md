@@ -1,0 +1,1 @@
+To test a product/tour page in this project, use a URL in this example format http://ingressos-e-passeioscom.local/passeio/6613GRANDCELE/ or in this format http://localhost:{port}/passeio/6613GRANDCELE.

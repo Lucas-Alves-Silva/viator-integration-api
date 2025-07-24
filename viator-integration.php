@@ -31,8 +31,47 @@ function viator_rewrite_rules() {
         'index.php?pagename=atracoes&attraction_id=$matches[1]',
         'top'
     );
+    
+    // Debug: log das rewrite rules
+    error_log('🔍 [REWRITE DEBUG] Viator rewrite rules added');
 }
 add_action('init', 'viator_rewrite_rules');
+
+// Force flush rewrite rules on plugin activation
+function viator_flush_rewrite_rules() {
+    viator_rewrite_rules();
+    flush_rewrite_rules();
+    error_log('🔍 [REWRITE DEBUG] Rewrite rules flushed');
+}
+register_activation_hook(__FILE__, 'viator_flush_rewrite_rules');
+
+// Debug function to manually flush rewrite rules
+function viator_debug_rewrite_rules() {
+    if (isset($_GET['viator_flush_rules']) && current_user_can('manage_options')) {
+        viator_rewrite_rules();
+        flush_rewrite_rules();
+        
+        // Test query vars
+        $product_code = get_query_var('product_code');
+        $current_url = $_SERVER['REQUEST_URI'];
+        
+        echo '<div style="background: #fff; padding: 20px; margin: 20px; border: 1px solid #ccc;">';
+        echo '<h3>Viator Rewrite Rules Debug</h3>';
+        echo '<p><strong>Rewrite rules flushed successfully!</strong></p>';
+        echo '<p><strong>Current URL:</strong> ' . esc_html($current_url) . '</p>';
+        echo '<p><strong>Product Code from query var:</strong> ' . ($product_code ? esc_html($product_code) : 'EMPTY') . '</p>';
+        echo '<p><strong>$_GET parameters:</strong> ' . esc_html(print_r($_GET, true)) . '</p>';
+        
+        global $wp_rewrite;
+        echo '<p><strong>WordPress rewrite rules (first 10):</strong></p>';
+        echo '<pre>' . esc_html(print_r(array_slice($wp_rewrite->wp_rewrite_rules(), 0, 10, true), true)) . '</pre>';
+        echo '</div>';
+        
+        error_log('🔍 [REWRITE DEBUG] Manual flush completed. Product code: ' . ($product_code ? $product_code : 'EMPTY'));
+        exit;
+    }
+}
+add_action('init', 'viator_debug_rewrite_rules');
 
 // Add product_code as a query var
 function viator_query_vars($query_vars) {
@@ -5140,14 +5179,8 @@ function viator_handle_attraction_page() {
 }
 add_action('template_redirect', 'viator_handle_attraction_page');
 
-// Função para limpar e recriar regras de reescrita
-function viator_flush_rewrite_rules() {
-    viator_rewrite_rules();
-    flush_rewrite_rules();
-}
-
-// Ativar na ativação do plugin
-register_activation_hook(__FILE__, 'viator_flush_rewrite_rules');
+// Ativar na ativação do plugin (função já declarada anteriormente)
+// register_activation_hook(__FILE__, 'viator_flush_rewrite_rules');
 
 // Função para testar uma atração específica (para debug)
 function viator_test_attraction() {
