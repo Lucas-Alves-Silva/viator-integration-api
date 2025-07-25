@@ -1966,6 +1966,149 @@ body.viator-modal-open {
         text-align: center;
     }
 
+    /* Melhorias para viator-modal-footer em mobile */
+    .viator-modal-footer {
+        padding: 12px 15px !important;
+    }
+    
+    .footer-price-summary {
+        padding: 10px 15px !important;
+    }
+    
+    .footer-buttons {
+        padding: 12px 15px !important;
+        gap: 8px !important;
+    }
+    
+    .viator-btn-primary,
+    .viator-btn-secondary,
+    .viator-btn-cancel {
+        padding: 10px 16px !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+    }
+    
+    .total-price {
+        font-size: 14px !important;
+    }
+    
+    .total-amount {
+        font-size: 16px !important;
+    }
+    
+    .price-breakdown .price-line {
+        font-size: 12px !important;
+        padding: 3px 0 !important;
+    }
+
+    /* Melhorias para travelers-step em mobile */
+    .travelers-step {
+        min-height: 150px !important;
+    }
+    
+    .traveler-summary-section {
+        padding: 15px !important;
+        margin-bottom: 15px !important;
+    }
+    
+    .traveler-summary-section h4 {
+        font-size: 1rem !important;
+        margin-bottom: 12px !important;
+    }
+    
+    .booker-info-section {
+        padding: 15px !important;
+        margin-bottom: 15px !important;
+    }
+    
+    .booker-info-section h4 {
+        font-size: 1rem !important;
+        margin-bottom: 12px !important;
+    }
+    
+    .traveler-form {
+        padding: 15px !important;
+        margin-bottom: 15px !important;
+    }
+    
+    .traveler-form h4 {
+        font-size: 1rem !important;
+        margin-bottom: 12px !important;
+    }
+    
+    .travelers-summary-list .summary-item {
+        padding: 10px 12px !important;
+        gap: 8px !important;
+        font-size: 13px !important;
+    }
+    
+    .booker-note {
+        font-size: 0.9rem !important;
+        margin-bottom: 15px !important;
+    }
+    
+    /* Melhorias para formulários em travelers-step mobile */
+    .travelers-step .form-group {
+        margin-bottom: 12px !important;
+    }
+    
+    .travelers-step .form-control,
+    .travelers-step input,
+    .travelers-step select,
+    .travelers-step textarea {
+        min-height: 42px !important;
+        padding: 8px 12px !important;
+        font-size: 14px !important;
+        border-radius: 6px !important;
+    }
+    
+    .travelers-step label {
+        font-size: 13px !important;
+        margin-bottom: 6px !important;
+        font-weight: 500 !important;
+    }
+    
+    .travelers-step .form-row {
+        margin-bottom: 10px !important;
+    }
+    
+    .travelers-step .form-row .form-group {
+        padding-right: 8px !important;
+        padding-left: 8px !important;
+    }
+    
+    /* Seções específicas em mobile */
+    #additional-booking-info-section {
+        padding: 15px !important;
+        margin-bottom: 15px !important;
+    }
+    
+    #additional-booking-info-section h4 {
+        font-size: 1rem !important;
+        margin-bottom: 12px !important;
+    }
+    
+    .additional-info-row {
+        flex-direction: column !important;
+        gap: 15px !important;
+    }
+    
+    .language-guide-column,
+    .general-questions-column {
+        flex: 1 1 100% !important;
+        max-width: 100% !important;
+    }
+    
+    .pickup-point-options {
+        padding: 15px !important;
+        margin-bottom: 15px !important;
+    }
+    
+    .pickup-point-options h4 {
+        font-size: 1rem !important;
+        margin-bottom: 12px !important;
+    }
+
     /* Product options mobile */
     .product-option-card {
         padding: 12px;
