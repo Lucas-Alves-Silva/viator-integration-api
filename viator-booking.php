@@ -870,16 +870,85 @@ class ViatorBookingSystem {
         // Reindexar o array para garantir que as chaves sejam numéricas sequenciais
         $booking_questions = array_values($booking_questions);
 
-        viator_debug_log('Perguntas de reserva filtradas para o produto ' . $product_code, $booking_questions);
+        // Enriquecer perguntas com dados dinâmicos da API e fallbacks quando necessário
+        $enriched_questions = [];
+        foreach ($booking_questions as $question) {
+            $enriched_question = $this->enrich_booking_question($question);
+            $enriched_questions[] = $enriched_question;
+        }
+
+        viator_debug_log('Perguntas de reserva enriquecidas para o produto ' . $product_code, $enriched_questions);
         
         // Armazenar no transient por 1 hora
-        set_transient($transient_key, $booking_questions, HOUR_IN_SECONDS);
+        set_transient($transient_key, $enriched_questions, HOUR_IN_SECONDS);
         
-        return $booking_questions;
+        return $enriched_questions;
     }
 
     /**
-     * Criar objeto de pergunta de reserva baseado no ID
+     * Enriquecer pergunta de reserva com dados dinâmicos da API e fallbacks
+     * Preserva todos os atributos originais da API e adiciona traduções/melhorias
+     */
+    private function enrich_booking_question($api_question) {
+        // Começar com os dados originais da API
+        $enriched_question = $api_question;
+        
+        // Aplicar traduções e melhorias específicas baseadas no ID
+        $question_id = $api_question['id'] ?? '';
+        
+        // Mapeamento de traduções e melhorias
+        $translations_and_improvements = [
+            'PICKUP_POINT' => [
+                'label' => 'Ponto de Encontro',
+                'hint' => 'Selecione o local de encontro ou digite um endereço específico'
+            ],
+            'SPECIAL_REQUIREMENTS' => [
+                'label' => 'Requisitos Especiais',
+                'hint' => 'Restrições alimentares, acessibilidade, etc.'
+            ],
+            'FULL_NAMES_FIRST' => [
+                'label' => 'Nome'
+            ],
+            'FULL_NAMES_LAST' => [
+                'label' => 'Sobrenome'
+            ],
+            'AGEBAND' => [
+                'label' => 'Faixa Etária'
+            ],
+            'WEIGHT' => [
+                'label' => 'Peso do viajante (necessário por motivos de segurança)'
+            ],
+            'HEIGHT' => [
+                'label' => 'Altura do viajante (necessário por motivos de segurança)'
+            ]
+        ];
+        
+        // Aplicar traduções se disponíveis
+        if (isset($translations_and_improvements[$question_id])) {
+            $improvements = $translations_and_improvements[$question_id];
+            foreach ($improvements as $key => $value) {
+                $enriched_question[$key] = $value;
+            }
+        }
+        
+        // Garantir que campos essenciais existam
+        if (!isset($enriched_question['required'])) {
+            $enriched_question['required'] = 'OPTIONAL';
+        }
+        
+        if (!isset($enriched_question['group'])) {
+            // Determinar grupo baseado no ID
+            $per_traveler_questions = ['FULL_NAMES_FIRST', 'FULL_NAMES_LAST', 'AGEBAND', 'WEIGHT', 'HEIGHT'];
+            $enriched_question['group'] = in_array($question_id, $per_traveler_questions) ? 'PER_TRAVELER' : 'PER_BOOKING';
+        }
+        
+        viator_debug_log('Pergunta enriquecida: ' . $question_id, $enriched_question);
+        
+        return $enriched_question;
+    }
+
+    /**
+     * Criar objeto de pergunta de reserva baseado no ID (FALLBACK)
      * Baseado na documentação: https://partnerresources.viator.com/travel-commerce/merchant/implementing-booking-questions/
      */
     private function create_booking_question_from_id($question_id) {

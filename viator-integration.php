@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Plugin Name: Viator API Integration
  * Description: Integração com a API da Viator para exibição de produtos e passeios. Utilize o shortcode [viator_search]
@@ -113,8 +113,18 @@ function viator_register_settings() {
     register_setting('viator_settings', 'viator_language');
     register_setting('viator_settings', 'viator_currency');
     register_setting('viator_settings', 'viator_enable_geolocation');
+    register_setting('viator_settings', 'viator_google_places_api_key');
 }
 add_action('admin_init', 'viator_register_settings');
+
+/**
+ * Função para obter a chave API do Google Places
+ * @return string|false A chave API ou false se não estiver configurada
+ */
+function viator_get_google_places_api_key() {
+    $api_key = get_option('viator_google_places_api_key');
+    return !empty($api_key) ? $api_key : false;
+}
 
 // Settings page content
 function viator_settings_page() {
@@ -128,14 +138,24 @@ function viator_settings_page() {
             ?>
             <table class="form-table">
                 <tr>
-                    <th scope="row">API Key</th>
+                    <th scope="row">API Key Viator</th>
                     <td>
                         <input type="text" 
                                name="viator_api_key" 
                                value="<?php echo esc_attr(get_option('viator_api_key')); ?>" 
                                class="regular-text"
                                required>
-                        <p class="description">Insira sua chave API aqui.</p>
+                        <p class="description">Insira sua chave API da Viator aqui.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">Google Places API Key</th>
+                    <td>
+                        <input type="text" 
+                               name="viator_google_places_api_key" 
+                               value="<?php echo esc_attr(get_option('viator_google_places_api_key')); ?>" 
+                               class="regular-text">
+                        <p class="description">Insira sua chave API do Google Places para funcionalidades de localização e autocomplete de endereços. <a href="https://developers.google.com/maps/documentation/places/web-service/get-api-key" target="_blank">Como obter uma chave API</a></p>
                     </td>
                 </tr>
                 <tr>

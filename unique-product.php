@@ -2411,6 +2411,11 @@ function viator_enqueue_product_scripts() {
                 if (isset($product_data['languageGuides'])) {
                     $js_data['languageGuides'] = $product_data['languageGuides'];
                 }
+
+                // Adicionar dados de logística se disponíveis
+                if (isset($product_data['logistics'])) {
+                    $js_data['logistics'] = $product_data['logistics'];
+                }
                 
                 // Adicionar script inline com os dados do produto
                 if (!empty($js_data)) {
@@ -3272,6 +3277,37 @@ function viator_clear_locations_cache_ajax() {
 add_action('wp_ajax_viator_clear_locations_cache', 'viator_clear_locations_cache_ajax');
 
 /**
+ * AJAX handler para obter detalhes de localização via /locations/bulk
+ */
+function viator_get_location_details_ajax() {
+    // Verificar nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'viator_booking_nonce')) {
+        wp_send_json_error('Nonce inválido');
+        return;
+    }
+    
+    // Obter referências de localização
+    $location_refs = isset($_POST['location_refs']) ? json_decode(stripslashes($_POST['location_refs']), true) : [];
+    
+    if (empty($location_refs) || !is_array($location_refs)) {
+        wp_send_json_error('Referências de localização não fornecidas');
+        return;
+    }
+    
+    // Buscar detalhes via API /locations/bulk
+    $location_details = viator_get_bulk_locations($location_refs);
+    
+    if (empty($location_details)) {
+        wp_send_json_error('Nenhum detalhe de localização encontrado');
+        return;
+    }
+    
+    wp_send_json_success($location_details);
+}
+add_action('wp_ajax_viator_get_location_details', 'viator_get_location_details_ajax');
+add_action('wp_ajax_nopriv_viator_get_location_details', 'viator_get_location_details_ajax');
+
+/**
  * Get the base URL for Viator API
  */
 function viator_get_api_base_url() {
@@ -3547,6 +3583,8 @@ function viator_get_bulk_locations($location_references) {
     $body = wp_remote_retrieve_body($response);
     $data = json_decode($body, true);
     
+
+    
     if (!isset($data['locations']) || !is_array($data['locations'])) {
         viator_debug_log('Invalid response format for bulk locations:', $data);
         return [];
@@ -3560,6 +3598,27 @@ function viator_get_bulk_locations($location_references) {
             if (!isset($location['name']) || empty($location['name'])) {
                 $location['name'] = viator_translate_location_reference($location['reference']);
             }
+            
+            // Para localizações que só têm provider/providerReference (sem endereço)
+            // buscar detalhes via Google Places API se disponível
+            if (!isset($location['address']) && isset($location['provider']) && isset($location['providerReference'])) {
+                if ($location['provider'] === 'GOOGLE') {
+                    // Tentar buscar detalhes do local via Google Places API
+                    $place_details = viator_get_google_place_details($location['providerReference']);
+                    if ($place_details) {
+                        $location['address'] = $place_details['address'];
+                        $location['name'] = $place_details['name'] ?: $location['name'];
+                        $location['contextInfo'] = 'Detalhes obtidos via Google Places';
+                    } else {
+                        $location['contextInfo'] = 'Local específico identificado via Google Maps';
+                    }
+                } elseif ($location['provider'] === 'TRIPADVISOR') {
+                    $location['contextInfo'] = 'Ponto de interesse conhecido no TripAdvisor';
+                } else {
+                    $location['contextInfo'] = 'Local identificado pelo fornecedor';
+                }
+            }
+            
             $processed_locations[] = $location;
         }
     }
@@ -3614,6 +3673,119 @@ function viator_get_location_icon($location) {
         // Default location pin icon
         return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>';
     }
+}
+
+/**
+ * Buscar detalhes de um local via Google Places API usando place_id
+ * 
+ * @param string $place_id O place_id do Google Places (providerReference)
+ * @return array|null Array com dados do local ou null se não encontrado
+ */
+function viator_get_google_place_details($place_id) {
+    // Verificar se temos a API key do Google configurada
+    $google_api_key = get_option('viator_google_places_api_key');
+    if (empty($google_api_key)) {
+        return null;
+    }
+    
+    // Cache key baseado no place_id
+    $cache_key = 'google_place_' . md5($place_id);
+    $cached_data = get_transient($cache_key);
+    
+    if (false !== $cached_data) {
+        return $cached_data;
+    }
+    
+    // URL da API Google Places Details
+    $url = 'https://maps.googleapis.com/maps/api/place/details/json';
+    $params = [
+        'place_id' => $place_id,
+        'key' => $google_api_key,
+        'fields' => 'name,formatted_address,address_components,geometry',
+        'language' => 'pt-BR' // Português brasileiro
+    ];
+    
+    $request_url = $url . '?' . http_build_query($params);
+    
+    $response = wp_remote_get($request_url, [
+        'timeout' => 10
+    ]);
+    
+    if (is_wp_error($response)) {
+        return null;
+    }
+    
+    $response_code = wp_remote_retrieve_response_code($response);
+    if ($response_code !== 200) {
+        return null;
+    }
+    
+    $body = wp_remote_retrieve_body($response);
+    $data = json_decode($body, true);
+    
+    if (!isset($data['result']) || $data['status'] !== 'OK') {
+        return null;
+    }
+    
+    $result = $data['result'];
+    
+    // Processar os dados do local
+    $place_details = [
+        'name' => $result['name'] ?? '',
+        'formatted_address' => $result['formatted_address'] ?? '',
+        'address' => []
+    ];
+    
+    // Processar componentes do endereço para formato compatível com Viator
+    if (isset($result['address_components'])) {
+        $address_components = [];
+        
+        foreach ($result['address_components'] as $component) {
+            $types = $component['types'];
+            $long_name = $component['long_name'];
+            
+            if (in_array('street_number', $types)) {
+                $address_components['street_number'] = $long_name;
+            } elseif (in_array('route', $types)) {
+                $address_components['route'] = $long_name;
+            } elseif (in_array('locality', $types) || in_array('administrative_area_level_2', $types)) {
+                $address_components['city'] = $long_name;
+            } elseif (in_array('administrative_area_level_1', $types)) {
+                $address_components['state'] = $long_name;
+            } elseif (in_array('country', $types)) {
+                $address_components['country'] = $long_name;
+            } elseif (in_array('postal_code', $types)) {
+                $address_components['postcode'] = $long_name;
+            }
+        }
+        
+        // Montar endereço no formato esperado pelo sistema
+        $street_parts = [];
+        if (!empty($address_components['street_number'])) {
+            $street_parts[] = $address_components['street_number'];
+        }
+        if (!empty($address_components['route'])) {
+            $street_parts[] = $address_components['route'];
+        }
+        
+        $place_details['address'] = [
+            'street' => implode(' ', $street_parts),
+            'city' => $address_components['city'] ?? '',
+            'state' => $address_components['state'] ?? '',
+            'country' => $address_components['country'] ?? '',
+            'postcode' => $address_components['postcode'] ?? ''
+        ];
+    }
+    
+    // Se não conseguimos processar os componentes, usar o endereço formatado
+    if (empty($place_details['address']['street']) && empty($place_details['address']['city'])) {
+        $place_details['address']['street'] = $place_details['formatted_address'];
+    }
+    
+    // Cache por 7 dias
+    set_transient($cache_key, $place_details, 7 * DAY_IN_SECONDS);
+    
+    return $place_details;
 }
 
 /**
