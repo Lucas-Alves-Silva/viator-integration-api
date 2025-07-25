@@ -1423,6 +1423,9 @@ class ViatorBookingManager {
         
         // Configurar seletor de país e máscara de telefone
         this.setupCountryCodeSelector();
+        
+        // Configurar validações para perguntas de reserva
+        this.setupBookingQuestionsValidation();
     }
     
     setupBookerInfoValidation() {
@@ -1433,22 +1436,27 @@ class ViatorBookingManager {
         
         // Função para limpar erro de campo específico
         const clearFieldError = (field) => {
-            field.classList.remove('error');
-            const existingError = field.parentNode.querySelector('.error-message');
-            if (existingError) {
-                existingError.remove();
+            field.classList.remove('is-invalid');
+            let errorDiv = document.getElementById(`error_${field.id}`);
+            if (errorDiv) {
+                errorDiv.style.display = 'none';
+                errorDiv.classList.remove('show');
             }
         };
         
         // Função para mostrar erro de campo específico
         const showFieldError = (field, message) => {
-            clearFieldError(field);
-            field.classList.add('error');
-            
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'error-message';
+            field.classList.add('is-invalid');
+            let errorDiv = document.getElementById(`error_${field.id}`);
+            if (!errorDiv) {
+                errorDiv = document.createElement('div');
+                errorDiv.id = `error_${field.id}`;
+                errorDiv.className = 'error-message';
+                field.parentNode.appendChild(errorDiv);
+            }
             errorDiv.textContent = message;
-            field.parentNode.appendChild(errorDiv);
+            errorDiv.style.display = 'block';
+            errorDiv.classList.add('show');
         };
         
         // Validação em tempo real para nome
@@ -1780,6 +1788,296 @@ class ViatorBookingManager {
         updatePhoneMask();
         
         console.log('✅ Seletor de país e máscara de telefone configurados');
+    }
+    
+    /**
+     * Configurar validações avançadas para perguntas de reserva
+     */
+    setupBookingQuestionsValidation() {
+        console.log('🔧 Configurando validações para perguntas de reserva...');
+        
+        // Aguardar um pouco para garantir que as perguntas foram renderizadas
+        setTimeout(() => {
+            this.initializeBookingQuestionsValidation();
+        }, 500);
+    }
+    
+    /**
+     * Inicializar validações para perguntas de reserva
+     */
+    initializeBookingQuestionsValidation() {
+        const questionsContainers = [
+            document.getElementById('general-booking-questions'),
+            document.getElementById('traveler-booking-questions-inner')
+        ];
+        
+        questionsContainers.forEach(container => {
+            if (!container) return;
+            
+            // Configurar validações para todos os campos de perguntas
+            const questionFields = container.querySelectorAll('input, select, textarea');
+            
+            questionFields.forEach(field => {
+                this.setupFieldValidation(field);
+            });
+            
+            // Configurar validação condicional
+            this.setupConditionalValidation(container);
+        });
+        
+        console.log('✅ Validações de perguntas de reserva configuradas');
+    }
+    
+    /**
+     * Configurar validação para um campo específico
+     */
+    setupFieldValidation(field) {
+        if (!field.id) return;
+        
+        const questionId = field.id;
+        const maxLength = field.dataset.maxLength;
+        const hint = field.dataset.hint;
+        const isRequired = field.hasAttribute('required');
+        
+        // Função para limpar erro
+        const clearError = () => {
+            field.classList.remove('is-invalid');
+            const errorDiv = document.getElementById(`error_${questionId}`);
+            if (errorDiv) {
+                errorDiv.style.display = 'none';
+                errorDiv.textContent = '';
+            }
+        };
+        
+        // Função para mostrar erro
+        const showError = (message) => {
+            field.classList.add('is-invalid');
+            let errorDiv = document.getElementById(`error_${questionId}`);
+            if (!errorDiv) {
+                errorDiv = document.createElement('div');
+                errorDiv.id = `error_${questionId}`;
+                errorDiv.className = 'error-message';
+                field.parentNode.appendChild(errorDiv);
+            }
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        };
+        
+        // Validação em tempo real (input)
+        field.addEventListener('input', () => {
+            const value = field.value.trim();
+            
+            // Validação de maxLength
+            if (maxLength && value.length > parseInt(maxLength)) {
+                showError(`Máximo de ${maxLength} caracteres permitidos.`);
+                return;
+            }
+            
+            // Limpar erro se o campo está válido
+            if (!isRequired || value) {
+                clearError();
+            }
+            
+            // Atualizar contador de caracteres se existir
+            this.updateCharacterCounter(questionId, value.length, maxLength);
+        });
+        
+        // Validação ao sair do campo (blur)
+        field.addEventListener('blur', () => {
+            this.validateField(field, showError, clearError);
+        });
+        
+        // maxLength validation is handled by the maxlength attribute
+    }
+    
+    /**
+     * Validar um campo específico
+     */
+    validateField(field, showError, clearError) {
+        const value = field.value.trim();
+        const isRequired = field.hasAttribute('required');
+        const maxLength = field.dataset.maxLength;
+        const fieldType = field.type || field.tagName.toLowerCase();
+        
+        // Verificar se é obrigatório
+        if (isRequired && !value) {
+            showError('Este campo é obrigatório.');
+            return false;
+        }
+        
+        // Se não há valor e não é obrigatório, está válido
+        if (!value) {
+            clearError();
+            return true;
+        }
+        
+        // Validação de maxLength
+        if (maxLength && value.length > parseInt(maxLength)) {
+            showError(`Máximo de ${maxLength} caracteres permitidos.`);
+            return false;
+        }
+        
+        // Validações específicas por tipo
+        switch (fieldType) {
+            case 'email':
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(value)) {
+                    showError('Por favor, informe um email válido.');
+                    return false;
+                }
+                break;
+                
+            case 'tel':
+            case 'phone':
+                const digitsOnly = value.replace(/[^\d]/g, '');
+                if (digitsOnly.length < 10) {
+                    showError('O telefone deve ter pelo menos 10 dígitos.');
+                    return false;
+                }
+                break;
+                
+            case 'number':
+                if (isNaN(value) || value === '') {
+                    showError('Por favor, informe um número válido.');
+                    return false;
+                }
+                break;
+                
+            case 'date':
+                const dateValue = new Date(value);
+                if (isNaN(dateValue.getTime())) {
+                    showError('Por favor, informe uma data válida.');
+                    return false;
+                }
+                break;
+        }
+        
+        // Validações específicas por ID da pergunta
+        if (field.id.includes('weight') || field.id.includes('peso')) {
+            const weight = parseFloat(value);
+            if (weight <= 0 || weight > 500) {
+                showError('Por favor, informe um peso válido (1-500 kg).');
+                return false;
+            }
+        }
+        
+        if (field.id.includes('height') || field.id.includes('altura')) {
+            const height = parseFloat(value);
+            if (height <= 0 || height > 300) {
+                showError('Por favor, informe uma altura válida (1-300 cm).');
+                return false;
+            }
+        }
+        
+        clearError();
+        return true;
+    }
+    
+
+    
+    /**
+     * Configurar validação condicional
+     */
+    setupConditionalValidation(container) {
+        const conditionalFields = container.querySelectorAll('[data-conditional-parent]');
+        
+        conditionalFields.forEach(field => {
+            const parentId = field.dataset.conditionalParent;
+            const showWhen = field.dataset.conditionalValue;
+            const parentField = document.getElementById(parentId);
+            
+            if (!parentField) return;
+            
+            // Função para verificar visibilidade
+            const checkVisibility = () => {
+                const parentValue = parentField.value;
+                const shouldShow = !showWhen || parentValue === showWhen;
+                
+                const fieldContainer = field.closest('.booking-question-group');
+                if (fieldContainer) {
+                    if (shouldShow) {
+                        fieldContainer.style.display = 'block';
+                        // Restaurar atributo required se necessário
+                        if (field.dataset.originalRequired === 'true') {
+                            field.setAttribute('required', 'required');
+                        }
+                    } else {
+                        fieldContainer.style.display = 'none';
+                        // Remover atributo required temporariamente
+                        if (field.hasAttribute('required')) {
+                            field.dataset.originalRequired = 'true';
+                            field.removeAttribute('required');
+                        }
+                        // Limpar valor e erro
+                        field.value = '';
+                        field.classList.remove('is-invalid');
+                        const errorDiv = document.getElementById(`error_${field.id}`);
+                        if (errorDiv) {
+                            errorDiv.style.display = 'none';
+                        }
+                    }
+                }
+            };
+            
+            // Verificar visibilidade inicial
+            checkVisibility();
+            
+            // Escutar mudanças no campo pai
+            parentField.addEventListener('change', checkVisibility);
+            parentField.addEventListener('input', checkVisibility);
+        });
+    }
+    
+    /**
+     * Validar todas as perguntas de reserva
+     */
+    validateAllBookingQuestions() {
+        let isValid = true;
+        const questionsContainers = [
+            document.getElementById('general-booking-questions'),
+            document.getElementById('traveler-booking-questions-inner')
+        ];
+        
+        questionsContainers.forEach(container => {
+            if (!container) return;
+            
+            const fields = container.querySelectorAll('input, select, textarea');
+            fields.forEach(field => {
+                // Pular campos ocultos (condicionais)
+                const fieldContainer = field.closest('.booking-question-group');
+                if (fieldContainer && fieldContainer.style.display === 'none') {
+                    return;
+                }
+                
+                const fieldValid = this.validateField(field, 
+                    (message) => {
+                        field.classList.add('is-invalid');
+                        let errorDiv = document.getElementById(`error_${field.id}`);
+                        if (!errorDiv) {
+                            errorDiv = document.createElement('div');
+                            errorDiv.id = `error_${field.id}`;
+                            errorDiv.className = 'error-message';
+                            field.parentNode.appendChild(errorDiv);
+                        }
+                        errorDiv.textContent = message;
+                        errorDiv.style.display = 'block';
+                    },
+                    () => {
+                        field.classList.remove('is-invalid');
+                        const errorDiv = document.getElementById(`error_${field.id}`);
+                        if (errorDiv) {
+                            errorDiv.style.display = 'none';
+                        }
+                    }
+                );
+                
+                if (!fieldValid) {
+                    isValid = false;
+                }
+            });
+        });
+        
+        return isValid;
     }
     
     async initializePaymentStep() {
@@ -2318,6 +2616,14 @@ class ViatorBookingManager {
             dataAttrs += ` data-original-required="CONDITIONAL"`;
         }
         
+        // Adicionar atributos de validação
+        if (question.maxLength) {
+            dataAttrs += ` data-max-length="${question.maxLength}"`;
+        }
+        if (question.hint) {
+            dataAttrs += ` data-hint="${question.hint.replace(/"/g, '&quot;')}"`;
+        }
+        
         const requiredAttr = isRequired ? 'required' : '';
 
         switch (question.type) {
@@ -2356,12 +2662,23 @@ class ViatorBookingManager {
                     
                     html += '</select>';
                 } else {
-                    // Placeholder específico para requisitos especiais
+                    // Placeholder específico para requisitos especiais ou usar hint
                     let placeholderAttr = '';
                     if (question.id === 'SPECIAL_REQUIREMENTS') {
                         placeholderAttr = ' placeholder="Restrições alimentares, acessibilidade, etc."';
+                    } else if (question.hint) {
+                        placeholderAttr = ` placeholder="${question.hint.replace(/"/g, '&quot;')}"`;
                     }
-                    html += `<input type="text" id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr} maxlength="${question.maxLength || ''}"${placeholderAttr}>`;
+                    
+                    const maxLengthAttr = question.maxLength ? ` maxlength="${question.maxLength}"` : '';
+                    html += `<input type="text" id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr}${maxLengthAttr}${placeholderAttr}>`;
+                    
+                    // maxLength validation is handled by the maxlength attribute
+                    
+                    // Adicionar hint como texto de ajuda se disponível
+                    if (question.hint && question.id !== 'SPECIAL_REQUIREMENTS') {
+                        html += `<small class="form-text text-muted">${question.hint}</small>`;
+                    }
                 }
                 break;
 
@@ -2398,21 +2715,41 @@ class ViatorBookingManager {
                 break;
 
             case 'TEXTAREA':
-                // Placeholder específico para requisitos especiais
+                // Placeholder específico para requisitos especiais ou usar hint
                 let placeholderText = question.hint || '';
                 if (question.id === 'SPECIAL_REQUIREMENTS') {
                     placeholderText = 'Restrições alimentares, acessibilidade, etc.';
                 }
-                html += `<textarea id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} rows="3" ${requiredAttr} placeholder="${placeholderText}"></textarea>`;
+                
+                const maxLengthAttr = question.maxLength ? ` maxlength="${question.maxLength}"` : '';
+                html += `<textarea id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} rows="3" ${requiredAttr} placeholder="${placeholderText}"${maxLengthAttr}></textarea>`;
+                
+                // maxLength validation is handled by the maxlength attribute
+                
+                // Adicionar hint como texto de ajuda se disponível e diferente do placeholder
+                if (question.hint && question.hint !== placeholderText) {
+                    html += `<small class="form-text text-muted">${question.hint}</small>`;
+                }
                 break;
 
             default:
-                // Placeholder específico para requisitos especiais
+                // Placeholder específico para requisitos especiais ou usar hint
                 let placeholderAttr = '';
                 if (question.id === 'SPECIAL_REQUIREMENTS') {
                     placeholderAttr = ' placeholder="Restrições alimentares, acessibilidade, etc."';
+                } else if (question.hint) {
+                    placeholderAttr = ` placeholder="${question.hint.replace(/"/g, '&quot;')}"`;
                 }
-                html += `<input type="text" id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr} maxlength="${question.maxLength || ''}"${placeholderAttr}>`;
+                
+                const maxLengthAttribute = question.maxLength ? ` maxlength="${question.maxLength}"` : '';
+                html += `<input type="text" id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr}${maxLengthAttribute}${placeholderAttr}>`;
+                
+                // maxLength validation is handled by the maxlength attribute
+                
+                // Adicionar hint como texto de ajuda se disponível
+                if (question.hint && question.id !== 'SPECIAL_REQUIREMENTS') {
+                    html += `<small class="form-text text-muted">${question.hint}</small>`;
+                }
         }
 
         return html;
@@ -3326,6 +3663,10 @@ class ViatorBookingManager {
             // Configurar sincronização de unidades para WEIGHT e HEIGHT
             this.setupUnitSynchronization();
             console.log('✅ Sincronização de unidades configurada');
+            
+            // Configurar validações avançadas para as perguntas de reserva
+            this.setupBookingQuestionsValidation();
+            console.log('✅ Validações avançadas das perguntas de reserva configuradas');
         }, 100);
         
         // Adicionar listeners de validação após a renderização
@@ -3756,6 +4097,11 @@ class ViatorBookingManager {
         if (!emailRegex.test(bookerEmail.value.trim())) {
             this.showDateError('Por favor, informe um email válido.');
             bookerEmail?.focus();
+            return false;
+        }
+        
+        // Validar perguntas de reserva
+        if (!this.validateAllBookingQuestions()) {
             return false;
         }
         
