@@ -108,6 +108,7 @@ add_action('admin_menu', 'viator_admin_menu');
 // Register settings
 function viator_register_settings() {
     register_setting('viator_settings', 'viator_api_key');
+    register_setting('viator_settings', 'viator_tripadvisor_api_key');
     register_setting('viator_settings', 'viator_groq_api_key');
     register_setting('viator_settings', 'viator_groq_model');
     register_setting('viator_settings', 'viator_language');
@@ -123,6 +124,15 @@ add_action('admin_init', 'viator_register_settings');
  */
 function viator_get_google_places_api_key() {
     $api_key = get_option('viator_google_places_api_key');
+    return !empty($api_key) ? $api_key : false;
+}
+
+/**
+ * Função para obter a chave API da TripAdvisor
+ * @return string|false A chave API ou false se não estiver configurada
+ */
+function viator_get_tripadvisor_api_key() {
+    $api_key = get_option('viator_tripadvisor_api_key');
     return !empty($api_key) ? $api_key : false;
 }
 
@@ -146,6 +156,16 @@ function viator_settings_page() {
                                class="regular-text"
                                required>
                         <p class="description">Insira sua chave API da Viator aqui.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">API Key TripAdvisor</th>
+                    <td>
+                        <input type="text" 
+                               name="viator_tripadvisor_api_key" 
+                               value="<?php echo esc_attr(get_option('viator_tripadvisor_api_key')); ?>" 
+                               class="regular-text">
+                        <p class="description">Insira sua chave API da TripAdvisor para uso nas perguntas de ponto de encontro (Pickup point booking questions). <a href="https://partnerresources.viator.com/travel-commerce/merchant/implementing-booking-questions/" target="_blank">Ver documentação</a></p>
                     </td>
                 </tr>
                 <tr>

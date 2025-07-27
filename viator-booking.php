@@ -1186,7 +1186,11 @@ class ViatorBookingSystem {
                 'type' => 'LOCATION_REF_OR_FREE_TEXT',
                 'group' => 'PER_BOOKING',
                 'required' => 'MANDATORY',
-                'units' => ['LOCATION_REFERENCE', 'FREETEXT']
+                'units' => ['LOCATION_REFERENCE', 'FREETEXT'],
+                // NOTA: Para implementar busca de locais com TripAdvisor API,
+                // utilize a função viator_get_tripadvisor_api_key() para obter a chave
+                // configurada em admin.php?page=viator-settings
+                'tripadvisor_integration' => true
             ],
             'SPECIAL_REQUIREMENTS' => [
                 'id' => 'SPECIAL_REQUIREMENTS',
