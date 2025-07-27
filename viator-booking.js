@@ -1269,12 +1269,16 @@ class ViatorBookingManager {
                 
                 // Limpar preços quando alterar viajantes
                 this.clearPriceDisplay();
+                this.updateButtonText();
             });
         });
         
         // Setup price updater
         console.log('🔧 Chamando setupPriceUpdater...');
         this.setupPriceUpdater();
+        
+        // Inicializar texto do botão
+        this.updateButtonText();
     }
     
     /**
@@ -2399,27 +2403,43 @@ class ViatorBookingManager {
      * Renderizar seção de Ponto de Encontro
      */
     renderPickupPointSection() {
+        // Buscar perguntas de ponto de encontro e transferência
         const pickupQuestions = this.bookingQuestions.filter(q => 
             q.group === 'PER_BOOKING' && q.id === 'PICKUP_POINT'
         );
         
-        if (pickupQuestions.length === 0) {
+        const transferQuestions = this.bookingQuestions.filter(q => 
+            q.group === 'PER_BOOKING' && q.id.startsWith('TRANSFER_')
+        );
+        
+        // Se não há perguntas de pickup nem de transferência, retornar vazio
+        if (pickupQuestions.length === 0 && transferQuestions.length === 0) {
             return '';
         }
         
-        const question = pickupQuestions[0];
-        const questionId = `booking_question_${question.id}`;
-        const isRequired = question.required === 'MANDATORY';
-        const requiredMark = isRequired ? ' *' : '';
+        let html = '';
         
-        let dataAttrs = `data-question-id="${question.id}" data-group="${question.group}"`;
-        const requiredAttr = isRequired ? 'required' : '';
+        // Renderizar pergunta de ponto de encontro
+        if (pickupQuestions.length > 0) {
+            const question = pickupQuestions[0];
+            const questionId = `booking_question_${question.id}`;
+            const isRequired = question.required === 'MANDATORY';
+            const requiredMark = isRequired ? ' *' : '';
+            
+            let dataAttrs = `data-question-id="${question.id}" data-group="${question.group}"`;
+            const requiredAttr = isRequired ? 'required' : '';
+            
+            html += '<div class="pickup-point-question-group">';
+            html += `<label for="${questionId}">${question.label}${requiredMark}</label>`;
+            html += this.renderQuestionField(question, questionId, isRequired, false, null);
+            html += `<div class="error-message" id="error_${questionId}" style="display: none;"></div>`;
+            html += '</div>';
+        }
         
-        let html = '<div class="pickup-point-question-group">';
-        html += `<label for="${questionId}">${question.label}${requiredMark}</label>`;
-        html += this.renderQuestionField(question, questionId, isRequired, false, null);
-        html += `<div class="error-message" id="error_${questionId}" style="display: none;"></div>`;
-        html += '</div>';
+        // Renderizar perguntas de transferência
+        if (transferQuestions.length > 0) {
+            html += this.renderGeneralBookingQuestions(transferQuestions);
+        }
         
         return html;
     }
@@ -3587,10 +3607,11 @@ class ViatorBookingManager {
                 }
             }
             
-            // Renderizar perguntas gerais (Requisitos Especiais e outras) excluindo PICKUP_POINT e LANGUAGE_GUIDE
+            // Renderizar perguntas gerais (Requisitos Especiais e outras) excluindo PICKUP_POINT, LANGUAGE_GUIDE e perguntas de TRANSFER
             const generalQuestions = this.bookingQuestions.filter(q => 
                 q.group === 'PER_BOOKING' && 
                 q.id !== 'PICKUP_POINT' && 
+                !q.id.startsWith('TRANSFER_') && 
                 !(q.subType === 'LANGUAGE_GUIDE' || q.label.toLowerCase().includes('idioma') || q.label.toLowerCase().includes('language'))
             );
             
@@ -4885,6 +4906,8 @@ class ViatorBookingManager {
                 console.log('✅ Requisição bem-sucedida, exibindo preços');
                 this.displayDynamicPricing(data.data);
                 this.bookingData.availabilityData = data.data; // Armazenar para uso posterior
+                this.bookingData.hasSearchedPrices = true; // Marcar que já houve uma busca
+                this.updateButtonText(); // Atualizar texto do botão
             } else {
                 console.log('❌ Erro na resposta:', data);
                 this.showPriceError('Erro: ' + (data.data?.message || 'Erro desconhecido'));
@@ -4906,15 +4929,16 @@ class ViatorBookingManager {
             return;
         }
 
-        // Organizar opções disponíveis
+        // Organizar opções disponíveis e indisponíveis
         const availableOptions = data.bookableItems.filter(item => item.available);
+        const unavailableOptions = data.bookableItems.filter(item => !item.available);
 
         if (availableOptions.length === 0) {
             this.showPriceError('Nenhuma opção disponível para esta data e quantidade de viajantes.');
             return;
         }
 
-        // Agrupar opções por productOptionCode
+        // Agrupar opções disponíveis por productOptionCode
         const groupedOptions = {};
         availableOptions.forEach(option => {
             const code = option.productOptionCode;
@@ -4922,6 +4946,16 @@ class ViatorBookingManager {
                 groupedOptions[code] = [];
             }
             groupedOptions[code].push(option);
+        });
+
+        // Agrupar opções indisponíveis por productOptionCode
+        const groupedUnavailableOptions = {};
+        unavailableOptions.forEach(option => {
+            const code = option.productOptionCode;
+            if (!groupedUnavailableOptions[code]) {
+                groupedUnavailableOptions[code] = [];
+            }
+            groupedUnavailableOptions[code].push(option);
         });
 
         // Construir HTML para todas as opções
@@ -5001,11 +5035,14 @@ class ViatorBookingManager {
                 timeSelector = `<span class="option-time">🕐 ${optionsGroup[0].startTime}</span>`;
             }
             
+                // Adicionar badge de disponibilidade
+            const availabilityBadge = this.getAvailabilityBadge(baseOption);
+            
             optionsHTML += `
                 <div class="product-option-card" data-option-code="${optionCode}" data-start-time="${optionsGroup[0].startTime || ''}">
                     <div class="option-header">
                         <div class="option-info">
-                            <h6 class="option-title">${baseOption.optionTitle || optionCode}</h6>
+                            <h6 class="option-title">${baseOption.optionTitle || optionCode}${availabilityBadge}</h6>
                             <div class="option-details">
                                 <span class="option-code">${optionCode}</span>
                                 ${timeSelector}
@@ -5053,13 +5090,48 @@ class ViatorBookingManager {
         }, 100);
 
         // Adicionar event listeners para seleção de opções
-        this.setupOptionSelection();
+                this.setupOptionSelection();
+
+        const dateInput = document.getElementById('viator-travel-date');
+        if (dateInput) {
+            dateInput.addEventListener('change', () => {
+                this.clearPriceDisplay();
+                this.updateButtonText();
+            });
+        }
 
         // Não selecionar nenhuma opção automaticamente
         this.bookingData.selectedOption = null;
 
         // Footer será atualizado apenas quando usuário selecionar uma opção
         console.log('💡 Opções exibidas - aguardando seleção do usuário');
+    }
+
+    /**
+     * Gera badge de indisponibilidade para uma opção específica
+     * @param {string} optionCode - Código da opção
+     * @param {Object} groupedUnavailableOptions - Opções indisponíveis agrupadas
+     * @returns {string} HTML da badge ou string vazia
+     */
+    getAvailabilityBadge(option) {
+        if (option.available) {
+            return ' <span class="availability-badge available">Disponível</span>';
+        }
+
+        if (!option.unavailableReason) {
+            return '';
+        }
+
+        const reasonMap = {
+            'SOLD_OUT': 'Esgotado',
+            'MAINTENANCE': 'Em manutenção',
+            'WEATHER': 'Indisponível devido ao clima'
+        };
+
+        const reasonText = reasonMap[option.unavailableReason] || option.unavailableReason.replace(/_/g, ' ');
+        const badgeClass = option.unavailableReason.toLowerCase();
+
+        return ` <span class="availability-badge unavailable ${badgeClass}" title="${reasonText}">${reasonText}</span>`;
     }
 
     setupOptionSelection() {
@@ -5304,16 +5376,33 @@ class ViatorBookingManager {
         const footerSummary = document.getElementById('footer-price-summary');
         
         if (priceDisplay) {
-            priceDisplay.style.display = 'none';
-            priceDisplay.innerHTML = '';
+            priceDisplay.innerHTML = '<p class="reset-message">Para ver a disponibilidade, clique em <strong>Atualizar Preços</strong>.</p>';
+            priceDisplay.style.display = 'block';
         }
         
         if (footerSummary) {
             footerSummary.style.display = 'none';
         }
         
+        // Limpar opção selecionada
+        this.bookingData.selectedOption = null;
+        
         // Limpar todas as mensagens de erro de viajantes também
         this.clearAllTravelerErrors();
+    }
+
+    updateButtonText() {
+        const updateBtn = document.getElementById('update-price-btn');
+        if (!updateBtn) return;
+        
+        // Verificar se já houve uma busca de preços anteriormente
+        const hasSearchedBefore = this.bookingData.hasSearchedPrices || false;
+        
+        if (hasSearchedBefore) {
+            updateBtn.innerHTML = '<span class="update-icon">↻</span>Atualizar Preços';
+        } else {
+            updateBtn.innerHTML = '<span class="update-icon">🔍</span>Buscar preços';
+        }
     }
 
     setupPriceDetailsToggle() {
