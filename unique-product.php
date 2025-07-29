@@ -2331,6 +2331,13 @@ function viator_enqueue_product_scripts() {
             '1.0.1'
         );
 
+        wp_enqueue_style(
+            'viator-location-picker-css',
+            plugin_dir_url(__FILE__) . 'assets/css/viator-location-picker.css',
+            array(),
+            '1.0.0'
+        );
+
         wp_localize_script('viator-booking-js', 'viatorBookingAjax', array(
             'ajaxurl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('viator_booking_nonce'),

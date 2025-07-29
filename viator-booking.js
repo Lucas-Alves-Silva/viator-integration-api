@@ -17,6 +17,7 @@ const ViatorConditionalQuestions = {
             dependentId: dependentId,
             showWhen: showWhen
         });
+
     },
     
     // Verifica se uma pergunta deve ser exibida
@@ -1411,6 +1412,7 @@ class ViatorBookingManager {
         console.log('🔍 [DEBUG] this.bookingQuestions antes da chamada:', this.bookingQuestions);
         console.log('🔍 [DEBUG] window.productData antes da chamada:', window.productData);
         this.renderBookingQuestionsInTravelersStep();
+this.renderLocationOptions();
         console.log('🔍 [DEBUG] Após chamar renderBookingQuestionsInTravelersStep');
         
         // Verificar se o resumo foi gerado
@@ -1977,7 +1979,41 @@ class ViatorBookingManager {
         return true;
     }
     
-
+    /**
+     * Atualizar contador de caracteres
+     */
+    updateCharacterCounter(questionId, currentLength, maxLength) {
+        if (!maxLength) return;
+        
+        const counterId = `char-counter-${questionId}`;
+        let counter = document.getElementById(counterId);
+        
+        if (!counter) {
+            // Criar contador se não existir
+            const field = document.getElementById(questionId);
+            if (!field) return;
+            
+            counter = document.createElement('div');
+            counter.id = counterId;
+            counter.className = 'character-counter';
+            counter.style.cssText = 'font-size: 12px; color: #6c757d; text-align: right; margin-top: 5px;';
+            
+            // Inserir após o campo
+            field.parentNode.insertBefore(counter, field.nextSibling);
+        }
+        
+        // Atualizar texto do contador
+        counter.textContent = `${currentLength}/${maxLength} caracteres`;
+        
+        // Alterar cor se próximo do limite
+        if (currentLength > maxLength * 0.9) {
+            counter.style.color = '#dc3545'; // Vermelho
+        } else if (currentLength > maxLength * 0.8) {
+            counter.style.color = '#ffc107'; // Amarelo
+        } else {
+            counter.style.color = '#6c757d'; // Cinza padrão
+        }
+    }
     
     /**
      * Configurar validação condicional
@@ -2919,7 +2955,13 @@ class ViatorBookingManager {
         html += `<div id="${questionId}_container" class="pickup-point-container">`;
         
         // Verificar se permite texto livre (allowCustomTravelerPickup)
-        const allowCustomPickup = pickupData.allowCustomTravelerPickup === true;
+        // Conforme documentação oficial da Viator: https://docs.viator.com/partner-api/technical/
+        // "Whether freetext is allowed for this answer depends on the value of logistics.travelerPickup.allowCustomTravelerPickup"
+        const allowCustomPickup = this.isCustomPickupAllowed();
+        
+        if (!allowCustomPickup) {
+            console.log('ℹ️ Pickup customizado não permitido para este produto. Apenas locais pré-definidos serão exibidos.');
+        }
         
         // Agrupar locais por tipo conforme recomendação da Viator
         const groupedLocations = this.groupPickupLocationsByType(pickupData.locations);
@@ -2953,6 +2995,15 @@ class ViatorBookingManager {
             html += `<input type="text" id="${questionId}_freetext" placeholder="Digite o endereço completo do seu hotel ou local" class="pickup-freetext-input">`;
             html += `</div>`;
             html += `</div>`;
+        } else {
+            // Informação quando pickup customizado não é permitido
+            html += `<div class="pickup-info-section">`;
+            html += `<div class="pickup-info-message">`;
+            html += `<i class="fas fa-info-circle"></i> `;
+            html += `Para este produto, você deve selecionar um dos locais de pickup listados acima. `;
+            html += `Locais personalizados não são aceitos pelo fornecedor.`;
+            html += `</div>`;
+            html += `</div>`;
         }
         
         html += `</div>`;
@@ -2967,26 +3018,49 @@ class ViatorBookingManager {
             html += `
                 <script>
                 (function() {
-                    const customRadio = document.getElementById('${questionId}_custom');
-                    const customInput = document.querySelector('.pickup-custom-input');
-                    const freetextInput = document.getElementById('${questionId}_freetext');
-                    
-                    if (customRadio && customInput && freetextInput) {
-                        customRadio.addEventListener('change', function() {
-                            if (this.checked) {
-                                customInput.style.display = 'block';
-                                freetextInput.focus();
-                            }
+                    // Aguardar um pouco para garantir que o DOM esteja pronto
+                    setTimeout(function() {
+                        const container = document.getElementById('${questionId}_container');
+                        if (!container) return;
+                        
+                        const customRadio = document.getElementById('${questionId}_custom');
+                        const customInput = container.querySelector('.pickup-custom-input');
+                        const freetextInput = document.getElementById('${questionId}_freetext');
+                        
+                        console.log('🔧 Pickup Point Script - Elementos encontrados:', {
+                            customRadio: !!customRadio,
+                            customInput: !!customInput,
+                            freetextInput: !!freetextInput
                         });
                         
-                        // Ocultar campo customizado quando outra opção for selecionada
-                        document.addEventListener('change', function(e) {
-                            if (e.target.name === '${questionId}' && e.target.value !== 'CUSTOM_LOCATION') {
-                                customInput.style.display = 'none';
-                                freetextInput.value = '';
-                            }
-                        });
-                    }
+                        if (customRadio && customInput && freetextInput) {
+                            customRadio.addEventListener('change', function() {
+                                console.log('📍 Radio customizado selecionado');
+                                if (this.checked) {
+                                    customInput.style.display = 'block';
+                                    freetextInput.focus();
+                                    console.log('✅ Campo de texto livre exibido');
+                                }
+                            });
+                            
+                            // Ocultar campo customizado quando outra opção for selecionada
+                            container.addEventListener('change', function(e) {
+                                if (e.target.name === '${questionId}' && e.target.value !== 'CUSTOM_LOCATION') {
+                                    console.log('🔄 Outra opção selecionada, ocultando campo customizado');
+                                    customInput.style.display = 'none';
+                                    freetextInput.value = '';
+                                }
+                            });
+                            
+                            console.log('✅ Event listeners configurados para pickup point');
+                        } else {
+                            console.error('❌ Elementos não encontrados para pickup point:', {
+                                customRadio: customRadio ? 'OK' : 'MISSING',
+                                customInput: customInput ? 'OK' : 'MISSING', 
+                                freetextInput: freetextInput ? 'OK' : 'MISSING'
+                            });
+                        }
+                    }, 200);
                 })();
                 </script>
             `;
@@ -3010,6 +3084,27 @@ class ViatorBookingManager {
             return window.productData.logistics.travelerPickup;
         }
         return null;
+    }
+    
+    /**
+     * Verificar se o produto permite pickup customizado
+     * Conforme documentação Viator: allowCustomTravelerPickup deve ser true
+     */
+    isCustomPickupAllowed() {
+        const pickupData = this.getPickupData();
+        if (!pickupData) {
+            console.log('❌ Nenhum dado de pickup encontrado');
+            return false;
+        }
+        
+        const allowed = pickupData.allowCustomTravelerPickup === true;
+        console.log('🔍 Verificação de pickup customizado:', {
+            allowCustomTravelerPickup: pickupData.allowCustomTravelerPickup,
+            isAllowed: allowed,
+            productData: window.productData?.productCode || 'N/A'
+        });
+        
+        return allowed;
     }
 
     /**
@@ -3532,9 +3627,9 @@ class ViatorBookingManager {
                             const selectedValue = selectedRadio.value;
                             const selectedUnit = selectedRadio.dataset.unit;
                             
-                            if (selectedValue === 'custom_location' || selectedUnit === 'FREETEXT') {
+                            if (selectedValue === 'CUSTOM_LOCATION' || selectedUnit === 'FREETEXT') {
                                 // Coletar valor do campo "Outro local"
-                                const otherTextField = document.getElementById(`${questionId}_other_text`);
+                                const otherTextField = document.getElementById(`${questionId}_freetext`);
                                 if (otherTextField && otherTextField.value.trim()) {
                                     answerValue = otherTextField.value.trim();
                                     answerObj = {
@@ -3560,8 +3655,8 @@ class ViatorBookingManager {
                             const selectedValue = selectedRadio.value;
                             const selectedUnit = selectedRadio.dataset.unit;
                             
-                            if (selectedValue === 'custom_location' || selectedUnit === 'FREETEXT') {
-                                const otherTextField = document.getElementById(`${questionId}_other_text`);
+                            if (selectedValue === 'CUSTOM_LOCATION' || selectedUnit === 'FREETEXT') {
+                                const otherTextField = document.getElementById(`${questionId}_freetext`);
                                 if (otherTextField && otherTextField.value.trim()) {
                                     answerValue = otherTextField.value.trim();
                                     answerObj = {
@@ -5839,6 +5934,138 @@ class ViatorBookingManager {
             console.error('❌ Erro de conexão no teste:', error);
             return null;
         }
+    }
+    renderLocationOptions() {
+        const container = document.getElementById('traveler-details-container');
+        if (!container) return;
+
+        const logistics = window.productData.logistics;
+        if (!logistics || !logistics.travelerPickup || !logistics.start || !logistics.start[0]) {
+            console.warn('Dados de logística incompletos ou ausentes.');
+            return;
+        }
+
+        const meetingPointDescription = logistics.start[0].description;
+
+        let locationHtml = `
+            <div class="viator-locations-section">
+                <h5>Ponto de encontro e traslado</h5>
+                <p>Você pode ir por conta própria para o ponto de encontro ou solicitar o traslado. Se não tiver certeza, pode decidir depois.</p>
+                
+                <div class="location-option">
+                    <input type="radio" id="pickup-request" name="pickup_option" value="request">
+                    <label for="pickup-request">Gostaria que me buscassem</label>
+                    <div id="pickup-search-container" style="display: none;">
+                        <input type="text" id="pickup-search" placeholder="Pesquisar por hotel...">
+                        <div id="pickup-results"></div>
+                    </div>
+                </div>
+
+                <div class="location-option">
+                    <input type="radio" id="pickup-own" name="pickup_option" value="own">
+                    <label for="pickup-own">Vou por conta própria até o ponto de encontro</label>
+                    <div id="meeting-point-address" style="display: none;">
+                        <p>${meetingPointDescription}</p>
+                    </div>
+                </div>
+
+                <div class="location-option">
+                    <input type="radio" id="pickup-later" name="pickup_option" value="later" checked>
+                    <label for="pickup-later">Vou decidir depois</label>
+                </div>
+            </div>
+        `;
+
+        container.insertAdjacentHTML('afterbegin', locationHtml);
+        this.setupLocationOptionsEvents();
+    }
+
+    setupLocationOptionsEvents() {
+        const options = document.querySelectorAll('input[name="pickup_option"]');
+        const searchContainer = document.getElementById('pickup-search-container');
+        const meetingPointContainer = document.getElementById('meeting-point-address');
+
+        if (!searchContainer || !meetingPointContainer) return;
+
+        options.forEach(option => {
+            option.addEventListener('change', (e) => {
+                searchContainer.style.display = 'none';
+                meetingPointContainer.style.display = 'none';
+
+                if (e.target.value === 'request') {
+                    searchContainer.style.display = 'block';
+                } else if (e.target.value === 'own') {
+                    meetingPointContainer.style.display = 'block';
+                } else if (e.target.value === 'later') {
+                    // Definir uma opção de marcação para passar na validação
+                    this.bookingData.selectedOption = {
+                        productOptionCode: 'unset',
+                        startTime: null,
+                        fullOption: { isLater: true }
+                    };
+                    // Limpar qualquer erro de data/opção, pois o usuário está prosseguindo
+                    this.hideDateError();
+                }
+             });
+         });
+
+        const searchInput = document.getElementById('pickup-search');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => this.handlePickupSearch(e));
+        }
+     }
+
+    handlePickupSearch(e) {
+        const searchTerm = e.target.value.toLowerCase();
+        const resultsContainer = document.getElementById('pickup-results');
+        resultsContainer.innerHTML = '';
+
+        if (searchTerm.length < 3) {
+            resultsContainer.style.display = 'none';
+            return;
+        }
+
+        const pickupLocations = window.productData.logistics.travelerPickup.locations;
+        if (!pickupLocations) return;
+
+        const filteredLocations = pickupLocations.filter(location => 
+            (location.name && location.name.toLowerCase().includes(searchTerm)) || 
+            (location.address && location.address.toLowerCase().includes(searchTerm))
+        );
+
+        if (filteredLocations.length > 0) {
+            resultsContainer.style.display = 'block';
+            filteredLocations.forEach(location => {
+                const resultItem = document.createElement('div');
+                resultItem.classList.add('pickup-result-item');
+                resultItem.textContent = `${location.name} - ${location.address}`;
+                resultItem.addEventListener('click', () => this.selectPickupLocation(location));
+                resultsContainer.appendChild(resultItem);
+            });
+        } else {
+            resultsContainer.style.display = 'none';
+        }
+    }
+
+    selectPickupLocation(location) {
+        const searchInput = document.getElementById('pickup-search');
+        searchInput.value = `${location.name} - ${location.address}`;
+        document.getElementById('pickup-results').style.display = 'none';
+        // Armazenar a localização selecionada para uso posterior
+        this.selectedPickupLocation = location;
+        console.log('Localização de retirada selecionada:', this.selectedPickupLocation);
+
+        const confirmationMessage = document.createElement('p');
+        confirmationMessage.textContent = 'Confirme seu ponto de encontro com a operadora local depois que reservar.';
+        confirmationMessage.id = 'pickup-confirmation-message';
+
+        const searchContainer = document.getElementById('pickup-search-container');
+        // Remove a mensagem de confirmação antiga, se houver
+        const oldMessage = document.getElementById('pickup-confirmation-message');
+        if(oldMessage) {
+            oldMessage.remove();
+        }
+        searchContainer.appendChild(confirmationMessage);
     }
 }
 

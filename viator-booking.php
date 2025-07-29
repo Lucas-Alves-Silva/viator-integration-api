@@ -467,10 +467,30 @@ class ViatorBookingSystem {
         
         // Se não houver itens do hold, usar fallback
         if (empty($confirm_items)) {
+            viator_debug_log('AVISO: Nenhum item encontrado no hold_response, usando fallback');
+            viator_debug_log('Hold Response disponível:', $hold_response);
+            
             $booking_ref = isset($_POST['partner_booking_ref']) ? sanitize_text_field($_POST['partner_booking_ref']) : ('BOOK_' . $this->generate_unique_id());
+            
+            // Tentar extrair bookingRef do hold_response se disponível
+            $extracted_booking_ref = null;
+            if (isset($hold_response['bookingRef'])) {
+                $extracted_booking_ref = $hold_response['bookingRef'];
+            } elseif (isset($hold_response['items'][0]['bookingRef'])) {
+                $extracted_booking_ref = $hold_response['items'][0]['bookingRef'];
+            }
+            
             $confirm_item = [
                 'partnerBookingRef' => $booking_ref
             ];
+            
+            // Incluir bookingRef se encontrado
+            if ($extracted_booking_ref) {
+                $confirm_item['bookingRef'] = $extracted_booking_ref;
+                viator_debug_log('BookingRef extraído para fallback:', $extracted_booking_ref);
+            } else {
+                viator_debug_log('ERRO: BookingRef não encontrado no hold_response');
+            }
             
             // Incluir perguntas de reserva no item se fornecidas
             if (!empty($booking_question_answers)) {
