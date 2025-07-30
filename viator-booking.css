@@ -360,26 +360,6 @@ body.viator-modal-open {
     color: #999;
 }
 
-/* Estilização do calendário do booking */
-/* =====================================
-   CSS FLATPICKR LEGADO - COMENTADO
-   ===================================== */
-
-/*
-.viator-booking-calendar.flatpickr-calendar {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12) !important;
-    border: none !important;
-    border-radius: 12px !important;
-    overflow: hidden !important;
-    background: white !important;
-    z-index: 10001 !important;
-    min-width: 0 !important;
-    box-sizing: border-box !important;
-    width: 640px !important;
-    max-width: 640px !important;
-}
-
 /* Ajuste específico para garantir que o calendário herde a largura correta do form-group */
 .form-group .viator-booking-date-selector + .flatpickr-calendar.viator-booking-calendar,
 .form-group .flatpickr-calendar.viator-booking-calendar {
@@ -4937,7 +4917,7 @@ body.viator-modal-open {
     padding: 20px;
     background: #f8f9fa;
     border-radius: 8px;
-    border-left: 4px solid #3498db;
+    /* border-left: 4px solid #3498db; Adiciona borda esquerda ao grupo de perguntas de booking com a cor azul*/
 }
 
 .per-booking-questions h4 {
@@ -5110,7 +5090,6 @@ body.viator-modal-open {
 
 .per-booking-questions h4,
 .per-traveler-questions h4 {
-    color: #00715D;
     font-size: 1.2rem;
     margin-bottom: 20px;
     padding-bottom: 8px;

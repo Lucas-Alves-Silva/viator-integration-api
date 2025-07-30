@@ -3552,16 +3552,6 @@ this.renderLocationOptions();
                 border-radius: 0.375rem !important;
             }
 
-            /* Remover border-left das seções booker-info-section e per-booking-questions */
-            .booker-info-section,
-            .per-booking-questions {
-                border-left: none !important;
-            }
-
-            .booker-info-section.per-booking-questions {
-                border-left: none !important;
-            }
-
             /* Aplicar padrões da Etapa 3 aos campos de pagamento */
             .payment-form input.form-control,
             .payment-form select.form-control {
