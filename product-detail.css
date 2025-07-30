@@ -1402,6 +1402,45 @@
     font-weight: 500; /* Deixa o texto um pouco mais destacado */
 }
 
+/* Service Info Container - Combina unit service e ticket info */
+.viator-service-info-container {
+    margin-top: 15px;
+    margin-bottom: 10px;
+}
+
+/* Ticket Info Styles */
+.viator-ticket-info {
+    margin-top: 10px;
+}
+
+.viator-ticket-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 15px;
+    margin-bottom: 5px;
+    background-color: #f0f8ff;
+    border-radius: 6px;
+    border: 1px solid #d1ecf1;
+    font-size: 14px;
+    color: #0c5460;
+}
+
+.viator-ticket-item:last-child {
+    margin-bottom: 0;
+}
+
+.viator-ticket-item .ticket-icon {
+    margin-right: 10px;
+    font-size: 16px;
+    display: inline-flex;
+    align-items: center;
+}
+
+.viator-ticket-item .ticket-text {
+    font-weight: 500;
+    line-height: 1.4;
+}
+
 /* Tags Carousel */
 .viator-tags-carousel {
     margin: 20px 0;

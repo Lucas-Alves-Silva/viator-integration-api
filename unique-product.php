@@ -711,6 +711,113 @@ function viator_get_product_details($product_code) {
         }
     }
 
+    // Variável para HTML das informações de ticket (quando disponível)
+    $ticket_info_html = '';
+    if (isset($product['ticketInfo'])) {
+        $ticket_info = $product['ticketInfo'];
+        $ticket_items = [];
+        
+        // Processar tipos de ticket
+        if (isset($ticket_info['ticketTypes']) && is_array($ticket_info['ticketTypes'])) {
+            $ticket_types_display = [];
+            foreach ($ticket_info['ticketTypes'] as $type) {
+                switch ($type) {
+                    case 'MOBILE_ONLY':
+                        $ticket_types_display[] = 'Apenas mobile';
+                        break;
+                    case 'PAPER_ONLY':
+                        $ticket_types_display[] = 'Apenas papel';
+                        break;
+                    case 'MOBILE_OR_PAPER':
+                        $ticket_types_display[] = 'Mobile ou papel';
+                        break;
+                    default:
+                        $ticket_types_display[] = ucfirst(strtolower(str_replace('_', ' ', $type)));
+                }
+            }
+            if (!empty($ticket_types_display)) {
+                $ticket_items[] = '<div class="viator-ticket-item"><span class="ticket-icon">🎫</span> <span class="ticket-text">Tipo de ingresso: ' . esc_html(implode(', ', $ticket_types_display)) . '</span></div>';
+            }
+        }
+        
+        // Usar descrição do tipo de ticket se disponível
+        if (isset($ticket_info['ticketTypeDescription']) && !empty($ticket_info['ticketTypeDescription'])) {
+            // Traduzir descrições comuns
+            $description_translations = [
+                'Mobile or paper ticket accepted' => 'Ingresso mobile ou papel aceito',
+                'Mobile ticket only' => 'Apenas ingresso mobile',
+                'Paper ticket only' => 'Apenas ingresso em papel',
+                'E-ticket' => 'Ingresso eletrônico'
+            ];
+            
+            $translated_description = isset($description_translations[$ticket_info['ticketTypeDescription']]) ? 
+                $description_translations[$ticket_info['ticketTypeDescription']] : 
+                $ticket_info['ticketTypeDescription'];
+                
+            $ticket_items[] = '<div class="viator-ticket-item"><span class="ticket-icon">📱</span> <span class="ticket-text">' . esc_html($translated_description) . '</span></div>';
+        }
+        
+        // Processar tickets por reserva
+        if (isset($ticket_info['ticketsPerBooking'])) {
+            $tickets_per_booking_text = '';
+            switch ($ticket_info['ticketsPerBooking']) {
+                case 'ONE_PER_BOOKING':
+                    $tickets_per_booking_text = 'Um por reserva';
+                    break;
+                case 'ONE_PER_TRAVELER':
+                    $tickets_per_booking_text = 'Um por viajante';
+                    break;
+                case 'ONE_PER_GROUP':
+                    $tickets_per_booking_text = 'Um por grupo';
+                    break;
+                default:
+                    $tickets_per_booking_text = ucfirst(strtolower(str_replace('_', ' ', $ticket_info['ticketsPerBooking'])));
+            }
+            
+            if (!empty($tickets_per_booking_text)) {
+                $ticket_items[] = '<div class="viator-ticket-item"><span class="ticket-icon">🎟️</span> <span class="ticket-text">Ingressos: ' . esc_html($tickets_per_booking_text) . '</span></div>';
+            }
+        }
+        
+        // Usar descrição de tickets por reserva se disponível
+        if (isset($ticket_info['ticketsPerBookingDescription']) && !empty($ticket_info['ticketsPerBookingDescription'])) {
+            // Traduzir descrições comuns
+            $booking_description_translations = [
+                'One per booking' => 'Um por reserva',
+                'One per traveler' => 'Um por viajante',
+                'One per group' => 'Um por grupo'
+            ];
+            
+            $translated_booking_description = isset($booking_description_translations[$ticket_info['ticketsPerBookingDescription']]) ? 
+                $booking_description_translations[$ticket_info['ticketsPerBookingDescription']] : 
+                $ticket_info['ticketsPerBookingDescription'];
+                
+            // Só adiciona se não foi adicionado anteriormente
+            $already_added = false;
+            foreach ($ticket_items as $item) {
+                if (strpos($item, $translated_booking_description) !== false) {
+                    $already_added = true;
+                    break;
+                }
+            }
+            
+            if (!$already_added) {
+                $ticket_items[] = '<div class="viator-ticket-item"><span class="ticket-icon">📋</span> <span class="ticket-text">' . esc_html($translated_booking_description) . '</span></div>';
+            }
+        }
+        
+        // Montar HTML final das informações de ticket
+        if (!empty($ticket_items)) {
+            $ticket_info_html = '<div class="viator-ticket-info">' . implode('', $ticket_items) . '</div>';
+        }
+    }
+
+    // Combinar informações de serviço de unidade e ticket
+    $combined_service_info = '';
+    if (!empty($unit_service_html) || !empty($ticket_info_html)) {
+        $combined_service_info = '<div class="viator-service-info-container">' . $unit_service_html . $ticket_info_html . '</div>';
+    }
+
     // Get main product details
     $title = isset($product['title']) ? esc_html($product['title']) : 'Título não disponível';
     
@@ -1200,7 +1307,7 @@ function viator_get_product_details($product_code) {
                     <?php endif; ?>
                 <?php endif; ?>
                 
-                <?php echo $unit_service_html; // Nova seção de informação do tipo de unidade AQUI DENTRO DA GALLERY ?>
+                <?php echo $combined_service_info; // Nova seção de informação do tipo de unidade e ticket AQUI DENTRO DA GALLERY ?>
             </div> <!-- Fim viator-product-gallery -->
 
             <div class="viator-product-info-container">
