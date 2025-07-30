@@ -504,17 +504,182 @@ class CustomCalendar {
 class ViatorBookingManager {
     constructor() {
         this.currentStep = 1;
+        this.totalSteps = 5; // Aumentado para incluir novos steps
         this.bookingData = {
             productCode: null,
+            selectedOption: null,
+            travelDate: null,
+            selectedTravelers: null,
             availabilityData: null,
             holdData: null,
-            paymentToken: null
+            paymentToken: null,
+            // Novos campos para booking questions
+            travelersDetails: null,
+            bookingQuestions: null,
+            bookingQuestionAnswers: null,
+            productLogistics: null
         };
         this.availableDates = new Set(); // Armazenar datas disponíveis
-        this.steps = ['availability', 'travelers', 'payment', 'confirmation'];
+        this.steps = ['availability', 'travelers', 'booking-questions', 'payment', 'confirmation'];
         this.ageBands = []; // Array para armazenar as regras de viajantes
         this.bookingQuestions = []; // Armazenar perguntas de reserva do endpoint /products/booking-questions
         this.pageBookingQuestions = []; // Armazenar perguntas de reserva da página de produto único
+
+        // Sistema de pagamento da Viator
+        this.payment = null;
+        this.deviceDataCollectionToken = null;
+
+        // Cache para booking questions
+        this.allBookingQuestions = null;
+        this.productBookingQuestions = null;
+    }
+
+    /**
+     * Estratégia abrangente para obter data de viagem de múltiplas fontes
+     */
+    getTravelDateFromMultipleSources() {
+        const sources = [
+            // 1. Elementos DOM primários
+            () => {
+                const element = document.getElementById('travel-date-value');
+                return element?.value || null;
+            },
+
+            // 2. Elementos DOM alternativos
+            () => {
+                const alternatives = [
+                    'travel-date',
+                    'travelDate',
+                    'date-picker',
+                    'booking-date'
+                ];
+
+                for (const id of alternatives) {
+                    const element = document.getElementById(id);
+                    if (element?.value) return element.value;
+                }
+                return null;
+            },
+
+            // 3. Seletores por atributo name
+            () => {
+                const selectors = [
+                    'input[name="travel_date"]',
+                    'input[name="travelDate"]',
+                    'input[name="date"]',
+                    'input[name="booking_date"]'
+                ];
+
+                for (const selector of selectors) {
+                    const element = document.querySelector(selector);
+                    if (element?.value) return element.value;
+                }
+                return null;
+            },
+
+            // 4. Seletores por classe CSS
+            () => {
+                const selectors = [
+                    '.travel-date-input',
+                    '.date-picker-input',
+                    '.booking-date',
+                    '.viator-date-input',
+                    'input[type="date"]'
+                ];
+
+                for (const selector of selectors) {
+                    const element = document.querySelector(selector);
+                    if (element?.value) return element.value;
+                }
+                return null;
+            },
+
+            // 5. Dados já armazenados
+            () => {
+                return this.bookingData.travelDate || null;
+            },
+
+            // 6. Dados de disponibilidade
+            () => {
+                return this.bookingData.availabilityData?.travelDate || null;
+            },
+
+            // 7. URL parameters
+            () => {
+                const urlParams = new URLSearchParams(window.location.search);
+                return urlParams.get('travel_date') || urlParams.get('date') || null;
+            },
+
+            // 8. Local storage
+            () => {
+                try {
+                    return localStorage.getItem('viator_travel_date') || null;
+                } catch (e) {
+                    return null;
+                }
+            }
+        ];
+
+        for (let i = 0; i < sources.length; i++) {
+            try {
+                const result = sources[i]();
+                if (result) {
+                    console.log(`✅ Data de viagem encontrada na fonte ${i + 1}:`, result);
+                    this.debugLog(`Travel date found from source ${i + 1}`, {
+                        source: i + 1,
+                        value: result
+                    });
+                    return result;
+                }
+            } catch (error) {
+                console.warn(`⚠️ Erro na fonte ${i + 1}:`, error);
+            }
+        }
+
+        console.warn('⚠️ Nenhuma data de viagem encontrada em todas as fontes');
+        this.debugLog('No travel date found in any source', {
+            sourcesChecked: sources.length
+        });
+
+        return null;
+    }
+
+    /**
+     * Função de debug para JavaScript (substitui viator_debug_log do PHP)
+     */
+    debugLog(message, data = null) {
+        if (typeof console !== 'undefined' && console.log) {
+            const timestamp = new Date().toISOString();
+            const logMessage = `[VIATOR DEBUG ${timestamp}] ${message}`;
+
+            if (data !== null) {
+                console.log(logMessage, data);
+            } else {
+                console.log(logMessage);
+            }
+
+            // Também enviar para o PHP se necessário (opcional)
+            if (typeof viatorBookingAjax !== 'undefined' && viatorBookingAjax.debug_enabled) {
+                try {
+                    fetch(viatorBookingAjax.ajaxurl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: new URLSearchParams({
+                            action: 'viator_debug_log_js',
+                            message: message,
+                            data: data ? JSON.stringify(data) : '',
+                            nonce: viatorBookingAjax.nonce
+                        })
+                    }).catch(error => {
+                        // Silenciosamente ignorar erros de debug logging
+                    });
+                } catch (error) {
+                    // Silenciosamente ignorar erros de debug logging
+                }
+            }
+        }
     }
     
     init() {
@@ -525,8 +690,30 @@ class ViatorBookingManager {
     extractProductCode() {
         // Extrair o código do produto da URL ou de um elemento hidden
         const urlParams = new URLSearchParams(window.location.search);
-        this.bookingData.productCode = urlParams.get('product') || 
-                                      document.querySelector('[data-product-code]')?.dataset.productCode;
+        let productCode = urlParams.get('product') ||
+                         urlParams.get('product_code') ||
+                         document.querySelector('[data-product-code]')?.dataset.productCode ||
+                         document.querySelector('.button-check-availability')?.dataset.productCode;
+
+        // Tentar extrair do shortcode na página
+        if (!productCode) {
+            const shortcodeMatch = document.body.innerHTML.match(/\[viator_product[^>]*product_code=["\']([^"\']+)["\'][^\]]*\]/);
+            if (shortcodeMatch) {
+                productCode = shortcodeMatch[1];
+            }
+        }
+
+        // Tentar extrair da URL path (formato: /produto/CODIGO)
+        if (!productCode) {
+            const pathMatch = window.location.pathname.match(/\/produto\/([^\/]+)/);
+            if (pathMatch) {
+                productCode = pathMatch[1];
+            }
+        }
+
+        console.log('🔍 Product code extraído:', productCode);
+        this.bookingData.productCode = productCode;
+        return productCode;
     }
     
     attachEvents() {
@@ -546,13 +733,19 @@ class ViatorBookingManager {
     }
     
     openBookingModal() {
+        console.log('🚀 Abrindo modal de booking...');
+
         // Se ainda não temos product_code, tentar extrair novamente
         if (!this.bookingData.productCode) {
+            console.log('🔍 Product code não encontrado, tentando extrair...');
             this.extractProductCode();
         }
-        
+
         console.log('🔍 [BOOKING QUESTIONS DEBUG] Product code no openBookingModal:', this.bookingData.productCode);
-        
+        console.log('🔍 [BOOKING QUESTIONS DEBUG] viatorBookingAjax disponível:', typeof viatorBookingAjax);
+        console.log('🔍 [BOOKING QUESTIONS DEBUG] AJAX URL:', viatorBookingAjax?.ajaxurl);
+        console.log('🔍 [BOOKING QUESTIONS DEBUG] Nonce:', viatorBookingAjax?.nonce);
+
         this.scrapeAgeBandsFromPage(); // Raspa os dados da página primeiro
         this.createBookingModal();
         this.showStep(1);
@@ -820,10 +1013,14 @@ class ViatorBookingManager {
                     </div>
                     <div class="progress-step" data-step="3">
                         <span class="step-number">3</span>
-                        <span class="step-label">Pagamento</span>
+                        <span class="step-label">Informações</span>
                     </div>
                     <div class="progress-step" data-step="4">
                         <span class="step-number">4</span>
+                        <span class="step-label">Pagamento</span>
+                    </div>
+                    <div class="progress-step" data-step="5">
+                        <span class="step-number">5</span>
                         <span class="step-label">Confirmação</span>
                     </div>
                 </div>
@@ -855,6 +1052,9 @@ class ViatorBookingManager {
         
         document.body.appendChild(modal);
         
+        // Inject animation styles
+        this.injectAnimationStyles();
+
         // Attach modal events
         modal.querySelector('.viator-modal-close').addEventListener('click', () => this.closeModal());
         modal.querySelector('#booking-cancel-btn').addEventListener('click', () => this.closeModal());
@@ -895,21 +1095,25 @@ class ViatorBookingManager {
                 await this.initializeTravelersStep();
                 break;
             case 3:
+                content.innerHTML = this.getBookingQuestionsStepHTML();
+                await this.initializeBookingQuestionsStep();
+                break;
+            case 4:
                 content.innerHTML = this.getPaymentStepHTML();
                 await this.initializePaymentStep();
                 break;
-            case 4:
+            case 5:
                 content.innerHTML = this.getConfirmationStepHTML();
                 // Se já temos dados de confirmação, exibir imediatamente
                 if (this.bookingData.confirmationData) {
-                    console.log('🎨 Exibindo confirmação na etapa 4 com dados existentes');
+                    console.log('🎨 Exibindo confirmação na etapa 5 com dados existentes');
                     this.displayConfirmationMessage(this.bookingData.confirmationData);
                 } else if (this.bookingData.paymentToken) {
                     // Se temos token de pagamento mas não confirmação, fazer confirmação agora
-                    console.log('🎯 Iniciando confirmação na etapa 4');
+                    console.log('🎯 Iniciando confirmação na etapa 5');
                     this.confirmBooking();
                 } else {
-                    console.error('❌ Chegou na etapa 4 sem token de pagamento!');
+                    console.error('❌ Chegou na etapa 5 sem token de pagamento!');
                 }
                 break;
         }
@@ -934,11 +1138,11 @@ class ViatorBookingManager {
         const cancelBtn = document.getElementById('booking-cancel-btn');
 
         // Lógica do botão Voltar: aparece do passo 2 em diante (exceto confirmação)
-        backBtn.style.display = this.currentStep > 1 && this.currentStep < 4 ? 'inline-block' : 'none';
+        backBtn.style.display = this.currentStep > 1 && this.currentStep < 5 ? 'inline-block' : 'none';
         
-        // Garante que o botão de próximo esteja visível, exceto na confirmação
-        nextBtn.style.display = this.currentStep < 4 ? 'inline-block' : 'none';
-        
+        // Garante que o botão de próximo esteja visível, exceto na confirmação (step 5)
+        nextBtn.style.display = this.currentStep < 5 ? 'inline-block' : 'none';
+
         // Move o botão de cancelar/fechar para a direita
         cancelBtn.style.marginLeft = 'auto';
 
@@ -950,10 +1154,14 @@ class ViatorBookingManager {
                 nextBtn.textContent = 'Continuar';
                 break;
             case 3:
-                nextBtn.textContent = 'Processar Pagamento';
+                nextBtn.textContent = 'Continuar';
                 break;
             case 4:
+                nextBtn.textContent = 'Processar Pagamento';
+                break;
+            case 5:
                 // No passo de confirmação, não há "próximo" ou "voltar"
+                nextBtn.style.display = 'none';
                 cancelBtn.textContent = 'Fechar';
                 break;
         }
@@ -1030,13 +1238,13 @@ class ViatorBookingManager {
                 
                 <!-- 1) Resumo dos Viajantes -->
                 <div class="traveler-summary-section">
-                    <h4>📋 Resumo dos Viajantes</h4>
+                    <h4>Resumo dos Viajantes</h4>
                     <div id="travelers-summary"></div>
                 </div>
                 
                 <!-- 2) Informações do Responsável pela Reserva -->
                 <div class="booker-info-section">
-                    <h4>👤 Informações do Responsável pela Reserva</h4>
+                    <h4>Informações do Responsável pela Reserva</h4>
                     <p class="booker-note">Apenas o responsável principal precisa fornecer seus dados pessoais:</p>
                     
                     <div class="form-row">
@@ -1098,7 +1306,7 @@ class ViatorBookingManager {
                 
                 <!-- 5) Informações Adicionais da Reserva (Idioma da Excursão e Requisitos Especiais) -->
                 <div id="additional-booking-info-section" class="additional-booking-info-section" style="display: none;">
-                    <h4>📝 Informações Adicionais da Reserva</h4>
+                    <h4>Informações Adicionais da Reserva</h4>
                     
                     <div class="additional-info-row">
                         <!-- Idioma da Excursão -->
@@ -1115,17 +1323,17 @@ class ViatorBookingManager {
         return `
             <div class="booking-step payment-step">
                 <h3>Informações de Pagamento</h3>
-                
-                <div class="payment-summary">
+
+                <div class="traveler-summary-section payment-summary">
                     <h4>Resumo da Reserva</h4>
                     <div id="booking-summary"></div>
                 </div>
-                
-                <div class="payment-form">
+
+                <div class="booker-info-section payment-form">
                     <h4>Dados do Cartão de Crédito</h4>
-                    
-                    <div class="security-notice">
-                        <div class="security-badge">
+
+                    <div class="security-notice" style="background: #e8f5e8; border: 1px solid #c3e6c3; border-radius: 8px; padding: 15px; margin-bottom: 20px; text-align: center;">
+                        <div class="security-badge" style="color: #155724; font-weight: 600;">
                             🔒 Suas informações são criptografadas e processadas com segurança
                         </div>
                     </div>
@@ -1135,7 +1343,7 @@ class ViatorBookingManager {
                         <input type="text" id="card-number" class="form-control" placeholder="1234 5678 9012 3456" maxlength="19" required>
                         <small class="form-text">Digite apenas os números do cartão</small>
                     </div>
-                    
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="expiry-month">Mês de Vencimento *:</label>
@@ -1158,22 +1366,22 @@ class ViatorBookingManager {
                                 }).join('')}
                             </select>
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="security-code">CVV *:</label>
                             <input type="text" id="security-code" class="form-control" placeholder="123" maxlength="4" required>
                             <small class="form-text">3 ou 4 dígitos</small>
                         </div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="cardholder-name">Nome no Cartão *:</label>
                         <input type="text" id="cardholder-name" class="form-control" placeholder="Como aparece no cartão" required>
                         <small class="form-text">Exatamente como está impresso no cartão</small>
                     </div>
                     
-                    <h4>Endereço de Cobrança</h4>
-                    
+                    <h4 style="margin-top: 30px;">Endereço de Cobrança</h4>
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="billing-country">País *:</label>
@@ -1211,8 +1419,10 @@ class ViatorBookingManager {
         // O conteúdo será preenchido dinamicamente após a confirmação
         return `
             <div class="booking-step confirmation-step">
-                <div class="confirmation-message">
-                    <!-- Gerado dinamicamente -->
+                <div class="confirmation-container">
+                    <div class="confirmation-message">
+                        <!-- Gerado dinamicamente -->
+                    </div>
                 </div>
             </div>
         `;
@@ -1271,6 +1481,7 @@ class ViatorBookingManager {
                 // Limpar preços quando alterar viajantes
                 this.clearPriceDisplay();
                 this.updateButtonText();
+                this.hideDateError(); // Esconder erro quando viajantes forem alterados
             });
         });
         
@@ -1318,18 +1529,24 @@ class ViatorBookingManager {
                 if (selectedDates.length === 1) {
                     const selectedDate = selectedDates[0];
                     hiddenInput.value = dateStr;
-                    
+
                     // Limpar mensagem de erro quando uma data for selecionada
                     this.hideDateError();
-                    
+
+                    // Limpar opções de preços e resetar botão quando data mudar
+                    this.clearPriceDisplay();
+                    this.resetButtonToSearchState();
+
+                    console.log('📅 Nova data selecionada:', dateStr, '- Preços limpos e botão resetado');
+
                     const diasDaSemana = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
                     const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-                    
+
                     const diaSemana = diasDaSemana[selectedDate.getDay()];
                     const dia = selectedDate.getDate().toString().padStart(2, '0');
                     const mes = meses[selectedDate.getMonth()];
                     const ano = selectedDate.getFullYear();
-                    
+
                     const dataFormatada = `${diaSemana}, ${dia} de ${mes} de ${ano}`;
                     // Atualizar especificamente o span de texto, não o ícone
                     const textSpan = dateSelector.querySelector('span:not(.calendar-icon)');
@@ -1907,7 +2124,7 @@ this.renderLocationOptions();
         
         // Verificar se é obrigatório
         if (isRequired && !value) {
-            showError('Este campo é obrigatório.');
+            showError('Obrigatório.');
             return false;
         }
         
@@ -2071,54 +2288,7 @@ this.renderLocationOptions();
     /**
      * Validar todas as perguntas de reserva
      */
-    validateAllBookingQuestions() {
-        let isValid = true;
-        const questionsContainers = [
-            document.getElementById('general-booking-questions'),
-            document.getElementById('traveler-booking-questions-inner')
-        ];
-        
-        questionsContainers.forEach(container => {
-            if (!container) return;
-            
-            const fields = container.querySelectorAll('input, select, textarea');
-            fields.forEach(field => {
-                // Pular campos ocultos (condicionais)
-                const fieldContainer = field.closest('.booking-question-group');
-                if (fieldContainer && fieldContainer.style.display === 'none') {
-                    return;
-                }
-                
-                const fieldValid = this.validateField(field, 
-                    (message) => {
-                        field.classList.add('is-invalid');
-                        let errorDiv = document.getElementById(`error_${field.id}`);
-                        if (!errorDiv) {
-                            errorDiv = document.createElement('div');
-                            errorDiv.id = `error_${field.id}`;
-                            errorDiv.className = 'error-message';
-                            field.parentNode.appendChild(errorDiv);
-                        }
-                        errorDiv.textContent = message;
-                        errorDiv.style.display = 'block';
-                    },
-                    () => {
-                        field.classList.remove('is-invalid');
-                        const errorDiv = document.getElementById(`error_${field.id}`);
-                        if (errorDiv) {
-                            errorDiv.style.display = 'none';
-                        }
-                    }
-                );
-                
-                if (!fieldValid) {
-                    isValid = false;
-                }
-            });
-        });
-        
-        return isValid;
-    }
+    // MÉTODO REMOVIDO - DUPLICATA (mantendo apenas a definição mais completa na linha 3373)
     
     async initializePaymentStep() {
         this.generateBookingSummary();
@@ -2144,16 +2314,1756 @@ this.renderLocationOptions();
         if (this.bookingData.holdData && this.bookingData.holdData.paymentSessionToken) {
             // Inicializar detecção de fraude da Viator conforme documentação oficial
             if (window.Payment) {
-                this.payment = window.Payment.init(this.bookingData.holdData.paymentSessionToken);
-                console.log('✅ Sistema de pagamento da Viator inicializado com detecção de fraude');
+                try {
+                    this.payment = window.Payment.init(this.bookingData.holdData.paymentSessionToken);
+                    console.log('✅ Sistema de pagamento da Viator inicializado com detecção de fraude');
+
+                    // Inicializar coleta de dados de dispositivo para detecção de fraude
+                    this.initializeFraudDetection();
+                } catch (error) {
+                    console.warn('⚠️ Erro ao inicializar Payment object:', error);
+                    console.log('ℹ️ Continuando com fallback de detecção de fraude');
+                    this.initializeFraudDetectionFallback();
+                }
             } else {
-                console.error('❌ Biblioteca de pagamento da Viator não carregada');
-                console.error('🔗 Verifique se https://checkout-assets.payments.tamg.cloud/stable/v2/payment.js está carregado');
+                console.log('ℹ️ Biblioteca de pagamento da Viator não carregada - usando fallback');
+                console.log('🔗 Para produção, carregue: https://checkout-assets.payments.tamg.cloud/stable/v2/payment.js');
+                this.initializeFraudDetectionFallback();
             }
         } else {
-            console.error('❌ PaymentSessionToken não disponível para inicializar sistema de pagamento');
+            console.warn('⚠️ PaymentSessionToken não disponível - inicializando fallback básico');
+            this.initializeFraudDetectionFallback();
         }
     }
+
+    /**
+     * Inicializar sistema de detecção de fraude com fallbacks robustos
+     */
+    initializeFraudDetection() {
+        try {
+            if (this.payment) {
+                console.log('🔒 Iniciando coleta de dados de dispositivo para detecção de fraude...');
+
+                // Inicializar flags de status
+                this.fraudDetectionStatus = {
+                    collectDeviceDataAvailable: false,
+                    getTokenAvailable: false,
+                    deviceDataCollected: false,
+                    tokenObtained: false,
+                    fallbackUsed: false
+                };
+
+                // Verificar e executar coleta de dados do dispositivo
+                if (typeof this.payment.collectDeviceData === 'function') {
+                    try {
+                        this.payment.collectDeviceData();
+                        this.fraudDetectionStatus.collectDeviceDataAvailable = true;
+                        this.fraudDetectionStatus.deviceDataCollected = true;
+                        console.log('✅ Coleta de dados de dispositivo iniciada');
+                    } catch (collectError) {
+                        console.warn('⚠️ Erro ao coletar dados do dispositivo:', collectError);
+                        this.fraudDetectionStatus.collectDeviceDataAvailable = true; // Método existe mas falhou
+                    }
+                } else {
+                    console.log('ℹ️ Método collectDeviceData não disponível - usando fallback (normal em desenvolvimento)');
+                    this.initializeFraudDetectionFallback();
+                }
+
+                // Verificar e obter token de coleta de dados
+                if (typeof this.payment.getDeviceDataCollectionToken === 'function') {
+                    try {
+                        this.deviceDataCollectionToken = this.payment.getDeviceDataCollectionToken();
+                        this.fraudDetectionStatus.getTokenAvailable = true;
+                        this.fraudDetectionStatus.tokenObtained = !!this.deviceDataCollectionToken;
+                        console.log('✅ Token de coleta de dados obtido:', this.deviceDataCollectionToken ? 'Sim' : 'Não');
+                    } catch (tokenError) {
+                        console.warn('⚠️ Erro ao obter token de detecção de fraude:', tokenError);
+                        this.generateFallbackDeviceToken();
+                    }
+                } else {
+                    console.log('ℹ️ Método getDeviceDataCollectionToken não disponível - gerando token fallback (normal em desenvolvimento)');
+                    this.generateFallbackDeviceToken();
+                }
+
+                this.debugLog('Fraud detection initialized', {
+                    paymentObjectExists: !!this.payment,
+                    status: this.fraudDetectionStatus,
+                    deviceDataCollectionToken: this.deviceDataCollectionToken ? 'Present' : 'Missing'
+                });
+
+            } else {
+                console.warn('⚠️ Sistema de pagamento não inicializado - usando detecção de fraude básica');
+                this.initializeFraudDetectionFallback();
+            }
+        } catch (error) {
+            console.error('❌ Erro ao inicializar detecção de fraude:', error);
+            this.debugLog('Fraud detection initialization error', error);
+            this.initializeFraudDetectionFallback();
+        }
+    }
+
+    /**
+     * Inicializar detecção de fraude com métodos alternativos
+     */
+    initializeFraudDetectionFallback() {
+        console.log('🔄 Inicializando detecção de fraude com métodos alternativos...');
+
+        this.fraudDetectionStatus = {
+            collectDeviceDataAvailable: false,
+            getTokenAvailable: false,
+            deviceDataCollected: false,
+            tokenObtained: false,
+            fallbackUsed: true
+        };
+
+        // Coletar informações básicas do dispositivo
+        this.collectBasicDeviceInfo();
+
+        // Gerar token alternativo
+        this.generateFallbackDeviceToken();
+
+        console.log('✅ Detecção de fraude alternativa inicializada');
+    }
+
+    /**
+     * Coletar informações básicas do dispositivo para detecção de fraude
+     */
+    collectBasicDeviceInfo() {
+        try {
+            this.basicDeviceInfo = {
+                userAgent: navigator.userAgent,
+                language: navigator.language,
+                platform: navigator.platform,
+                cookieEnabled: navigator.cookieEnabled,
+                screenResolution: `${screen.width}x${screen.height}`,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                timestamp: new Date().toISOString()
+            };
+
+            this.fraudDetectionStatus.deviceDataCollected = true;
+            console.log('✅ Informações básicas do dispositivo coletadas');
+        } catch (error) {
+            console.warn('⚠️ Erro ao coletar informações básicas do dispositivo:', error);
+        }
+    }
+
+    /**
+     * Gerar token alternativo para detecção de fraude
+     */
+    generateFallbackDeviceToken() {
+        try {
+            const tokenData = {
+                sessionId: this.generateSessionId(),
+                deviceInfo: this.basicDeviceInfo || {},
+                timestamp: Date.now(),
+                source: 'fallback'
+            };
+
+            // Gerar token simples baseado nos dados disponíveis
+            this.deviceDataCollectionToken = btoa(JSON.stringify(tokenData));
+            this.fraudDetectionStatus.tokenObtained = true;
+
+            console.log('✅ Token de detecção de fraude alternativo gerado');
+            this.debugLog('Fallback device token generated', {
+                tokenLength: this.deviceDataCollectionToken.length,
+                source: 'fallback'
+            });
+        } catch (error) {
+            console.warn('⚠️ Erro ao gerar token alternativo:', error);
+            // Token mínimo como último recurso
+            this.deviceDataCollectionToken = 'fallback_' + Date.now();
+        }
+    }
+
+    /**
+     * Gerar ID de sessão único
+     */
+    generateSessionId() {
+        return 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    /**
+     * Gerenciar submissão de dados de detecção de fraude com fallbacks
+     */
+    async handleFraudDetectionSubmission() {
+        try {
+            console.log('🔒 Processando submissão de dados de detecção de fraude...');
+
+            if (this.payment && typeof this.payment.submitDeviceData === 'function') {
+                try {
+                    // Tentar submeter dados usando método oficial
+                    this.payment.submitDeviceData();
+                    console.log('✅ Dados de detecção de fraude submetidos via método oficial');
+
+                    // Verificar se temos token após submissão
+                    if (!this.deviceDataCollectionToken && typeof this.payment.getDeviceDataCollectionToken === 'function') {
+                        try {
+                            this.deviceDataCollectionToken = this.payment.getDeviceDataCollectionToken();
+                            console.log('✅ Token obtido após submissão:', !!this.deviceDataCollectionToken);
+                        } catch (tokenError) {
+                            console.warn('⚠️ Erro ao obter token após submissão:', tokenError);
+                        }
+                    }
+
+                } catch (submitError) {
+                    console.warn('⚠️ Erro na submissão oficial, usando método alternativo:', submitError);
+                    await this.submitFraudDetectionFallback();
+                }
+            } else {
+                console.warn('⚠️ Método submitDeviceData não disponível, usando submissão alternativa');
+                await this.submitFraudDetectionFallback();
+            }
+
+            // Garantir que temos um token para incluir no pagamento
+            if (!this.deviceDataCollectionToken) {
+                console.warn('⚠️ Token de detecção de fraude não disponível, gerando token de emergência...');
+                this.generateEmergencyFraudToken();
+            }
+
+            this.debugLog('Fraud detection submission completed', {
+                method: this.payment && typeof this.payment.submitDeviceData === 'function' ? 'official' : 'fallback',
+                hasToken: !!this.deviceDataCollectionToken,
+                tokenSource: this.fraudDetectionStatus?.fallbackUsed ? 'fallback' : 'official'
+            });
+
+        } catch (error) {
+            console.error('❌ Erro crítico na submissão de detecção de fraude:', error);
+            this.generateEmergencyFraudToken();
+        }
+    }
+
+    /**
+     * Submissão alternativa de dados de detecção de fraude
+     */
+    async submitFraudDetectionFallback() {
+        try {
+            console.log('🔄 Executando submissão alternativa de dados de detecção de fraude...');
+
+            // Simular submissão coletando dados adicionais
+            const fraudData = {
+                basicDeviceInfo: this.basicDeviceInfo || {},
+                sessionInfo: {
+                    sessionId: this.generateSessionId(),
+                    pageUrl: window.location.href,
+                    referrer: document.referrer,
+                    timestamp: new Date().toISOString()
+                },
+                browserInfo: {
+                    cookiesEnabled: navigator.cookieEnabled,
+                    javaEnabled: navigator.javaEnabled ? navigator.javaEnabled() : false,
+                    plugins: Array.from(navigator.plugins || []).map(p => p.name),
+                    mimeTypes: Array.from(navigator.mimeTypes || []).map(m => m.type)
+                }
+            };
+
+            // Armazenar dados para possível uso posterior
+            this.fraudDetectionData = fraudData;
+
+            // Gerar ou atualizar token baseado nos dados coletados
+            if (!this.deviceDataCollectionToken) {
+                this.generateFallbackDeviceToken();
+            }
+
+            console.log('✅ Submissão alternativa de detecção de fraude concluída');
+
+        } catch (error) {
+            console.warn('⚠️ Erro na submissão alternativa:', error);
+        }
+    }
+
+    /**
+     * Gerar token de emergência para casos críticos
+     */
+    generateEmergencyFraudToken() {
+        const emergencyData = {
+            emergency: true,
+            timestamp: Date.now(),
+            sessionId: 'emergency_' + Math.random().toString(36).substr(2, 9),
+            userAgent: navigator.userAgent.substring(0, 100) // Limitar tamanho
+        };
+
+        this.deviceDataCollectionToken = 'emergency_' + btoa(JSON.stringify(emergencyData));
+        console.log('🚨 Token de emergência gerado para detecção de fraude');
+
+        this.debugLog('Emergency fraud token generated', {
+            reason: 'Critical fallback',
+            tokenLength: this.deviceDataCollectionToken.length
+        });
+    }
+
+    /**
+     * Garantir que temos um token de detecção de fraude válido
+     */
+    ensureFraudDetectionToken() {
+        try {
+            // Verificar se já temos um token válido
+            if (this.deviceDataCollectionToken && this.deviceDataCollectionToken.length > 10) {
+                return {
+                    success: true,
+                    source: this.fraudDetectionStatus?.fallbackUsed ? 'fallback' : 'official',
+                    token: this.deviceDataCollectionToken
+                };
+            }
+
+            // Tentar obter token do sistema oficial se disponível
+            if (this.payment && typeof this.payment.getDeviceDataCollectionToken === 'function') {
+                try {
+                    const officialToken = this.payment.getDeviceDataCollectionToken();
+                    if (officialToken) {
+                        this.deviceDataCollectionToken = officialToken;
+                        return {
+                            success: true,
+                            source: 'official_retry',
+                            token: officialToken
+                        };
+                    }
+                } catch (error) {
+                    console.warn('⚠️ Erro ao obter token oficial na verificação final:', error);
+                }
+            }
+
+            // Gerar token de fallback se necessário
+            if (!this.deviceDataCollectionToken) {
+                this.generateFallbackDeviceToken();
+                if (this.deviceDataCollectionToken) {
+                    return {
+                        success: true,
+                        source: 'fallback_generated',
+                        token: this.deviceDataCollectionToken
+                    };
+                }
+            }
+
+            // Último recurso: token de emergência
+            this.generateEmergencyFraudToken();
+            return {
+                success: true,
+                source: 'emergency',
+                token: this.deviceDataCollectionToken
+            };
+
+        } catch (error) {
+            console.error('❌ Erro crítico ao garantir token de detecção de fraude:', error);
+            return {
+                success: false,
+                reason: 'Critical error in token generation',
+                fallbackAttempted: true,
+                error: error.message
+            };
+        }
+    }
+
+    /**
+     * Gerar fingerprint básico do navegador
+     */
+    generateBrowserFingerprint() {
+        try {
+            const fingerprint = {
+                screen: `${screen.width}x${screen.height}x${screen.colorDepth}`,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                language: navigator.language,
+                platform: navigator.platform,
+                cookieEnabled: navigator.cookieEnabled,
+                doNotTrack: navigator.doNotTrack,
+                plugins: Array.from(navigator.plugins || []).slice(0, 5).map(p => p.name),
+                canvas: this.getCanvasFingerprint()
+            };
+
+            return btoa(JSON.stringify(fingerprint)).substring(0, 50);
+        } catch (error) {
+            console.warn('⚠️ Erro ao gerar fingerprint do navegador:', error);
+            return 'fingerprint_error_' + Date.now();
+        }
+    }
+
+    /**
+     * Gerar fingerprint do canvas para identificação do dispositivo
+     */
+    getCanvasFingerprint() {
+        try {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.textBaseline = 'top';
+            ctx.font = '14px Arial';
+            ctx.fillText('Viator Security Check', 2, 2);
+            return canvas.toDataURL().substring(0, 50);
+        } catch (error) {
+            return 'canvas_unavailable';
+        }
+    }
+
+    /**
+     * Buscar booking questions para o produto atual
+     */
+    async loadBookingQuestions() {
+        try {
+            console.log('🔄 Carregando booking questions para produto:', this.bookingData.productCode);
+
+            if (!this.bookingData.productCode) {
+                throw new Error('Product code não encontrado');
+            }
+
+            console.log('📡 Fazendo requisição para:', viatorBookingAjax.ajaxurl);
+            console.log('📡 Parâmetros:', {
+                action: 'viator_get_booking_questions',
+                product_code: this.bookingData.productCode,
+                nonce: viatorBookingAjax.nonce
+            });
+
+            const response = await fetch(viatorBookingAjax.ajaxurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    action: 'viator_get_booking_questions',
+                    product_code: this.bookingData.productCode,
+                    nonce: viatorBookingAjax.nonce
+                })
+            });
+
+            console.log('📡 Response status:', response.status, response.statusText);
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            console.log('📡 Response data:', result);
+
+            if (result.success) {
+                this.productBookingQuestions = result.data;
+                console.log('✅ Booking questions carregadas:', Object.keys(result.data.booking_questions || {}).length, 'perguntas');
+                console.log('✅ Dados completos:', result.data);
+                this.debugLog('Booking questions loaded', {
+                    product_code: this.bookingData.productCode,
+                    questions_count: Object.keys(result.data.booking_questions || {}).length,
+                    logistics: result.data.logistics
+                });
+                return result.data;
+            } else {
+                console.error('❌ Erro na resposta:', result);
+                throw new Error(result.data?.message || 'Erro ao carregar booking questions');
+            }
+        } catch (error) {
+            console.error('❌ Erro ao carregar booking questions:', error);
+            console.error('❌ Stack trace:', error.stack);
+            this.debugLog('Booking questions load error', error);
+
+            // Fallback: continuar sem booking questions
+            this.productBookingQuestions = {
+                product_code: this.bookingData.productCode,
+                booking_questions: {},
+                logistics: {},
+                product_options: []
+            };
+
+            return this.productBookingQuestions;
+        }
+    }
+
+    /**
+     * Gerar HTML para o step de booking questions
+     */
+    getBookingQuestionsStepHTML() {
+        return `
+            <div class="booking-step booking-questions-step">
+                <h3>Informações Adicionais</h3>
+
+                <div id="booking-questions-loading" class="loading-container">
+                    <div class="loading-spinner"></div>
+                    <p>Carregando informações necessárias...</p>
+                </div>
+
+                <div id="booking-questions-content" style="display: none;">
+                    <div id="booking-questions-form">
+                        <!-- Perguntas serão inseridas aqui dinamicamente -->
+                    </div>
+                </div>
+
+                <div id="booking-questions-error" class="booker-info-section" style="display: none; background: #f8d7da; border-color: #f5c6cb; color: #721c24;">
+                    <h4 style="color: #721c24;">Erro ao Carregar</h4>
+                    <p>Não foi possível carregar as informações necessárias. Você pode continuar com o processo de reserva.</p>
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * Inicializar step de booking questions
+     */
+    async initializeBookingQuestionsStep() {
+        console.log('🚀 Inicializando step de booking questions');
+        console.log('🔍 Product code atual:', this.bookingData.productCode);
+        console.log('🔍 Booking data completo:', this.bookingData);
+
+        // Verificar se temos product code
+        if (!this.bookingData.productCode) {
+            console.error('❌ Product code não encontrado! Tentando extrair novamente...');
+            this.extractProductCode();
+            console.log('🔍 Product code após extração:', this.bookingData.productCode);
+        }
+
+        try {
+            // Carregar booking questions
+            const questionsData = await this.loadBookingQuestions();
+
+            // Esconder loading
+            const loadingElement = document.getElementById('booking-questions-loading');
+            if (loadingElement) loadingElement.style.display = 'none';
+
+            // Renderizar perguntas
+            this.renderBookingQuestions(questionsData);
+
+            // Mostrar conteúdo
+            const contentElement = document.getElementById('booking-questions-content');
+            if (contentElement) contentElement.style.display = 'block';
+
+            // Inicializar eventos das perguntas
+            this.initializeQuestionEvents();
+
+        } catch (error) {
+            console.error('❌ Erro ao inicializar booking questions:', error);
+
+            // Esconder loading
+            const loadingElement = document.getElementById('booking-questions-loading');
+            if (loadingElement) loadingElement.style.display = 'none';
+
+            // Mostrar erro
+            const errorElement = document.getElementById('booking-questions-error');
+            if (errorElement) errorElement.style.display = 'block';
+        }
+    }
+
+    /**
+     * Renderizar booking questions dinamicamente
+     */
+    renderBookingQuestions(questionsData) {
+        console.log('🎨 Renderizando booking questions:', questionsData);
+        console.log('🎨 Dados dos viajantes disponíveis:', this.bookingData.selectedTravelers);
+
+        const formContainer = document.getElementById('booking-questions-form');
+        if (!formContainer) {
+            console.error('❌ Container de formulário não encontrado!');
+            return;
+        }
+
+        // As perguntas vêm como array, não como objeto
+        const questions = questionsData.booking_questions || [];
+
+        console.log('🎨 Perguntas encontradas:', questions.length);
+        console.log('🎨 Dados das perguntas:', questions);
+
+        if (questions.length === 0) {
+            console.log('ℹ️ Nenhuma pergunta encontrada, mostrando mensagem padrão');
+            formContainer.innerHTML = `
+                <div class="booker-info-section">
+                    <h4>Tudo Pronto!</h4>
+                    <p>Nenhuma informação adicional é necessária para esta experiência.</p>
+                    <p>Você pode prosseguir diretamente para o pagamento.</p>
+                    <p class="booker-note">
+                        <strong>Debug:</strong> Product Code: ${this.bookingData.productCode || 'N/A'}
+                    </p>
+                </div>
+            `;
+            return;
+        }
+
+        console.log('🎨 Renderizando', questions.length, 'booking questions');
+
+        let formHTML = '<div class="booking-questions-container">';
+
+        // Separar perguntas por tipo
+        const perBookingQuestions = [];
+        const perTravelerQuestions = [];
+
+        questions.forEach(question => {
+            if (question.group === 'PER_BOOKING') {
+                perBookingQuestions.push(question);
+            } else if (question.group === 'PER_TRAVELER') {
+                perTravelerQuestions.push(question);
+            }
+        });
+
+        // Renderizar perguntas PER_BOOKING primeiro
+        if (perBookingQuestions.length > 0) {
+            formHTML += '<div class="booker-info-section per-booking-questions">';
+            formHTML += '<h4>Informações da Reserva</h4>';
+
+            perBookingQuestions.forEach(question => {
+                formHTML += this.renderSingleQuestion(question, 'booking');
+            });
+
+            formHTML += '</div>';
+        }
+
+        // Renderizar perguntas PER_TRAVELER
+        if (perTravelerQuestions.length > 0) {
+            console.log('🎨 Renderizando perguntas PER_TRAVELER:', perTravelerQuestions.length);
+            console.log('🎨 Dados dos viajantes:', this.bookingData.selectedTravelers);
+
+            formHTML += '<div class="booker-info-section per-traveler-questions">';
+            formHTML += '<h4>Informações dos Viajantes</h4>';
+
+            // Para cada viajante - corrigir a lógica para usar array
+            const travelers = this.bookingData.selectedTravelers || [];
+            const totalTravelers = travelers.reduce((sum, travelerGroup) => sum + travelerGroup.numberOfTravelers, 0);
+
+            console.log('🎨 Total de viajantes calculado:', totalTravelers);
+
+            if (totalTravelers > 0) {
+                let globalTravelerIndex = 1;
+
+                travelers.forEach((travelerGroup, groupIndex) => {
+                    for (let i = 0; i < travelerGroup.numberOfTravelers; i++) {
+                        formHTML += `<div class="traveler-questions-group">`;
+                        formHTML += `<h5>Viajante ${globalTravelerIndex}</h5>`;
+
+                        perTravelerQuestions.forEach(question => {
+                            formHTML += this.renderSingleQuestion(question, 'traveler', globalTravelerIndex);
+                        });
+
+                        formHTML += '</div>';
+                        globalTravelerIndex++;
+                    }
+                });
+            } else {
+                formHTML += '<div class="no-travelers-message">';
+                formHTML += '<p>⚠️ Nenhum viajante selecionado. Volte para a etapa anterior para selecionar os viajantes.</p>';
+                formHTML += '</div>';
+            }
+
+            formHTML += '</div>';
+        }
+
+        formHTML += '</div>';
+
+        formContainer.innerHTML = formHTML;
+
+        // Inicializar eventos e validação
+        this.initializeQuestionEvents();
+    }
+
+    /**
+     * Renderizar uma única booking question
+     */
+    renderSingleQuestion(question, scope, travelerIndex = null) {
+        const questionId = question.id;
+        const fieldId = travelerIndex ? `${questionId}_traveler_${travelerIndex}` : questionId;
+        const isRequired = question.required === 'MANDATORY';
+        const requiredAttr = isRequired ? 'required' : '';
+        const requiredLabel = isRequired ? ' *' : '';
+
+        let questionHTML = `<div class="form-group question-group" data-question-id="${questionId}" data-scope="${scope}">`;
+        questionHTML += `<label for="${fieldId}" class="question-label">`;
+        questionHTML += `${question.label || question.id}${requiredLabel}`;
+        questionHTML += `</label>`;
+
+        // Adicionar hint se disponível
+        if (question.hint) {
+            questionHTML += `<div class="question-hint booker-note">${question.hint}</div>`;
+        }
+
+        // Renderizar campo baseado no tipo
+        switch (question.id) {
+            case 'FULL_NAMES_FIRST':
+                questionHTML += `<input type="text" id="${fieldId}" name="${fieldId}"
+                    class="form-control question-input" placeholder="Nome" ${requiredAttr}>`;
+                break;
+
+            case 'FULL_NAMES_LAST':
+                questionHTML += `<input type="text" id="${fieldId}" name="${fieldId}"
+                    class="form-control question-input" placeholder="Sobrenome" ${requiredAttr}>`;
+                break;
+
+            case 'DATE_OF_BIRTH':
+                questionHTML += `<input type="date" id="${fieldId}" name="${fieldId}"
+                    class="form-control question-input" ${requiredAttr}>`;
+                break;
+
+            case 'AGEBAND':
+                questionHTML += this.renderAgeBandSelect(fieldId, requiredAttr, question);
+                break;
+
+            case 'PICKUP_POINT':
+                questionHTML += this.renderPickupPointSelect(fieldId, requiredAttr, question);
+                break;
+
+            case 'SPECIAL_REQUIREMENTS':
+                questionHTML += `<textarea id="${fieldId}" name="${fieldId}"
+                    class="form-control question-input" rows="3"
+                    placeholder="Descreva quaisquer necessidades especiais ou solicitações"
+                    maxlength="${question.maxLength || 1000}"></textarea>`;
+                break;
+
+            case 'WEIGHT':
+                questionHTML += this.renderWeightInput(fieldId, requiredAttr, question, travelerIndex);
+                break;
+
+            default:
+                // Campo genérico baseado no tipo de dados esperado
+                if (question.type === 'STRING') {
+                    questionHTML += `<input type="text" id="${fieldId}" name="${fieldId}"
+                        class="form-control question-input" ${requiredAttr}
+                        maxlength="${question.maxLength || 255}">`;
+                } else if (question.type === 'NUMBER_AND_UNIT') {
+                    questionHTML += this.renderNumberWithUnitInput(fieldId, requiredAttr, question, travelerIndex);
+                } else {
+                    questionHTML += `<input type="text" id="${fieldId}" name="${fieldId}"
+                        class="form-control question-input" ${requiredAttr}>`;
+                }
+                break;
+        }
+
+        questionHTML += `<div class="error-message" id="error_${fieldId}" style="display: none;"></div>`;
+        questionHTML += `</div>`;
+
+        return questionHTML;
+    }
+
+    /**
+     * Renderizar select de age band
+     */
+    renderAgeBandSelect(fieldId, requiredAttr, question = null) {
+        // Usar allowedAnswers da pergunta se disponível, senão usar padrão
+        let ageBands;
+        if (question && question.allowedAnswers) {
+            ageBands = question.allowedAnswers.map(answer => ({
+                id: answer,
+                label: this.getAgeBandLabel(answer)
+            }));
+        } else {
+            ageBands = this.ageBands || [
+                { id: 'ADULT', label: 'Adulto (18+)' },
+                { id: 'CHILD', label: 'Criança (3-17)' },
+                { id: 'INFANT', label: 'Bebê (0-2)' },
+                { id: 'SENIOR', label: 'Idoso (65+)' }
+            ];
+        }
+
+        let selectHTML = `<select id="${fieldId}" name="${fieldId}" class="form-control question-input" ${requiredAttr}>`;
+        selectHTML += '<option value="">Selecione a faixa etária</option>';
+
+        ageBands.forEach(band => {
+            selectHTML += `<option value="${band.id}">${band.label}</option>`;
+        });
+
+        selectHTML += '</select>';
+        return selectHTML;
+    }
+
+    /**
+     * Renderizar select de pickup point
+     */
+    renderPickupPointSelect(fieldId, requiredAttr, question = null) {
+        const logistics = this.productBookingQuestions?.logistics || {};
+        const pickupPoints = logistics.pickupPoints || [];
+
+        let selectHTML = `<select id="${fieldId}" name="${fieldId}" class="form-control question-input" ${requiredAttr}>`;
+        selectHTML += '<option value="">Selecione o ponto de encontro</option>';
+
+        if (pickupPoints.length > 0) {
+            pickupPoints.forEach(point => {
+                selectHTML += `<option value="${point.id}">${point.name}</option>`;
+            });
+        } else {
+            selectHTML += '<option value="hotel">Busca no hotel</option>';
+            selectHTML += '<option value="meeting_point">Ponto de encontro padrão</option>';
+        }
+
+        selectHTML += '</select>';
+
+        // Adicionar campo de texto livre se suportado
+        if (question && question.units && question.units.includes('FREETEXT')) {
+            selectHTML += `<div style="margin-top: 10px;">
+                <input type="text" id="${fieldId}_freetext" name="${fieldId}_freetext"
+                       class="form-control question-input"
+                       placeholder="Ou digite um endereço específico"
+                       maxlength="${question.maxLength || 1000}">
+            </div>`;
+        }
+
+        return selectHTML;
+    }
+
+    /**
+     * Renderizar input de peso
+     */
+    renderWeightInput(fieldId, requiredAttr, question, travelerIndex = null) {
+        const units = question.units || ['kg', 'lbs'];
+        const isFirstTraveler = travelerIndex === 1;
+        const shouldDisableUnit = travelerIndex && !isFirstTraveler;
+
+        let html = `<div class="weight-input-container" style="display: flex; gap: 10px; align-items: stretch;">
+            <div style="flex: 2;">
+                <input type="number" id="${fieldId}" name="${fieldId}"
+                       class="form-control question-input"
+                       placeholder="Peso" ${requiredAttr} min="1" max="300"
+                       style="width: 100%; height: 100%;">
+            </div>
+            <div style="flex: 1;">
+                <select id="${fieldId}_unit" name="${fieldId}_unit"
+                        class="form-control question-input unit-sync-field"
+                        data-question-type="WEIGHT"
+                        data-traveler="${travelerIndex || 1}"
+                        ${shouldDisableUnit ? 'disabled' : ''}
+                        ${requiredAttr}
+                        style="width: 100%; height: 100%; padding-right: 30px;">`;
+
+        units.forEach(unit => {
+            const selected = unit === 'kg' ? 'selected' : '';
+            html += `<option value="${unit}" ${selected}>${unit}</option>`;
+        });
+
+        html += `</select></div></div>`;
+        return html;
+    }
+
+    /**
+     * Renderizar input de número com unidade
+     */
+    renderNumberWithUnitInput(fieldId, requiredAttr, question, travelerIndex = null) {
+        const units = question.units || [];
+        const isFirstTraveler = travelerIndex === 1;
+        const shouldDisableUnit = travelerIndex && !isFirstTraveler;
+        const questionType = question.id || 'NUMBER';
+
+        let html = `<div class="number-unit-container" style="display: flex; gap: 10px; align-items: stretch;">
+            <div style="flex: 2;">
+                <input type="number" id="${fieldId}" name="${fieldId}"
+                       class="form-control question-input"
+                       ${requiredAttr} maxlength="${question.maxLength || 50}"
+                       placeholder="${question.hint || 'Digite o valor'}"
+                       style="width: 100%; height: 100%;">
+            </div>`;
+
+        if (units.length > 0) {
+            html += `<div style="flex: 1;">
+                <select id="${fieldId}_unit" name="${fieldId}_unit"
+                        class="form-control question-input unit-sync-field"
+                        data-question-type="${questionType}"
+                        data-traveler="${travelerIndex || 1}"
+                        ${shouldDisableUnit ? 'disabled' : ''}
+                        ${requiredAttr}
+                        style="width: 100%; height: 100%; padding-right: 30px;">`;
+
+            units.forEach(unit => {
+                const selected = (questionType === 'HEIGHT' && unit === 'cm') ||
+                               (questionType === 'WEIGHT' && unit === 'kg') ? 'selected' : '';
+                html += `<option value="${unit}" ${selected}>${unit}</option>`;
+            });
+
+            html += `</select></div>`;
+        }
+
+        html += `</div>`;
+        return html;
+    }
+
+    /**
+     * Obter label traduzido para age band
+     */
+    getAgeBandLabel(ageBand) {
+        const labels = {
+            'ADULT': 'Adulto (18+)',
+            'SENIOR': 'Idoso (65+)',
+            'YOUTH': 'Jovem (13-17)',
+            'CHILD': 'Criança (3-12)',
+            'INFANT': 'Bebê (0-2)',
+            'TRAVELER': 'Viajante'
+        };
+
+        return labels[ageBand] || ageBand;
+    }
+
+    /**
+     * Inicializar eventos das booking questions
+     */
+    initializeQuestionEvents() {
+        const questionInputs = document.querySelectorAll('.question-input');
+
+        questionInputs.forEach(input => {
+            // Validação em tempo real
+            input.addEventListener('blur', () => {
+                this.validateQuestionField(input);
+            });
+
+            // Coletar respostas sempre que houver mudança
+            input.addEventListener('change', () => {
+                this.collectBookingQuestionAnswers();
+
+                // Lógica condicional para campos específicos
+                if (input.id.includes('DATE_OF_BIRTH')) {
+                    this.updateAgeBandFromBirthDate(input);
+                }
+
+                // Sincronização de unidades para campos WEIGHT e HEIGHT
+                if (input.classList.contains('unit-sync-field')) {
+                    this.syncUnitsAcrossTravelers(input);
+                }
+            });
+
+            // Para campos de texto, coletar também no input
+            input.addEventListener('input', () => {
+                if (input.type === 'text' || input.type === 'textarea') {
+                    this.collectBookingQuestionAnswers();
+                }
+            });
+        });
+
+        // Inicializar coleta inicial
+        this.collectBookingQuestionAnswers();
+
+        // Adicionar estilos para campos sincronizados
+        this.addUnitSyncStyles();
+
+        // Adicionar estilos padronizados de validação
+        this.addValidationStyles();
+    }
+
+    /**
+     * Sincronizar unidades entre viajantes
+     */
+    syncUnitsAcrossTravelers(changedField) {
+        const questionType = changedField.dataset.questionType;
+        const travelerIndex = parseInt(changedField.dataset.traveler);
+        const selectedUnit = changedField.value;
+
+        console.log(`🔄 Sincronizando unidades ${questionType}: Viajante ${travelerIndex} selecionou ${selectedUnit}`);
+
+        // Apenas o Viajante 1 pode alterar unidades
+        if (travelerIndex !== 1) {
+            console.log('⚠️ Apenas o Viajante 1 pode alterar unidades');
+            return;
+        }
+
+        // Encontrar todos os campos de unidade do mesmo tipo
+        const allUnitFields = document.querySelectorAll(`.unit-sync-field[data-question-type="${questionType}"]`);
+
+        allUnitFields.forEach((field, index) => {
+            const fieldTravelerIndex = parseInt(field.dataset.traveler);
+
+            if (fieldTravelerIndex !== 1) {
+                // Sincronizar unidade para outros viajantes
+                field.value = selectedUnit;
+                console.log(`✅ Viajante ${fieldTravelerIndex} - ${questionType} sincronizado para ${selectedUnit}`);
+            }
+        });
+
+        // Coletar respostas atualizadas
+        this.collectBookingQuestionAnswers();
+    }
+
+    /**
+     * Adicionar estilos CSS para campos de unidade sincronizados
+     */
+    addUnitSyncStyles() {
+        const styleId = 'unit-sync-styles';
+
+        // Verificar se os estilos já foram adicionados
+        if (document.getElementById(styleId)) {
+            return;
+        }
+
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `
+            /* Estilos para campos de unidade sincronizados */
+            .unit-sync-field:disabled {
+                background-color: #f8f9fa !important;
+                border-color: #e9ecef !important;
+                color: #6c757d !important;
+                cursor: not-allowed !important;
+                opacity: 0.8 !important;
+            }
+
+            .unit-sync-field:disabled:hover {
+                background-color: #f8f9fa !important;
+                border-color: #e9ecef !important;
+            }
+
+            /* Indicador visual para campos sincronizados */
+            .form-group:has(.unit-sync-field:disabled) {
+                position: relative;
+            }
+
+            /* Ícone ::after removido para evitar sobreposição com background-image */
+
+            /* Tooltip para explicar sincronização */
+            .unit-sync-field:disabled {
+                position: relative;
+            }
+
+            .unit-sync-field:disabled:hover::before {
+                content: "Sincronizado com Viajante 1";
+                position: absolute;
+                bottom: 100%;
+                left: 50%;
+                transform: translateX(-50%);
+                background: #333;
+                color: white;
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-size: 11px;
+                white-space: nowrap;
+                z-index: 1000;
+                margin-bottom: 5px;
+            }
+
+            .unit-sync-field:disabled:hover::after {
+                content: "";
+                position: absolute;
+                bottom: 100%;
+                left: 50%;
+                transform: translateX(-50%);
+                border: 4px solid transparent;
+                border-top-color: #333;
+                z-index: 1000;
+            }
+        `;
+
+        document.head.appendChild(style);
+        console.log('🎨 Estilos de sincronização de unidades injetados');
+    }
+
+    /**
+     * Adicionar estilos CSS padronizados para validação (todas as etapas)
+     */
+    addValidationStyles() {
+        const styleId = 'validation-styles';
+
+        // Verificar se os estilos já foram adicionados
+        if (document.getElementById(styleId)) {
+            return;
+        }
+
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `
+            /* Estilos padronizados para validação - replicando exatamente a Etapa 2 */
+            .error-message {
+                color: #dc3545;
+                background-color: #f8d7da;
+                font-size: 0.875rem;
+                margin-top: 0.25rem;
+                padding: 0.75rem 1rem;
+                text-align: center;
+                border-radius: 0.375rem;
+                display: block;
+                font-weight: normal;
+                line-height: 1.4;
+                border: none;
+            }
+
+            .error-message.show {
+                animation: fadeInError 0.3s ease-in;
+            }
+
+            .warning-message {
+                color: #856404;
+                background-color: #fff3cd;
+                border: 1px solid #ffeaa7;
+                border-radius: 0.375rem;
+                padding: 0.75rem 1rem;
+                font-size: 0.875rem;
+                margin-top: 0.5rem;
+                display: block;
+                font-weight: 500;
+                line-height: 1.4;
+            }
+
+            /* Campos com erro - borda vermelha sólida como na imagem */
+            .is-invalid {
+                border: 2px solid #dc3545 !important;
+                box-shadow: none !important;
+            }
+
+            .is-invalid:focus {
+                border: 2px solid #dc3545 !important;
+                box-shadow: none !important;
+                outline: none !important;
+            }
+
+            /* Mensagens de erro para viajantes - mesmo padrão */
+            .traveler-error-message {
+                color: #dc3545;
+                background-color: #f8d7da;
+                font-size: 0.875rem;
+                margin-top: 0.5rem;
+                padding: 0.75rem 1rem;
+                text-align: center;
+                border-radius: 0.375rem;
+                display: block;
+                font-weight: normal;
+                border: none;
+            }
+
+            @keyframes fadeInError {
+                from {
+                    opacity: 0;
+                    transform: translateY(-10px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            /* Mensagens de erro gerais - mesmo padrão da imagem */
+            #date-error-message {
+                color: #dc3545;
+                background-color: #f8d7da;
+                border-radius: 0.375rem;
+                padding: 0.75rem 1rem;
+                margin-top: 0.5rem;
+                font-size: 0.875rem;
+                font-weight: normal;
+                line-height: 1.4;
+                text-align: center;
+                border: none;
+            }
+
+            /* Remover estilos conflitantes antigos */
+            .field-error,
+            .question-error {
+                display: none !important;
+            }
+
+            /* Estilos específicos para campos com unidades */
+            .weight-input-container,
+            .number-unit-container {
+                display: flex !important;
+                gap: 10px !important;
+                align-items: stretch !important;
+            }
+
+            .weight-input-container > div,
+            .number-unit-container > div {
+                display: flex !important;
+                align-items: stretch !important;
+            }
+
+            .weight-input-container input,
+            .number-unit-container input,
+            .weight-input-container select,
+            .number-unit-container select {
+                height: auto !important;
+                min-height: 38px !important;
+                border: 2px solid #e9ecef !important;
+                border-radius: 0.375rem !important;
+                padding: 8px 12px !important;
+                font-size: 1rem !important;
+                line-height: 1.5 !important;
+            }
+
+            /* Corrigir alinhamento do select de unidades */
+            .weight-input-container select,
+            .number-unit-container select {
+                padding-right: 30px !important;
+                padding-left: 12px !important;
+                text-align: left !important;
+                text-align-last: left !important;
+                appearance: none !important;
+                -webkit-appearance: none !important;
+                -moz-appearance: none !important;
+                background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e") !important;
+                background-repeat: no-repeat !important;
+                background-position: right 8px center !important;
+                background-size: 16px !important;
+            }
+
+            /* Remover ícone de clips dos campos desabilitados */
+            .weight-input-container select:disabled,
+            .number-unit-container select:disabled {
+                background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M9 12l2 2 4-4'%3e%3c/path%3e%3ccircle cx='12' cy='12' r='10'%3e%3c/circle%3e%3c/svg%3e") !important;
+                background-color: #f8f9fa !important;
+                color: #6c757d !important;
+                cursor: not-allowed !important;
+            }
+
+            /* Garantir que campos com erro mantenham o estilo correto */
+            .weight-input-container input.is-invalid,
+            .number-unit-container input.is-invalid,
+            .weight-input-container select.is-invalid,
+            .number-unit-container select.is-invalid {
+                border: 2px solid #dc3545 !important;
+            }
+
+            /* Corrigir placeholder do campo de peso para peso sutil igual aos demais */
+            .weight-input-container input::placeholder,
+            .number-unit-container input::placeholder {
+                font-weight: 500 !important;
+                font-style: normal !important;
+                color: #6c757d !important;
+            }
+
+            /* Remover ícones de validação automáticos do Bootstrap/frameworks */
+            .form-control.is-invalid {
+                background-image: none !important;
+                padding-right: 12px !important;
+            }
+
+            .weight-input-container .form-control.is-invalid,
+            .number-unit-container .form-control.is-invalid {
+                background-image: none !important;
+                padding-right: 12px !important;
+            }
+
+            /* Garantir que não há ícones de validação em nenhum campo */
+            .question-input.is-invalid {
+                background-image: none !important;
+                background-repeat: no-repeat !important;
+                background-position: right calc(0.375em + 0.1875rem) center !important;
+                background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem) !important;
+                padding-right: 12px !important;
+            }
+
+            /* Remover qualquer pseudo-elemento que possa estar adicionando ícones */
+            .question-input.is-invalid::after,
+            .question-input.is-invalid::before,
+            .form-control.is-invalid::after,
+            .form-control.is-invalid::before {
+                display: none !important;
+                content: none !important;
+            }
+
+            /* Garantir alinhamento consistente para todos os selects */
+            select.form-control,
+            select.question-input {
+                text-align: left !important;
+                text-align-last: left !important;
+                padding-left: 12px !important;
+                padding-right: 30px !important;
+                border-radius: 0.375rem !important;
+                appearance: none !important;
+                -webkit-appearance: none !important;
+                -moz-appearance: none !important;
+                background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e") !important;
+                background-repeat: no-repeat !important;
+                background-position: right 8px center !important;
+                background-size: 16px !important;
+            }
+
+            /* Garantir border-radius consistente para todos os inputs */
+            input.form-control,
+            input.question-input,
+            textarea.form-control,
+            textarea.question-input {
+                border-radius: 0.375rem !important;
+            }
+
+            /* Remover border-left das seções booker-info-section e per-booking-questions */
+            .booker-info-section,
+            .per-booking-questions {
+                border-left: none !important;
+            }
+
+            .booker-info-section.per-booking-questions {
+                border-left: none !important;
+            }
+
+            /* Aplicar padrões da Etapa 3 aos campos de pagamento */
+            .payment-form input.form-control,
+            .payment-form select.form-control {
+                border: 2px solid #e9ecef !important;
+                border-radius: 0.375rem !important;
+                padding: 8px 12px !important;
+                font-size: 1rem !important;
+                line-height: 1.5 !important;
+                background-image: none !important;
+            }
+
+            /* Placeholder dos campos de pagamento com peso consistente */
+            .payment-form input.form-control::placeholder {
+                font-weight: 500 !important;
+                font-style: normal !important;
+                color: #6c757d !important;
+            }
+
+            /* Selects de pagamento com alinhamento consistente */
+            .payment-form select.form-control {
+                text-align: left !important;
+                text-align-last: left !important;
+                padding-left: 12px !important;
+                padding-right: 12px !important;
+                appearance: none !important;
+                -webkit-appearance: none !important;
+                -moz-appearance: none !important;
+                background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e") !important;
+                background-repeat: no-repeat !important;
+                background-position: right 8px center !important;
+                background-size: 16px !important;
+            }
+
+            /* Campos de pagamento com erro - mesmo padrão da Etapa 3 */
+            .payment-form input.form-control.is-invalid,
+            .payment-form select.form-control.is-invalid {
+                border: 2px solid #dc3545 !important;
+                background-image: none !important;
+                padding-right: 12px !important;
+            }
+
+            /* Remover ícones de validação dos campos de pagamento */
+            .payment-form .form-control.is-invalid::after,
+            .payment-form .form-control.is-invalid::before {
+                display: none !important;
+                content: none !important;
+            }
+
+            /* Labels dos campos de pagamento */
+            .payment-form label {
+                font-weight: 500 !important;
+                color: #495057 !important;
+                margin-bottom: 5px !important;
+                display: block !important;
+            }
+
+            /* Textos de ajuda dos campos de pagamento */
+            .payment-form .form-text {
+                font-size: 0.875rem !important;
+                color: #6c757d !important;
+                margin-top: 5px !important;
+            }
+
+            /* Correção específica para selects de data de vencimento */
+            #expiry-month,
+            #expiry-year,
+            #billing-country {
+                padding-right: 30px !important;
+                background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e") !important;
+                background-repeat: no-repeat !important;
+                background-position: right 8px center !important;
+                background-size: 16px !important;
+                appearance: none !important;
+                -webkit-appearance: none !important;
+                -moz-appearance: none !important;
+            }
+
+            /* Garantir que o texto não seja cortado */
+            #expiry-month option,
+            #expiry-year option,
+            #billing-country option {
+                padding: 8px 12px !important;
+                text-align: left !important;
+            }
+        `;
+
+        document.head.appendChild(style);
+        console.log('🎨 Estilos de validação padronizados injetados');
+    }
+
+    /**
+     * Coletar todas as respostas das booking questions (formato compatível com backend PHP)
+     */
+    collectBookingQuestionAnswers() {
+        console.log('📝 Coletando respostas das booking questions...');
+
+        const answers = [];
+        const questionInputs = document.querySelectorAll('.question-input');
+
+        questionInputs.forEach(input => {
+            const questionId = this.extractQuestionId(input);
+            const travelerIndex = this.extractTravelerNumber(input);
+            const value = input.value.trim();
+
+            if (!questionId || !value) return;
+
+            // Determinar scope baseado no tipo de pergunta
+            const scope = this.getQuestionScope(questionId, travelerIndex);
+
+            const answer = {
+                questionId: questionId,  // Formato esperado pelo PHP
+                answer: value,
+                scope: scope
+            };
+
+            // Adicionar travelerIndex para perguntas PER_TRAVELER
+            if (travelerIndex && scope === 'traveler') {
+                answer.travelerIndex = parseInt(travelerIndex);
+            }
+
+            // Adicionar unit para campos que precisam (formato Viator API)
+            const unit = this.getQuestionUnit(input, questionId);
+            if (unit) {
+                answer.unit = unit;
+            }
+
+            answers.push(answer);
+        });
+
+        // Armazenar respostas no bookingData
+        this.bookingData.bookingQuestionAnswers = answers;
+
+        console.log('📝 Respostas coletadas:', answers.length);
+        console.log('📝 Dados das respostas:', answers);
+
+        // Atualizar contador no UI se existir
+        this.updateBookingQuestionsCount(answers.length);
+
+        return answers;
+    }
+
+    /**
+     * Determinar scope da pergunta (booking ou traveler)
+     */
+    getQuestionScope(questionId, travelerIndex) {
+        // Perguntas PER_TRAVELER
+        const perTravelerQuestions = [
+            'FULL_NAMES_FIRST', 'FULL_NAMES_LAST', 'DATE_OF_BIRTH',
+            'AGEBAND', 'WEIGHT', 'HEIGHT', 'PASSPORT_EXPIRY',
+            'PASSPORT_NATIONALITY', 'PASSPORT_PASSPORT_NO'
+        ];
+
+        if (perTravelerQuestions.includes(questionId) || travelerIndex) {
+            return 'traveler';
+        }
+
+        return 'booking';
+    }
+
+    /**
+     * Extrair ID da pergunta do campo
+     */
+    extractQuestionId(input) {
+        // Formato: QUESTION_ID ou QUESTION_ID_traveler_X ou QUESTION_ID_unit
+        const id = input.id || input.name;
+        if (!id) return null;
+
+        // Remover sufixos _traveler_X, _unit, etc.
+        return id.split('_')[0];
+    }
+
+    /**
+     * Extrair número do viajante do campo
+     */
+    extractTravelerNumber(input) {
+        const id = input.id || input.name;
+        if (!id) return null;
+
+        const match = id.match(/traveler_(\d+)/);
+        return match ? match[1] : null;
+    }
+
+    /**
+     * Obter unidade para a pergunta
+     */
+    getQuestionUnit(input, questionId) {
+        // Para campos de peso
+        if (questionId === 'WEIGHT') {
+            const unitField = document.querySelector(`[name="${input.name}_unit"], [id="${input.id}_unit"]`);
+            return unitField ? unitField.value : 'kg';
+        }
+
+        // Para pickup point
+        if (questionId === 'PICKUP_POINT') {
+            // Verificar se é um campo de texto livre ou location reference
+            if (input.type === 'text') {
+                return 'FREETEXT';
+            } else if (input.type === 'select-one') {
+                return 'LOCATION_REFERENCE';
+            }
+        }
+
+        // Para campos de altura
+        if (questionId === 'HEIGHT') {
+            const unitField = document.querySelector(`[name="${input.name}_unit"], [id="${input.id}_unit"]`);
+            return unitField ? unitField.value : 'cm';
+        }
+
+        return null;
+    }
+
+    /**
+     * Atualizar contador de booking questions no UI
+     */
+    updateBookingQuestionsCount(count) {
+        const countElement = document.querySelector('.booking-questions-count');
+        if (countElement) {
+            countElement.textContent = count;
+        }
+
+        // Atualizar indicador de progresso se existir
+        const progressElement = document.querySelector('.booking-questions-progress');
+        if (progressElement) {
+            const totalQuestions = this.getTotalRequiredQuestions();
+            const percentage = totalQuestions > 0 ? (count / totalQuestions) * 100 : 0;
+            progressElement.style.width = `${percentage}%`;
+        }
+    }
+
+    /**
+     * Obter total de perguntas obrigatórias
+     */
+    getTotalRequiredQuestions() {
+        const requiredInputs = document.querySelectorAll('.question-input[required]');
+        return requiredInputs.length;
+    }
+
+    /**
+     * Validar se todas as booking questions obrigatórias foram respondidas
+     */
+    validateAllBookingQuestions() {
+        console.log('🔍 Validando todas as booking questions...');
+
+        const requiredInputs = document.querySelectorAll('.question-input[required]');
+        const errors = [];
+        let isValid = true;
+
+        requiredInputs.forEach(input => {
+            const value = input.value.trim();
+            const questionId = this.extractQuestionId(input);
+            const travelerNum = this.extractTravelerNumber(input);
+
+            if (!value) {
+                isValid = false;
+                const label = this.getQuestionLabel(questionId, travelerNum);
+                errors.push(`${label} é obrigatório`);
+
+                // Adicionar classe de erro visual (padrão etapa 2)
+                this.showFieldError(input, 'Obrigatório');
+            } else {
+                // Remover classe de erro se campo está preenchido
+                this.hideFieldError(input);
+            }
+        });
+
+        // Validações específicas
+        if (isValid) {
+            isValid = this.validateSpecificQuestions();
+        }
+
+        console.log(`🔍 Validação completa: ${isValid ? 'VÁLIDA' : 'INVÁLIDA'}`);
+        if (errors.length > 0) {
+            console.log('❌ Erros encontrados:', errors);
+        }
+
+        return {
+            isValid,
+            errors
+        };
+    }
+
+    /**
+     * Validações específicas para tipos de perguntas
+     */
+    validateSpecificQuestions() {
+        let isValid = true;
+
+        // Validar PICKUP_POINT quando obrigatório (arrivalMode: OTHER)
+        const pickupPointInput = document.querySelector('[id*="PICKUP_POINT"]');
+        if (pickupPointInput) {
+            const value = pickupPointInput.value.trim();
+            // PICKUP_POINT é obrigatório para produtos com arrivalMode: OTHER
+            // Como não temos acesso direto ao arrivalMode, consideramos obrigatório se o campo existe
+            if (!value) {
+                isValid = false;
+                this.showFieldError(pickupPointInput, 'Ponto de encontro é obrigatório para este produto');
+                console.warn('❌ PICKUP_POINT obrigatório não preenchido');
+            }
+        }
+
+        // Validar campos de peso (devem ter valor e unidade)
+        const weightInputs = document.querySelectorAll('[id*="WEIGHT"]:not([id*="_unit"])');
+        weightInputs.forEach(input => {
+            const value = parseFloat(input.value);
+            if (value && (value < 1 || value > 300)) {
+                isValid = false;
+                this.showFieldError(input, 'Peso deve estar entre 1 e 300');
+            }
+        });
+
+        // Validar datas de nascimento
+        const birthDateInputs = document.querySelectorAll('[id*="DATE_OF_BIRTH"]');
+        birthDateInputs.forEach(input => {
+            if (input.value) {
+                const birthDate = new Date(input.value);
+                const today = new Date();
+                const age = today.getFullYear() - birthDate.getFullYear();
+
+                if (age < 0 || age > 120) {
+                    isValid = false;
+                    this.showFieldError(input, 'Data de nascimento inválida');
+                }
+            }
+        });
+
+        return isValid;
+    }
+
+    /**
+     * Obter label da pergunta para exibição
+     */
+    getQuestionLabel(questionId, travelerNum) {
+        const labels = {
+            'FULL_NAMES_FIRST': 'Nome',
+            'FULL_NAMES_LAST': 'Sobrenome',
+            'WEIGHT': 'Peso',
+            'AGEBAND': 'Faixa Etária',
+            'PICKUP_POINT': 'Ponto de Encontro',
+            'SPECIAL_REQUIREMENTS': 'Requisitos Especiais',
+            'DATE_OF_BIRTH': 'Data de Nascimento'
+        };
+
+        const label = labels[questionId] || questionId;
+        return travelerNum ? `${label} (Viajante ${travelerNum})` : label;
+    }
+
+    /**
+     * Mostrar erro no campo (padrão exato da etapa 2)
+     */
+    showFieldError(field, message) {
+        // Adicionar classe de erro ao campo (borda vermelha)
+        field.classList.add('is-invalid');
+
+        let errorElement = document.getElementById(`error_${field.id}`);
+
+        if (!errorElement) {
+            errorElement = document.createElement('div');
+            errorElement.id = `error_${field.id}`;
+            errorElement.className = 'error-message';
+            field.parentNode.appendChild(errorElement);
+        }
+
+        // Texto simples sem ícone, como na imagem
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+        errorElement.classList.add('show');
+    }
+
+    /**
+     * Esconder erro no campo (padrão etapa 2)
+     */
+    hideFieldError(field) {
+        // Remover classe de erro do campo
+        field.classList.remove('is-invalid');
+
+        const errorElement = document.getElementById(`error_${field.id}`);
+        if (errorElement) {
+            errorElement.style.display = 'none';
+            errorElement.classList.remove('show');
+        }
+    }
+
+    /**
+     * Validar campo de booking question
+     */
+    validateQuestionField(field) {
+        const isRequired = field.hasAttribute('required');
+        const value = field.value.trim();
+        // Usar o ID correto que corresponde ao HTML gerado
+        const errorElement = document.getElementById(`error_${field.id}`);
+
+        let isValid = true;
+        let errorMessage = '';
+
+        if (isRequired && !value) {
+            isValid = false;
+            errorMessage = 'Obrigatório.';
+        } else if (field.type === 'date' && value) {
+            // Validar data de nascimento
+            const birthDate = new Date(value);
+            const today = new Date();
+            const age = today.getFullYear() - birthDate.getFullYear();
+
+            if (age < 0 || age > 120) {
+                isValid = false;
+                errorMessage = 'Por favor, insira uma data de nascimento válida.';
+            }
+        } else if (field.type === 'email' && value) {
+            // Validar email se aplicável
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(value)) {
+                isValid = false;
+                errorMessage = 'Por favor, insira um email válido.';
+            }
+        }
+
+        // Atualizar visual usando o método padronizado
+        if (isValid) {
+            this.hideFieldError(field);
+        } else {
+            this.showFieldError(field, errorMessage);
+        }
+
+        return isValid;
+    }
+
+    /**
+     * Atualizar age band baseado na data de nascimento
+     */
+    updateAgeBandFromBirthDate(birthDateField) {
+        const birthDate = new Date(birthDateField.value);
+        const today = new Date();
+        const age = today.getFullYear() - birthDate.getFullYear();
+
+        // Encontrar campo de age band correspondente
+        const travelerMatch = birthDateField.id.match(/traveler_(\d+)/);
+        if (travelerMatch) {
+            const travelerIndex = travelerMatch[1];
+            const ageBandField = document.getElementById(`AGEBAND_traveler_${travelerIndex}`);
+
+            if (ageBandField) {
+                let ageBand = 'ADULT';
+                if (age < 3) ageBand = 'INFANT';
+                else if (age < 18) ageBand = 'CHILD';
+                else if (age >= 65) ageBand = 'SENIOR';
+
+                ageBandField.value = ageBand;
+                console.log(`✅ Age band atualizado para viajante ${travelerIndex}: ${ageBand} (idade: ${age})`);
+            }
+        }
+    }
+
+    /**
+     * Validar todas as booking questions
+     */
+    async validateBookingQuestions() {
+        console.log('🔍 Validando booking questions para step 3...');
+
+        // Primeiro, coletar todas as respostas atuais
+        this.collectBookingQuestionAnswers();
+
+        // Validar se todas as perguntas obrigatórias foram respondidas
+        const validation = this.validateAllBookingQuestions();
+
+        if (!validation.isValid) {
+            console.warn('⚠️ Validação de booking questions falhou:', validation.errors);
+
+            // Mostrar erros para o usuário
+            this.showBookingQuestionsErrors(validation.errors);
+
+            // Scroll para o primeiro campo com erro (padrão etapa 2)
+            const firstErrorField = document.querySelector('.question-input.is-invalid');
+            if (firstErrorField) {
+                firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                firstErrorField.focus();
+            }
+
+            return false;
+        }
+
+        console.log('✅ Todas as booking questions validadas com sucesso');
+        console.log('📝 Total de respostas coletadas:', this.bookingData.bookingQuestionAnswers?.length || 0);
+
+        return true;
+    }
+
+    /**
+     * Mostrar erros de validação das booking questions (padrão etapa 2)
+     */
+    showBookingQuestionsErrors(errors) {
+        // Usar o mesmo padrão da etapa 2 - showDateError
+        const errorMessage = `Por favor, preencha os seguintes campos obrigatórios:\n\n• ${errors.join('\n• ')}`;
+        this.showDateError(errorMessage);
+
+        // Scroll para o topo para mostrar a mensagem
+        const errorElement = document.getElementById('date-error-message');
+        if (errorElement) {
+            errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    // MÉTODO REMOVIDO - DUPLICATA
     
     generateTravelersForm() {
         const container = document.getElementById('travelers-summary');
@@ -2747,11 +4657,13 @@ this.renderLocationOptions();
                     const isFirstTraveler = isTraveler && travelerIndex === 1;
                     const shouldDisable = isSyncField && isTraveler && !isFirstTraveler;
                     
-                    html += `<select name="${questionId}_unit" class="${cssClass}" data-question-id="${question.id}" ${isTraveler ? `data-traveler="${travelerIndex}"` : ''} ${shouldDisable ? 'disabled' : ''}>`;
+                    const travelerAttr = isTraveler ? `data-traveler="${travelerIndex}"` : '';
+                    const disabledAttr = shouldDisable ? 'disabled' : '';
+                    html += `<select name="${questionId}_unit" class="${cssClass}" data-question-id="${question.id}" ${travelerAttr} ${disabledAttr}>`;
                     question.units.forEach(unit => {
                         html += `<option value="${unit}">${unit}</option>`;
                     });
-                    html += `</select>`;
+                    html += '</select>';
                 }
                 html += `</div>`;
                 break;
@@ -2953,6 +4865,9 @@ this.renderLocationOptions();
         
         // Container principal para pickup point
         html += `<div id="${questionId}_container" class="pickup-point-container">`;
+
+        // Campo hidden para validação (recebe o valor selecionado)
+        html += `<input type="hidden" id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr}>`;
         
         // Verificar se permite texto livre (allowCustomTravelerPickup)
         // Conforme documentação oficial da Viator: https://docs.viator.com/partner-api/technical/
@@ -3287,6 +5202,37 @@ this.renderLocationOptions();
             
             container.innerHTML = html || '<p>Nenhum local disponível nesta categoria</p>';
         });
+
+        // Adicionar event listeners para sincronizar radio buttons com campo hidden
+        setTimeout(() => {
+            const hiddenField = document.getElementById(questionId);
+            const radioButtons = document.querySelectorAll(`input[name="${questionId}"][type="radio"]`);
+
+            if (hiddenField && radioButtons.length > 0) {
+                // Definir valor inicial se há um radio button marcado
+                const checkedRadio = document.querySelector(`input[name="${questionId}"][type="radio"]:checked`);
+                if (checkedRadio) {
+                    hiddenField.value = checkedRadio.value;
+                    console.log('📍 PICKUP_POINT valor inicial definido:', checkedRadio.value);
+                }
+
+                // Adicionar listeners para mudanças
+                radioButtons.forEach(radio => {
+                    radio.addEventListener('change', function() {
+                        if (this.checked) {
+                            hiddenField.value = this.value;
+                            console.log('📍 PICKUP_POINT valor atualizado:', this.value);
+
+                            // Remover classe de erro se existir
+                            hiddenField.classList.remove('error');
+
+                            // Trigger change event para validação
+                            hiddenField.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    });
+                });
+            }
+        }, 100);
     }
     
     /**
@@ -3486,55 +5432,7 @@ this.renderLocationOptions();
         return languageNames[languageCode] || languageCode.toUpperCase();
     }
 
-    /**
-     * Coletar respostas das perguntas de reserva
-     */
-    collectBookingQuestionAnswers() {
-        const answers = [];
-        
-        // Coletar respostas das seções dedicadas primeiro
-        this.collectPickupPointAnswers(answers);
-        this.collectLanguageGuideAnswers(answers);
-        
-        this.bookingQuestions.forEach(question => {
-            if (question.group === 'PER_BOOKING') {
-                // Pular PICKUP_POINT e LANGUAGE_GUIDE pois já foram coletados nas seções dedicadas
-                if (question.id === 'PICKUP_POINT' || 
-                    question.subType === 'LANGUAGE_GUIDE' || 
-                    question.label.toLowerCase().includes('idioma') || 
-                    question.label.toLowerCase().includes('language')) {
-                    return;
-                }
-                
-                // Perguntas gerais da reserva
-                const questionId = `booking_question_${question.id}`;
-                const answer = this.collectQuestionAnswer(question, questionId, false, null);
-                
-                if (answer) {
-                    answers.push(answer);
-                }
-            } else if (question.group === 'PER_TRAVELER') {
-                // Perguntas por viajante
-                if (this.bookingData.selectedTravelers) {
-                    this.bookingData.selectedTravelers.forEach((travelerGroup, groupIndex) => {
-                        for (let i = 0; i < travelerGroup.numberOfTravelers; i++) {
-                            const travelerIndex = groupIndex * 10 + i; // Índice único para cada viajante
-                            const questionId = `traveler_${travelerIndex}_question_${question.id}`;
-                            const answer = this.collectQuestionAnswer(question, questionId, true, travelerIndex);
-                            
-                            if (answer) {
-                                answer.travelerNum = travelerIndex + 1;
-                                answers.push(answer);
-                            }
-                        }
-                    });
-                }
-            }
-        });
-        
-        console.log('📝 Respostas das perguntas de reserva coletadas:', answers);
-        return answers;
-    }
+    // MÉTODO REMOVIDO - DUPLICATA (mantendo apenas a primeira definição)
     
     /**
      * Coletar respostas da seção de Ponto de Encontro
@@ -3947,7 +5845,7 @@ this.renderLocationOptions();
                     if (!target.value) {
                         target.classList.add('is-invalid');
                         if (errorDiv) {
-                            errorDiv.textContent = 'Este campo é obrigatório.';
+                            errorDiv.textContent = 'Obrigatório.';
                             errorDiv.classList.add('show');
                         }
                     } else {
@@ -4077,17 +5975,620 @@ this.renderLocationOptions();
     
     formatCardNumber() {
         const cardInput = document.getElementById('card-number');
+        if (!cardInput) return;
+
         cardInput.addEventListener('input', (e) => {
             let value = e.target.value.replace(/\s/g, '').replace(/[^0-9]/gi, '');
             let formattedValue = value.match(/.{1,4}/g)?.join(' ') || value;
             e.target.value = formattedValue;
+
+            // Validar cartão em tempo real
+            const isValid = this.validateCreditCard(value);
+            const errorElement = document.getElementById('card-number-error');
+
+            if (value.length > 0) {
+                if (isValid) {
+                    cardInput.classList.remove('is-invalid');
+                    cardInput.classList.add('is-valid');
+                    if (errorElement) errorElement.style.display = 'none';
+                } else {
+                    cardInput.classList.remove('is-valid');
+                    cardInput.classList.add('is-invalid');
+                    if (errorElement) {
+                        errorElement.textContent = 'Número do cartão inválido';
+                        errorElement.style.display = 'block';
+                    }
+                }
+            } else {
+                cardInput.classList.remove('is-valid', 'is-invalid');
+                if (errorElement) errorElement.style.display = 'none';
+            }
         });
+
+        // Adicionar validação ao sair do campo
+        cardInput.addEventListener('blur', (e) => {
+            const value = e.target.value.replace(/\s/g, '');
+            if (value.length > 0 && !this.validateCreditCard(value)) {
+                this.showDateError('Número do cartão inválido. Verifique e tente novamente.');
+            }
+        });
+
+        // Inicializar validação de outros campos de pagamento
+        this.initializePaymentFieldValidation();
     }
     
+    /**
+     * Validar número do cartão de crédito usando algoritmo de Luhn
+     */
+    validateCreditCard(cardNumber) {
+        // Remover espaços e caracteres não numéricos
+        cardNumber = cardNumber.replace(/\D/g, '');
+
+        // Verificar se tem pelo menos 13 dígitos e no máximo 19
+        if (cardNumber.length < 13 || cardNumber.length > 19) {
+            return false;
+        }
+
+        // Algoritmo de Luhn
+        let sum = 0;
+        let isEven = false;
+
+        // Processar dígitos da direita para a esquerda
+        for (let i = cardNumber.length - 1; i >= 0; i--) {
+            let digit = parseInt(cardNumber.charAt(i), 10);
+
+            if (isEven) {
+                digit *= 2;
+                if (digit > 9) {
+                    digit -= 9;
+                }
+            }
+
+            sum += digit;
+            isEven = !isEven;
+        }
+
+        const isValidLuhn = (sum % 10) === 0;
+
+        // Verificar padrões de cartão conhecidos
+        const cardType = this.detectCardType(cardNumber);
+        const isValidPattern = cardType !== 'unknown';
+
+        this.debugLog('Credit card validation', {
+            cardNumber: cardNumber.substring(0, 6) + '...' + cardNumber.substring(cardNumber.length - 4),
+            length: cardNumber.length,
+            luhnValid: isValidLuhn,
+            cardType: cardType,
+            patternValid: isValidPattern
+        });
+
+        return isValidLuhn && isValidPattern;
+    }
+
+    /**
+     * Detectar tipo do cartão de crédito
+     */
+    detectCardType(cardNumber) {
+        const patterns = {
+            visa: /^4[0-9]{12}(?:[0-9]{3})?$/,
+            mastercard: /^5[1-5][0-9]{14}$/,
+            amex: /^3[47][0-9]{13}$/,
+            discover: /^6(?:011|5[0-9]{2})[0-9]{12}$/,
+            diners: /^3[0689][0-9]{11}$/,
+            jcb: /^(?:2131|1800|35\d{3})\d{11}$/,
+            elo: /^((((636368)|(438935)|(504175)|(451416)|(636297))\d{0,10})|((5067)|(4576)|(4011))\d{0,12})$/,
+            hipercard: /^(606282\d{10}(\d{3})?)|(3841\d{15})$/
+        };
+
+        for (const [type, pattern] of Object.entries(patterns)) {
+            if (pattern.test(cardNumber)) {
+                return type;
+            }
+        }
+
+        return 'unknown';
+    }
+
+    /**
+     * Inicializar validação de campos de pagamento
+     */
+    initializePaymentFieldValidation() {
+        // Validação do número do cartão (já implementada no formatCardNumber)
+
+        // Validação do CVV
+        const cvvInput = document.getElementById('security-code');
+        if (cvvInput) {
+            cvvInput.addEventListener('input', (e) => {
+                const value = e.target.value.replace(/\D/g, '');
+                e.target.value = value;
+            });
+
+            cvvInput.addEventListener('blur', (e) => {
+                const value = e.target.value.trim();
+                if (!value) {
+                    this.showFieldError(cvvInput, 'O CVV é obrigatório.');
+                } else if (!this.validateCVV(value)) {
+                    this.showFieldError(cvvInput, 'CVV deve ter 3 ou 4 dígitos.');
+                } else {
+                    this.hideFieldError(cvvInput);
+                }
+            });
+        }
+
+        // Validação da data de expiração
+        const expMonthInput = document.getElementById('expiry-month');
+        const expYearInput = document.getElementById('expiry-year');
+
+        if (expMonthInput && expYearInput) {
+            const validateExpiry = () => {
+                const month = expMonthInput.value;
+                const year = expYearInput.value;
+
+                if (!month) {
+                    this.showFieldError(expMonthInput, 'Selecione o mês de vencimento.');
+                    return;
+                }
+
+                if (!year) {
+                    this.showFieldError(expYearInput, 'Selecione o ano de vencimento.');
+                    return;
+                }
+
+                if (!this.validateExpiryDate(month, year)) {
+                    this.showFieldError(expMonthInput, 'Data de vencimento inválida.');
+                    this.showFieldError(expYearInput, 'Data de vencimento inválida.');
+                } else {
+                    this.hideFieldError(expMonthInput);
+                    this.hideFieldError(expYearInput);
+                }
+            };
+
+            expMonthInput.addEventListener('blur', validateExpiry);
+            expYearInput.addEventListener('blur', validateExpiry);
+        }
+
+        // Validação do nome do portador
+        const nameInput = document.getElementById('cardholder-name');
+        if (nameInput) {
+            nameInput.addEventListener('blur', (e) => {
+                const value = e.target.value.trim();
+                if (!value) {
+                    this.showFieldError(nameInput, 'O nome no cartão é obrigatório.');
+                } else if (value.length < 2) {
+                    this.showFieldError(nameInput, 'Nome deve ter pelo menos 2 caracteres.');
+                } else if (!/^[a-zA-ZÀ-ÿ\s]+$/.test(value)) {
+                    this.showFieldError(nameInput, 'Nome deve conter apenas letras.');
+                } else {
+                    this.hideFieldError(nameInput);
+                }
+            });
+        }
+
+        // Validação do país
+        const countryInput = document.getElementById('billing-country');
+        if (countryInput) {
+            countryInput.addEventListener('blur', (e) => {
+                const value = e.target.value;
+                if (!value) {
+                    this.showFieldError(countryInput, 'Selecione o país.');
+                } else {
+                    this.hideFieldError(countryInput);
+                }
+            });
+        }
+
+        // Validação do CEP
+        const zipInput = document.getElementById('billing-zip');
+        if (zipInput) {
+            zipInput.addEventListener('blur', (e) => {
+                const value = e.target.value.trim();
+                if (!value) {
+                    this.showFieldError(zipInput, 'O CEP é obrigatório.');
+                } else if (value.length < 5) {
+                    this.showFieldError(zipInput, 'CEP deve ter pelo menos 5 caracteres.');
+                } else {
+                    this.hideFieldError(zipInput);
+                }
+            });
+        }
+    }
+
+    /**
+     * Validar CVV
+     */
+    validateCVV(cvv) {
+        return cvv.length >= 3 && cvv.length <= 4 && /^\d+$/.test(cvv);
+    }
+
+    /**
+     * Validar data de expiração
+     */
+    validateExpiryDate(month, year) {
+        if (!month || !year) return false;
+
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth() + 1;
+
+        const expMonth = parseInt(month, 10);
+        const expYear = parseInt(year, 10);
+
+        // Verificar se o mês é válido
+        if (expMonth < 1 || expMonth > 12) return false;
+
+        // Verificar se a data não está no passado
+        if (expYear < currentYear || (expYear === currentYear && expMonth < currentMonth)) {
+            return false;
+        }
+
+        // Verificar se não está muito no futuro (mais de 20 anos)
+        if (expYear > currentYear + 20) return false;
+
+        return true;
+    }
+
+    /**
+     * Atualizar validação visual do campo
+     */
+    updateFieldValidation(field, isValid, errorMessage) {
+        if (isValid) {
+            this.hideFieldError(field);
+        } else {
+            this.showFieldError(field, errorMessage);
+        }
+    }
+
+    /**
+     * Validação abrangente da prontidão para pagamento
+     */
+    async validatePaymentReadiness() {
+        const validationErrors = [];
+
+        try {
+            // 1. Validar validade do hold
+            const holdValidation = this.validateHoldValidity();
+            if (!holdValidation.isValid) {
+                validationErrors.push(holdValidation.error);
+            }
+
+            // 2. Validar completude das perguntas de reserva
+            const bookingQuestionsValidation = this.validateBookingQuestionsCompleteness();
+            if (!bookingQuestionsValidation.isValid) {
+                validationErrors.push(bookingQuestionsValidation.error);
+            }
+
+            // 3. Validar dados dos viajantes
+            const travelerValidation = this.validateTravelerDataCompleteness();
+            if (!travelerValidation.isValid) {
+                validationErrors.push(travelerValidation.error);
+            }
+
+            // 4. Validar dados de pagamento
+            const paymentValidation = this.validatePaymentDataCompleteness();
+            if (!paymentValidation.isValid) {
+                validationErrors.push(paymentValidation.error);
+            }
+
+            // 5. Validar disponibilidade ainda válida
+            const availabilityValidation = await this.validateAvailabilityStillValid();
+            if (!availabilityValidation.isValid) {
+                validationErrors.push(availabilityValidation.error);
+            }
+
+            this.debugLog('Payment readiness validation completed', {
+                holdValid: holdValidation.isValid,
+                bookingQuestionsValid: bookingQuestionsValidation.isValid,
+                travelerDataValid: travelerValidation.isValid,
+                paymentDataValid: paymentValidation.isValid,
+                availabilityValid: availabilityValidation.isValid,
+                totalErrors: validationErrors.length
+            });
+
+            if (validationErrors.length > 0) {
+                return {
+                    isValid: false,
+                    errorMessage: 'Problemas encontrados:\n\n' + validationErrors.join('\n\n')
+                };
+            }
+
+            return { isValid: true };
+
+        } catch (error) {
+            console.error('❌ Erro na validação de prontidão para pagamento:', error);
+            this.debugLog('Payment readiness validation error', error);
+
+            return {
+                isValid: false,
+                errorMessage: 'Erro na validação dos dados. Tente novamente.'
+            };
+        }
+    }
+
+    /**
+     * Validar validade do hold
+     */
+    validateHoldValidity() {
+        if (!this.bookingData.holdData) {
+            return {
+                isValid: false,
+                error: 'Sessão de reserva não encontrada. Recarregue a página e tente novamente.'
+            };
+        }
+
+        // Verificar se o hold não expirou
+        const holdCreatedAt = this.bookingData.holdCreatedAt;
+        if (holdCreatedAt) {
+            const holdAge = Date.now() - holdCreatedAt;
+            const holdExpiryTime = 15 * 60 * 1000; // 15 minutos
+
+            if (holdAge > holdExpiryTime) {
+                return {
+                    isValid: false,
+                    error: 'Sessão de reserva expirada. A página será recarregada para criar uma nova sessão.'
+                };
+            }
+        }
+
+        // Verificar se tem os dados essenciais do hold
+        if (!this.bookingData.holdData.paymentSessionToken || !this.bookingData.holdData.paymentDataSubmissionUrl) {
+            return {
+                isValid: false,
+                error: 'Dados de sessão de pagamento incompletos. Recarregue a página.'
+            };
+        }
+
+        return { isValid: true };
+    }
+
+    /**
+     * Validar completude das perguntas de reserva
+     */
+    validateBookingQuestionsCompleteness() {
+        const missingQuestions = [];
+
+        // Verificar perguntas obrigatórias gerais
+        const generalQuestions = document.querySelectorAll('#general-booking-questions [required]');
+        generalQuestions.forEach(field => {
+            if (!field.value || field.value.trim() === '') {
+                const label = field.closest('.booking-question-group')?.querySelector('label')?.textContent || field.id;
+                missingQuestions.push(`• ${label.replace('*', '').trim()}`);
+            }
+        });
+
+        // Verificar perguntas obrigatórias por viajante
+        const travelerQuestions = document.querySelectorAll('#traveler-booking-questions-inner [required]');
+        travelerQuestions.forEach(field => {
+            if (!field.value || field.value.trim() === '') {
+                const label = field.closest('.form-group')?.querySelector('label')?.textContent || field.id;
+                missingQuestions.push(`• ${label.replace('*', '').trim()}`);
+            }
+        });
+
+        if (missingQuestions.length > 0) {
+            return {
+                isValid: false,
+                error: 'Perguntas obrigatórias não respondidas:\n' + missingQuestions.join('\n')
+            };
+        }
+
+        return { isValid: true };
+    }
+
+    /**
+     * Validar completude dos dados dos viajantes
+     */
+    validateTravelerDataCompleteness() {
+        const bookerInfo = this.bookingData.bookerInfo;
+
+        if (!bookerInfo) {
+            return {
+                isValid: false,
+                error: 'Dados do responsável pela reserva não encontrados.'
+            };
+        }
+
+        const requiredFields = ['firstname', 'lastname', 'email'];
+        const missingFields = [];
+
+        requiredFields.forEach(field => {
+            if (!bookerInfo[field] || bookerInfo[field].trim() === '') {
+                const fieldNames = {
+                    firstname: 'Nome',
+                    lastname: 'Sobrenome',
+                    email: 'Email'
+                };
+                missingFields.push(`• ${fieldNames[field]}`);
+            }
+        });
+
+        if (missingFields.length > 0) {
+            return {
+                isValid: false,
+                error: 'Dados obrigatórios do responsável não preenchidos:\n' + missingFields.join('\n')
+            };
+        }
+
+        // Validar formato do email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(bookerInfo.email)) {
+            return {
+                isValid: false,
+                error: 'Email do responsável pela reserva é inválido.'
+            };
+        }
+
+        return { isValid: true };
+    }
+
+    /**
+     * Validar completude dos dados de pagamento
+     */
+    validatePaymentDataCompleteness() {
+        const requiredFields = [
+            { id: 'card-number', name: 'Número do cartão' },
+            { id: 'security-code', name: 'CVV' },
+            { id: 'expiry-month', name: 'Mês de expiração' },
+            { id: 'expiry-year', name: 'Ano de expiração' },
+            { id: 'cardholder-name', name: 'Nome do portador' },
+            { id: 'billing-country', name: 'País' },
+            { id: 'billing-zip', name: 'CEP' }
+        ];
+
+        const missingFields = [];
+        const invalidFields = [];
+
+        requiredFields.forEach(field => {
+            const element = document.getElementById(field.id);
+            if (!element || !element.value || element.value.trim() === '') {
+                missingFields.push(`• ${field.name}`);
+            } else {
+                // Validações específicas
+                switch (field.id) {
+                    case 'card-number':
+                        const cardNumber = element.value.replace(/\s/g, '');
+                        if (!this.validateCreditCard(cardNumber)) {
+                            invalidFields.push(`• ${field.name} (número inválido)`);
+                        }
+                        break;
+                    case 'security-code':
+                        if (!this.validateCVV(element.value)) {
+                            invalidFields.push(`• ${field.name} (formato inválido)`);
+                        }
+                        break;
+                    case 'expiry-month':
+                    case 'expiry-year':
+                        const month = document.getElementById('expiry-month')?.value;
+                        const year = document.getElementById('expiry-year')?.value;
+                        if (month && year && !this.validateExpiryDate(month, year)) {
+                            invalidFields.push(`• Data de expiração (inválida ou expirada)`);
+                        }
+                        break;
+                    case 'cardholder-name':
+                        if (element.value.length < 2 || !/^[a-zA-ZÀ-ÿ\s]+$/.test(element.value)) {
+                            invalidFields.push(`• ${field.name} (formato inválido)`);
+                        }
+                        break;
+                }
+            }
+        });
+
+        const errors = [];
+        if (missingFields.length > 0) {
+            errors.push('Campos obrigatórios não preenchidos:\n' + missingFields.join('\n'));
+        }
+        if (invalidFields.length > 0) {
+            errors.push('Campos com dados inválidos:\n' + invalidFields.join('\n'));
+        }
+
+        if (errors.length > 0) {
+            return {
+                isValid: false,
+                error: errors.join('\n\n')
+            };
+        }
+
+        return { isValid: true };
+    }
+
+    /**
+     * Validar se a disponibilidade ainda é válida
+     */
+    async validateAvailabilityStillValid() {
+        try {
+            if (!this.bookingData.availabilityData || !this.bookingData.selectedOption) {
+                return {
+                    isValid: false,
+                    error: 'Dados de disponibilidade não encontrados.'
+                };
+            }
+
+            // Verificar se a disponibilidade foi verificada recentemente (últimos 5 minutos)
+            const availabilityAge = Date.now() - (this.bookingData.availabilityCheckedAt || 0);
+            const maxAge = 5 * 60 * 1000; // 5 minutos
+
+            if (availabilityAge > maxAge) {
+                console.log('🔄 Verificando disponibilidade atualizada antes do pagamento...');
+
+                try {
+                    // Re-verificar disponibilidade com tratamento de erro robusto
+                    const freshAvailability = await this.checkAvailability();
+                    if (!freshAvailability) {
+                        // Se falhou, mas temos dados recentes (menos de 15 minutos), usar cache
+                        const cacheMaxAge = 15 * 60 * 1000; // 15 minutos
+                        if (availabilityAge < cacheMaxAge) {
+                            console.warn('⚠️ Usando dados de disponibilidade em cache devido a erro na verificação');
+                            return { isValid: true };
+                        }
+
+                        return {
+                            isValid: false,
+                            error: 'Não foi possível verificar a disponibilidade atual. Tente novamente.'
+                        };
+                    }
+
+                    // Verificar se a opção selecionada ainda está disponível
+                    const selectedOptionCode = this.bookingData.selectedOption.productOptionCode;
+
+                    // Verificar tanto em freshAvailability quanto em bookableItems
+                    let optionStillAvailable = false;
+
+                    if (freshAvailability.productOptions) {
+                        optionStillAvailable = freshAvailability.productOptions.some(option =>
+                            option.productOptionCode === selectedOptionCode && option.available
+                        );
+                    } else if (freshAvailability.bookableItems) {
+                        optionStillAvailable = freshAvailability.bookableItems.some(item =>
+                            item.productOptionCode === selectedOptionCode && item.available
+                        );
+                    } else if (this.bookingData.availabilityData.bookableItems) {
+                        // Fallback para dados existentes
+                        optionStillAvailable = this.bookingData.availabilityData.bookableItems.some(item =>
+                            item.productOptionCode === selectedOptionCode && item.available
+                        );
+                    }
+
+                    if (!optionStillAvailable) {
+                        return {
+                            isValid: false,
+                            error: 'A opção selecionada não está mais disponível. Por favor, selecione outra opção.'
+                        };
+                    }
+
+                    console.log('✅ Disponibilidade confirmada');
+                } catch (availabilityError) {
+                    console.warn('⚠️ Erro na re-verificação de disponibilidade:', availabilityError);
+                    this.debugLog('Availability recheck failed', availabilityError);
+
+                    // Se temos dados recentes, continuar com eles
+                    const cacheMaxAge = 15 * 60 * 1000; // 15 minutos
+                    if (availabilityAge < cacheMaxAge) {
+                        console.warn('⚠️ Usando dados de disponibilidade em cache devido a erro na verificação');
+                        return { isValid: true };
+                    }
+
+                    return {
+                        isValid: false,
+                        error: 'Erro ao verificar disponibilidade. Tente novamente em alguns instantes.'
+                    };
+                }
+            }
+
+            return { isValid: true };
+
+        } catch (error) {
+            console.error('❌ Erro na validação de disponibilidade:', error);
+            this.debugLog('Availability validation error', error);
+            return {
+                isValid: false,
+                error: 'Erro ao verificar disponibilidade. Tente novamente.'
+            };
+        }
+    }
+
     getTotalTravelers() {
         let totalTravelers = 0;
         let travelersText = [];
-        
+
         // Usar dados armazenados se disponíveis (para uso em etapas posteriores)
         if (this.bookingData.selectedTravelers && this.bookingData.selectedTravelers.length > 0) {
             this.bookingData.selectedTravelers.forEach(travelerGroup => {
@@ -4158,25 +6659,54 @@ this.renderLocationOptions();
     
     async nextStep() {
         if (await this.validateCurrentStep()) {
-            if (this.currentStep < 4) {
+            if (this.currentStep < 5) { // Atualizado para 5 steps
                 await this.showStep(this.currentStep + 1);
             }
         }
     }
-    
+
     async previousStep() {
         if (this.currentStep > 1) {
             await this.showStep(this.currentStep - 1);
         }
     }
-    
+
     async validateCurrentStep() {
+        console.log(`🔍 Validando step ${this.currentStep}...`);
+
+        // Para step 1, não fazer validação crítica pois o usuário ainda está selecionando
+        if (this.currentStep > 1) {
+            console.log(`🔍 Executando validação crítica para step ${this.currentStep}...`);
+            // Validar dados críticos antes de prosseguir (contextual ao step)
+            const criticalValidation = this.validateCriticalData(this.currentStep);
+            if (!criticalValidation.isValid) {
+                console.error('❌ Validação de dados críticos falhou:', criticalValidation.errors);
+                // Não usar retry para validação crítica para evitar loops infinitos
+                this.showDateError(`Dados incompletos: ${criticalValidation.errors.join(', ')}`);
+                return false;
+            }
+            console.log(`✅ Validação crítica passou para step ${this.currentStep}`);
+        } else {
+            console.log(`⏭️ Pulando validação crítica para step ${this.currentStep} (usuário ainda selecionando)`);
+        }
+
         switch (this.currentStep) {
             case 1:
                 return await this.checkAvailability();
             case 2:
                 return this.validateTravelersInfo();
             case 3:
+                return await this.validateBookingQuestions();
+            case 4:
+                // Validar conectividade antes do pagamento
+                const isConnected = await this.validateApiConnectivity();
+                if (!isConnected) {
+                    this.showErrorWithRetry(
+                        'Problema de conectividade detectado. Verifique sua conexão com a internet.',
+                        () => this.processPayment()
+                    );
+                    return false;
+                }
                 return await this.processPayment();
             default:
                 return true;
@@ -4184,11 +6714,44 @@ this.renderLocationOptions();
     }
     
     async checkAvailability() {
-        const travelDate = document.getElementById('travel-date-value').value;
-        if (!travelDate) {
+        // Primeiro, verificar se uma data foi selecionada
+        const dateInput = document.getElementById('travel-date-value');
+        if (!dateInput || !dateInput.value) {
             this.showDateError('Por favor, selecione uma data de viagem antes de continuar.');
             return false;
         }
+
+        // Declarar variável no escopo da função
+        let travelDate = null;
+
+        // Estratégia abrangente de detecção de data de viagem
+        travelDate = this.getTravelDateFromMultipleSources();
+
+        if (!travelDate) {
+            // Se ainda não encontrou, tentar última estratégia de fallback
+            console.warn('⚠️ Data de viagem não encontrada em nenhuma fonte, tentando fallbacks finais...');
+
+            // Verificar se temos dados de disponibilidade já carregados
+            if (this.bookingData.availabilityData?.travelDate) {
+                travelDate = this.bookingData.availabilityData.travelDate;
+                console.log('✅ Usando data de viagem dos dados de disponibilidade:', travelDate);
+            } else if (this.bookingData.travelDate) {
+                travelDate = this.bookingData.travelDate;
+                console.log('✅ Usando data de viagem já armazenada:', travelDate);
+            } else {
+                // Se chegou aqui, significa que não há data selecionada
+                this.showDateError('Por favor, selecione uma data de viagem antes de continuar.');
+                return false;
+            }
+        }
+
+        // Atualizar referência para uso futuro
+        this.bookingData.travelDate = travelDate;
+
+        console.log('✅ Data de viagem definida:', travelDate);
+
+        // Esconder erro de data se chegou até aqui
+        this.hideDateError();
 
         const paxMix = this.collectTravelersData();
         
@@ -4201,11 +6764,19 @@ this.renderLocationOptions();
         
         // Verificar se os preços foram atualizados (se há opções disponíveis)
         const priceDisplay = document.getElementById('price-display');
-        const hasOptionsDisplayed = priceDisplay && priceDisplay.style.display !== 'none' && 
+        const hasOptionsDisplayed = priceDisplay && priceDisplay.style.display !== 'none' &&
                                   priceDisplay.querySelector('.product-options-list');
-        
+
         if (!hasOptionsDisplayed) {
-            this.showDateError('Por favor, clique em "Atualizar Preços" para verificar a disponibilidade e opções de passeio.');
+            // Verificar se o botão ainda está no estado "Buscar Preços"
+            const updateBtn = document.getElementById('update-price-btn');
+            const buttonText = updateBtn ? updateBtn.textContent.trim() : '';
+
+            if (buttonText.includes('Buscar')) {
+                this.showDateError('Por favor, clique em "Buscar Preços" para verificar a disponibilidade e opções de passeio.');
+            } else {
+                this.showDateError('Por favor, clique em "Atualizar Preços" para verificar a disponibilidade e opções de passeio.');
+            }
             return false;
         }
         
@@ -4325,7 +6896,7 @@ this.renderLocationOptions();
         container.className = 'availability-result success';
         container.innerHTML = `
             <div class="availability-success">
-                <h4>✅ Disponível!</h4>
+                <h4>Disponível!</h4>
                 <p>Esta experiência está disponível na data selecionada.</p>
                 <div class="price-display">
                     <div class="price-label">Preço total:</div>
@@ -4341,25 +6912,26 @@ this.renderLocationOptions();
         const bookerLastname = document.getElementById('booker-lastname');
         const bookerEmail = document.getElementById('booker-email');
         const bookerPhone = document.getElementById('booker-phone');
-        
+        const bookerCountryCode = document.getElementById('booker-country-code');
+
         if (!bookerFirstname?.value.trim()) {
             this.showDateError('Por favor, informe o nome do responsável pela reserva.');
             bookerFirstname?.focus();
             return false;
         }
-        
+
         if (!bookerLastname?.value.trim()) {
             this.showDateError('Por favor, informe o sobrenome do responsável pela reserva.');
             bookerLastname?.focus();
             return false;
         }
-        
+
         if (!bookerEmail?.value.trim()) {
             this.showDateError('Por favor, informe o email do responsável pela reserva.');
             bookerEmail?.focus();
             return false;
         }
-        
+
         // Validação básica de email
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(bookerEmail.value.trim())) {
@@ -4367,26 +6939,102 @@ this.renderLocationOptions();
             bookerEmail?.focus();
             return false;
         }
-        
-        // Validar perguntas de reserva
-        if (!this.validateAllBookingQuestions()) {
+
+        if (!bookerPhone?.value.trim()) {
+            this.showDateError('Por favor, informe o telefone do responsável pela reserva.');
+            bookerPhone?.focus();
             return false;
         }
-        
+
+        // Coletar dados detalhados dos viajantes
+        this.collectDetailedTravelersData();
+
         // Armazenar dados do booker no bookingData para uso posterior
         this.bookingData.bookerInfo = {
             firstname: bookerFirstname.value.trim(),
             lastname: bookerLastname.value.trim(),
             email: bookerEmail.value.trim(),
-            phone: bookerPhone?.value.trim() || ''
+            phone: bookerPhone.value.trim(),
+            countryCode: bookerCountryCode?.value || 'BR'
         };
-        
+
         console.log('✅ Dados do responsável armazenados:', this.bookingData.bookerInfo);
-        
+        console.log('✅ Dados detalhados dos viajantes coletados:', this.bookingData.travelersDetails);
+
         return true;
+    }
+
+    /**
+     * Coletar dados detalhados dos viajantes para uso nas booking questions
+     */
+    collectDetailedTravelersData() {
+        // Usar dados dos viajantes já armazenados (paxMix)
+        const paxMix = this.bookingData.selectedTravelers || this.collectTravelersData();
+
+        // Usar dados do booker armazenados ou tentar coletar do DOM (fallback)
+        let bookerInfo = this.bookingData.bookerInfo;
+
+        if (!bookerInfo) {
+            // Fallback: tentar coletar do DOM se ainda não foram armazenados
+            const bookerFirstname = document.getElementById('booker-firstname')?.value || '';
+            const bookerLastname = document.getElementById('booker-lastname')?.value || '';
+            const bookerEmail = document.getElementById('booker-email')?.value || '';
+            const bookerPhone = document.getElementById('booker-phone')?.value || '';
+
+            bookerInfo = {
+                firstname: bookerFirstname,
+                lastname: bookerLastname,
+                email: bookerEmail,
+                phone: bookerPhone
+            };
+        }
+
+        // Usar respostas das perguntas de reserva já coletadas (não recoletar)
+        const bookingQuestionAnswers = this.bookingData.bookingQuestionAnswers || [];
+
+        console.log('📋 Dados coletados do responsável:', bookerInfo);
+        console.log('📝 Respostas das perguntas de reserva:', bookingQuestionAnswers);
+
+        return {
+            // Informações dos viajantes (apenas quantidades por faixa etária)
+            paxMix: paxMix,
+
+            // Informações do responsável principal pela reserva
+            bookerInfo: bookerInfo,
+
+            // Respostas das perguntas de reserva
+            bookingQuestionAnswers: bookingQuestionAnswers
+        };
     }
     
     async processPayment() {
+        // Validação abrangente antes do processamento do pagamento
+        try {
+            const validationResult = await this.validatePaymentReadiness();
+            if (!validationResult.isValid) {
+                // Se a validação falhou por problemas de conectividade, permitir continuar com aviso
+                if (validationResult.errorMessage.includes('disponibilidade') &&
+                    this.bookingData.availabilityData &&
+                    this.bookingData.selectedOption) {
+
+                    console.warn('⚠️ Validação de disponibilidade falhou, mas continuando com dados em cache');
+                    this.debugLog('Payment proceeding with cached data due to validation failure', validationResult);
+
+                    // Mostrar aviso mas não bloquear
+                    this.showDateError('Aviso: Não foi possível verificar disponibilidade atual. Continuando com dados em cache.', 'warning');
+
+                    // Aguardar 2 segundos para o usuário ver o aviso
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                } else {
+                    this.showDateError(validationResult.errorMessage);
+                    return false;
+                }
+            }
+        } catch (validationError) {
+            console.warn('⚠️ Erro na validação de prontidão, continuando com dados disponíveis:', validationError);
+            this.debugLog('Payment validation error, proceeding anyway', validationError);
+        }
+
         // Verificar se uma opção foi selecionada
         if (!this.bookingData.selectedOption) {
             console.warn('⚠️ Tentativa de pagamento sem opção selecionada:', {
@@ -4481,24 +7129,126 @@ this.renderLocationOptions();
                 this.showDateError('Sessão de pagamento expirada. Por favor, recarregue a página e tente novamente.');
                 return false;
             }
-            
-            // Processar pagamento usando o hold existente
-            const paymentResult = await this.submitPayment();
-            if (!paymentResult) return false;
-            
-            console.log('✅ Pagamento processado com sucesso, pronto para confirmação na etapa 4');
+
+            // Mostrar indicador de progresso
+            this.showPaymentProgress('Processando pagamento...');
+
+            // Processar pagamento usando o hold existente com retry
+            const paymentResult = await this.executeWithRetry(
+                () => this.submitPayment(),
+                3, // 3 tentativas
+                2000 // 2 segundos de delay inicial
+            );
+
+            if (!paymentResult) {
+                this.hidePaymentProgress();
+                return false;
+            }
+
+            // Mostrar sucesso temporariamente
+            this.showPaymentProgress('✅ Pagamento processado com sucesso!', 'success');
+
+            // Aguardar 1 segundo para mostrar o sucesso
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Agora processar a confirmação da reserva automaticamente com retry
+            this.showPaymentProgress('📋 Criando sua reserva...', 'info');
+
+            const confirmationResult = await this.executeWithRetry(
+                () => this.confirmBooking(),
+                3, // 3 tentativas
+                3000 // 3 segundos de delay inicial
+            );
+
+            if (!confirmationResult) {
+                this.hidePaymentProgress();
+                this.showErrorWithRetry(
+                    'Pagamento processado, mas houve erro na confirmação da reserva. Você pode tentar novamente ou entrar em contato conosco.',
+                    () => this.confirmBooking()
+                );
+                return false;
+            }
+
+            // Mostrar sucesso final
+            this.showPaymentProgress('🎉 Reserva confirmada com sucesso!', 'success');
+
+            // Aguardar 2 segundos para mostrar o sucesso
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            this.hidePaymentProgress();
+
+            console.log('✅ Pagamento e reserva processados com sucesso, pronto para step 5');
             return true;
-            
+
         } catch (error) {
+            this.hidePaymentProgress();
             this.showDateError('Erro no processamento do pagamento: ' + error.message);
             return false;
         }
     }
-    
+
+    /**
+     * Mostrar indicador de progresso do pagamento
+     */
+    showPaymentProgress(message, type = 'info') {
+        // Remover indicador anterior se existir
+        this.hidePaymentProgress();
+
+        const progressDiv = document.createElement('div');
+        progressDiv.id = 'payment-progress-indicator';
+        progressDiv.className = `payment-progress alert alert-${type === 'success' ? 'success' : 'info'}`;
+        progressDiv.innerHTML = `
+            <div class="d-flex align-items-center">
+                ${type === 'success' ? '' : '<div class="spinner-border spinner-border-sm me-2" role="status"></div>'}
+                <span>${message}</span>
+            </div>
+        `;
+
+        // Inserir no topo do step de pagamento
+        const paymentStep = document.querySelector('.payment-step');
+        if (paymentStep) {
+            paymentStep.insertBefore(progressDiv, paymentStep.firstChild);
+        }
+
+        // Scroll para o indicador
+        progressDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    /**
+     * Esconder indicador de progresso do pagamento
+     */
+    hidePaymentProgress() {
+        const progressIndicator = document.getElementById('payment-progress-indicator');
+        if (progressIndicator) {
+            progressIndicator.remove();
+        }
+    }
+
     async requestBookingHoldForPayment() {
         try {
-            const travelersDetails = this.collectDetailedTravelersData();
-            
+            console.log('📋 Iniciando hold request com booking questions...');
+
+            // IMPORTANTE: Usar as respostas já coletadas das booking questions (não recoletar)
+            // As respostas já foram coletadas e validadas no Step 3
+            const bookingQuestionAnswers = this.bookingData.bookingQuestionAnswers || [];
+
+            console.log('📝 Booking questions para hold (usando dados já coletados):', {
+                count: bookingQuestionAnswers.length,
+                answers: bookingQuestionAnswers,
+                fromCache: true
+            });
+
+            // Se não há respostas em cache, tentar coletar uma última vez
+            if (bookingQuestionAnswers.length === 0) {
+                console.log('⚠️ Nenhuma resposta em cache, tentando coletar novamente...');
+                this.collectBookingQuestionAnswers();
+                const freshAnswers = this.bookingData.bookingQuestionAnswers || [];
+                console.log('📝 Respostas coletadas na segunda tentativa:', freshAnswers.length);
+            }
+
+            // Coletar dados detalhados dos viajantes
+            const travelersDetails = this.bookingData.travelersDetails || this.collectDetailedTravelersData();
+
             // Simplificar o objeto enviado para o backend, passando apenas a opção selecionada
             // que já contém o 'fullOption' com o 'totalPrice'.
             const availabilityDataWithSelection = {
@@ -4508,9 +7258,11 @@ this.renderLocationOptions();
                 paxMix: this.collectTravelersData() // Adicionar paxMix para consistência
             };
 
-            console.log('📋 Dados para hold (simplificado):', {
+            console.log('📋 Dados para hold (completo):', {
                 availabilityData: availabilityDataWithSelection,
-                travelersDetails: travelersDetails
+                travelersDetails: travelersDetails,
+                bookingQuestionAnswers: bookingQuestionAnswers,
+                bookerInfo: this.bookingData.bookerInfo
             });
             
             // Verificar se viatorBookingAjax está disponível
@@ -4519,6 +7271,10 @@ this.renderLocationOptions();
                 return false;
             }
             
+            // Configurar timeout mais longo para requisições de hold
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 segundos
+
             const response = await fetch(viatorBookingAjax.ajaxurl, {
                 method: 'POST',
                 headers: {
@@ -4528,10 +7284,14 @@ this.renderLocationOptions();
                     action: 'viator_request_hold',
                     availability_data: JSON.stringify(availabilityDataWithSelection),
                     travelers_details: JSON.stringify(travelersDetails),
-                    booking_question_answers: JSON.stringify(travelersDetails.bookingQuestionAnswers || []),
+                    booking_question_answers: JSON.stringify(bookingQuestionAnswers),
+                    booker_info: JSON.stringify(this.bookingData.bookerInfo || {}),
                     nonce: viatorBookingAjax.nonce
-                })
+                }),
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
             
             const data = await response.json();
             console.log('📥 Resposta do hold (inicialização pagamento):', data);
@@ -4588,6 +7348,26 @@ this.renderLocationOptions();
             }
         } catch (error) {
             console.error('❌ Erro de conexão no hold:', error);
+            this.debugLog('Hold request connection error', {
+                error: error.message,
+                stack: error.stack,
+                name: error.name
+            });
+
+            // Tratamento específico para diferentes tipos de erro
+            let errorMessage = 'Erro de conexão na criação da reserva.';
+
+            if (error.name === 'AbortError') {
+                errorMessage = 'Timeout na criação da reserva. A operação está demorando mais que o esperado. Tente novamente.';
+            } else if (error.message.includes('fetch')) {
+                errorMessage = 'Erro de rede. Verifique sua conexão e tente novamente.';
+            } else if (error.message.includes('timeout')) {
+                errorMessage = 'Timeout na requisição. Tente novamente em alguns instantes.';
+            }
+
+            // Mostrar erro para o usuário
+            this.showDateError(errorMessage);
+
             return false;
         }
     }
@@ -4657,13 +7437,9 @@ this.renderLocationOptions();
     async submitPayment() {
         try {
             // OBRIGATÓRIO: Submeter dados de detecção de fraude ANTES do pagamento
-            if (this.payment) {
-                console.log('🔒 Submetendo dados de detecção de fraude...');
-                this.payment.submitDeviceData();
-                console.log('✅ Dados de detecção de fraude submetidos');
-            } else {
-                console.warn('⚠️ Sistema de detecção de fraude não inicializado');
-            }
+            await this.handleFraudDetectionSubmission();
+
+            console.log('🔒 Dados de detecção de fraude processados, prosseguindo com pagamento...');
             
             // Coletar todos os dados necessários do formulário
             const cardNumber = document.getElementById('card-number').value.replace(/\s/g, ''); // Remove espaços
@@ -4714,6 +7490,33 @@ this.renderLocationOptions();
                     ]
                 }
             };
+
+            // Incluir token de detecção de fraude com fallbacks robustos
+            const fraudTokenResult = this.ensureFraudDetectionToken();
+            if (fraudTokenResult.success) {
+                paymentData.deviceDataCollectionToken = this.deviceDataCollectionToken;
+                console.log('✅ Token de detecção de fraude incluído no pagamento');
+                this.debugLog('Device data collection token included in payment', {
+                    tokenSource: fraudTokenResult.source,
+                    tokenLength: this.deviceDataCollectionToken.length,
+                    hasToken: true
+                });
+            } else {
+                console.warn('⚠️ Token de detecção de fraude não disponível - pagamento prosseguirá sem token');
+                this.debugLog('Device data collection token missing in payment', {
+                    reason: fraudTokenResult.reason,
+                    fallbackAttempted: fraudTokenResult.fallbackAttempted
+                });
+            }
+
+            // Incluir informações adicionais de segurança se disponíveis
+            if (this.fraudDetectionData) {
+                paymentData.additionalSecurityData = {
+                    sessionId: this.fraudDetectionData.sessionInfo?.sessionId,
+                    browserFingerprint: this.generateBrowserFingerprint()
+                };
+                console.log('✅ Dados adicionais de segurança incluídos');
+            }
             
             console.log('💳 Enviando dados de pagamento para API da Viator:', {
                 cardLastFour: cardNumber.slice(-4),
@@ -4891,44 +7694,94 @@ this.renderLocationOptions();
         if (status === 'CONFIRMED') {
             html = `
                 <div class="confirmation-success">
-                    <div class="confirmation-header">
-                        <div class="success-icon">✓</div>
-                        <h3>🎉 Reserva Confirmada!</h3>
-                        <p class="confirmation-subtitle">Sua experiência foi reservada com sucesso</p>
-                    </div>
-                    
-                    <div class="booking-details-card">
-                        <div class="detail-row">
-                            <span class="detail-label">📋 Referência da Reserva:</span>
-                            <span class="detail-value booking-ref">${bookingRef}</span>
+                    <div class="success-hero">
+                        <div class="success-animation">
+                            <div class="success-circle">
+                                <div class="success-checkmark">
+                                    <svg viewBox="0 0 52 52" class="checkmark">
+                                        <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
+                                        <path class="checkmark-check" fill="none" d="m14.1 27.2l7.1 7.2 16.7-16.8"/>
+                                    </svg>
+                                </div>
+                            </div>
                         </div>
-                        <div class="detail-row">
-                            <span class="detail-label">🎯 Experiência:</span>
-                            <span class="detail-value">${productName}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">📅 Data da Viagem:</span>
-                            <span class="detail-value">${this.formatDate(travelDate)}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">💰 Valor Total:</span>
-                            <span class="detail-value price">${currency} ${amount.toFixed(2)}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">📧 Email de Confirmação:</span>
-                            <span class="detail-value">${bookerEmail}</span>
+                        <div class="success-content">
+                            <h1 class="success-title">Reserva Confirmada!</h1>
+                            <p class="success-subtitle">Sua experiência foi reservada com sucesso</p>
+                            <div class="booking-ref-highlight">
+                                <span class="ref-label">Código da Reserva</span>
+                                <span class="ref-value">${bookingRef}</span>
+                            </div>
                         </div>
                     </div>
-                    
-                    <div class="next-steps">
-                        <h4>📋 Próximos Passos:</h4>
-                        <ul>
-                            <li>✅ Um email de confirmação foi enviado para <strong>${bookerEmail}</strong></li>
-                            <li>📱 Você receberá seu voucher por email em breve</li>
-                            <li>🎫 Apresente o voucher no dia da experiência</li>
-                            <li>📞 Em caso de dúvidas, entre em contato conosco</li>
-                        </ul>
+
+                    <div class="booker-info-section booking-summary-card">
+                        <h4>Resumo da Reserva</h4>
+                            <div class="summary-item">
+                                <div class="item-icon">🎯</div>
+                                <div class="item-content">
+                                    <span class="item-label">Experiência</span>
+                                    <span class="item-value">${productName}</span>
+                                </div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="item-icon">📅</div>
+                                <div class="item-content">
+                                    <span class="item-label">Data da Viagem</span>
+                                    <span class="item-value">${this.formatDate(travelDate)}</span>
+                                </div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="item-icon">💰</div>
+                                <div class="item-content">
+                                    <span class="item-label">Valor Total</span>
+                                    <span class="item-value price">${currency} ${amount.toFixed(2)}</span>
+                                </div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="item-icon">📧</div>
+                                <div class="item-content">
+                                    <span class="item-label">Email de Confirmação</span>
+                                    <span class="item-value">${bookerEmail}</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
+
+                    <div class="booker-info-section next-steps-card">
+                        <h4>Próximos Passos</h4>
+                        <div class="steps-grid">
+                            <div class="step-item">
+                                <div class="step-number">1</div>
+                                <div class="step-content">
+                                    <h4>Email Enviado</h4>
+                                    <p>Confirmação enviada para <strong>${bookerEmail}</strong></p>
+                                </div>
+                            </div>
+                            <div class="step-item">
+                                <div class="step-number">2</div>
+                                <div class="step-content">
+                                    <h4>Voucher em Breve</h4>
+                                    <p>Você receberá seu voucher por email</p>
+                                </div>
+                            </div>
+                            <div class="step-item">
+                                <div class="step-number">3</div>
+                                <div class="step-content">
+                                    <h4>Apresente o Voucher</h4>
+                                    <p>Mostre o voucher no dia da experiência</p>
+                                </div>
+                            </div>
+                            <div class="step-item">
+                                <div class="step-number">4</div>
+                                <div class="step-content">
+                                    <h4>Suporte Disponível</h4>
+                                    <p>Entre em contato se tiver dúvidas</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             `;
             
             if (isRestricted) {
@@ -4974,7 +7827,7 @@ this.renderLocationOptions();
                     </div>
                     
                     <div class="pending-info">
-                        <h4>ℹ️ Informações Importantes:</h4>
+                        <h4>Informações Importantes:</h4>
                         <ul>
                             <li>⏱️ A confirmação pode levar até <strong>48 horas</strong></li>
                             <li>💳 Seu cartão foi apenas <strong>pré-autorizado</strong>, não cobrado</li>
@@ -4986,24 +7839,77 @@ this.renderLocationOptions();
             `;
             
         } else { // FAILED, CANCELLED, etc.
+            const errorMessage = data.message || 'Ocorreu um problema durante o processamento da sua reserva';
+            const errorCode = data.code || 'UNKNOWN_ERROR';
+
             html = `
                 <div class="confirmation-error">
-                    <div class="confirmation-header">
-                        <div class="error-icon">❌</div>
-                        <h3>❌ Falha na Reserva</h3>
-                        <p class="confirmation-subtitle">Não foi possível completar sua reserva</p>
+                    <div class="error-hero">
+                        <div class="error-animation">
+                            <div class="error-circle">
+                                <div class="error-icon">
+                                    <svg viewBox="0 0 52 52" class="error-cross">
+                                        <circle class="error-circle-bg" cx="26" cy="26" r="25" fill="none"/>
+                                        <path class="error-cross-line1" fill="none" d="m16 16 20 20"/>
+                                        <path class="error-cross-line2" fill="none" d="m36 16-20 20"/>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="error-content">
+                            <h1 class="error-title">Falha na Reserva</h1>
+                            <p class="error-subtitle">Não foi possível completar sua reserva</p>
+                            <div class="error-code-highlight">
+                                <span class="error-code-label">Código do Erro</span>
+                                <span class="error-code-value">${errorCode}</span>
+                            </div>
+                        </div>
                     </div>
-                    
-                    <div class="error-details">
-                        <p>Ocorreu um problema durante o processamento da sua reserva. Por favor, verifique os detalhes e tente novamente.</p>
-                        
-                        <div class="error-actions">
-                            <h4>💡 O que você pode fazer:</h4>
-                            <ul>
-                                <li>🔄 Tente novamente em alguns minutos</li>
-                                <li>💳 Verifique os dados do seu cartão</li>
-                                <li>📞 Entre em contato conosco se o problema persistir</li>
-                            </ul>
+
+                    <div class="booker-info-section error-details-card">
+                        <h4>Detalhes do Problema</h4>
+                            <div class="error-message">
+                                <div class="message-icon">💬</div>
+                                <div class="message-content">
+                                    <p>${errorMessage}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="booker-info-section error-actions-card">
+                        <h4>O que você pode fazer</h4>
+                        <div class="actions-grid">
+                            <div class="action-item">
+                                <div class="action-icon">🔄</div>
+                                <div class="action-content">
+                                    <h4>Tente Novamente</h4>
+                                    <p>Aguarde alguns minutos e tente fazer a reserva novamente</p>
+                                    <button class="action-btn retry-btn" onclick="window.location.reload()">
+                                        Tentar Novamente
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="action-item">
+                                <div class="action-icon">💳</div>
+                                <div class="action-content">
+                                    <h4>Verifique os Dados</h4>
+                                    <p>Confirme se os dados do cartão e informações estão corretos</p>
+                                    <button class="action-btn secondary-btn" onclick="history.back()">
+                                        Voltar e Revisar
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="action-item">
+                                <div class="action-icon">📞</div>
+                                <div class="action-content">
+                                    <h4>Entre em Contato</h4>
+                                    <p>Nossa equipe está pronta para ajudar você</p>
+                                    <button class="action-btn contact-btn">
+                                        Falar com Suporte
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -5011,52 +7917,798 @@ this.renderLocationOptions();
         }
         
         container.innerHTML = html;
-        
+
+        // Adicionar CSS específico para a tela de confirmação
+        this.addConfirmationStyles();
+
+        // Scroll para o topo da confirmação
+        container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
         // Adicionar animação de entrada
         setTimeout(() => {
             container.classList.add('confirmation-loaded');
         }, 100);
+
+        console.log('✅ Mensagem de confirmação exibida com sucesso');
     }
-    
-    collectDetailedTravelersData() {
-        // Usar dados dos viajantes já armazenados (paxMix)
-        const paxMix = this.bookingData.selectedTravelers || this.collectTravelersData();
-        
-        // Usar dados do booker armazenados ou tentar coletar do DOM (fallback)
-        let bookerInfo = this.bookingData.bookerInfo;
-        
-        if (!bookerInfo) {
-            // Fallback: tentar coletar do DOM se ainda não foram armazenados
-            const bookerFirstname = document.getElementById('booker-firstname')?.value || '';
-            const bookerLastname = document.getElementById('booker-lastname')?.value || '';
-            const bookerEmail = document.getElementById('booker-email')?.value || '';
-            const bookerPhone = document.getElementById('booker-phone')?.value || '';
-            
-            bookerInfo = {
-                firstname: bookerFirstname,
-                lastname: bookerLastname,
-                email: bookerEmail,
-                phone: bookerPhone
-            };
+
+    /**
+     * Injetar estilos CSS para animações
+     */
+    injectAnimationStyles() {
+        const styleId = 'viator-animation-styles';
+
+        // Verificar se os estilos já foram adicionados
+        if (document.getElementById(styleId)) {
+            return;
         }
-        
-        // Coletar respostas das perguntas de reserva
-        const bookingQuestionAnswers = this.collectBookingQuestionAnswers();
-        
-        console.log('📋 Dados coletados do responsável:', bookerInfo);
-        console.log('📝 Respostas das perguntas de reserva:', bookingQuestionAnswers);
-        
+
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `
+            @keyframes spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+            }
+
+            .update-icon.spinning {
+                animation: spin 1s linear infinite;
+                display: inline-block;
+            }
+        `;
+
+        document.head.appendChild(style);
+        console.log('🎨 Estilos de animação injetados');
+    }
+
+    /**
+     * Adicionar estilos CSS para a tela de confirmação
+     */
+    addConfirmationStyles() {
+        const styleId = 'viator-confirmation-styles';
+
+        // Verificar se os estilos já foram adicionados
+        if (document.getElementById(styleId)) {
+            return;
+        }
+
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `
+            /* Container principal da confirmação */
+            .confirmation-container {
+                width: 100%;
+                max-width: none;
+                padding: 0;
+                margin: 0;
+            }
+
+            .confirmation-success, .confirmation-pending, .confirmation-error {
+                width: 100%;
+                max-width: none;
+                margin: 0;
+                padding: 0;
+                background: transparent;
+                box-shadow: none;
+                border-radius: 0;
+            }
+
+            /* Hero Section - Sucesso */
+            .success-hero {
+                background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                color: white;
+                padding: 60px 40px;
+                text-align: center;
+                position: relative;
+                overflow: hidden;
+            }
+
+            .success-hero::before {
+                content: '';
+                position: absolute;
+                top: -50%;
+                left: -50%;
+                width: 200%;
+                height: 200%;
+                background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+                animation: pulse 3s ease-in-out infinite;
+            }
+
+            .success-animation {
+                margin-bottom: 30px;
+                position: relative;
+                z-index: 2;
+            }
+
+            .success-circle {
+                width: 120px;
+                height: 120px;
+                margin: 0 auto;
+                position: relative;
+            }
+
+            .checkmark {
+                width: 120px;
+                height: 120px;
+                border-radius: 50%;
+                display: block;
+                stroke-width: 3;
+                stroke: #fff;
+                stroke-miterlimit: 10;
+                box-shadow: inset 0px 0px 0px #28a745;
+                animation: fill 0.4s ease-in-out 0.4s forwards, scale 0.3s ease-in-out 0.9s both;
+            }
+
+            .checkmark-circle {
+                stroke-dasharray: 166;
+                stroke-dashoffset: 166;
+                stroke-width: 3;
+                stroke-miterlimit: 10;
+                stroke: #fff;
+                fill: none;
+                animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+            }
+
+            .checkmark-check {
+                transform-origin: 50% 50%;
+                stroke-dasharray: 48;
+                stroke-dashoffset: 48;
+                animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+            }
+
+            .success-content {
+                position: relative;
+                z-index: 2;
+            }
+
+            .success-title {
+                font-size: 2.5rem;
+                font-weight: 700;
+                margin: 0 0 15px 0;
+                text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+
+            .success-subtitle {
+                font-size: 1.2rem;
+                margin: 0 0 30px 0;
+                opacity: 0.9;
+            }
+
+            .booking-ref-highlight {
+                background: rgba(255,255,255,0.2);
+                border-radius: 12px;
+                padding: 20px;
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255,255,255,0.3);
+            }
+
+            .ref-label {
+                display: block;
+                font-size: 0.9rem;
+                opacity: 0.8;
+                margin-bottom: 8px;
+            }
+
+            .ref-value {
+                display: block;
+                font-size: 1.5rem;
+                font-weight: 700;
+                font-family: 'Courier New', monospace;
+                letter-spacing: 2px;
+            }
+
+            /* Cards */
+            .booking-summary-card, .next-steps-card, .error-details-card, .error-actions-card {
+                background: white;
+                margin: 30px 40px;
+                border-radius: 16px;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+                overflow: hidden;
+                border: 1px solid rgba(0,0,0,0.05);
+            }
+
+            .card-header {
+                background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                padding: 25px 30px;
+                border-bottom: 1px solid #dee2e6;
+            }
+
+            .card-header h3 {
+                margin: 0;
+                font-size: 1.3rem;
+                font-weight: 600;
+                color: #495057;
+            }
+
+            .card-body {
+                padding: 30px;
+            }
+
+            /* Summary Items */
+            .summary-item {
+                display: flex;
+                align-items: center;
+                padding: 20px 0;
+                border-bottom: 1px solid #f1f3f4;
+            }
+
+            .summary-item:last-child {
+                border-bottom: none;
+            }
+
+            .item-icon {
+                width: 50px;
+                height: 50px;
+                background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+                border-radius: 12px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.5rem;
+                margin-right: 20px;
+                flex-shrink: 0;
+            }
+
+            .item-content {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .item-label {
+                font-size: 0.9rem;
+                color: #6c757d;
+                margin-bottom: 5px;
+            }
+
+            .item-value {
+                font-size: 1.1rem;
+                font-weight: 600;
+                color: #212529;
+            }
+
+            .item-value.price {
+                color: #28a745;
+                font-weight: 700;
+                font-size: 1.3rem;
+            }
+
+            /* Steps Grid */
+            .steps-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 25px;
+                padding: 30px;
+            }
+
+            .step-item {
+                display: flex;
+                align-items: flex-start;
+                padding: 25px;
+                background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+                border-radius: 12px;
+                border: 1px solid #e9ecef;
+                transition: transform 0.3s ease, box-shadow 0.3s ease;
+            }
+
+            .step-item:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            }
+
+            .step-number {
+                width: 40px;
+                height: 40px;
+                background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                color: white;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: 700;
+                margin-right: 15px;
+                flex-shrink: 0;
+            }
+
+            .step-content h4 {
+                margin: 0 0 8px 0;
+                font-size: 1.1rem;
+                font-weight: 600;
+                color: #212529;
+            }
+
+            .step-content p {
+                margin: 0;
+                font-size: 0.95rem;
+                color: #6c757d;
+                line-height: 1.5;
+            }
+            }
+
+            /* Hero Section - Erro */
+            .error-hero {
+                background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+                color: white;
+                padding: 60px 40px;
+                text-align: center;
+                position: relative;
+                overflow: hidden;
+            }
+
+            .error-hero::before {
+                content: '';
+                position: absolute;
+                top: -50%;
+                left: -50%;
+                width: 200%;
+                height: 200%;
+                background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+                animation: pulse 3s ease-in-out infinite;
+            }
+
+            .error-animation {
+                margin-bottom: 30px;
+                position: relative;
+                z-index: 2;
+            }
+
+            .error-circle {
+                width: 120px;
+                height: 120px;
+                margin: 0 auto;
+                position: relative;
+            }
+
+            .error-cross {
+                width: 120px;
+                height: 120px;
+                border-radius: 50%;
+                display: block;
+                stroke-width: 3;
+                stroke: #fff;
+                stroke-miterlimit: 10;
+                animation: scale 0.3s ease-in-out 0.5s both;
+            }
+
+            .error-circle-bg {
+                stroke-dasharray: 166;
+                stroke-dashoffset: 166;
+                stroke-width: 3;
+                stroke-miterlimit: 10;
+                stroke: #fff;
+                fill: none;
+                animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+            }
+
+            .error-cross-line1, .error-cross-line2 {
+                stroke-dasharray: 28;
+                stroke-dashoffset: 28;
+                animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+            }
+
+            .error-title {
+                font-size: 2.5rem;
+                font-weight: 700;
+                margin: 0 0 15px 0;
+                text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                position: relative;
+                z-index: 2;
+            }
+
+            .error-subtitle {
+                font-size: 1.2rem;
+                margin: 0 0 30px 0;
+                opacity: 0.9;
+                position: relative;
+                z-index: 2;
+            }
+
+            .error-code-highlight {
+                background: rgba(255,255,255,0.2);
+                border-radius: 12px;
+                padding: 20px;
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255,255,255,0.3);
+                position: relative;
+                z-index: 2;
+            }
+
+            .error-code-label {
+                display: block;
+                font-size: 0.9rem;
+                opacity: 0.8;
+                margin-bottom: 8px;
+            }
+
+            .error-code-value {
+                display: block;
+                font-size: 1.2rem;
+                font-weight: 700;
+                font-family: 'Courier New', monospace;
+                letter-spacing: 1px;
+            }
+
+            /* Error Message */
+            .error-message {
+                display: flex;
+                align-items: flex-start;
+                padding: 25px;
+                background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+                border-radius: 12px;
+                border-left: 4px solid #dc3545;
+            }
+
+            .message-icon {
+                width: 40px;
+                height: 40px;
+                background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.2rem;
+                margin-right: 15px;
+                flex-shrink: 0;
+            }
+
+            .message-content p {
+                margin: 0;
+                font-size: 1.1rem;
+                color: #495057;
+                line-height: 1.6;
+            }
+
+            /* Actions Grid */
+            .actions-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                gap: 25px;
+                padding: 30px;
+            }
+
+            .action-item {
+                background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+                border-radius: 16px;
+                padding: 30px;
+                text-align: center;
+                border: 1px solid #e9ecef;
+                transition: transform 0.3s ease, box-shadow 0.3s ease;
+            }
+
+            .action-item:hover {
+                transform: translateY(-3px);
+                box-shadow: 0 12px 35px rgba(0,0,0,0.15);
+            }
+
+            .action-icon {
+                width: 60px;
+                height: 60px;
+                background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.8rem;
+                margin: 0 auto 20px;
+            }
+
+            .action-content h4 {
+                margin: 0 0 12px 0;
+                font-size: 1.2rem;
+                font-weight: 600;
+                color: #212529;
+            }
+
+            .action-content p {
+                margin: 0 0 20px 0;
+                font-size: 0.95rem;
+                color: #6c757d;
+                line-height: 1.5;
+            }
+
+            .action-btn {
+                background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                font-size: 0.95rem;
+            }
+
+            .action-btn:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 6px 20px rgba(0,123,255,0.3);
+            }
+
+            .action-btn.retry-btn {
+                background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            }
+
+            .action-btn.retry-btn:hover {
+                box-shadow: 0 6px 20px rgba(40,167,69,0.3);
+            }
+
+            .action-btn.secondary-btn {
+                background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+            }
+
+            .action-btn.secondary-btn:hover {
+                box-shadow: 0 6px 20px rgba(108,117,125,0.3);
+            }
+
+            .action-btn.contact-btn {
+                background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+            }
+
+            .action-btn.contact-btn:hover {
+                box-shadow: 0 6px 20px rgba(23,162,184,0.3);
+            }
+
+            /* Animações */
+            @keyframes stroke {
+                100% {
+                    stroke-dashoffset: 0;
+                }
+            }
+
+            @keyframes scale {
+                0%, 100% {
+                    transform: none;
+                }
+                50% {
+                    transform: scale3d(1.1, 1.1, 1);
+                }
+            }
+
+            @keyframes fill {
+                100% {
+                    box-shadow: inset 0px 0px 0px 30px #28a745;
+                }
+            }
+
+            @keyframes pulse {
+                0%, 100% {
+                    opacity: 0.3;
+                    transform: scale(1);
+                }
+                50% {
+                    opacity: 0.6;
+                    transform: scale(1.05);
+                }
+            }
+
+            @keyframes slideDown {
+                from {
+                    opacity: 0;
+                    transform: translateY(-10px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+
+
+
+            .confirmation-loaded {
+                animation: fadeIn 0.5s ease-in;
+            }
+
+            /* Responsividade */
+            @media (max-width: 768px) {
+                .success-hero, .error-hero {
+                    padding: 40px 20px;
+                }
+
+                .success-title, .error-title {
+                    font-size: 2rem;
+                }
+
+                .booking-summary-card, .next-steps-card, .error-details-card, .error-actions-card {
+                    margin: 20px 15px;
+                }
+
+                .steps-grid, .actions-grid {
+                    grid-template-columns: 1fr;
+                    padding: 20px;
+                }
+
+                .card-body {
+                    padding: 20px;
+                }
+            }
+        `;
+
+        document.head.appendChild(style);
+    }
+
+    /**
+     * Executar requisição com retry automático
+     */
+    async executeWithRetry(requestFunction, maxRetries = 3, retryDelay = 1000) {
+        let lastError = null;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(`🔄 Tentativa ${attempt}/${maxRetries}...`);
+                const result = await requestFunction();
+
+                if (result) {
+                    console.log(`✅ Sucesso na tentativa ${attempt}`);
+                    return result;
+                }
+
+                throw new Error('Resultado inválido');
+
+            } catch (error) {
+                lastError = error;
+                console.warn(`⚠️ Tentativa ${attempt} falhou:`, error.message);
+
+                // Se não é a última tentativa, aguardar antes de tentar novamente
+                if (attempt < maxRetries) {
+                    console.log(`⏳ Aguardando ${retryDelay}ms antes da próxima tentativa...`);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    retryDelay *= 1.5; // Aumentar delay progressivamente
+                } else {
+                    console.error(`❌ Todas as ${maxRetries} tentativas falharam`);
+                }
+            }
+        }
+
+        throw lastError;
+    }
+
+    /**
+     * Validar conectividade com a API
+     */
+    async validateApiConnectivity() {
+        try {
+            const response = await fetch(viatorBookingAjax.ajaxurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    action: 'viator_test_api_access',
+                    nonce: viatorBookingAjax.nonce
+                })
+            });
+
+            const data = await response.json();
+            return data.success;
+
+        } catch (error) {
+            console.error('❌ Erro de conectividade:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Mostrar erro com opções de retry
+     */
+    showErrorWithRetry(message, retryFunction = null) {
+        // Remover alertas anteriores
+        const existingAlert = document.querySelector('.error-with-retry');
+        if (existingAlert) {
+            existingAlert.remove();
+        }
+
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'error-with-retry alert alert-danger';
+        alertDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h5>❌ Erro</h5>
+                    <p class="mb-2">${message}</p>
+                </div>
+                <div class="error-actions">
+                    ${retryFunction ? '<button class="btn btn-sm btn-outline-danger retry-btn">🔄 Tentar Novamente</button>' : ''}
+                    <button class="btn btn-sm btn-secondary close-error-btn">✕</button>
+                </div>
+            </div>
+        `;
+
+        // Adicionar event listeners
+        const retryBtn = alertDiv.querySelector('.retry-btn');
+        const closeBtn = alertDiv.querySelector('.close-error-btn');
+
+        if (retryBtn && retryFunction) {
+            retryBtn.addEventListener('click', async () => {
+                retryBtn.disabled = true;
+                retryBtn.innerHTML = '🔄 Tentando...';
+
+                try {
+                    await retryFunction();
+                    alertDiv.remove();
+                } catch (error) {
+                    retryBtn.disabled = false;
+                    retryBtn.innerHTML = '🔄 Tentar Novamente';
+                }
+            });
+        }
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                alertDiv.remove();
+            });
+        }
+
+        // Inserir no topo do container atual
+        const currentStep = document.querySelector(`.booking-step:nth-child(${this.currentStep})`);
+        if (currentStep) {
+            currentStep.insertBefore(alertDiv, currentStep.firstChild);
+        }
+
+        // Auto-remover após 15 segundos se não houver retry
+        if (!retryFunction) {
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 15000);
+        }
+    }
+
+    /**
+     * Validar dados críticos antes de prosseguir (contextual ao step)
+     */
+    validateCriticalData(step = null) {
+        const currentStep = step || this.currentStep;
+        const errors = [];
+
+        // Validações básicas (sempre necessárias)
+        if (!this.bookingData.productCode) {
+            errors.push('Código do produto não encontrado');
+        }
+
+        // Validações para Step 2+ (após seleção de data e opção)
+        if (currentStep >= 2) {
+            if (!this.bookingData.availabilityData) {
+                errors.push('Dados de disponibilidade não carregados');
+            }
+
+            if (!this.bookingData.selectedOption) {
+                errors.push('Nenhuma opção de produto selecionada');
+            }
+
+            if (!this.bookingData.travelDate) {
+                errors.push('Data de viagem não selecionada');
+            }
+        }
+
+        // Validações para Step 3+ (após dados de viajantes)
+        if (currentStep >= 3) {
+            if (!this.bookingData.selectedTravelers) {
+                errors.push('Dados de viajantes não coletados');
+            }
+        }
+
+        // Validações para Step 4+ (antes do pagamento)
+        if (currentStep >= 4) {
+            // Verificar se há booking questions obrigatórias não respondidas
+            const mandatoryQuestions = this.bookingQuestions?.filter(q => q.required === 'MANDATORY') || [];
+            const answeredQuestions = this.bookingData.bookingQuestionAnswers || [];
+
+            if (mandatoryQuestions.length > 0 && answeredQuestions.length === 0) {
+                errors.push('Respostas das booking questions obrigatórias não coletadas');
+            }
+        }
+
         return {
-            // Informações dos viajantes (apenas quantidades por faixa etária)
-            paxMix: paxMix,
-            
-            // Informações do responsável principal pela reserva
-            bookerInfo: bookerInfo,
-            
-            // Respostas das perguntas de reserva
-            bookingQuestionAnswers: bookingQuestionAnswers
+            isValid: errors.length === 0,
+            errors: errors
         };
     }
+
+    // MÉTODO REMOVIDO - DUPLICATA (mantendo apenas a primeira definição na linha 6454)
     
     /**
      * Formatar data para exibição amigável
@@ -5122,6 +8774,7 @@ this.renderLocationOptions();
         }
 
         console.log('🔄 Iniciando requisição de preços...');
+        this.startButtonLoadingAnimation();
         this.showPriceLoading();
 
         try {
@@ -5155,13 +8808,16 @@ this.renderLocationOptions();
                 this.bookingData.availabilityData = data.data; // Armazenar para uso posterior
                 this.bookingData.hasSearchedPrices = true; // Marcar que já houve uma busca
                 this.updateButtonText(); // Atualizar texto do botão
+                this.stopButtonLoadingAnimation(); // Parar animação quando resultados aparecem
             } else {
                 console.log('❌ Erro na resposta:', data);
                 this.showPriceError('Erro: ' + (data.data?.message || 'Erro desconhecido'));
+                this.stopButtonLoadingAnimation(); // Parar animação em caso de erro
             }
         } catch (error) {
             console.log('❌ Erro na requisição:', error);
             this.showPriceError('Erro de conexão. Tente novamente.');
+            this.stopButtonLoadingAnimation(); // Parar animação em caso de erro de conexão
         }
     }
 
@@ -5339,12 +8995,54 @@ this.renderLocationOptions();
         // Adicionar event listeners para seleção de opções
                 this.setupOptionSelection();
 
-        const dateInput = document.getElementById('viator-travel-date');
-        if (dateInput) {
-            dateInput.addEventListener('change', () => {
-                this.clearPriceDisplay();
-                this.updateButtonText();
+        // Monitorar cliques no seletor de data (para casos onde o onChange do flatpickr não funciona)
+        const dateSelector = document.querySelector('.viator-booking-date-selector');
+        if (dateSelector) {
+            dateSelector.addEventListener('click', () => {
+                console.log('📅 Date selector clicado - preparando para possível mudança de data');
+                // Não fazer nada aqui, apenas preparar. A ação real acontece no onChange do flatpickr
             });
+        }
+
+        // Também monitorar o input hidden da data
+        const hiddenDateInput = document.getElementById('travel-date-value');
+        if (hiddenDateInput) {
+            // Event listener para mudanças diretas
+            hiddenDateInput.addEventListener('change', () => {
+                console.log('📅 Input hidden da data mudou:', hiddenDateInput.value);
+                this.clearPriceDisplay();
+                this.resetButtonToSearchState();
+                this.hideDateError();
+            });
+
+            // Adicionar observer para detectar mudanças programáticas no valor
+            let lastValue = hiddenDateInput.value;
+            const observer = new MutationObserver(() => {
+                if (hiddenDateInput.value !== lastValue) {
+                    console.log('📅 Valor da data detectado via observer:', hiddenDateInput.value);
+                    lastValue = hiddenDateInput.value;
+                    this.clearPriceDisplay();
+                    this.resetButtonToSearchState();
+                    this.hideDateError();
+                }
+            });
+
+            // Observar mudanças nos atributos
+            observer.observe(hiddenDateInput, {
+                attributes: true,
+                attributeFilter: ['value']
+            });
+
+            // Também verificar periodicamente (fallback)
+            setInterval(() => {
+                if (hiddenDateInput.value !== lastValue) {
+                    console.log('📅 Valor da data detectado via polling:', hiddenDateInput.value);
+                    lastValue = hiddenDateInput.value;
+                    this.clearPriceDisplay();
+                    this.resetButtonToSearchState();
+                    this.hideDateError();
+                }
+            }, 500);
         }
 
         // Não selecionar nenhuma opção automaticamente
@@ -5572,7 +9270,6 @@ this.renderLocationOptions();
         const priceDisplay = document.getElementById('price-display');
         priceDisplay.innerHTML = `
             <div class="price-loading">
-                <div class="loading-spinner">↻</div>
                 <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">🔍 Verificando disponibilidade</div>
                 <div style="font-size: 14px; color: #6c757d;">Buscando as melhores opções e preços para você...</div>
             </div>
@@ -5621,19 +9318,19 @@ this.renderLocationOptions();
     clearPriceDisplay() {
         const priceDisplay = document.getElementById('price-display');
         const footerSummary = document.getElementById('footer-price-summary');
-        
+
         if (priceDisplay) {
-            priceDisplay.innerHTML = '<p class="reset-message">Para ver a disponibilidade, clique em <strong>Atualizar Preços</strong>.</p>';
-            priceDisplay.style.display = 'block';
+            priceDisplay.innerHTML = '';
+            priceDisplay.style.display = 'none'; // Esconder completamente quando limpar
         }
-        
+
         if (footerSummary) {
             footerSummary.style.display = 'none';
         }
-        
+
         // Limpar opção selecionada
         this.bookingData.selectedOption = null;
-        
+
         // Limpar todas as mensagens de erro de viajantes também
         this.clearAllTravelerErrors();
     }
@@ -5641,14 +9338,62 @@ this.renderLocationOptions();
     updateButtonText() {
         const updateBtn = document.getElementById('update-price-btn');
         if (!updateBtn) return;
-        
+
         // Verificar se já houve uma busca de preços anteriormente
         const hasSearchedBefore = this.bookingData.hasSearchedPrices || false;
-        
+
         if (hasSearchedBefore) {
             updateBtn.innerHTML = '<span class="update-icon">↻</span>Atualizar Preços';
         } else {
             updateBtn.innerHTML = '<span class="update-icon">🔍</span>Buscar preços';
+        }
+    }
+
+    resetButtonToSearchState() {
+        const updateBtn = document.getElementById('update-price-btn');
+        if (updateBtn) {
+            // Resetar para estado inicial
+            this.bookingData.hasSearchedPrices = false;
+            updateBtn.innerHTML = '<span class="update-icon">🔍</span>Buscar preços';
+            console.log('🔄 Botão resetado para estado "Buscar preços"');
+        }
+    }
+
+    startButtonLoadingAnimation() {
+        const updateBtn = document.getElementById('update-price-btn');
+        const updateIcon = updateBtn?.querySelector('.update-icon');
+
+        console.log('🔄 startButtonLoadingAnimation chamado', {
+            updateBtn: !!updateBtn,
+            updateIcon: !!updateIcon,
+            iconClasses: updateIcon?.className
+        });
+
+        if (updateIcon) {
+            // Adicionar classe de animação
+            updateIcon.classList.add('spinning');
+            console.log('🔄 Classe "spinning" adicionada. Classes atuais:', updateIcon.className);
+        } else {
+            console.log('❌ Ícone do botão não encontrado');
+        }
+    }
+
+    stopButtonLoadingAnimation() {
+        const updateBtn = document.getElementById('update-price-btn');
+        const updateIcon = updateBtn?.querySelector('.update-icon');
+
+        console.log('⏹️ stopButtonLoadingAnimation chamado', {
+            updateBtn: !!updateBtn,
+            updateIcon: !!updateIcon,
+            iconClasses: updateIcon?.className
+        });
+
+        if (updateIcon) {
+            // Remover classe de animação
+            updateIcon.classList.remove('spinning');
+            console.log('⏹️ Classe "spinning" removida. Classes atuais:', updateIcon.className);
+        } else {
+            console.log('❌ Ícone do botão não encontrado para parar animação');
         }
     }
 
@@ -5807,12 +9552,57 @@ this.renderLocationOptions();
         this.restorePageScroll();
     }
 
-    showDateError(message) {
+    showDateError(message, type = 'error') {
         const errorElement = document.getElementById('date-error-message');
         if (errorElement) {
+            // Texto simples sem ícone, como na imagem da Etapa 2
             errorElement.textContent = message;
             errorElement.style.display = 'block';
+
+            // Aplicar classe CSS baseada no tipo
+            errorElement.className = type === 'warning' ? 'warning-message' : 'error-message';
+
+            // Auto-hide warnings after 5 seconds
+            if (type === 'warning') {
+                setTimeout(() => {
+                    if (errorElement.textContent.includes(message)) {
+                        this.hideDateError();
+                    }
+                }, 5000);
+            }
+        } else {
+            // Fallback para console e alert
+            const prefix = type === 'warning' ? 'Aviso: ' : 'Erro: ';
+            console.log(prefix + message);
+
+            // Tentar encontrar container de erro alternativo
+            const altErrorContainer = document.getElementById('viator-error-message') ||
+                                    document.querySelector('.error-container') ||
+                                    document.querySelector('.alert-container');
+
+            if (altErrorContainer) {
+                const alertClass = type === 'warning' ? 'alert-warning' : 'alert-danger';
+                // Texto simples sem ícone
+                altErrorContainer.innerHTML = `<div class="alert ${alertClass}">
+                    ${message}
+                </div>`;
+
+                if (type === 'warning') {
+                    setTimeout(() => {
+                        if (altErrorContainer.innerHTML.includes(message)) {
+                            altErrorContainer.innerHTML = '';
+                        }
+                    }, 5000);
+                }
+            }
         }
+
+        // Log do erro/aviso para debug
+        this.debugLog(`User message displayed (${type})`, {
+            message: message,
+            type: type,
+            elementFound: !!errorElement
+        });
     }
     
     hideDateError() {

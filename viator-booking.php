@@ -24,6 +24,8 @@ class ViatorBookingSystem {
         add_action('wp_ajax_nopriv_viator_check_availability', array($this, 'ajax_check_availability'));
         add_action('wp_ajax_viator_get_booking_questions', array($this, 'ajax_get_booking_questions'));
         add_action('wp_ajax_nopriv_viator_get_booking_questions', array($this, 'ajax_get_booking_questions'));
+        add_action('wp_ajax_viator_get_all_booking_questions', array($this, 'ajax_get_all_booking_questions'));
+        add_action('wp_ajax_nopriv_viator_get_all_booking_questions', array($this, 'ajax_get_all_booking_questions'));
         add_action('wp_ajax_viator_request_hold', array($this, 'ajax_request_hold'));
         add_action('wp_ajax_nopriv_viator_request_hold', array($this, 'ajax_request_hold'));
         add_action('wp_ajax_viator_process_payment', array($this, 'ajax_process_payment'));
@@ -35,6 +37,8 @@ class ViatorBookingSystem {
         add_action('wp_ajax_viator_get_monthly_availability', array($this, 'ajax_get_monthly_availability'));
         add_action('wp_ajax_nopriv_viator_get_monthly_availability', array($this, 'ajax_get_monthly_availability'));
         add_action('wp_ajax_viator_test_api_access', array($this, 'ajax_test_api_access'));
+        add_action('wp_ajax_viator_debug_log_js', array($this, 'ajax_debug_log_js'));
+        add_action('wp_ajax_nopriv_viator_debug_log_js', array($this, 'ajax_debug_log_js'));
         add_action('wp_ajax_nopriv_viator_test_api_access', array($this, 'ajax_test_api_access'));
     }
     
@@ -67,14 +71,18 @@ class ViatorBookingSystem {
         ));
         
         if (is_wp_error($response)) {
+            viator_debug_log('Connection error in availability check', $response->get_error_message());
             return array('error' => 'Erro de conexão: ' . $response->get_error_message());
         }
-        
+
+        $response_code = wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
-        
-        if (isset($data['errorCode']) || isset($data['error'])) {
-            return array('error' => isset($data['errorMessage']) ? $data['errorMessage'] : 'Erro na verificação de disponibilidade');
+
+        // Tratamento abrangente de erros da API
+        $error_result = $this->handle_api_error($response_code, $data, 'availability_check');
+        if ($error_result) {
+            return $error_result;
         }
         
         return $data;
@@ -83,7 +91,7 @@ class ViatorBookingSystem {
     /**
      * Solicitar hold de reserva
      */
-    public function request_booking_hold($availability_data, $travelers_details, $booking_question_answers = []) {
+    public function request_booking_hold($availability_data, $travelers_details, $booking_question_answers = [], $booker_info = []) {
         if (empty($this->api_key)) {
             return array('error' => viator_t('error_api_key'));
         }
@@ -171,20 +179,57 @@ class ViatorBookingSystem {
             viator_debug_log('Hold - Detailed Pricing:', $availability_data['selectedOption']['pricing']);
         }
         
+        // Processar booking questions se fornecidas
+        if (!empty($booking_question_answers)) {
+            $processed_questions = $this->process_booking_questions_for_hold($booking_question_answers, $booker_info);
+            if (!empty($processed_questions)) {
+                // Adicionar booking questions ao primeiro item
+                $request_data['items'][0]['bookingQuestionAnswers'] = $processed_questions;
+                viator_debug_log('Hold - Booking Questions Added:', $processed_questions);
+            }
+        }
+
+        // Adicionar informações do responsável se fornecidas
+        if (!empty($booker_info)) {
+            // Adicionar informações do lead traveler
+            $request_data['items'][0]['leadTraveler'] = array(
+                'firstname' => $booker_info['firstname'] ?? '',
+                'lastname' => $booker_info['lastname'] ?? '',
+                'email' => $booker_info['email'] ?? '',
+                'phone' => $booker_info['phone'] ?? ''
+            );
+            viator_debug_log('Hold - Lead Traveler Added:', $request_data['items'][0]['leadTraveler']);
+        }
+
         // Log completo da requisição
         viator_debug_log('Hold - Complete Request Data:', $request_data);
         viator_debug_log('Hold - Request JSON:', json_encode($request_data, JSON_PRETTY_PRINT));
         
-        $response = wp_remote_post($this->base_url . '/partner/bookings/cart/hold', array(
-            'headers' => array(
-                'Accept' => 'application/json;version=2.0',
-                'Content-Type' => 'application/json;version=2.0',
-                'exp-api-key' => $this->api_key,
-                'Accept-Language' => $locale_settings['language']
+        // Usar método com retry automático para requisições críticas como hold
+        $response = $this->make_api_request_with_retry(
+            $this->base_url . '/partner/bookings/cart/hold',
+            array(
+                'method' => 'POST',
+                'headers' => array(
+                    'Accept' => 'application/json;version=2.0',
+                    'Content-Type' => 'application/json;version=2.0',
+                    'exp-api-key' => $this->api_key,
+                    'Accept-Language' => $locale_settings['language']
+                ),
+                'body' => json_encode($request_data),
+                'timeout' => 90, // Aumentar timeout para 90 segundos para holds complexos
+                'sslverify' => false, // Evitar problemas de SSL em alguns ambientes
+                'user-agent' => 'Viator-WordPress-Plugin/1.0',
+                'httpversion' => '1.1', // Forçar HTTP/1.1 para melhor compatibilidade
+                'blocking' => true, // Garantir que a requisição seja bloqueante
+                'compress' => false, // Desabilitar compressão para evitar problemas
+                'decompress' => true, // Permitir descompressão de respostas
+                'stream' => false, // Não usar streaming para requisições críticas
+                'redirection' => 3 // Permitir até 3 redirecionamentos
             ),
-            'body' => json_encode($request_data),
-            'timeout' => 30
-        ));
+            3, // Máximo 3 tentativas
+            'booking_hold'
+        );
         
         if (is_wp_error($response)) {
             viator_debug_log('Hold WP_Error:', $response->get_error_message());
@@ -968,6 +1013,143 @@ class ViatorBookingSystem {
     }
 
     /**
+     * Tratamento abrangente de erros da API Viator
+     * Baseado na documentação oficial da API
+     */
+    private function handle_api_error($response_code, $data, $context = '') {
+        viator_debug_log("API Error Handler - Response Code: $response_code, Context: $context", $data);
+
+        // Mapear códigos de erro específicos para mensagens localizadas
+        $error_messages = array(
+            400 => 'Dados da requisição inválidos. Verifique as informações e tente novamente.',
+            401 => 'Chave de API inválida ou expirada. Entre em contato com o suporte.',
+            403 => 'Acesso negado. Verifique suas permissões de API.',
+            404 => 'Recurso não encontrado. O produto pode não estar mais disponível.',
+            409 => 'Conflito na requisição. Tente novamente em alguns instantes.',
+            422 => 'Dados fornecidos são inválidos ou incompletos.',
+            429 => 'Muitas requisições. Aguarde alguns segundos e tente novamente.',
+            500 => 'Erro interno do servidor. Tente novamente em alguns minutos.',
+            502 => 'Serviço temporariamente indisponível. Tente novamente.',
+            503 => 'Serviço em manutenção. Tente novamente mais tarde.',
+            504 => 'Timeout na requisição. Tente novamente.'
+        );
+
+        // Verificar se há erro baseado no código de resposta
+        if ($response_code >= 400) {
+            $error_message = isset($error_messages[$response_code])
+                ? $error_messages[$response_code]
+                : "Erro na API (Código: $response_code). Tente novamente.";
+
+            // Adicionar detalhes específicos se disponíveis na resposta
+            if (is_array($data)) {
+                if (isset($data['errorMessage'])) {
+                    $error_message = $data['errorMessage'];
+                } elseif (isset($data['message'])) {
+                    $error_message = $data['message'];
+                } elseif (isset($data['error'])) {
+                    $error_message = is_string($data['error']) ? $data['error'] : $error_message;
+                }
+
+                // Log detalhado para debugging
+                viator_debug_log("API Error Details", array(
+                    'context' => $context,
+                    'response_code' => $response_code,
+                    'error_data' => $data,
+                    'final_message' => $error_message
+                ));
+            }
+
+            // Determinar se deve tentar novamente
+            $should_retry = in_array($response_code, [429, 500, 502, 503, 504]);
+
+            return array(
+                'error' => $error_message,
+                'error_code' => $response_code,
+                'should_retry' => $should_retry,
+                'context' => $context
+            );
+        }
+
+        // Verificar erros específicos da API Viator no corpo da resposta
+        if (is_array($data)) {
+            if (isset($data['errorCode']) || isset($data['error'])) {
+                $error_message = 'Erro na operação';
+
+                if (isset($data['errorMessage'])) {
+                    $error_message = $data['errorMessage'];
+                } elseif (isset($data['error'])) {
+                    $error_message = is_string($data['error']) ? $data['error'] : $error_message;
+                }
+
+                viator_debug_log("API Business Logic Error", array(
+                    'context' => $context,
+                    'error_code' => isset($data['errorCode']) ? $data['errorCode'] : 'unknown',
+                    'error_message' => $error_message,
+                    'full_data' => $data
+                ));
+
+                return array(
+                    'error' => $error_message,
+                    'error_code' => isset($data['errorCode']) ? $data['errorCode'] : 'api_error',
+                    'should_retry' => false,
+                    'context' => $context
+                );
+            }
+        }
+
+        // Nenhum erro detectado
+        return null;
+    }
+
+    /**
+     * Executar requisição com retry automático para erros temporários
+     */
+    private function make_api_request_with_retry($url, $args, $max_retries = 3, $context = '') {
+        $attempt = 0;
+
+        while ($attempt < $max_retries) {
+            $attempt++;
+
+            viator_debug_log("API Request Attempt $attempt/$max_retries", array(
+                'url' => $url,
+                'context' => $context
+            ));
+
+            $response = wp_remote_request($url, $args);
+
+            if (is_wp_error($response)) {
+                viator_debug_log("Connection error on attempt $attempt", $response->get_error_message());
+
+                if ($attempt < $max_retries) {
+                    sleep(pow(2, $attempt)); // Exponential backoff
+                    continue;
+                }
+
+                return $response; // Return error on final attempt
+            }
+
+            $response_code = wp_remote_retrieve_response_code($response);
+            $body = wp_remote_retrieve_body($response);
+            $data = json_decode($body, true);
+
+            // Verificar se deve tentar novamente
+            $error_result = $this->handle_api_error($response_code, $data, $context);
+
+            if (!$error_result || !$error_result['should_retry']) {
+                // Sucesso ou erro não recuperável
+                return $response;
+            }
+
+            if ($attempt < $max_retries) {
+                viator_debug_log("Retrying request due to temporary error", $error_result);
+                sleep(pow(2, $attempt)); // Exponential backoff
+            }
+        }
+
+        return $response; // Return final response
+    }
+
+    /**
      * Criar objeto de pergunta de reserva baseado no ID (FALLBACK)
      * Baseado na documentação: https://partnerresources.viator.com/travel-commerce/merchant/implementing-booking-questions/
      */
@@ -1219,6 +1401,77 @@ class ViatorBookingSystem {
                 'group' => 'PER_BOOKING',
                 'required' => 'OPTIONAL',
                 'maxLength' => 1000
+            ],
+
+            // Perguntas adicionais obrigatórias conforme documentação
+            'DATE_OF_BIRTH' => [
+                'id' => 'DATE_OF_BIRTH',
+                'label' => 'Data de Nascimento',
+                'type' => 'DATE',
+                'group' => 'PER_TRAVELER',
+                'required' => 'MANDATORY',
+                'maxLength' => 100
+            ],
+            'PASSPORT_PASSPORT_NO' => [
+                'id' => 'PASSPORT_PASSPORT_NO',
+                'label' => 'Número do Passaporte',
+                'type' => 'STRING',
+                'group' => 'PER_TRAVELER',
+                'required' => 'MANDATORY',
+                'maxLength' => 50
+            ],
+            'PASSPORT_NATIONALITY' => [
+                'id' => 'PASSPORT_NATIONALITY',
+                'label' => 'Nacionalidade do Passaporte',
+                'type' => 'STRING',
+                'group' => 'PER_TRAVELER',
+                'required' => 'MANDATORY',
+                'maxLength' => 100
+            ],
+            'PASSPORT_EXPIRY' => [
+                'id' => 'PASSPORT_EXPIRY',
+                'label' => 'Data de Expiração do Passaporte',
+                'type' => 'DATE',
+                'group' => 'PER_TRAVELER',
+                'required' => 'MANDATORY',
+                'maxLength' => 100
+            ],
+            'HOTEL_PICKUP' => [
+                'id' => 'HOTEL_PICKUP',
+                'label' => 'Hotel para Busca',
+                'type' => 'LOCATION_REF_OR_FREE_TEXT',
+                'group' => 'PER_BOOKING',
+                'required' => 'CONDITIONAL',
+                'units' => ['LOCATION_REFERENCE', 'FREETEXT'],
+                'maxLength' => 255,
+                'tripadvisor_integration' => true
+            ],
+            'DIETARY_REQUIREMENTS' => [
+                'id' => 'DIETARY_REQUIREMENTS',
+                'label' => 'Restrições Alimentares',
+                'type' => 'STRING',
+                'group' => 'PER_BOOKING',
+                'required' => 'OPTIONAL',
+                'maxLength' => 500,
+                'hint' => 'Vegetariano, vegano, sem glúten, alergias, etc.'
+            ],
+            'ACCESSIBILITY_REQUIREMENTS' => [
+                'id' => 'ACCESSIBILITY_REQUIREMENTS',
+                'label' => 'Necessidades de Acessibilidade',
+                'type' => 'STRING',
+                'group' => 'PER_BOOKING',
+                'required' => 'OPTIONAL',
+                'maxLength' => 500,
+                'hint' => 'Cadeira de rodas, deficiência visual, etc.'
+            ],
+            'MEDICAL_CONDITIONS' => [
+                'id' => 'MEDICAL_CONDITIONS',
+                'label' => 'Condições Médicas',
+                'type' => 'STRING',
+                'group' => 'PER_BOOKING',
+                'required' => 'OPTIONAL',
+                'maxLength' => 500,
+                'hint' => 'Condições médicas relevantes para a atividade'
             ]
         ];
         
@@ -1260,13 +1513,23 @@ class ViatorBookingSystem {
         }
         
         viator_debug_log('🔍 [AJAX BOOKING QUESTIONS] Requisição recebida para produto: ' . $product_code);
-        
+
         $booking_questions = $this->get_product_booking_questions($product_code);
-        
+
+        // O método get_product_booking_questions retorna um array simples de perguntas
+        // Vamos estruturar a resposta no formato esperado pelo frontend
+        $result = array(
+            'product_code' => $product_code,
+            'booking_questions' => $booking_questions,
+            'logistics' => array(), // Será preenchido se necessário
+            'product_options' => array(), // Será preenchido se necessário
+            'raw_booking_questions' => array_keys($booking_questions)
+        );
+
         viator_debug_log('🔍 [AJAX BOOKING QUESTIONS] Perguntas encontradas: ' . count($booking_questions));
-        viator_debug_log('🔍 [AJAX BOOKING QUESTIONS] Dados das perguntas: ' . json_encode($booking_questions));
-        
-        wp_send_json_success(array('bookingQuestions' => $booking_questions));
+        viator_debug_log('🔍 [AJAX BOOKING QUESTIONS] Dados das perguntas: ' . json_encode($result));
+
+        wp_send_json_success($result);
     }
 
     /**
@@ -1324,15 +1587,21 @@ class ViatorBookingSystem {
         $availability_data = json_decode(stripslashes($_POST['availability_data']), true);
         $travelers_details = json_decode(stripslashes($_POST['travelers_details']), true);
         $booking_question_answers = isset($_POST['booking_question_answers']) ? json_decode(stripslashes($_POST['booking_question_answers']), true) : [];
-        
+        $booker_info = isset($_POST['booker_info']) ? json_decode(stripslashes($_POST['booker_info']), true) : [];
+
         if (empty($availability_data) || empty($travelers_details)) {
             wp_send_json_error(array('message' => 'Dados incompletos'));
         }
-        
+
         // Log das respostas das perguntas de reserva para debug
-        viator_debug_log('Booking Question Answers recebidas no hold', $booking_question_answers);
-        
-        $result = $this->request_booking_hold($availability_data, $travelers_details, $booking_question_answers);
+        viator_debug_log('Hold request data received', array(
+            'availability_data' => $availability_data,
+            'travelers_count' => count($travelers_details),
+            'booking_questions_count' => count($booking_question_answers),
+            'has_booker_info' => !empty($booker_info)
+        ));
+
+        $result = $this->request_booking_hold($availability_data, $travelers_details, $booking_question_answers, $booker_info);
         
         if (isset($result['error'])) {
             wp_send_json_error(array('message' => $result['error']));
@@ -1373,20 +1642,38 @@ class ViatorBookingSystem {
         if (!wp_verify_nonce($_POST['nonce'], 'viator_booking_nonce')) {
             wp_send_json_error(array('message' => 'Nonce inválido'));
         }
-        
+
         $payment_data = json_decode(stripslashes($_POST['payment_data']), true);
         $payment_url = sanitize_text_field($_POST['payment_url']); // Receber URL do frontend
-        
+
         if (empty($payment_data)) {
             wp_send_json_error(array('message' => 'Dados de pagamento incompletos'));
         }
-        
+
         $result = $this->submit_payment_to_viator($payment_url, $payment_data);
-        
+
         if (isset($result['error'])) {
             wp_send_json_error(array('message' => $result['error']));
         }
-        
+
+        wp_send_json_success($result);
+    }
+
+    /**
+     * AJAX - Buscar todas as booking questions disponíveis
+     */
+    public function ajax_get_all_booking_questions() {
+        // Verificar nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'viator_booking_nonce')) {
+            wp_send_json_error(array('message' => 'Nonce inválido'));
+        }
+
+        $result = $this->get_all_booking_questions();
+
+        if (isset($result['error'])) {
+            wp_send_json_error(array('message' => $result['error']));
+        }
+
         wp_send_json_success($result);
     }
     
@@ -1507,6 +1794,25 @@ class ViatorBookingSystem {
         }
 
         wp_send_json_success($result);
+    }
+
+    /**
+     * AJAX - Debug logging do JavaScript
+     */
+    public function ajax_debug_log_js() {
+        // Verificar nonce se fornecido
+        if (isset($_POST['nonce']) && !wp_verify_nonce($_POST['nonce'], 'viator_booking_nonce')) {
+            wp_send_json_error(array('message' => 'Nonce inválido'));
+        }
+
+        $message = sanitize_text_field($_POST['message'] ?? '');
+        $data = $_POST['data'] ?? '';
+
+        if (!empty($message)) {
+            viator_debug_log('[JS] ' . $message, $data ? json_decode($data, true) : null);
+        }
+
+        wp_send_json_success();
     }
 
     /**
@@ -1634,6 +1940,125 @@ class ViatorBookingSystem {
                 'Confirme se está usando a API key correta para o ambiente'
             ]
         ];
+    }
+
+    /**
+     * Buscar todas as booking questions disponíveis na API da Viator
+     */
+    private function get_all_booking_questions() {
+        viator_debug_log('Buscando todas as booking questions da Viator');
+
+        // Cache das booking questions por 1 hora
+        $cache_key = 'viator_all_booking_questions';
+        $cached_data = get_transient($cache_key);
+
+        if ($cached_data !== false) {
+            viator_debug_log('Usando booking questions do cache');
+            return $cached_data;
+        }
+
+        $response = $this->make_api_request_with_retry(
+            $this->base_url . '/products/booking-questions',
+            array(
+                'method' => 'GET',
+                'headers' => array(
+                    'Accept' => 'application/json;version=2.0',
+                    'exp-api-key' => $this->api_key,
+                    'Accept-Language' => 'pt-BR'
+                ),
+                'timeout' => 30
+            ),
+            3,
+            'get_all_booking_questions'
+        );
+
+        if (is_wp_error($response)) {
+            viator_debug_log('Erro ao buscar booking questions:', $response->get_error_message());
+            return array('error' => 'Erro ao buscar booking questions: ' . $response->get_error_message());
+        }
+
+        $response_code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+
+        if ($response_code !== 200) {
+            viator_debug_log('Erro na API de booking questions', array(
+                'status_code' => $response_code,
+                'response' => $body
+            ));
+            return array('error' => 'Erro na API: ' . ($data['message'] ?? 'Erro desconhecido'));
+        }
+
+        // Organizar questions por ID para fácil acesso
+        $questions_by_id = array();
+        if (isset($data['bookingQuestions']) && is_array($data['bookingQuestions'])) {
+            foreach ($data['bookingQuestions'] as $question) {
+                $questions_by_id[$question['id']] = $question;
+            }
+        }
+
+        $result = array(
+            'questions' => $questions_by_id,
+            'raw_data' => $data
+        );
+
+        // Cache por 1 hora
+        set_transient($cache_key, $result, HOUR_IN_SECONDS);
+
+        viator_debug_log('Booking questions carregadas com sucesso', array(
+            'total_questions' => count($questions_by_id)
+        ));
+
+        return $result;
+    }
+
+    /**
+     * Processar booking questions para o formato da API da Viator
+     */
+    private function process_booking_questions_for_hold($booking_question_answers, $booker_info = []) {
+        $processed_questions = array();
+
+        viator_debug_log('Processing booking questions for hold', array(
+            'answers_count' => count($booking_question_answers),
+            'has_booker_info' => !empty($booker_info)
+        ));
+
+        foreach ($booking_question_answers as $answer) {
+            $question_id = $answer['questionId'] ?? '';
+            $answer_value = $answer['answer'] ?? '';
+            $scope = $answer['scope'] ?? 'booking';
+            $traveler_index = $answer['travelerIndex'] ?? null;
+
+            if (empty($question_id) || empty($answer_value)) {
+                continue;
+            }
+
+            // Formato da API da Viator para booking questions
+            $processed_answer = array(
+                'question' => $question_id,  // API da Viator usa 'question', não 'questionId'
+                'answer' => $answer_value
+            );
+
+            // Adicionar travelerNum se for pergunta PER_TRAVELER (formato API Viator)
+            if ($scope === 'traveler' && $traveler_index !== null) {
+                $processed_answer['travelerNum'] = intval($traveler_index);
+            }
+
+            // Adicionar unit se fornecida
+            if (isset($answer['unit']) && !empty($answer['unit'])) {
+                $processed_answer['unit'] = $answer['unit'];
+            }
+
+            $processed_questions[] = $processed_answer;
+        }
+
+        viator_debug_log('Processed booking questions', array(
+            'original_count' => count($booking_question_answers),
+            'processed_count' => count($processed_questions),
+            'processed_questions' => $processed_questions
+        ));
+
+        return $processed_questions;
     }
 }
 

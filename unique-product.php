@@ -27,7 +27,7 @@ function viator_modify_page_title($title, $sep = '|') {
         // Se tiver um código de produto, busca o título do produto
         if (!empty($product_code)) {
             // Tenta obter o título do produto do cache
-            $cached_title = get_transient('viator_product_' . $product_code . '_title');
+            $cached_title = get_transient("viator_product_{$product_code}_title");
             
             if ($cached_title) {
                 // Retorna o título do produto + separador + nome do site
@@ -56,7 +56,7 @@ function viator_modify_page_title($title, $sep = '|') {
                         
                         if (!empty($product) && isset($product['title'])) {
                             // Armazena o título no cache para futuras requisições
-                            set_transient('viator_product_' . $product_code . '_title', $product['title'], DAY_IN_SECONDS);
+                            set_transient("viator_product_{$product_code}_title", $product['title'], defined('DAY_IN_SECONDS') ? DAY_IN_SECONDS : 86400);
                             return esc_html($product['title']) . ' ' . $sep . ' ' . get_bloginfo('name');
                         }
                     }
@@ -84,9 +84,9 @@ add_filter('document_title_parts', function($title_parts) {
  */
 function viator_product_detail_shortcode($atts) {
     // Extract attributes
-    $atts = shortcode_atts(array(
+    $atts = shortcode_atts([
         'product_code' => '', // Default empty
-    ), $atts, 'viator_product');
+    ], $atts, 'viator_product');
     
     // If no product code is provided in the shortcode, check URL parameter
     if (empty($atts['product_code'])) {
@@ -716,7 +716,7 @@ function viator_get_product_details($product_code) {
     
     // Armazena o título do produto em cache para uso na função de título da página
     if (isset($product['title'])) {
-        set_transient('viator_product_' . $product_code . '_title', $product['title'], DAY_IN_SECONDS);
+        set_transient("viator_product_{$product_code}_title", $product['title'], defined('DAY_IN_SECONDS') ? DAY_IN_SECONDS : 86400);
     }
     $description = isset($product['description']) ? esc_html($product['description']) : 'Descrição não disponível';
     $rating = isset($product['reviews']['combinedAverageRating']) ? number_format($product['reviews']['combinedAverageRating'], 1) : 0;
@@ -908,7 +908,7 @@ function viator_get_product_details($product_code) {
             $duration = viator_format_duration($duration_fixed, $duration_from, $duration_to, $unstructured_duration);
             
                          // Armazena a duração formatada em cache para uso futuro
-             set_transient($formatted_duration_cache_key, $duration, 7 * DAY_IN_SECONDS);
+             set_transient($formatted_duration_cache_key, $duration, 7 * (defined('DAY_IN_SECONDS') ? DAY_IN_SECONDS : 86400));
                   } else {
              // Debug: vamos logar as estruturas de dados que estão vindo da API
              viator_debug_log('Estruturas de duração não encontradas para produto ' . $product_code, [
@@ -947,7 +947,7 @@ function viator_get_product_details($product_code) {
                 }
                 
                 // Armazena a duração formatada em cache
-                set_transient($formatted_duration_cache_key, $duration, 7 * DAY_IN_SECONDS);
+                set_transient($formatted_duration_cache_key, $duration, 7 * (defined('DAY_IN_SECONDS') ? DAY_IN_SECONDS : 86400));
             }
         } else {
             // Se não encontrar no cache, tenta obter dos dados armazenados em options
@@ -958,7 +958,7 @@ function viator_get_product_details($product_code) {
                 $duration = $stored_data['duration'];
                 
                 // Armazena em cache para uso futuro
-                set_transient($formatted_duration_cache_key, $duration, 7 * DAY_IN_SECONDS);
+                set_transient($formatted_duration_cache_key, $duration, 7 * (defined('DAY_IN_SECONDS') ? DAY_IN_SECONDS : 86400));
             } elseif ($stored_data && isset($stored_data['duration_data'])) {
                 // Se tiver os dados brutos de duração, formata usando a mesma lógica dos cards
                 $duration_data = $stored_data['duration_data'];
@@ -1047,7 +1047,7 @@ function viator_get_product_details($product_code) {
                 }
                 
                 // Armazena em cache para uso futuro
-                set_transient($formatted_duration_cache_key, $duration, 7 * DAY_IN_SECONDS);
+                set_transient($formatted_duration_cache_key, $duration, 7 * (defined('DAY_IN_SECONDS') ? DAY_IN_SECONDS : 86400));
             }
         }
     }
@@ -1060,7 +1060,7 @@ function viator_get_product_details($product_code) {
                 // Get the highest quality image available
                 // Sort variants by size to ensure we get the highest resolution
                 $variants = $image['variants'];
-                usort($variants, function($a, $b) {
+                usort($variants, function($a, $b) use ($image) {
                     // If width or height is available, sort by area (width * height)
                     if (isset($a['width']) && isset($a['height']) && isset($b['width']) && isset($b['height'])) {
                         return ($b['width'] * $b['height']) - ($a['width'] * $a['height']);
@@ -2117,15 +2117,15 @@ function viator_get_product_details($product_code) {
                         $rec_formatted_duration = isset($rec_product_info['duration']) ? $rec_product_info['duration'] : 'Duração não disponível';
                         
                         // Armazenar a duração formatada em cache para uso futuro
-                        $formatted_duration_cache_key = 'viator_product_' . $rec_product_code . '_formatted_duration';
-                        set_transient($formatted_duration_cache_key, $rec_formatted_duration, 7 * DAY_IN_SECONDS);
+                        $formatted_duration_cache_key = "viator_product_{$rec_product_code}_formatted_duration";
+                        set_transient($formatted_duration_cache_key, $rec_formatted_duration, 7 * (defined('DAY_IN_SECONDS') ? DAY_IN_SECONDS : 86400));
                         
                         // Usar as flags que já foram processadas na função get_product_recommendations
-                        $flags = isset($rec_product_info['flags']) ? $rec_product_info['flags'] : [];
+                        $flags = $rec_product_info['flags'] ?? [];
                         
                         // Se não encontrou flags nos dados da recomendação, verificar nos dados de preço armazenados
                         if (empty($flags)) {
-                            $stored_price_data = get_option('viator_product_' . $rec_product_code . '_price');
+                            $stored_price_data = get_option("viator_product_{$rec_product_code}_price");
                             if ($stored_price_data && isset($stored_price_data['flags']) && is_array($stored_price_data['flags'])) {
                                 $flags = $stored_price_data['flags'];
                             }
@@ -2136,9 +2136,9 @@ function viator_get_product_details($product_code) {
                             $flags = $product['flags'];
                             
                             // Atualizar os dados armazenados com as flags
-                            $stored_price_data = get_option('viator_product_' . $rec_product_code . '_price', []);
+                            $stored_price_data = get_option("viator_product_{$rec_product_code}_price", []);
                             $stored_price_data['flags'] = $flags;
-                            update_option('viator_product_' . $rec_product_code . '_price', $stored_price_data);
+                            update_option("viator_product_{$rec_product_code}_price", $stored_price_data);
                         }
                         
                         $recommended_items[] = [
@@ -2148,8 +2148,8 @@ function viator_get_product_details($product_code) {
                             'price' => $price,
                             'original_price' => $original_price,
                             'is_special_offer' => ($original_price !== null && $original_price > $price),
-                            'rating' => isset($product['reviews']['combinedAverageRating']) ? $product['reviews']['combinedAverageRating'] : 0,
-                            'reviews' => isset($product['reviews']['totalReviews']) ? $product['reviews']['totalReviews'] : 0,
+                            'rating' => $product['reviews']['combinedAverageRating'] ?? 0,
+                            'reviews' => $product['reviews']['totalReviews'] ?? 0,
                             'duration' => $duration,
                             'formatted_duration' => $rec_formatted_duration,
                             'flags' => $flags // Adicionar as flags aos dados do item
@@ -2319,7 +2319,7 @@ function viator_enqueue_product_scripts() {
         wp_enqueue_script(
             'viator-booking-js',
             plugin_dir_url(__FILE__) . 'viator-booking.js',
-            array('jquery', 'viator-payment-lib'),
+            ['jquery', 'viator-payment-lib'],
             '1.0.1',
             true
         );
@@ -2327,22 +2327,22 @@ function viator_enqueue_product_scripts() {
         wp_enqueue_style(
             'viator-booking-css',
             plugin_dir_url(__FILE__) . 'viator-booking.css',
-            array(),
+            [],
             '1.0.1'
         );
 
         wp_enqueue_style(
             'viator-location-picker-css',
-            plugin_dir_url(__FILE__) . 'assets/css/viator-location-picker.css',
-            array(),
+            plugin_dir_url(__FILE__) . 'viator-location-picker.css',
+            [],
             '1.0.0'
         );
 
-        wp_localize_script('viator-booking-js', 'viatorBookingAjax', array(
+        wp_localize_script('viator-booking-js', 'viatorBookingAjax', [
             'ajaxurl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('viator_booking_nonce'),
             'environment' => 'sandbox' // Change to 'production' when ready
-        ));
+        ]);
         error_log('🔍 [BOOKING QUESTIONS DEBUG] Scripts enqueued successfully');
     }
     wp_enqueue_script('timezone-formatter', plugin_dir_url(__FILE__) . 'timezone-formatter.js', array('jquery'), '1.0.0', true);
@@ -3631,7 +3631,7 @@ function viator_get_bulk_locations($location_references) {
     }
     
     // Cache for 30 days as recommended in documentation
-    set_transient($cache_key, $processed_locations, 30 * DAY_IN_SECONDS);
+    set_transient($cache_key, $processed_locations, 30 * (defined('DAY_IN_SECONDS') ? DAY_IN_SECONDS : 86400));
     
     return $processed_locations;
 }
@@ -3790,7 +3790,7 @@ function viator_get_google_place_details($place_id) {
     }
     
     // Cache por 7 dias
-    set_transient($cache_key, $place_details, 7 * DAY_IN_SECONDS);
+    set_transient($cache_key, $place_details, 7 * (defined('DAY_IN_SECONDS') ? DAY_IN_SECONDS : 86400));
     
     return $place_details;
 }

@@ -4,7 +4,7 @@ if (!defined('ABSPATH')) {
     exit; // Security check
 }
 
-define('CUSTOM_DEBUG_LOG', false); // True para habilitar e false para desabilitar o log customizado
+define('CUSTOM_DEBUG_LOG', true); // True para habilitar e false para desabilitar o log customizado
 
 // Log de inicialização para confirmar que o debug está funcionando
 viator_debug_log('🚀 Sistema de debug inicializado - ' . date('Y-m-d H:i:s'));

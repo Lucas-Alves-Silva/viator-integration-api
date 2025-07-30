@@ -4877,3 +4877,295 @@ body.viator-modal-open {
     font-style: italic;
     color: #555;
 }
+
+
+
+/* ===== BOOKING QUESTIONS STYLES ===== */
+
+/* Step de Booking Questions */
+.booking-questions-step {
+    padding: 20px;
+}
+
+.booking-questions-step .step-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.booking-questions-step .step-header h3 {
+    color: #2c3e50;
+    margin-bottom: 10px;
+    font-size: 1.5rem;
+}
+
+.booking-questions-step .step-header p {
+    color: #7f8c8d;
+    font-size: 1rem;
+    margin: 0;
+}
+
+/* Loading Container */
+.loading-container {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #3498db;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 20px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Booking Questions Container */
+.booking-questions-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+/* Per Booking Questions */
+.per-booking-questions {
+    margin-bottom: 30px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #3498db;
+}
+
+.per-booking-questions h4 {
+    color: #2c3e50;
+    margin-bottom: 20px;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.per-booking-questions h4:before {
+    content: "📋";
+    font-size: 1.1rem;
+}
+
+/* Per Traveler Questions */
+.per-traveler-questions {
+    margin-bottom: 20px;
+}
+
+.per-traveler-questions h4 {
+    color: #2c3e50;
+    margin-bottom: 25px;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.per-traveler-questions h4:before {
+    content: "👥";
+    font-size: 1.1rem;
+}
+
+/* Traveler Questions Group */
+.traveler-questions-group {
+    margin-bottom: 25px;
+    padding: 20px;
+    background: #ffffff;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.traveler-questions-group h5 {
+    color: #495057;
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e9ecef;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.traveler-questions-group h5:before {
+    content: "👤";
+    font-size: 1rem;
+}
+
+/* Question Group */
+.question-group {
+    margin-bottom: 20px;
+}
+
+.question-label {
+    display: block;
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+}
+
+/* Question Input */
+.question-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e9ecef;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    background-color: #ffffff;
+}
+
+.question-input:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.question-input.is-valid {
+    border-color: #27ae60;
+    background-color: #f8fff9;
+}
+
+.question-input.is-invalid {
+    border-color: #e74c3c;
+    background-color: #fff8f8;
+}
+
+/* Question Error */
+.question-error {
+    color: #e74c3c;
+    font-size: 0.85rem;
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.question-error:before {
+    content: "⚠️";
+    font-size: 0.8rem;
+}
+
+/* No Questions Message */
+.no-questions-message {
+    text-align: center;
+    padding: 40px 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 2px dashed #dee2e6;
+}
+
+.no-questions-message p {
+    margin: 10px 0;
+    color: #6c757d;
+}
+
+.no-questions-message p:first-child {
+    font-size: 1.1rem;
+    color: #28a745;
+    font-weight: 600;
+}
+
+/* Estilos específicos para campos compostos */
+.weight-input-group,
+.number-unit-input-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.weight-input-group .weight-value,
+.number-unit-input-group .number-value {
+    flex: 2;
+}
+
+.weight-input-group .weight-unit,
+.number-unit-input-group .number-unit {
+    flex: 1;
+    min-width: 80px;
+}
+
+/* Question hints */
+.question-hint {
+    font-size: 0.85rem;
+    color: #6c757d;
+    margin-top: 4px;
+    margin-bottom: 8px;
+    font-style: italic;
+}
+
+/* Separação entre grupos de perguntas */
+.per-booking-questions,
+.per-traveler-questions {
+    margin-bottom: 30px;
+}
+
+.per-booking-questions h4,
+.per-traveler-questions h4 {
+    color: #00715D;
+    font-size: 1.2rem;
+    margin-bottom: 20px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.traveler-questions-group {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #00715D;
+}
+
+.traveler-questions-group h5 {
+    color: #00715D;
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+/* Melhorar espaçamento dos campos de pergunta */
+.question-group {
+    margin-bottom: 20px;
+}
+
+.question-label {
+    display: block;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 6px;
+    font-size: 0.95rem;
+}
+
+/* Indicador de campo obrigatório */
+.question-label:has(+ .form-control[required])::after,
+.question-label:contains('*')::after {
+    content: ' *';
+    color: #dc3545;
+    font-weight: bold;
+}
+
+/* Responsividade para campos compostos */
+@media (max-width: 768px) {
+    .weight-input-group,
+    .number-unit-input-group {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .weight-input-group .weight-value,
+    .weight-input-group .weight-unit,
+    .number-unit-input-group .number-value,
+    .number-unit-input-group .number-unit {
+        flex: 1;
+        width: 100%;
+    }
+}

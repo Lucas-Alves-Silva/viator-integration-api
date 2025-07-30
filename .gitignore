@@ -4,3 +4,9 @@
 *.log
 # Ignora arquivos .txt
 *.txt
+# Ignora o diretório Vercel
+.trae/
+# Ignora o diretório Vercel
+.cursor/
+# Ignora o diretório Vercel
+.vscode/
