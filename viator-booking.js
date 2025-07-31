@@ -8941,8 +8941,7 @@ this.renderLocationOptions();
 
             /* Error State */
             .error-hero {
-                background: linear-gradient(135deg, var(--destructive), #c32a38);
-                color: var(--destructive-foreground);
+                color: var(--destructive);
                 padding: 2.5rem 1.5rem;
                 text-align: center;
             }
@@ -8962,9 +8961,8 @@ this.renderLocationOptions();
             }
 
             .error-cross {
-                width: 52px;
-                height: 52px;
-                animation: shake 0.5s ease-in-out;
+                background: var(--destructive);
+                border-radius: 50%;
             }
 
             .error-circle-bg {
@@ -9029,19 +9027,30 @@ this.renderLocationOptions();
 
             .actions-grid {
                 padding: 1.5rem;
-                display: flex;
-                flex-direction: column;
+                display: grid;
+                grid-template-columns: 1fr;
                 gap: 1.5rem;
+                max-width: 600px;
+                margin: 0 auto;
+                width: 100%;
             }
 
             .action-item {
                 display: flex;
-                align-items: flex-start;
+                align-items: center;
                 gap: 1rem;
-                padding: 1rem;
+                padding: 1.5rem;
                 background: var(--background);
                 border: 1px solid var(--border);
                 border-radius: var(--radius-md, 1rem);
+                transition: all 0.2s ease;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            }
+
+            .action-item:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                border-color: var(--primary);
             }
 
             .action-icon {
@@ -9058,23 +9067,29 @@ this.renderLocationOptions();
 
             .action-content {
                 flex: 1;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
             }
 
             .action-content h4 {
                 margin: 0 0 0.5rem 0;
-                font-size: 1rem;
+                font-size: 1.1rem;
                 font-weight: 600;
                 color: var(--foreground);
                 background: none;
                 padding: 0;
                 border: none;
+                line-height: 1.3;
             }
 
             .action-content p {
                 margin: 0 0 1rem 0;
-                font-size: 0.9rem;
+                font-size: 0.95rem;
                 color: var(--muted-foreground);
                 line-height: 1.5;
+                flex-grow: 1;
             }
 
             .action-btn {
@@ -9178,7 +9193,19 @@ this.renderLocationOptions();
                 animation: fadeIn 0.5s ease-in;
             }
 
-            /* Responsividade */
+            /* Responsividade para tablets */
+            @media (max-width: 1024px) and (min-width: 769px) {
+                .actions-grid {
+                    max-width: 500px;
+                    padding: 1.25rem;
+                }
+
+                .action-item {
+                    padding: 1.25rem;
+                }
+            }
+
+            /* Responsividade para mobile */
             @media (max-width: 768px) {
                 .success-hero, .error-hero {
                     padding: 40px 20px;
@@ -9194,7 +9221,30 @@ this.renderLocationOptions();
 
                 .steps-grid, .actions-grid {
                     grid-template-columns: 1fr;
-                    padding: 20px;
+                    padding: 1rem;
+                    max-width: 100%;
+                    margin: 0;
+                }
+
+                .action-item {
+                    flex-direction: column;
+                    text-align: center;
+                    padding: 1.25rem;
+                    gap: 0.75rem;
+                }
+
+                .action-icon {
+                    margin-bottom: 0.5rem;
+                }
+
+                .action-content {
+                    width: 100%;
+                }
+
+                .action-btn {
+                    width: 100%;
+                    padding: 1rem 1.5rem;
+                    font-size: 1rem;
                 }
 
                 .card-body {
