@@ -181,11 +181,25 @@ class ViatorBookingSystem {
         
         // Processar booking questions se fornecidas
         if (!empty($booking_question_answers)) {
+            // Validar perguntas de reserva (MANDATORY + CONDITIONAL) antes de processar
+            $validation_result = $this->validate_conditional_booking_questions($booking_question_answers, $product_code);
+            if (!$validation_result['valid']) {
+                viator_debug_log('Hold - Booking Questions Validation Failed:', $validation_result['errors']);
+                return array('error' => 'Validação de perguntas de reserva falhou: ' . implode(', ', $validation_result['errors']));
+            }
+            
             $processed_questions = $this->process_booking_questions_for_hold($booking_question_answers, $booker_info);
             if (!empty($processed_questions)) {
                 // Adicionar booking questions ao primeiro item
                 $request_data['items'][0]['bookingQuestionAnswers'] = $processed_questions;
                 viator_debug_log('Hold - Booking Questions Added:', $processed_questions);
+            }
+        } else {
+            // Verificar se há perguntas obrigatórias que não foram fornecidas
+            $required_questions = $this->get_required_booking_questions($product_code);
+            if (!empty($required_questions)) {
+                viator_debug_log('Hold - Missing Required Questions:', $required_questions);
+                return array('error' => 'Perguntas obrigatórias não respondidas: ' . implode(', ', array_column($required_questions, 'title')));
             }
         }
 
@@ -2059,6 +2073,221 @@ class ViatorBookingSystem {
         ));
 
         return $processed_questions;
+    }
+
+    /**
+     * Validar booking questions (MANDATORY e CONDITIONAL) conforme documentação da Viator
+     * Baseado em: https://docs.viator.com/partner-api/technical/
+     * https://partnerresources.viator.com/travel-commerce/merchant/implementing-booking-questions/
+     */
+    private function validate_conditional_booking_questions($booking_question_answers, $product_code = '') {
+        $validation_errors = [];
+        $answers_by_question = [];
+        
+        // Organizar respostas por questionId para facilitar validação
+        foreach ($booking_question_answers as $answer) {
+            $question_id = $answer['questionId'] ?? '';
+            if (!empty($question_id)) {
+                $answers_by_question[$question_id] = $answer;
+            }
+        }
+
+        viator_debug_log('Validating booking questions (MANDATORY + CONDITIONAL)', array(
+            'product_code' => $product_code,
+            'total_answers' => count($answers_by_question),
+            'questions' => array_keys($answers_by_question)
+        ));
+        
+        // 1. Validar perguntas MANDATORY se product_code fornecido
+        if (!empty($product_code)) {
+            $required_questions = $this->get_required_booking_questions($product_code);
+            foreach ($required_questions as $required_question) {
+                $question_id = $required_question['id'];
+                if (!isset($answers_by_question[$question_id]) || 
+                    empty($answers_by_question[$question_id]['answer'])) {
+                    $validation_errors[] = array(
+                        'field' => $question_id,
+                        'message' => sprintf('Pergunta obrigatória não respondida: %s', $required_question['label'] ?? $question_id),
+                        'code' => 'MANDATORY_REQUIRED'
+                    );
+                }
+            }
+        }
+
+        // Validação específica para PICKUP_POINT conforme documentação Viator
+        if (isset($answers_by_question['TRANSFER_ARRIVAL_MODE'])) {
+            $arrival_mode = $answers_by_question['TRANSFER_ARRIVAL_MODE']['answer'] ?? '';
+            
+            // Se TRANSFER_ARRIVAL_MODE é "OTHER", PICKUP_POINT torna-se obrigatório
+            if ($arrival_mode === 'OTHER') {
+                if (!isset($answers_by_question['PICKUP_POINT']) || 
+                    empty($answers_by_question['PICKUP_POINT']['answer'])) {
+                    $validation_errors[] = array(
+                        'field' => 'PICKUP_POINT',
+                        'message' => 'Ponto de encontro é obrigatório quando o modo de chegada é "Outro"',
+                        'code' => 'CONDITIONAL_REQUIRED'
+                    );
+                }
+            }
+        }
+
+        // Validação para TRANSFER_DEPARTURE_MODE e suas dependências
+        if (isset($answers_by_question['TRANSFER_DEPARTURE_MODE'])) {
+            $departure_mode = $answers_by_question['TRANSFER_DEPARTURE_MODE']['answer'] ?? '';
+            
+            // Validações condicionais baseadas no modo de partida
+            $conditional_questions = [
+                'FLIGHT' => ['TRANSFER_AIR_DEPARTURE_AIRLINE', 'TRANSFER_AIR_DEPARTURE_FLIGHT_NO'],
+                'CRUISE' => ['TRANSFER_CRUISE_DEPARTURE_SHIP_NAME'],
+                'TRAIN' => ['TRANSFER_RAIL_DEPARTURE_STATION'],
+                'OTHER' => ['TRANSFER_DEPARTURE_PICKUP']
+            ];
+
+            if (isset($conditional_questions[$departure_mode])) {
+                foreach ($conditional_questions[$departure_mode] as $required_question) {
+                    if (!isset($answers_by_question[$required_question]) || 
+                        empty($answers_by_question[$required_question]['answer'])) {
+                        $validation_errors[] = array(
+                            'field' => $required_question,
+                            'message' => sprintf('Campo obrigatório para modo de partida: %s', $departure_mode),
+                            'code' => 'CONDITIONAL_REQUIRED'
+                        );
+                    }
+                }
+            }
+        }
+
+        // Validação para TRANSFER_ARRIVAL_MODE e suas dependências
+        if (isset($answers_by_question['TRANSFER_ARRIVAL_MODE'])) {
+            $arrival_mode = $answers_by_question['TRANSFER_ARRIVAL_MODE']['answer'] ?? '';
+            
+            $conditional_questions = [
+                'FLIGHT' => ['TRANSFER_AIR_ARRIVAL_AIRLINE', 'TRANSFER_AIR_ARRIVAL_FLIGHT_NO'],
+                'CRUISE' => ['TRANSFER_CRUISE_ARRIVAL_SHIP_NAME'],
+                'TRAIN' => ['TRANSFER_RAIL_ARRIVAL_STATION'],
+                'OTHER' => ['TRANSFER_ARRIVAL_DROP_OFF']
+            ];
+
+            if (isset($conditional_questions[$arrival_mode])) {
+                foreach ($conditional_questions[$arrival_mode] as $required_question) {
+                    if (!isset($answers_by_question[$required_question]) || 
+                        empty($answers_by_question[$required_question]['answer'])) {
+                        $validation_errors[] = array(
+                            'field' => $required_question,
+                            'message' => sprintf('Campo obrigatório para modo de chegada: %s', $arrival_mode),
+                            'code' => 'CONDITIONAL_REQUIRED'
+                        );
+                    }
+                }
+            }
+        }
+
+        // Log dos resultados da validação
+        if (!empty($validation_errors)) {
+            viator_debug_log('Conditional booking questions validation failed', array(
+                'errors' => $validation_errors,
+                'answers_provided' => array_keys($answers_by_question)
+            ));
+        } else {
+            viator_debug_log('Conditional booking questions validation passed');
+        }
+
+        // Retornar resultado estruturado conforme esperado pelo código
+        return array(
+            'valid' => empty($validation_errors),
+            'errors' => array_map(function($error) {
+                return $error['message'];
+            }, $validation_errors)
+        );
+    }
+
+    /**
+     * Detectar automaticamente pickup availability conforme documentação Viator
+     */
+    private function detect_pickup_availability($product_data) {
+        $pickup_info = array(
+            'available' => false,
+            'type' => 'MEET_EVERYONE_AT_START_POINT',
+            'custom_pickup_allowed' => false
+        );
+
+        // Verificar logistics.travelerPickup.pickupOptionType
+        if (isset($product_data['logistics']['travelerPickup']['pickupOptionType'])) {
+            $pickup_type = $product_data['logistics']['travelerPickup']['pickupOptionType'];
+            
+            if ($pickup_type === 'PICKUP_EVERYONE' || $pickup_type === 'PICKUP_AND_MEET_AT_START_POINT') {
+                $pickup_info['available'] = true;
+                $pickup_info['type'] = $pickup_type;
+            }
+        }
+
+        // Verificar allowCustomTravelerPickup
+        if (isset($product_data['logistics']['travelerPickup']['allowCustomTravelerPickup'])) {
+            $pickup_info['custom_pickup_allowed'] = $product_data['logistics']['travelerPickup']['allowCustomTravelerPickup'];
+        }
+
+        // Verificar productOptions para "Pickup included"
+        if (isset($product_data['productOptions']) && is_array($product_data['productOptions'])) {
+            foreach ($product_data['productOptions'] as $option) {
+                if (isset($option['description']) && 
+                    stripos($option['description'], 'pickup included') !== false) {
+                    $pickup_info['available'] = true;
+                    break;
+                }
+            }
+        }
+
+        viator_debug_log('Pickup availability detected', $pickup_info);
+        
+        return $pickup_info;
+    }
+    
+    /**
+     * Busca perguntas obrigatórias para um produto específico
+     */
+    private function get_required_booking_questions($product_code) {
+        if (empty($product_code)) {
+            return array();
+        }
+        
+        // Buscar todas as perguntas de reserva
+        $all_questions_data = $this->get_all_booking_questions();
+        if (empty($all_questions_data) || isset($all_questions_data['error'])) {
+            viator_debug_log('Erro ao buscar perguntas obrigatórias: ', $all_questions_data);
+            return array();
+        }
+        
+        // Usar a estrutura correta dos dados retornados
+        $all_questions = $all_questions_data['questions'] ?? array();
+        if (empty($all_questions)) {
+            viator_debug_log('Nenhuma pergunta encontrada na resposta da API');
+            return array();
+        }
+        
+        $required_questions = array();
+        
+        foreach ($all_questions as $question) {
+            // Verificar se a pergunta é obrigatória (MANDATORY)
+            if (!isset($question['required']) || $question['required'] !== 'MANDATORY') {
+                continue;
+            }
+            
+            // Verificar se a pergunta se aplica a este produto
+            if (isset($question['applicableProducts']) && 
+                !empty($question['applicableProducts']) && 
+                !in_array($product_code, $question['applicableProducts'])) {
+                continue;
+            }
+            
+            $required_questions[] = $question;
+        }
+        
+        viator_debug_log("Required questions for product {$product_code}:", array(
+            'total_questions_available' => count($all_questions),
+            'required_questions_found' => count($required_questions),
+            'required_questions' => $required_questions
+        ));
+        return $required_questions;
     }
 }
 

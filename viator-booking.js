@@ -183,12 +183,16 @@ const ViatorConditionalQuestions = {
     }
 };
 
+// Instância global do booking manager
+window.viatorBookingManager = null;
+
 document.addEventListener('DOMContentLoaded', function() {
     // Inicializar o sistema de perguntas condicionais
     ViatorConditionalQuestions.initialize();
     
-    const bookingSystem = new ViatorBookingManager();
-    bookingSystem.init();
+    // Criar instância global
+    window.viatorBookingManager = new ViatorBookingManager();
+    window.viatorBookingManager.init();
 });
 
 class CustomCalendar {
@@ -1332,16 +1336,18 @@ class ViatorBookingManager {
                 <div class="booker-info-section payment-form">
                     <h4>Dados do Cartão de Crédito</h4>
 
-                    <div class="security-notice" style="background: #e8f5e8; border: 1px solid #c3e6c3; border-radius: 8px; padding: 15px; margin-bottom: 20px; text-align: center;">
                         <div class="security-badge" style="color: #155724; font-weight: 600;">
                             🔒 Suas informações são criptografadas e processadas com segurança
                         </div>
-                    </div>
                     
                     <div class="form-group">
                         <label for="card-number">Número do Cartão *:</label>
-                        <input type="text" id="card-number" class="form-control" placeholder="1234 5678 9012 3456" maxlength="19" required>
+                        <div class="card-input-container" style="position: relative;">
+                            <input type="text" id="card-number" class="form-control" placeholder="1234 5678 9012 3456" maxlength="23" required autocomplete="cc-number">
+                            <div id="card-type-indicator" class="card-type-indicator" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 24px; display: none;"></div>
+                        </div>
                         <small class="form-text">Digite apenas os números do cartão</small>
+                        <div id="card-number-error" class="field-error" style="display: none;"></div>
                     </div>
 
                     <div class="form-row">
@@ -3058,30 +3064,45 @@ this.renderLocationOptions();
     renderPickupPointSelect(fieldId, requiredAttr, question = null) {
         const logistics = this.productBookingQuestions?.logistics || {};
         const pickupPoints = logistics.pickupPoints || [];
+        const allowCustomPickup = question?.units?.includes('FREETEXT') || false;
 
-        let selectHTML = `<select id="${fieldId}" name="${fieldId}" class="form-control question-input" ${requiredAttr}>`;
+        let selectHTML = `<select id="${fieldId}" name="${fieldId}" class="form-control question-input pickup-point-select" ${requiredAttr}>`;
         selectHTML += '<option value="">Selecione o ponto de encontro</option>';
+
+        // Adicionar opção padrão MEET_AT_DEPARTURE_POINT
+        selectHTML += '<option value="MEET_AT_DEPARTURE_POINT">Encontrar no ponto de partida</option>';
 
         if (pickupPoints.length > 0) {
             pickupPoints.forEach(point => {
                 selectHTML += `<option value="${point.id}">${point.name}</option>`;
             });
         } else {
-            selectHTML += '<option value="hotel">Busca no hotel</option>';
-            selectHTML += '<option value="meeting_point">Ponto de encontro padrão</option>';
+            // Opções padrão quando não há pickup points específicos
+            selectHTML += '<option value="HOTEL_PICKUP">Busca no hotel</option>';
+            selectHTML += '<option value="CENTRAL_MEETING_POINT">Ponto de encontro central</option>';
         }
 
         selectHTML += '</select>';
 
         // Adicionar campo de texto livre se suportado
-        if (question && question.units && question.units.includes('FREETEXT')) {
-            selectHTML += `<div style="margin-top: 10px;">
+        if (allowCustomPickup) {
+            selectHTML += `<div class="pickup-freetext-container" style="margin-top: 10px; display: none;">
+                <label for="${fieldId}_freetext" class="form-label">Endereço específico:</label>
                 <input type="text" id="${fieldId}_freetext" name="${fieldId}_freetext"
                        class="form-control question-input"
-                       placeholder="Ou digite um endereço específico"
-                       maxlength="${question.maxLength || 1000}">
+                       placeholder="Digite o endereço completo para coleta"
+                       maxlength="${question?.maxLength || 1000}">
+                <small class="form-text text-muted">Deixe em branco para usar a opção selecionada acima</small>
             </div>`;
         }
+        
+        // Adicionar indicador visual de campo condicional
+        selectHTML += `<div class="pickup-point-info" style="margin-top: 5px;">
+            <small class="text-info">
+                <i class="fas fa-info-circle"></i> 
+                Este campo é obrigatório quando o modo de chegada é "Outro"
+            </small>
+        </div>`;
 
         return selectHTML;
     }
@@ -3196,6 +3217,16 @@ this.renderLocationOptions();
                 if (input.id.includes('DATE_OF_BIRTH')) {
                     this.updateAgeBandFromBirthDate(input);
                 }
+                
+                // Detectar mudanças no modo de chegada para PICKUP_POINT
+                if (input.id.includes('TRANSFER_ARRIVAL_MODE')) {
+                    this.handleArrivalModeChange(input);
+                }
+                
+                // Detectar mudanças no PICKUP_POINT para mostrar/ocultar texto livre
+                if (input.id.includes('PICKUP_POINT') && !input.id.includes('_freetext')) {
+                    this.handlePickupPointChange(input);
+                }
 
                 // Sincronização de unidades para campos WEIGHT e HEIGHT
                 if (input.classList.contains('unit-sync-field')) {
@@ -3252,6 +3283,96 @@ this.renderLocationOptions();
 
         // Coletar respostas atualizadas
         this.collectBookingQuestionAnswers();
+    }
+
+    /**
+     * Lidar com mudanças no modo de chegada
+     */
+    handleArrivalModeChange(arrivalModeField) {
+        const selectedMode = arrivalModeField.value;
+        const travelerIndex = arrivalModeField.dataset.traveler;
+        
+        console.log(`🚗 Modo de chegada alterado para: ${selectedMode} (Viajante ${travelerIndex})`);
+        
+        // Encontrar o campo PICKUP_POINT correspondente
+        const pickupPointField = document.querySelector(`[id*="PICKUP_POINT"][data-traveler="${travelerIndex}"]`);
+        
+        if (pickupPointField) {
+            this.updatePickupPointVisibility(pickupPointField, selectedMode);
+        }
+        
+        // Revalidar perguntas condicionais
+        this.validatePickupPointConditional();
+    }
+    
+    /**
+     * Lidar com mudanças no ponto de coleta
+     */
+    handlePickupPointChange(pickupPointField) {
+        const selectedValue = pickupPointField.value;
+        const travelerIndex = pickupPointField.dataset.traveler;
+        
+        console.log(`📍 Ponto de coleta alterado para: ${selectedValue} (Viajante ${travelerIndex})`);
+        
+        // Mostrar/ocultar campo de texto livre
+        this.togglePickupPointFreetext(pickupPointField, selectedValue);
+    }
+    
+    /**
+     * Atualizar visibilidade do campo PICKUP_POINT baseado no modo de chegada
+     */
+    updatePickupPointVisibility(pickupPointField, arrivalMode) {
+        const formGroup = pickupPointField.closest('.form-group');
+        const isPickupRequired = ['HOTEL_PICKUP', 'CENTRAL_MEETING_POINT'].includes(arrivalMode);
+        
+        if (formGroup) {
+            if (isPickupRequired) {
+                formGroup.style.display = 'block';
+                pickupPointField.setAttribute('required', 'required');
+                
+                // Adicionar indicador visual de obrigatório
+                const label = formGroup.querySelector('label');
+                if (label && !label.textContent.includes('*')) {
+                    label.innerHTML += ' <span class="text-danger">*</span>';
+                }
+            } else {
+                formGroup.style.display = 'none';
+                pickupPointField.removeAttribute('required');
+                pickupPointField.value = ''; // Limpar valor
+                
+                // Ocultar também o campo de texto livre se existir
+                const freetextField = document.querySelector(`[id*="PICKUP_POINT_freetext"][data-traveler="${pickupPointField.dataset.traveler}"]`);
+                if (freetextField) {
+                    const freetextGroup = freetextField.closest('.form-group');
+                    if (freetextGroup) {
+                        freetextGroup.style.display = 'none';
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * Mostrar/ocultar campo de texto livre para PICKUP_POINT
+     */
+    togglePickupPointFreetext(pickupPointField, selectedValue) {
+        const travelerIndex = pickupPointField.dataset.traveler;
+        const freetextField = document.querySelector(`[id*="PICKUP_POINT_freetext"][data-traveler="${travelerIndex}"]`);
+        
+        if (freetextField) {
+            const freetextGroup = freetextField.closest('.form-group');
+            
+            if (freetextGroup) {
+                if (selectedValue === 'OTHER' || selectedValue === 'HOTEL_PICKUP') {
+                    freetextGroup.style.display = 'block';
+                    freetextField.setAttribute('required', 'required');
+                } else {
+                    freetextGroup.style.display = 'none';
+                    freetextField.removeAttribute('required');
+                    freetextField.value = ''; // Limpar valor
+                }
+            }
+        }
     }
 
     /**
@@ -3492,7 +3613,7 @@ this.renderLocationOptions();
             /* Corrigir placeholder do campo de peso para peso sutil igual aos demais */
             .weight-input-container input::placeholder,
             .number-unit-container input::placeholder {
-                font-weight: 500 !important;
+                font-weight: 400 !important;
                 font-style: normal !important;
                 color: #6c757d !important;
             }
@@ -3565,7 +3686,7 @@ this.renderLocationOptions();
 
             /* Placeholder dos campos de pagamento com peso consistente */
             .payment-form input.form-control::placeholder {
-                font-weight: 500 !important;
+                font-weight: 400 !important;
                 font-style: normal !important;
                 color: #6c757d !important;
             }
@@ -3839,18 +3960,11 @@ this.renderLocationOptions();
     validateSpecificQuestions() {
         let isValid = true;
 
-        // Validar PICKUP_POINT quando obrigatório (arrivalMode: OTHER)
-        const pickupPointInput = document.querySelector('[id*="PICKUP_POINT"]');
-        if (pickupPointInput) {
-            const value = pickupPointInput.value.trim();
-            // PICKUP_POINT é obrigatório para produtos com arrivalMode: OTHER
-            // Como não temos acesso direto ao arrivalMode, consideramos obrigatório se o campo existe
-            if (!value) {
-                isValid = false;
-                this.showFieldError(pickupPointInput, 'Ponto de encontro é obrigatório para este produto');
-                console.warn('❌ PICKUP_POINT obrigatório não preenchido');
-            }
-        }
+        // Validar PICKUP_POINT com lógica condicional baseada no arrivalMode
+        isValid = this.validatePickupPointConditional() && isValid;
+        
+        // Validar TRANSFER_ARRIVAL_MODE e TRANSFER_DEPARTURE_MODE
+        isValid = this.validateTransferModes() && isValid;
 
         // Validar campos de peso (devem ter valor e unidade)
         const weightInputs = document.querySelectorAll('[id*="WEIGHT"]:not([id*="_unit"])');
@@ -3876,8 +3990,125 @@ this.renderLocationOptions();
                 }
             }
         });
+        
+        // Validar AGEBAND consistency
+        isValid = this.validateAgeBandConsistency() && isValid;
 
         return isValid;
+    }
+    
+    /**
+     * Validar PICKUP_POINT baseado no modo de chegada
+     */
+    validatePickupPointConditional() {
+        const arrivalModeInput = document.querySelector('[id*="TRANSFER_ARRIVAL_MODE"]');
+        const pickupPointInput = document.querySelector('[id*="PICKUP_POINT"]');
+        
+        if (!pickupPointInput) {
+            return true; // Não há campo PICKUP_POINT, validação não se aplica
+        }
+        
+        let arrivalMode = 'OTHER'; // Padrão se não especificado
+        if (arrivalModeInput && arrivalModeInput.value) {
+            arrivalMode = arrivalModeInput.value;
+        }
+        
+        console.log('🚗 Validando PICKUP_POINT para arrivalMode:', arrivalMode);
+        
+        // PICKUP_POINT é obrigatório quando arrivalMode é OTHER
+        if (arrivalMode === 'OTHER') {
+            const pickupValue = pickupPointInput.value.trim();
+            const freetextInput = document.querySelector('[id*="PICKUP_POINT"][id*="_freetext"]');
+            const freetextValue = freetextInput ? freetextInput.value.trim() : '';
+            
+            if (!pickupValue && !freetextValue) {
+                this.showFieldError(pickupPointInput, 'Ponto de encontro é obrigatório quando o modo de chegada é "Outro"');
+                console.warn('❌ PICKUP_POINT obrigatório não preenchido para arrivalMode: OTHER');
+                return false;
+            }
+            
+            // Se selecionou uma opção mas também preencheu texto livre, dar preferência ao texto livre
+            if (pickupValue && freetextValue) {
+                console.log('ℹ️ Texto livre tem preferência sobre seleção de pickup point');
+            }
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Validar modos de transferência
+     */
+    validateTransferModes() {
+        const arrivalModeInput = document.querySelector('[id*="TRANSFER_ARRIVAL_MODE"]');
+        const departureModeInput = document.querySelector('[id*="TRANSFER_DEPARTURE_MODE"]');
+        
+        let isValid = true;
+        
+        // Validar TRANSFER_ARRIVAL_MODE se presente
+        if (arrivalModeInput && arrivalModeInput.hasAttribute('required')) {
+            const value = arrivalModeInput.value.trim();
+            if (!value) {
+                this.showFieldError(arrivalModeInput, 'Modo de chegada é obrigatório');
+                isValid = false;
+            }
+        }
+        
+        // Validar TRANSFER_DEPARTURE_MODE se presente
+        if (departureModeInput && departureModeInput.hasAttribute('required')) {
+            const value = departureModeInput.value.trim();
+            if (!value) {
+                this.showFieldError(departureModeInput, 'Modo de partida é obrigatório');
+                isValid = false;
+            }
+        }
+        
+        return isValid;
+    }
+    
+    /**
+     * Validar consistência de AGEBAND entre viajantes
+     */
+    validateAgeBandConsistency() {
+        const ageBandInputs = document.querySelectorAll('[id*="AGEBAND"]');
+        let isValid = true;
+        
+        ageBandInputs.forEach(input => {
+            const value = input.value;
+            const travelerNum = this.extractTravelerNumber(input);
+            
+            if (value && travelerNum) {
+                // Verificar se a faixa etária corresponde aos dados do paxMix
+                const expectedAgeBand = this.getExpectedAgeBandForTraveler(travelerNum);
+                if (expectedAgeBand && value !== expectedAgeBand) {
+                    this.showFieldError(input, `Faixa etária deve ser ${expectedAgeBand} para este viajante`);
+                    console.warn(`❌ AGEBAND inconsistente: esperado ${expectedAgeBand}, recebido ${value}`);
+                    isValid = false;
+                }
+            }
+        });
+        
+        return isValid;
+    }
+    
+    /**
+     * Obter faixa etária esperada para um viajante baseado no paxMix
+     */
+    getExpectedAgeBandForTraveler(travelerNum) {
+        if (!this.currentAvailabilityData || !this.currentAvailabilityData.paxMix) {
+            return null;
+        }
+        
+        let currentTraveler = 1;
+        for (const paxGroup of this.currentAvailabilityData.paxMix) {
+            const count = paxGroup.numberOfTravelers || 1;
+            if (travelerNum >= currentTraveler && travelerNum < currentTraveler + count) {
+                return paxGroup.ageBand;
+            }
+            currentTraveler += count;
+        }
+        
+        return null;
     }
 
     /**
@@ -5969,14 +6200,90 @@ this.renderLocationOptions();
 
         cardInput.addEventListener('input', (e) => {
             let value = e.target.value.replace(/\s/g, '').replace(/[^0-9]/gi, '');
-            let formattedValue = value.match(/.{1,4}/g)?.join(' ') || value;
+            
+            // Detectar tipo de cartão
+            const cardType = this.detectCardType(value);
+            this.updateCardTypeIndicator(cardType);
+            
+            // Definir maxlength baseado no tipo de cartão
+            const maxLengths = {
+                visa: 19, // 16 dígitos + 3 espaços ou 13 dígitos + 2 espaços
+                mastercard: 19, // 16 dígitos + 3 espaços
+                amex: 17, // 15 dígitos + 2 espaços
+                elo: 19, // 16 dígitos + 3 espaços
+                hipercard: 23, // 19 dígitos + 4 espaços (máximo)
+                mercadolivre: 19, // 16 dígitos + 3 espaços
+                unknown: 23 // Máximo possível
+            };
+            
+            cardInput.maxLength = maxLengths[cardType] || 23;
+            
+            // Formatação específica por tipo de cartão
+            let formattedValue;
+            if (cardType === 'amex') {
+                // American Express: 4-6-5 format (15 dígitos)
+                if (value.length <= 4) {
+                    formattedValue = value;
+                } else if (value.length <= 10) {
+                    formattedValue = value.replace(/(\d{4})(\d{0,6})/, '$1 $2');
+                } else {
+                    formattedValue = value.replace(/(\d{4})(\d{6})(\d{0,5})/, '$1 $2 $3');
+                }
+            } else if (cardType === 'hipercard' && value.length > 16) {
+                // Hipercard pode ter 19 dígitos: 4-4-4-4-3 format
+                if (value.length <= 4) {
+                    formattedValue = value;
+                } else if (value.length <= 8) {
+                    formattedValue = value.replace(/(\d{4})(\d{0,4})/, '$1 $2');
+                } else if (value.length <= 12) {
+                    formattedValue = value.replace(/(\d{4})(\d{4})(\d{0,4})/, '$1 $2 $3');
+                } else if (value.length <= 16) {
+                    formattedValue = value.replace(/(\d{4})(\d{4})(\d{4})(\d{0,4})/, '$1 $2 $3 $4');
+                } else {
+                    formattedValue = value.replace(/(\d{4})(\d{4})(\d{4})(\d{4})(\d{0,3})/, '$1 $2 $3 $4 $5');
+                }
+            } else {
+                // Outros cartões: 4-4-4-4 format (16 dígitos)
+                formattedValue = value.match(/.{1,4}/g)?.join(' ') || value;
+            }
+            
             e.target.value = formattedValue;
 
-            // Validar cartão em tempo real
-            const isValid = this.validateCreditCard(value);
+            // Validação em tempo real mais inteligente
             const errorElement = document.getElementById('card-number-error');
-
-            if (value.length > 0) {
+            
+            // Definir comprimentos mínimos por tipo de cartão
+            const minLengths = {
+                visa: 13, // Visa pode ter 13 ou 16 dígitos
+                mastercard: 16,
+                amex: 15,
+                elo: 16,
+                hipercard: 13, // Hipercard pode ter 13, 16 ou 19 dígitos
+                mercadolivre: 16,
+                unknown: 13
+            };
+            
+            const minLength = minLengths[cardType] || 13;
+            
+            if (value.length === 0) {
+                // Campo vazio - remover todas as classes
+                cardInput.classList.remove('is-valid', 'is-invalid');
+                if (errorElement) errorElement.style.display = 'none';
+            } else if (value.length < minLength) {
+                // Ainda digitando - mostrar apenas se tipo desconhecido
+                cardInput.classList.remove('is-valid', 'is-invalid');
+                if (cardType === 'unknown' && value.length >= 4) {
+                    cardInput.classList.add('is-invalid');
+                    if (errorElement) {
+                        errorElement.textContent = 'Tipo de cartão não reconhecido. Bandeiras aceitas: Visa, Mastercard, Amex, Elo, Hipercard, Mercado Livre';
+                        errorElement.style.display = 'block';
+                    }
+                } else {
+                    if (errorElement) errorElement.style.display = 'none';
+                }
+            } else {
+                // Número completo - validação rigorosa
+                const isValid = this.validateCreditCard(value);
                 if (isValid) {
                     cardInput.classList.remove('is-invalid');
                     cardInput.classList.add('is-valid');
@@ -5985,21 +6292,52 @@ this.renderLocationOptions();
                     cardInput.classList.remove('is-valid');
                     cardInput.classList.add('is-invalid');
                     if (errorElement) {
-                        errorElement.textContent = 'Número do cartão inválido';
+                        errorElement.textContent = 'Número do cartão inválido para a bandeira ' + cardType.charAt(0).toUpperCase() + cardType.slice(1);
                         errorElement.style.display = 'block';
                     }
                 }
-            } else {
-                cardInput.classList.remove('is-valid', 'is-invalid');
-                if (errorElement) errorElement.style.display = 'none';
             }
         });
 
-        // Adicionar validação ao sair do campo
+        // Validação mais robusta ao sair do campo
         cardInput.addEventListener('blur', (e) => {
             const value = e.target.value.replace(/\s/g, '');
-            if (value.length > 0 && !this.validateCreditCard(value)) {
-                this.showDateError('Número do cartão inválido. Verifique e tente novamente.');
+            const errorElement = document.getElementById('card-number-error');
+            const cardType = this.detectCardType(value);
+            
+            // Definir comprimentos mínimos por tipo de cartão
+            const minLengths = {
+                visa: 13,
+                mastercard: 16,
+                amex: 15,
+                elo: 16,
+                hipercard: 13,
+                mercadolivre: 16,
+                unknown: 13
+            };
+            
+            const minLength = minLengths[cardType] || 13;
+            
+            if (value.length > 0) {
+                if (cardType === 'unknown') {
+                    cardInput.classList.add('is-invalid');
+                    if (errorElement) {
+                        errorElement.textContent = 'Tipo de cartão não reconhecido. Bandeiras aceitas: Visa, Mastercard, Amex, Elo, Hipercard, Mercado Livre';
+                        errorElement.style.display = 'block';
+                    }
+                } else if (value.length < minLength) {
+                    cardInput.classList.add('is-invalid');
+                    if (errorElement) {
+                        errorElement.textContent = `Número do cartão muito curto para ${cardType.charAt(0).toUpperCase() + cardType.slice(1)} (mínimo ${minLength} dígitos)`;
+                        errorElement.style.display = 'block';
+                    }
+                } else if (!this.validateCreditCard(value)) {
+                    cardInput.classList.add('is-invalid');
+                    if (errorElement) {
+                        errorElement.textContent = 'Número do cartão inválido para a bandeira ' + cardType.charAt(0).toUpperCase() + cardType.slice(1);
+                        errorElement.style.display = 'block';
+                    }
+                }
             }
         });
 
@@ -6056,27 +6394,94 @@ this.renderLocationOptions();
     }
 
     /**
-     * Detectar tipo do cartão de crédito
+     * Detectar tipo do cartão de crédito com padrões mais flexíveis
      */
     detectCardType(cardNumber) {
+        // Remover espaços e caracteres não numéricos
+        const cleanNumber = cardNumber.replace(/\D/g, '');
+        
+        // Padrões mais flexíveis para detecção durante a digitação
         const patterns = {
-            visa: /^4[0-9]{12}(?:[0-9]{3})?$/,
-            mastercard: /^5[1-5][0-9]{14}$/,
-            amex: /^3[47][0-9]{13}$/,
-            discover: /^6(?:011|5[0-9]{2})[0-9]{12}$/,
-            diners: /^3[0689][0-9]{11}$/,
-            jcb: /^(?:2131|1800|35\d{3})\d{11}$/,
-            elo: /^((((636368)|(438935)|(504175)|(451416)|(636297))\d{0,10})|((5067)|(4576)|(4011))\d{0,12})$/,
-            hipercard: /^(606282\d{10}(\d{3})?)|(3841\d{15})$/
+            visa: /^4/,
+            mastercard: /^5[1-5]|^2[2-7]/,
+            amex: /^3[47]/,
+            elo: /^(636368|438935|504175|451416|636297|5067|4576|4011)/,
+            hipercard: /^(606282|3841)/,
+            mercadolivre: /^(603493|627780|637095|637568|637599|637609|637612)/
         };
 
-        for (const [type, pattern] of Object.entries(patterns)) {
-            if (pattern.test(cardNumber)) {
-                return type;
+        // Para validação final, usar padrões completos com quantidade correta de dígitos
+        const fullPatterns = {
+            visa: /^4[0-9]{12}(?:[0-9]{3})?$/, // 13 ou 16 dígitos
+            mastercard: /^5[1-5][0-9]{14}$|^2[2-7][0-9]{14}$/, // 16 dígitos
+            amex: /^3[47][0-9]{13}$/, // 15 dígitos
+            elo: /^((636368|438935|504175|451416|636297)[0-9]{10})|((5067|4576|4011)[0-9]{12})$/, // 16 dígitos
+            hipercard: /^(606282[0-9]{10}([0-9]{3})?|3841[0-9]{15})$/, // 13, 16 ou 19 dígitos
+            mercadolivre: /^(603493|627780|637095|637568|637599|637609|637612)[0-9]{10}$/ // 16 dígitos
+        };
+
+        // Se o número está completo, usar validação rigorosa
+        if (cleanNumber.length >= 13) {
+            for (const [type, pattern] of Object.entries(fullPatterns)) {
+                if (pattern.test(cleanNumber)) {
+                    return type;
+                }
+            }
+        } else {
+            // Durante a digitação, usar padrões flexíveis
+            for (const [type, pattern] of Object.entries(patterns)) {
+                if (pattern.test(cleanNumber)) {
+                    return type;
+                }
             }
         }
 
         return 'unknown';
+    }
+
+    /**
+     * Obter ícone do tipo de cartão
+     */
+    getCardTypeIcon(cardType) {
+        const icons = {
+            visa: '💳', // Ou usar ícones SVG específicos
+            mastercard: '💳',
+            amex: '💳',
+            elo: '💳',
+            hipercard: '💳',
+            mercadolivre: '💳',
+            unknown: ''
+        };
+        
+        return icons[cardType] || '';
+    }
+
+    /**
+     * Atualizar indicador visual do tipo de cartão
+     */
+    updateCardTypeIndicator(cardType) {
+        const indicator = document.getElementById('card-type-indicator');
+        if (!indicator) return;
+
+        const cardNames = {
+            visa: 'Visa',
+            mastercard: 'Mastercard',
+            amex: 'American Express',
+            discover: 'Discover',
+            diners: 'Diners Club',
+            jcb: 'JCB',
+            elo: 'Elo',
+            hipercard: 'Hipercard'
+        };
+
+        if (cardType && cardType !== 'unknown') {
+            indicator.textContent = this.getCardTypeIcon(cardType);
+            indicator.title = cardNames[cardType] || cardType;
+            indicator.style.display = 'block';
+            indicator.style.color = '#28a745';
+        } else {
+            indicator.style.display = 'none';
+        }
     }
 
     /**
@@ -6090,17 +6495,58 @@ this.renderLocationOptions();
         if (cvvInput) {
             cvvInput.addEventListener('input', (e) => {
                 const value = e.target.value.replace(/\D/g, '');
-                e.target.value = value;
+                
+                // Limitar o comprimento baseado no tipo de cartão
+                const cardNumber = document.getElementById('card-number')?.value.replace(/\s/g, '') || '';
+                const cardType = this.detectCardType(cardNumber);
+                const maxLength = cardType === 'amex' ? 4 : 3;
+                
+                e.target.value = value.substring(0, maxLength);
+                
+                // Atualizar placeholder baseado no tipo de cartão
+                if (cardType === 'amex') {
+                    e.target.placeholder = '1234';
+                    e.target.maxLength = 4;
+                } else {
+                    e.target.placeholder = '123';
+                    e.target.maxLength = 3;
+                }
+                
+                // Validação em tempo real
+                if (value.length > 0) {
+                    const isValid = this.validateCVV(value, cardType);
+                    if (isValid) {
+                        cvvInput.classList.remove('is-invalid');
+                        cvvInput.classList.add('is-valid');
+                        this.hideFieldError(cvvInput);
+                    } else {
+                        cvvInput.classList.remove('is-valid');
+                        if (value.length >= maxLength) {
+                            cvvInput.classList.add('is-invalid');
+                            this.showFieldError(cvvInput, this.getCVVErrorMessage(cardType));
+                        }
+                    }
+                } else {
+                    cvvInput.classList.remove('is-valid', 'is-invalid');
+                    this.hideFieldError(cvvInput);
+                }
             });
 
             cvvInput.addEventListener('blur', (e) => {
                 const value = e.target.value.trim();
+                const cardNumber = document.getElementById('card-number')?.value.replace(/\s/g, '') || '';
+                const cardType = this.detectCardType(cardNumber);
+                
                 if (!value) {
                     this.showFieldError(cvvInput, 'O CVV é obrigatório.');
-                } else if (!this.validateCVV(value)) {
-                    this.showFieldError(cvvInput, 'CVV deve ter 3 ou 4 dígitos.');
+                    cvvInput.classList.add('is-invalid');
+                } else if (!this.validateCVV(value, cardType)) {
+                    this.showFieldError(cvvInput, this.getCVVErrorMessage(cardType));
+                    cvvInput.classList.add('is-invalid');
                 } else {
                     this.hideFieldError(cvvInput);
+                    cvvInput.classList.remove('is-invalid');
+                    cvvInput.classList.add('is-valid');
                 }
             });
         }
@@ -6110,46 +6556,139 @@ this.renderLocationOptions();
         const expYearInput = document.getElementById('expiry-year');
 
         if (expMonthInput && expYearInput) {
-            const validateExpiry = () => {
+            const validateExpiry = (showErrors = true) => {
                 const month = expMonthInput.value;
                 const year = expYearInput.value;
+                
+                // Limpar classes de validação anteriores
+                expMonthInput.classList.remove('is-valid', 'is-invalid');
+                expYearInput.classList.remove('is-valid', 'is-invalid');
 
-                if (!month) {
+                if (!month && showErrors) {
                     this.showFieldError(expMonthInput, 'Selecione o mês de vencimento.');
-                    return;
+                    expMonthInput.classList.add('is-invalid');
+                    return false;
                 }
 
-                if (!year) {
+                if (!year && showErrors) {
                     this.showFieldError(expYearInput, 'Selecione o ano de vencimento.');
-                    return;
+                    expYearInput.classList.add('is-invalid');
+                    return false;
                 }
-
-                if (!this.validateExpiryDate(month, year)) {
-                    this.showFieldError(expMonthInput, 'Data de vencimento inválida.');
-                    this.showFieldError(expYearInput, 'Data de vencimento inválida.');
-                } else {
+                
+                // Validação individual dos campos
+                if (month && !this.validateExpiryMonth(month)) {
+                    if (showErrors) {
+                        this.showFieldError(expMonthInput, 'Mês inválido');
+                        expMonthInput.classList.add('is-invalid');
+                    }
+                    return false;
+                }
+                
+                if (year && !this.validateExpiryYear(year)) {
+                    if (showErrors) {
+                        this.showFieldError(expYearInput, 'Ano inválido');
+                        expYearInput.classList.add('is-invalid');
+                    }
+                    return false;
+                }
+                
+                // Validação combinada se ambos estão preenchidos
+                if (month && year) {
+                    const expiryValidation = this.validateExpiryDate(month, year);
+                    if (!expiryValidation.valid) {
+                        if (showErrors) {
+                            this.showFieldError(expMonthInput, expiryValidation.message);
+                            this.showFieldError(expYearInput, expiryValidation.message);
+                            expMonthInput.classList.add('is-invalid');
+                            expYearInput.classList.add('is-invalid');
+                        }
+                        return false;
+                    } else {
+                        this.hideFieldError(expMonthInput);
+                        this.hideFieldError(expYearInput);
+                        expMonthInput.classList.add('is-valid');
+                        expYearInput.classList.add('is-valid');
+                        return true;
+                    }
+                }
+                
+                // Se apenas um campo está preenchido, marcar como válido individualmente
+                if (month && this.validateExpiryMonth(month)) {
                     this.hideFieldError(expMonthInput);
-                    this.hideFieldError(expYearInput);
+                    expMonthInput.classList.add('is-valid');
                 }
+                
+                if (year && this.validateExpiryYear(year)) {
+                    this.hideFieldError(expYearInput);
+                    expYearInput.classList.add('is-valid');
+                }
+                
+                return true;
             };
-
-            expMonthInput.addEventListener('blur', validateExpiry);
-            expYearInput.addEventListener('blur', validateExpiry);
+            
+            // Validação em tempo real (sem mostrar erros)
+            expMonthInput.addEventListener('change', () => validateExpiry(false));
+            expYearInput.addEventListener('change', () => validateExpiry(false));
+            
+            // Validação completa ao sair do campo
+            expMonthInput.addEventListener('blur', () => validateExpiry(true));
+            expYearInput.addEventListener('blur', () => validateExpiry(true));
         }
 
         // Validação do nome do portador
         const nameInput = document.getElementById('cardholder-name');
         if (nameInput) {
+            nameInput.addEventListener('input', (e) => {
+                // Permitir apenas letras, espaços e acentos
+                let value = e.target.value;
+                value = value.replace(/[^a-zA-ZÀ-ÿ\s]/g, '');
+                
+                // Limitar múltiplos espaços consecutivos
+                value = value.replace(/\s{2,}/g, ' ');
+                
+                // Capitalizar primeira letra de cada palavra
+                value = value.replace(/\b\w/g, l => l.toUpperCase());
+                
+                e.target.value = value;
+                
+                // Validação em tempo real
+                if (value.length > 0) {
+                    if (value.length >= 2 && /^[a-zA-ZÀ-ÿ\s]+$/.test(value.trim())) {
+                        nameInput.classList.remove('is-invalid');
+                        nameInput.classList.add('is-valid');
+                        this.hideFieldError(nameInput);
+                    } else {
+                        nameInput.classList.remove('is-valid');
+                        if (value.length >= 10) { // Só mostrar erro após digitar bastante
+                            nameInput.classList.add('is-invalid');
+                        }
+                    }
+                } else {
+                    nameInput.classList.remove('is-valid', 'is-invalid');
+                    this.hideFieldError(nameInput);
+                }
+            });
+            
             nameInput.addEventListener('blur', (e) => {
                 const value = e.target.value.trim();
+                nameInput.classList.remove('is-valid', 'is-invalid');
+                
                 if (!value) {
                     this.showFieldError(nameInput, 'O nome no cartão é obrigatório.');
+                    nameInput.classList.add('is-invalid');
                 } else if (value.length < 2) {
                     this.showFieldError(nameInput, 'Nome deve ter pelo menos 2 caracteres.');
+                    nameInput.classList.add('is-invalid');
                 } else if (!/^[a-zA-ZÀ-ÿ\s]+$/.test(value)) {
                     this.showFieldError(nameInput, 'Nome deve conter apenas letras.');
+                    nameInput.classList.add('is-invalid');
+                } else if (value.split(' ').length < 2) {
+                    this.showFieldError(nameInput, 'Digite o nome completo (nome e sobrenome).');
+                    nameInput.classList.add('is-invalid');
                 } else {
                     this.hideFieldError(nameInput);
+                    nameInput.classList.add('is-valid');
                 }
             });
         }
@@ -6169,32 +6708,128 @@ this.renderLocationOptions();
 
         // Validação do CEP
         const zipInput = document.getElementById('billing-zip');
+        const countrySelect = document.getElementById('billing-country');
+        
         if (zipInput) {
-            zipInput.addEventListener('blur', (e) => {
-                const value = e.target.value.trim();
-                if (!value) {
-                    this.showFieldError(zipInput, 'O CEP é obrigatório.');
-                } else if (value.length < 5) {
-                    this.showFieldError(zipInput, 'CEP deve ter pelo menos 5 caracteres.');
+            zipInput.addEventListener('input', (e) => {
+                const country = countrySelect?.value || 'BR';
+                let value = e.target.value.replace(/\D/g, ''); // Apenas números
+                
+                // Formatação específica por país
+                if (country === 'BR') {
+                    // Brasil: 12345-678
+                    if (value.length > 5) {
+                        value = value.substring(0, 5) + '-' + value.substring(5, 8);
+                    }
+                    e.target.maxLength = 9;
+                    e.target.placeholder = '12345-678';
+                } else if (country === 'US') {
+                    // EUA: 12345 ou 12345-6789
+                    if (value.length > 5) {
+                        value = value.substring(0, 5) + '-' + value.substring(5, 9);
+                    }
+                    e.target.maxLength = 10;
+                    e.target.placeholder = '12345-6789';
                 } else {
+                    // Outros países: formato genérico
+                    e.target.maxLength = 10;
+                    e.target.placeholder = 'Código postal';
+                }
+                
+                e.target.value = value;
+                
+                // Validação em tempo real
+                if (value.length > 0) {
+                    const isValid = this.validateZipCode(value, country);
+                    if (isValid) {
+                        zipInput.classList.remove('is-invalid');
+                        zipInput.classList.add('is-valid');
+                        this.hideFieldError(zipInput);
+                    } else {
+                        zipInput.classList.remove('is-valid');
+                        // Só mostrar erro se o campo parece completo
+                        if ((country === 'BR' && value.length >= 8) || 
+                            (country === 'US' && value.length >= 5) || 
+                            (country !== 'BR' && country !== 'US' && value.length >= 5)) {
+                            zipInput.classList.add('is-invalid');
+                        }
+                    }
+                } else {
+                    zipInput.classList.remove('is-valid', 'is-invalid');
                     this.hideFieldError(zipInput);
                 }
             });
+            
+            zipInput.addEventListener('blur', (e) => {
+                const value = e.target.value.trim();
+                const country = countrySelect?.value || 'BR';
+                
+                zipInput.classList.remove('is-valid', 'is-invalid');
+                
+                if (!value) {
+                    this.showFieldError(zipInput, 'O CEP/Código Postal é obrigatório.');
+                    zipInput.classList.add('is-invalid');
+                } else if (!this.validateZipCode(value, country)) {
+                    this.showFieldError(zipInput, this.getZipCodeErrorMessage(country));
+                    zipInput.classList.add('is-invalid');
+                } else {
+                    this.hideFieldError(zipInput);
+                    zipInput.classList.add('is-valid');
+                }
+            });
+            
+            // Atualizar formatação quando o país mudar
+            if (countrySelect) {
+                countrySelect.addEventListener('change', () => {
+                    if (zipInput.value) {
+                        // Trigger input event para reformatar
+                        zipInput.dispatchEvent(new Event('input'));
+                    }
+                });
+            }
         }
     }
 
     /**
-     * Validar CVV
+     * Validar CVV com base no tipo de cartão
      */
-    validateCVV(cvv) {
-        return cvv.length >= 3 && cvv.length <= 4 && /^\d+$/.test(cvv);
+    validateCVV(cvv, cardType = null) {
+        if (!cvv || !/^\d+$/.test(cvv)) {
+            return false;
+        }
+        
+        // Se não temos o tipo do cartão, detectar pelo número
+        if (!cardType) {
+            const cardNumber = document.getElementById('card-number')?.value.replace(/\s/g, '') || '';
+            cardType = this.detectCardType(cardNumber);
+        }
+        
+        // American Express usa CVV de 4 dígitos
+        if (cardType === 'amex') {
+            return cvv.length === 4;
+        }
+        
+        // Outros cartões usam CVV de 3 dígitos
+        return cvv.length === 3;
+    }
+    
+    /**
+     * Obter mensagem de erro específica para CVV
+     */
+    getCVVErrorMessage(cardType = null) {
+        if (cardType === 'amex') {
+            return 'CVV deve ter 4 dígitos para American Express';
+        }
+        return 'CVV deve ter 3 dígitos';
     }
 
     /**
      * Validar data de expiração
      */
     validateExpiryDate(month, year) {
-        if (!month || !year) return false;
+        if (!month || !year) {
+            return { valid: false, message: 'Mês e ano são obrigatórios' };
+        }
 
         const currentDate = new Date();
         const currentYear = currentDate.getFullYear();
@@ -6203,18 +6838,110 @@ this.renderLocationOptions();
         const expMonth = parseInt(month, 10);
         const expYear = parseInt(year, 10);
 
+        if (isNaN(expMonth) || isNaN(expYear)) {
+            return { valid: false, message: 'Mês e ano devem ser números válidos' };
+        }
+
         // Verificar se o mês é válido
-        if (expMonth < 1 || expMonth > 12) return false;
+        if (expMonth < 1 || expMonth > 12) {
+            return { valid: false, message: 'Mês deve estar entre 01 e 12' };
+        }
 
         // Verificar se a data não está no passado
         if (expYear < currentYear || (expYear === currentYear && expMonth < currentMonth)) {
-            return false;
+            return { valid: false, message: 'Cartão expirado' };
         }
 
         // Verificar se não está muito no futuro (mais de 20 anos)
-        if (expYear > currentYear + 20) return false;
+        if (expYear > currentYear + 20) {
+            return { valid: false, message: 'Data de expiração muito distante' };
+        }
 
-        return true;
+        return { valid: true, message: '' };
+    }
+    
+    /**
+     * Validar apenas o mês
+     */
+    validateExpiryMonth(month) {
+        const expMonth = parseInt(month, 10);
+        return !isNaN(expMonth) && expMonth >= 1 && expMonth <= 12;
+    }
+    
+    /**
+     * Validar apenas o ano
+     */
+    validateExpiryYear(year) {
+        const currentYear = new Date().getFullYear();
+        const expYear = parseInt(year, 10);
+        return !isNaN(expYear) && expYear >= currentYear && expYear <= currentYear + 20;
+    }
+    
+    /**
+     * Validar CEP/Código Postal por país
+     */
+    validateZipCode(zipCode, country = 'BR') {
+        if (!zipCode) return false;
+        
+        const cleanZip = zipCode.replace(/\D/g, '');
+        
+        switch (country) {
+            case 'BR':
+                // Brasil: 8 dígitos (12345678 ou 12345-678)
+                return cleanZip.length === 8;
+            case 'US':
+                // EUA: 5 ou 9 dígitos (12345 ou 123456789)
+                return cleanZip.length === 5 || cleanZip.length === 9;
+            case 'CA':
+                // Canadá: formato A1A1A1
+                return /^[A-Za-z]\d[A-Za-z]\d[A-Za-z]\d$/.test(zipCode.replace(/\s/g, ''));
+            case 'GB':
+                // Reino Unido: vários formatos
+                return /^[A-Za-z]{1,2}\d[A-Za-z\d]?\s?\d[A-Za-z]{2}$/.test(zipCode);
+            case 'DE':
+                // Alemanha: 5 dígitos
+                return cleanZip.length === 5;
+            case 'FR':
+                // França: 5 dígitos
+                return cleanZip.length === 5;
+            case 'IT':
+                // Itália: 5 dígitos
+                return cleanZip.length === 5;
+            case 'ES':
+                // Espanha: 5 dígitos
+                return cleanZip.length === 5;
+            case 'AU':
+                // Austrália: 4 dígitos
+                return cleanZip.length === 4;
+            default:
+                // Formato genérico: pelo menos 3 caracteres
+                return zipCode.trim().length >= 3;
+        }
+    }
+    
+    /**
+     * Obter mensagem de erro específica para CEP por país
+     */
+    getZipCodeErrorMessage(country = 'BR') {
+        switch (country) {
+            case 'BR':
+                return 'CEP deve ter 8 dígitos (ex: 12345-678)';
+            case 'US':
+                return 'ZIP Code deve ter 5 ou 9 dígitos (ex: 12345-6789)';
+            case 'CA':
+                return 'Código postal deve seguir o formato A1A 1A1';
+            case 'GB':
+                return 'Código postal deve seguir o formato britânico';
+            case 'DE':
+            case 'FR':
+            case 'IT':
+            case 'ES':
+                return 'Código postal deve ter 5 dígitos';
+            case 'AU':
+                return 'Código postal deve ter 4 dígitos';
+            default:
+                return 'Código postal inválido';
+        }
     }
 
     /**
@@ -6449,8 +7176,11 @@ this.renderLocationOptions();
                     case 'expiry-year':
                         const month = document.getElementById('expiry-month')?.value;
                         const year = document.getElementById('expiry-year')?.value;
-                        if (month && year && !this.validateExpiryDate(month, year)) {
-                            invalidFields.push(`• Data de expiração (inválida ou expirada)`);
+                        if (month && year) {
+                            const expiryValidation = this.validateExpiryDate(month, year);
+                            if (!expiryValidation.valid) {
+                                invalidFields.push(`• Data de expiração (${expiryValidation.message.toLowerCase()})`);
+                            }
                         }
                         break;
                     case 'cardholder-name':
@@ -7194,9 +7924,15 @@ this.renderLocationOptions();
             </div>
         `;
 
-        // Inserir no topo do step de pagamento
+        // Inserir após o h3 "Informações de Pagamento" no step de pagamento
         const paymentStep = document.querySelector('.payment-step');
-        if (paymentStep) {
+        const paymentTitle = paymentStep ? paymentStep.querySelector('h3') : null;
+        
+        if (paymentStep && paymentTitle) {
+            // Inserir logo após o h3
+            paymentTitle.insertAdjacentElement('afterend', progressDiv);
+        } else if (paymentStep) {
+            // Fallback: inserir no topo se não encontrar o h3
             paymentStep.insertBefore(progressDiv, paymentStep.firstChild);
         }
 
@@ -7885,7 +8621,7 @@ this.renderLocationOptions();
                                 <div class="action-content">
                                     <h4>Verifique os Dados</h4>
                                     <p>Confirme se os dados do cartão e informações estão corretos</p>
-                                    <button class="action-btn secondary-btn" onclick="history.back()">
+                                    <button class="action-btn secondary-btn" onclick="window.viatorBookingManager && window.viatorBookingManager.previousStep()">
                                         Voltar e Revisar
                                     </button>
                                 </div>
@@ -7965,67 +8701,84 @@ this.renderLocationOptions();
         const style = document.createElement('style');
         style.id = styleId;
         style.textContent = `
-            /* Container principal da confirmação */
+            :root {
+              --background: #ffffff;
+              --foreground: #0f1419;
+              --card: #f7f8f8;
+              --card-foreground: #0f1419;
+              --popover: #ffffff;
+              --popover-foreground: #0f1419;
+              --primary: #0b1543;
+              --primary-foreground: #ffffff;
+              --secondary: #0f1419;
+              --secondary-foreground: #ffffff;
+              --muted: #e5e5e6;
+              --muted-foreground: #0f1419;
+              --accent: #e3ecf6;
+              --accent-foreground: #1e9df1;
+              --destructive: #f4212e;
+              --destructive-foreground: #ffffff;
+              --border: #e1eaef;
+              --input: #f7f9fa;
+              --ring: #1da1f2;
+              --chart-1: #1e9df1;
+              --chart-2: #00b87a;
+              --chart-3: #f7b928;
+              --chart-4: #17bf63;
+              --chart-5: #e0245e;
+              --radius: 1.3rem;
+            }
+
             .confirmation-container {
                 width: 100%;
-                max-width: none;
+                max-width: 100%;
+                margin: 0 auto;
                 padding: 0;
-                margin: 0;
+                font-family: var(--font-sans, 'Open Sans', sans-serif);
+            }
+
+            .viator-modal-body .confirmation-container {
+                padding: 0;
             }
 
             .confirmation-success, .confirmation-pending, .confirmation-error {
-                width: 100%;
-                max-width: none;
-                margin: 0;
-                padding: 0;
-                background: transparent;
-                box-shadow: none;
-                border-radius: 0;
+                background-color: var(--background);
             }
 
             /* Hero Section - Sucesso */
             .success-hero {
-                background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-                color: white;
-                padding: 60px 40px;
+                background: linear-gradient(135deg, var(--chart-2), var(--chart-4));
+                color: var(--primary-foreground);
+                padding: 2.5rem 1.5rem;
                 text-align: center;
                 position: relative;
                 overflow: hidden;
             }
 
-            .success-hero::before {
-                content: '';
-                position: absolute;
-                top: -50%;
-                left: -50%;
-                width: 200%;
-                height: 200%;
-                background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-                animation: pulse 3s ease-in-out infinite;
+            .viator-modal-body .success-hero {
+                padding: 2rem 1rem;
+                border-radius: 0;
             }
 
             .success-animation {
-                margin-bottom: 30px;
-                position: relative;
-                z-index: 2;
+                margin-bottom: 1.5rem;
             }
 
             .success-circle {
-                width: 120px;
-                height: 120px;
+                width: 80px;
+                height: 80px;
                 margin: 0 auto;
-                position: relative;
             }
 
             .checkmark {
-                width: 120px;
-                height: 120px;
+                width: 80px;
+                height: 80px;
                 border-radius: 50%;
                 display: block;
                 stroke-width: 3;
-                stroke: #fff;
+                stroke: var(--primary-foreground);
                 stroke-miterlimit: 10;
-                box-shadow: inset 0px 0px 0px #28a745;
+                box-shadow: inset 0px 0px 0px var(--chart-2);
                 animation: fill 0.4s ease-in-out 0.4s forwards, scale 0.3s ease-in-out 0.9s both;
             }
 
@@ -8033,8 +8786,7 @@ this.renderLocationOptions();
                 stroke-dasharray: 166;
                 stroke-dashoffset: 166;
                 stroke-width: 3;
-                stroke-miterlimit: 10;
-                stroke: #fff;
+                stroke: var(--primary-foreground);
                 fill: none;
                 animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
             }
@@ -8046,80 +8798,75 @@ this.renderLocationOptions();
                 animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
             }
 
-            .success-content {
-                position: relative;
-                z-index: 2;
-            }
-
             .success-title {
-                font-size: 2.5rem;
+                font-size: 1.8rem;
                 font-weight: 700;
-                margin: 0 0 15px 0;
-                text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                margin: 0 0 0.5rem 0;
             }
 
             .success-subtitle {
-                font-size: 1.2rem;
-                margin: 0 0 30px 0;
+                font-size: 1rem;
+                margin: 0 0 1.5rem 0;
                 opacity: 0.9;
             }
 
             .booking-ref-highlight {
-                background: rgba(255,255,255,0.2);
-                border-radius: 12px;
-                padding: 20px;
-                backdrop-filter: blur(10px);
-                border: 1px solid rgba(255,255,255,0.3);
+                background: rgba(255,255,255,0.15);
+                border-radius: var(--radius-md, 1rem);
+                padding: 1rem;
+                backdrop-filter: blur(5px);
+                border: 1px solid rgba(255,255,255,0.2);
+                display: inline-block;
             }
 
             .ref-label {
                 display: block;
-                font-size: 0.9rem;
+                font-size: 0.8rem;
                 opacity: 0.8;
-                margin-bottom: 8px;
+                margin-bottom: 0.25rem;
             }
 
             .ref-value {
                 display: block;
-                font-size: 1.5rem;
+                font-size: 1.2rem;
                 font-weight: 700;
-                font-family: 'Courier New', monospace;
-                letter-spacing: 2px;
+                font-family: var(--font-mono, 'Menlo', monospace);
+                letter-spacing: 1.5px;
             }
 
             /* Cards */
             .booking-summary-card, .next-steps-card, .error-details-card, .error-actions-card {
-                background: white;
-                margin: 30px 40px;
-                border-radius: 16px;
-                box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+                background: var(--card);
+                margin: 1.5rem 0;
+                border-radius: var(--radius-lg, 1.3rem);
+                box-shadow: var(--shadow-md, 0px 2px 4px -1px rgba(0,0,0,0.1));
+                border: 1px solid var(--border);
                 overflow: hidden;
-                border: 1px solid rgba(0,0,0,0.05);
             }
 
             .card-header {
-                background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-                padding: 25px 30px;
-                border-bottom: 1px solid #dee2e6;
+                background: var(--muted);
+                padding: 1rem 1.5rem;
+                border-bottom: 1px solid var(--border);
             }
 
             .card-header h3 {
                 margin: 0;
-                font-size: 1.3rem;
+                font-size: 1.1rem;
                 font-weight: 600;
-                color: #495057;
+                color: var(--card-foreground);
             }
 
             .card-body {
-                padding: 30px;
+                padding: 1.5rem;
             }
 
             /* Summary Items */
             .summary-item {
                 display: flex;
                 align-items: center;
-                padding: 20px 0;
-                border-bottom: 1px solid #f1f3f4;
+                padding: 1rem 0;
+                border-bottom: 1px solid var(--border);
             }
 
             .summary-item:last-child {
@@ -8127,314 +8874,249 @@ this.renderLocationOptions();
             }
 
             .item-icon {
-                width: 50px;
-                height: 50px;
-                background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-                border-radius: 12px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
                 font-size: 1.5rem;
-                margin-right: 20px;
-                flex-shrink: 0;
+                margin-right: 1.5rem;
+                color: var(--accent-foreground);
             }
 
             .item-content {
-                flex: 1;
                 display: flex;
                 flex-direction: column;
             }
 
             .item-label {
-                font-size: 0.9rem;
-                color: #6c757d;
-                margin-bottom: 5px;
+                font-size: 0.85rem;
+                color: var(--muted-foreground);
+                margin-bottom: 0.25rem;
             }
 
             .item-value {
-                font-size: 1.1rem;
+                font-size: 1rem;
                 font-weight: 600;
-                color: #212529;
+                color: var(--foreground);
             }
 
-            .item-value.price {
-                color: #28a745;
-                font-weight: 700;
-                font-size: 1.3rem;
-            }
-
-            /* Steps Grid */
-            .steps-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-                gap: 25px;
-                padding: 30px;
-            }
-
+            /* Next Steps */
             .step-item {
                 display: flex;
                 align-items: flex-start;
-                padding: 25px;
-                background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
-                border-radius: 12px;
-                border: 1px solid #e9ecef;
-                transition: transform 0.3s ease, box-shadow 0.3s ease;
+                margin-bottom: 1.5rem;
             }
 
-            .step-item:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            .step-item:last-child {
+                margin-bottom: 0;
             }
 
             .step-number {
-                width: 40px;
-                height: 40px;
-                background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-                color: white;
+                width: 36px;
+                height: 36px;
                 border-radius: 50%;
+                background: var(--primary);
+                color: var(--primary-foreground);
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 font-weight: 700;
-                margin-right: 15px;
+                font-size: 1rem;
+                margin-right: 1rem;
                 flex-shrink: 0;
             }
 
             .step-content h4 {
-                margin: 0 0 8px 0;
-                font-size: 1.1rem;
+                margin: 0 0 0.5rem 0;
+                font-size: 1rem;
                 font-weight: 600;
-                color: #212529;
             }
 
             .step-content p {
                 margin: 0;
-                font-size: 0.95rem;
-                color: #6c757d;
+                font-size: 0.9rem;
+                color: var(--muted-foreground);
                 line-height: 1.5;
             }
-            }
 
-            /* Hero Section - Erro */
+            /* Error State */
             .error-hero {
-                background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-                color: white;
-                padding: 60px 40px;
+                background: linear-gradient(135deg, var(--destructive), #c32a38);
+                color: var(--destructive-foreground);
+                padding: 2.5rem 1.5rem;
                 text-align: center;
-                position: relative;
-                overflow: hidden;
-            }
-
-            .error-hero::before {
-                content: '';
-                position: absolute;
-                top: -50%;
-                left: -50%;
-                width: 200%;
-                height: 200%;
-                background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-                animation: pulse 3s ease-in-out infinite;
-            }
-
-            .error-animation {
-                margin-bottom: 30px;
-                position: relative;
-                z-index: 2;
             }
 
             .error-circle {
-                width: 120px;
-                height: 120px;
-                margin: 0 auto;
-                position: relative;
+                width: 80px;
+                height: 80px;
+                margin: 0 auto 1.5rem;
+            }
+
+            .error-icon {
+                width: 100%;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
             }
 
             .error-cross {
-                width: 120px;
-                height: 120px;
-                border-radius: 50%;
-                display: block;
-                stroke-width: 3;
-                stroke: #fff;
-                stroke-miterlimit: 10;
-                animation: scale 0.3s ease-in-out 0.5s both;
+                width: 52px;
+                height: 52px;
+                animation: shake 0.5s ease-in-out;
             }
 
             .error-circle-bg {
-                stroke-dasharray: 166;
-                stroke-dashoffset: 166;
-                stroke-width: 3;
-                stroke-miterlimit: 10;
-                stroke: #fff;
-                fill: none;
-                animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+                stroke: var(--destructive-foreground);
+                stroke-width: 2;
+                opacity: 0.3;
             }
 
-            .error-cross-line1, .error-cross-line2 {
-                stroke-dasharray: 28;
-                stroke-dashoffset: 28;
-                animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+            .error-cross-line1,
+            .error-cross-line2 {
+                stroke: var(--destructive-foreground);
+                stroke-width: 3;
+                stroke-linecap: round;
             }
 
             .error-title {
-                font-size: 2.5rem;
+                font-size: 1.8rem;
                 font-weight: 700;
-                margin: 0 0 15px 0;
-                text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                position: relative;
-                z-index: 2;
+                margin: 0 0 0.5rem 0;
             }
 
             .error-subtitle {
-                font-size: 1.2rem;
-                margin: 0 0 30px 0;
+                font-size: 1rem;
                 opacity: 0.9;
-                position: relative;
-                z-index: 2;
             }
 
-            .error-code-highlight {
-                background: rgba(255,255,255,0.2);
-                border-radius: 12px;
-                padding: 20px;
-                backdrop-filter: blur(10px);
-                border: 1px solid rgba(255,255,255,0.3);
-                position: relative;
-                z-index: 2;
-            }
-
-            .error-code-label {
-                display: block;
+            .retry-button, .contact-button {
+                background: var(--primary);
+                color: var(--primary-foreground);
+                border: none;
+                padding: 0.75rem 1.5rem;
+                border-radius: var(--radius-md, 1rem);
+                cursor: pointer;
                 font-size: 0.9rem;
-                opacity: 0.8;
-                margin-bottom: 8px;
+                margin: 0.5rem;
+                transition: background 0.2s;
             }
 
-            .error-code-value {
-                display: block;
-                font-size: 1.2rem;
-                font-weight: 700;
-                font-family: 'Courier New', monospace;
-                letter-spacing: 1px;
+            .retry-button:hover, .contact-button:hover {
+                background: var(--secondary);
+                color: var(--secondary-foreground);
             }
 
-            /* Error Message */
-            .error-message {
-                display: flex;
-                align-items: flex-start;
-                padding: 25px;
-                background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
-                border-radius: 12px;
-                border-left: 4px solid #dc3545;
+            /* Error Actions Card */
+            .error-actions-card {
+                background: var(--card);
+                border: 1px solid var(--border);
+                border-radius: var(--radius-lg, 1.3rem);
+                padding: 0;
+                margin: 1.5rem 0;
             }
 
-            .message-icon {
-                width: 40px;
-                height: 40px;
-                background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 1.2rem;
-                margin-right: 15px;
-                flex-shrink: 0;
-            }
-
-            .message-content p {
+            .error-actions-card h4 {
+                background: var(--muted);
                 margin: 0;
+                padding: 1rem 1.5rem;
+                border-bottom: 1px solid var(--border);
                 font-size: 1.1rem;
-                color: #495057;
-                line-height: 1.6;
+                font-weight: 600;
+                color: var(--card-foreground);
             }
 
-            /* Actions Grid */
             .actions-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-                gap: 25px;
-                padding: 30px;
+                padding: 1.5rem;
+                display: flex;
+                flex-direction: column;
+                gap: 1.5rem;
             }
 
             .action-item {
-                background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
-                border-radius: 16px;
-                padding: 30px;
-                text-align: center;
-                border: 1px solid #e9ecef;
-                transition: transform 0.3s ease, box-shadow 0.3s ease;
-            }
-
-            .action-item:hover {
-                transform: translateY(-3px);
-                box-shadow: 0 12px 35px rgba(0,0,0,0.15);
+                display: flex;
+                align-items: flex-start;
+                gap: 1rem;
+                padding: 1rem;
+                background: var(--background);
+                border: 1px solid var(--border);
+                border-radius: var(--radius-md, 1rem);
             }
 
             .action-icon {
-                width: 60px;
-                height: 60px;
-                background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-                border-radius: 50%;
+                font-size: 1.5rem;
+                flex-shrink: 0;
+                width: 40px;
+                height: 40px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                font-size: 1.8rem;
-                margin: 0 auto 20px;
+                background: var(--accent);
+                border-radius: 50%;
+            }
+
+            .action-content {
+                flex: 1;
             }
 
             .action-content h4 {
-                margin: 0 0 12px 0;
-                font-size: 1.2rem;
+                margin: 0 0 0.5rem 0;
+                font-size: 1rem;
                 font-weight: 600;
-                color: #212529;
+                color: var(--foreground);
+                background: none;
+                padding: 0;
+                border: none;
             }
 
             .action-content p {
-                margin: 0 0 20px 0;
-                font-size: 0.95rem;
-                color: #6c757d;
+                margin: 0 0 1rem 0;
+                font-size: 0.9rem;
+                color: var(--muted-foreground);
                 line-height: 1.5;
             }
 
             .action-btn {
-                background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-                color: white;
+                background: var(--primary);
+                color: var(--primary-foreground);
                 border: none;
-                padding: 12px 24px;
-                border-radius: 8px;
-                font-weight: 600;
+                padding: 0.75rem 1.5rem;
+                border-radius: var(--radius-md, 1rem);
                 cursor: pointer;
-                transition: all 0.3s ease;
-                font-size: 0.95rem;
+                font-size: 0.9rem;
+                font-weight: 600;
+                transition: all 0.2s;
             }
 
             .action-btn:hover {
+                background: var(--secondary);
+                color: var(--secondary-foreground);
                 transform: translateY(-1px);
-                box-shadow: 0 6px 20px rgba(0,123,255,0.3);
             }
 
-            .action-btn.retry-btn {
-                background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            .retry-btn {
+                background: var(--chart-2);
+                color: var(--primary-foreground);
             }
 
-            .action-btn.retry-btn:hover {
-                box-shadow: 0 6px 20px rgba(40,167,69,0.3);
+            .retry-btn:hover {
+                background: var(--chart-4);
             }
 
-            .action-btn.secondary-btn {
-                background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+            .secondary-btn {
+                background: var(--secondary);
+                color: var(--secondary-foreground);
             }
 
-            .action-btn.secondary-btn:hover {
-                box-shadow: 0 6px 20px rgba(108,117,125,0.3);
+            .secondary-btn:hover {
+                background: var(--muted);
+                color: var(--muted-foreground);
             }
 
-            .action-btn.contact-btn {
-                background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+            .contact-btn {
+                background: var(--chart-1);
+                color: var(--primary-foreground);
             }
 
-            .action-btn.contact-btn:hover {
-                box-shadow: 0 6px 20px rgba(23,162,184,0.3);
+            .contact-btn:hover {
+                background: var(--chart-3);
             }
 
             /* Animações */
@@ -9855,8 +10537,12 @@ window.testViatorAPI = function() {
     return bookingManager.testApiAccess();
 };
 
-// Inicializar quando o DOM estiver carregado
-document.addEventListener('DOMContentLoaded', function() {
-    const bookingManager = new ViatorBookingManager();
-    bookingManager.init();
-});
+// Garantir que a instância global seja inicializada
+if (!window.viatorBookingManager) {
+    document.addEventListener('DOMContentLoaded', function() {
+        if (!window.viatorBookingManager) {
+            window.viatorBookingManager = new ViatorBookingManager();
+            window.viatorBookingManager.init();
+        }
+    });
+}

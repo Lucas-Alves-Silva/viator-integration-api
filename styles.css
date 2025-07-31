@@ -2810,6 +2810,59 @@
     padding: 0 20px;
 }
 
+/* Botões de navegação para carrossel de passeios */
+.viator-tours-nav-prev,
+.viator-tours-nav-next {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 10;
+    color: #666;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.viator-tours-nav-prev {
+    left: 10px;
+}
+
+.viator-tours-nav-next {
+    right: 10px;
+}
+
+.viator-tours-nav-prev:hover,
+.viator-tours-nav-next:hover {
+    background: #0056B3;
+    border-color: #0056B3;
+    color: white;
+    box-shadow: 0 4px 12px rgba(4, 132, 107, 0.2);
+}
+
+.viator-tours-nav-prev.swiper-button-disabled,
+.viator-tours-nav-next.swiper-button-disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: #f5f5f5;
+    color: #ccc;
+}
+
+.viator-tours-nav-prev.swiper-button-disabled:hover,
+.viator-tours-nav-next.swiper-button-disabled:hover {
+    background: #f5f5f5;
+    border-color: #e0e0e0;
+    color: #ccc;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
 /* Padronização da altura dos cards no carrossel de tours */
 .viator-tours-section .viator-card {
     height: 450px; /* Altura fixa para todos os cards */

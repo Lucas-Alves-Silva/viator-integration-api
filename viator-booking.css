@@ -32,6 +32,15 @@ body.viator-modal-open {
     overflow: hidden; /* Previne qualquer scroll fora do modal */
 }
 
+/* Garantir que não haja sobreposição de backgrounds no modal */
+.viator-modal::before {
+    display: none !important;
+}
+
+.viator-modal::after {
+    display: none !important;
+}
+
 .viator-modal-content {
     background: white;
     border-radius: 12px;
@@ -2304,13 +2313,9 @@ body.viator-modal-open {
     padding: 12px 16px;
     border-radius: 8px;
     font-size: 13px;
-    margin-top: 15px;
+    margin-bottom: 20px;
     border: 1px solid #c3e6cb;
     font-weight: 500;
-}
-
-.security-notice {
-    margin-bottom: 20px;
 }
 
 /* Billing note styling */
@@ -2325,7 +2330,21 @@ body.viator-modal-open {
     font-weight: 500;
 }
 
-/* Form text styling para campos de ajuda */
+/* Form text styling para campos de ajuda - oculto no modal para evitar poluição visual */
+.viator-modal .form-text {
+    display: none !important;
+}
+
+/* Placeholders do modal com peso normal para evitar negrito */
+.viator-modal input::placeholder,
+.viator-modal textarea::placeholder,
+.viator-modal select::placeholder {
+    font-weight: 400 !important;
+    font-style: normal !important;
+    color: #6c757d !important;
+}
+
+/* Form text styling para campos de ajuda fora do modal */
 .form-text {
     display: block;
     margin-top: 5px;
@@ -2969,15 +2988,16 @@ body.viator-modal-open {
 }
 
 .confirmation-message {
-    max-width: 600px;
-    margin: 0 auto;
+    width: 100%;
+    margin: 0;
+    padding: 0;
 }
 
 /* Status de Confirmação */
 .confirmation-status {
-    margin-bottom: 30px;
-    padding: 25px;
-    border-radius: 15px;
+    margin: 0 0 25px 0;
+    padding: 30px 25px;
+    border-radius: 12px;
     position: relative;
     overflow: hidden;
 }
@@ -3036,8 +3056,9 @@ body.viator-modal-open {
     background: #f8f9fa;
     border-radius: 12px;
     padding: 25px;
-    margin: 25px 0;
+    margin: 20px 0;
     border: 1px solid #e9ecef;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
 .booking-details h4 {
@@ -3776,6 +3797,143 @@ body.viator-modal-open {
 .form-control.is-invalid:focus {
     border-color: #dc3545;
     box-shadow: 0 0 0 .25rem rgba(220, 53, 69, .25);
+}
+
+/* Estilos para campos de formulário válidos */
+.form-control.is-valid {
+    border-color: #28a745;
+    padding-right: calc(1.5em + .75rem);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%2328a745' d='m2.3 6.73.94-.94 2.94-2.94.94-.94.94.94L2.3 8.5z'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right calc(.375em + .1875rem) center;
+    background-size: calc(.75em + .375rem) calc(.75em + .375rem);
+}
+
+.form-control.is-valid:focus {
+    border-color: #28a745;
+    box-shadow: 0 0 0 .25rem rgba(40, 167, 69, .25);
+}
+
+/* Indicadores de tipo de cartão */
+.card-input-container {
+    position: relative;
+}
+
+.card-type-indicator {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 20px;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 2;
+}
+
+.card-type-indicator.show {
+    opacity: 1;
+}
+
+/* Ícones dos tipos de cartão */
+.card-type-indicator.visa {
+    background-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCA0MCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjI0IiByeD0iNCIgZmlsbD0iIzAwNTFBNSIvPgo8cGF0aCBkPSJNMTYuNzUgN0gxNC4yNUwxMi41IDE3SDE1TDE2Ljc1IDdaIiBmaWxsPSJ3aGl0ZSIvPgo8cGF0aCBkPSJNMjMuNSA3SDIxTDE5IDEwLjVMMTcuNSA3SDE0LjVMMTcuNSAxN0gyMEwyMy41IDdaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4K');
+}
+
+.card-type-indicator.mastercard {
+    background-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCA0MCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjI0IiByeD0iNCIgZmlsbD0iI0VCMDAxQiIvPgo8Y2lyY2xlIGN4PSIxNSIgY3k9IjEyIiByPSI3IiBmaWxsPSIjRkY1RjAwIi8+CjxjaXJjbGUgY3g9IjI1IiBjeT0iMTIiIHI9IjciIGZpbGw9IiNGRkY1RjAiLz4KPC9zdmc+Cg==');
+}
+
+.card-type-indicator.amex {
+    background-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCA0MCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjI0IiByeD0iNCIgZmlsbD0iIzAwNkZDRiIvPgo8cGF0aCBkPSJNMTAgN0g4TDYgMTdIOEwxMCA3WiIgZmlsbD0id2hpdGUiLz4KPHBhdGggZD0iTTE2IDdIMTNMMTEgMTBMMTMgMTNIMTZMMTggMTBMMTYgN1oiIGZpbGw9IndoaXRlIi8+CjxwYXRoIGQ9Ik0yNCA3SDIyTDIwIDEwTDIyIDEzSDI0TDI2IDEwTDI0IDdaIiBmaWxsPSJ3aGl0ZSIvPgo8cGF0aCBkPSJNMzIgN0gzMEwyOCAxN0gzMEwzMiA3WiIgZmlsbD0id2hpdGUiLz4KPC9zdmc+Cg==');
+}
+
+.card-type-indicator.discover {
+    background-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCA0MCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjI0IiByeD0iNCIgZmlsbD0iI0ZGNjAwMCIvPgo8cGF0aCBkPSJNOCA5SDEyVjE1SDhWOVoiIGZpbGw9IndoaXRlIi8+CjxwYXRoIGQ9Ik0xNiA5SDIwVjE1SDE2VjlaIiBmaWxsPSJ3aGl0ZSIvPgo8cGF0aCBkPSJNMjQgOUgyOFYxNUgyNFY5WiIgZmlsbD0id2hpdGUiLz4KPC9zdmc+Cg==');
+}
+
+/* Ajuste para campos com indicador de cartão */
+.card-input-container .form-control {
+    padding-right: 50px;
+}
+
+.card-input-container .form-control.is-valid,
+.card-input-container .form-control.is-invalid {
+    padding-right: 80px;
+}
+
+/* Mensagens de erro específicas para pagamento */
+.payment-error-message {
+    color: #dc3545;
+    font-size: 12px;
+    margin-top: 5px;
+    padding: 8px 12px;
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+    line-height: 1.4;
+    display: none;
+}
+
+.payment-error-message.show {
+    display: block;
+}
+
+/* Animações para feedback visual */
+.form-control {
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+/* Estilos específicos para campos CVV */
+.cvv-input-container {
+    position: relative;
+}
+
+.cvv-help-icon {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    background: #6c757d;
+    border-radius: 50%;
+    color: white;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: help;
+    z-index: 2;
+}
+
+.cvv-help-icon:hover {
+    background: #495057;
+}
+
+/* Tooltip para CVV */
+.cvv-tooltip {
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    background: #333;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+    z-index: 1000;
+}
+
+.cvv-help-icon:hover .cvv-tooltip {
+    opacity: 1;
+    visibility: visible;
 }
 
 /* Responsividade */
@@ -5146,5 +5304,74 @@ body.viator-modal-open {
     .number-unit-input-group .number-unit {
         flex: 1;
         width: 100%;
+    }
+}
+
+/* ===== INDICADOR DE PROGRESSO DO PAGAMENTO ===== */
+#payment-progress-indicator {
+    margin: 20px 0;
+    padding: 15px 20px;
+    border-radius: 8px;
+    border: none;
+    font-weight: 500;
+    font-size: 14px;
+    animation: slideInDown 0.3s ease-out;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+#payment-progress-indicator.alert-info {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+    color: white;
+    border-left: 4px solid #0c5460;
+}
+
+#payment-progress-indicator.alert-success {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    border-left: 4px solid #155724;
+}
+
+#payment-progress-indicator .d-flex {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#payment-progress-indicator .spinner-border {
+    width: 1.2rem;
+    height: 1.2rem;
+    border-width: 2px;
+    border-color: rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes slideInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsivo para mobile */
+@media (max-width: 768px) {
+    #payment-progress-indicator {
+        margin: 15px 0;
+        padding: 12px 15px;
+        font-size: 13px;
+    }
+    
+    #payment-progress-indicator .spinner-border {
+        width: 1rem;
+        height: 1rem;
     }
 }
