@@ -480,7 +480,7 @@ class ViatorBookingSystem {
     /**
      * Confirmar a reserva
      */
-    public function confirm_booking($cart_id, $payment_token, $booker_info, $booking_question_answers = []) {
+    public function confirm_booking($cart_id, $payment_token, $booker_info, $booking_question_answers = [], $hold_data = []) {
         if (empty($this->api_key)) {
             return array('error' => viator_t('error_api_key'));
         }
@@ -504,9 +504,15 @@ class ViatorBookingSystem {
             'booking_ref' => $booking_ref
         ]);
         
-        // Obter referências da resposta do hold salva
-        $hold_response = $this->last_hold_response ?? [];
+        // Usar dados do hold passados como parâmetro ou fallback para last_hold_response
+        $hold_response = !empty($hold_data) ? $hold_data : ($this->last_hold_response ?? []);
         $hold_items = $hold_response['items'] ?? [];
+        
+        viator_debug_log('Hold Data recebido para confirmação:', [
+            'hold_data_provided' => !empty($hold_data),
+            'hold_items_count' => count($hold_items),
+            'hold_response_keys' => array_keys($hold_response)
+        ]);
         
         // Construir array items para confirmação
         $confirm_items = [];
@@ -1771,12 +1777,13 @@ class ViatorBookingSystem {
         $payment_token = sanitize_text_field($_POST['payment_token']);
         $booker_info = json_decode(stripslashes($_POST['booker_info']), true);
         $booking_question_answers = isset($_POST['bookingQuestionAnswers']) ? json_decode(stripslashes($_POST['bookingQuestionAnswers']), true) : [];
+        $hold_data = isset($_POST['hold_data']) ? json_decode(stripslashes($_POST['hold_data']), true) : [];
 
         if (empty($cart_id) || empty($payment_token) || empty($booker_info)) {
             wp_send_json_error(['message' => 'Dados incompletos para confirmação']);
         }
 
-        $result = $this->confirm_booking($cart_id, $payment_token, $booker_info, $booking_question_answers);
+        $result = $this->confirm_booking($cart_id, $payment_token, $booker_info, $booking_question_answers, $hold_data);
 
         if (isset($result['error']) && $result['error']) {
             wp_send_json_error($result);

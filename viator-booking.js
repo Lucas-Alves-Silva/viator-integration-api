@@ -8030,6 +8030,9 @@ this.renderLocationOptions();
                 console.log('🔍 Valor do partnerCartRef:', data.data.partnerCartRef);
                 
                 this.bookingData.holdData = data.data;
+
+                // Clonar a resposta completa para evitar referências circulares
+                this.bookingData.holdData.fullResponse = JSON.parse(JSON.stringify(data.data));
                 
                 // CRÍTICO: Usar o cartRef real retornado pela API da Viator, não o partnerCartRef
                 if (data.data.cartRef) {
@@ -8345,6 +8348,7 @@ this.renderLocationOptions();
                 partner_booking_ref: this.bookingData.holdData.bookingRef || '',
                 payment_token: this.bookingData.paymentToken,
                 booker_info: JSON.stringify(bookerInfo),
+                hold_data: JSON.stringify(this.bookingData.holdData.fullResponse || {}),
                 nonce: viatorBookingAjax.nonce
             };
             
