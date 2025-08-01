@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Viator API Integration
  * Description: Integração com a API da Viator para exibição de produtos e passeios. Utilize o shortcode [viator_search]
- * Version: 1.5
+ * Version: 1.6
  * Author: Lucas Alves
  * Text Domain: viator-integration
  */

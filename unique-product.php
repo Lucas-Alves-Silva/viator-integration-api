@@ -3935,8 +3935,3 @@ function viator_format_location_address($address) {
     
     return implode(', ', $parts);
 }
-
-
-
-
-
