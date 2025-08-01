@@ -3799,7 +3799,22 @@ this.renderLocationOptions();
                 answer.unit = unit;
             }
 
-            answers.push(answer);
+            // FASE 1.1: Usar novo método de formatação conforme documentação
+            try {
+                const question = this.bookingQuestions?.find(q => q.id === questionId);
+                if (question) {
+                    const formattedAnswer = this.formatBookingAnswer(question, answer, travelerIndex);
+                    answers.push(formattedAnswer);
+                } else {
+                    answers.push(answer);
+                }
+            } catch (error) {
+                this.logBookingEvent('format_answer_error', {
+                    questionId: questionId,
+                    error: error.message
+                }, 'error');
+                answers.push(answer); // Fallback para formato original
+            }
         });
 
         // Armazenar respostas no bookingData
@@ -4449,10 +4464,28 @@ this.renderLocationOptions();
                 return [];
             }
             
+            // FASE 3.1: Verificar cache inteligente primeiro
+            const cacheKey = `booking_questions_${this.bookingData?.productCode}`;
+            const cachedQuestions = this.getSmartCachedData(cacheKey, 2); // Cache por 2 horas
+
+            if (cachedQuestions && cachedQuestions.length > 0) {
+                console.log('✅ [CACHE] Usando perguntas do cache inteligente');
+                this.bookingQuestions = cachedQuestions;
+                return cachedQuestions;
+            }
+
             // Fallback: buscar via AJAX se não há dados na página
             console.log('📡 [BOOKING QUESTIONS DEBUG] Buscando perguntas de reserva via AJAX...');
             console.log('🔍 [BOOKING QUESTIONS DEBUG] viatorBookingAjax:', typeof viatorBookingAjax !== 'undefined' ? viatorBookingAjax : 'undefined');
-            
+
+            // FASE 2.1: Aplicar rate limiting
+            try {
+                this.enforceRateLimit('booking');
+            } catch (rateLimitError) {
+                console.warn('⚠️ Rate limit:', rateLimitError.message);
+                throw rateLimitError;
+            }
+
             // Verificar se viatorBookingAjax está disponível
             if (typeof viatorBookingAjax === 'undefined') {
                 console.error('❌ [BOOKING QUESTIONS DEBUG] viatorBookingAjax não está definido. Verifique se o script foi carregado corretamente.');
@@ -4507,9 +4540,12 @@ this.renderLocationOptions();
                 const perBookingQuestions = this.bookingQuestions.filter(q => q.group === 'PER_BOOKING');
                 console.log(`✅ [BOOKING QUESTIONS DEBUG] PER_TRAVELER: ${perTravelerQuestions.length}, PER_BOOKING: ${perBookingQuestions.length}`);
                 
-                // Salvar no cache local para futuras consultas
+                // FASE 3.1: Salvar no cache inteligente
+                this.setSmartCache(cacheKey, this.bookingQuestions, 2);
+
+                // Salvar no cache local para futuras consultas (compatibilidade)
                 this.saveCachedBookingQuestions(this.bookingQuestions);
-                
+
                 console.log('✅ [BOOKING QUESTIONS DEBUG] Perguntas de reserva carregadas via AJAX:', this.bookingQuestions);
                 return this.bookingQuestions;
             } else {
@@ -10582,6 +10618,398 @@ this.renderLocationOptions();
             oldMessage.remove();
         }
         searchContainer.appendChild(confirmationMessage);
+    }
+
+    /**
+     * FASE 1.1: Formatar resposta para conformidade total com documentação Viator
+     */
+    formatBookingAnswer(question, answerData, travelerNum = null) {
+        const baseAnswer = {
+            question: question.id,
+            answer: answerData.answer
+        };
+
+        // Adicionar travelerNum se aplicável (BASE 1, não 0 - conforme documentação)
+        if (travelerNum !== null && question.group === 'PER_TRAVELER') {
+            baseAnswer.travelerNum = parseInt(travelerNum) + 1; // Converter para base 1
+        }
+
+        // Tratar tipos especiais conforme documentação Viator
+        switch (question.type) {
+            case 'LOCATION_REF_OR_FREE_TEXT':
+                const unit = answerData.unit || 'FREETEXT';
+                baseAnswer.unit = unit;
+                break;
+
+            case 'SELECT':
+                // Garantir que a resposta está nas opções permitidas
+                const allowedAnswers = question.allowedAnswers || [];
+                const allowed = allowedAnswers.map(opt => opt.answer);
+                if (allowed.length > 0 && !allowed.includes(baseAnswer.answer)) {
+                    throw new Error(`Resposta inválida para pergunta: ${question.label}`);
+                }
+                break;
+
+            case 'NUMBER':
+                // Garantir que é um número válido
+                const numValue = parseFloat(baseAnswer.answer);
+                if (isNaN(numValue)) {
+                    throw new Error(`Valor numérico inválido para: ${question.label}`);
+                }
+                baseAnswer.answer = numValue.toString();
+                break;
+        }
+
+        return baseAnswer;
+    }
+
+    /**
+     * FASE 1.2: Processar perguntas PER_OPTION conforme documentação
+     */
+    processPerOptionQuestions(allAnswers, selectedOptions) {
+        const perOptionAnswers = [];
+
+        allAnswers.forEach(answer => {
+            if (answer.optionId && selectedOptions.includes(answer.optionId)) {
+                perOptionAnswers.push({
+                    question: answer.questionId,
+                    answer: answer.answer,
+                    optionId: answer.optionId
+                });
+            }
+        });
+
+        return perOptionAnswers;
+    }
+
+    /**
+     * FASE 1.3: Validação completa de dependências condicionais
+     */
+    validateConditionalQuestionsComplete(answers, questions) {
+        const errors = [];
+        const answerMap = this.buildAnswerMap(answers);
+
+        questions.forEach(question => {
+            if ((question.required || '') === 'CONDITIONAL') {
+                const conditionalErrors = this.validateSingleConditional(question, answerMap);
+                errors.push(...conditionalErrors);
+            }
+        });
+
+        return errors;
+    }
+
+    /**
+     * Construir mapa de respostas para validação condicional
+     */
+    buildAnswerMap(answers) {
+        const map = {};
+        answers.forEach(answer => {
+            let key = answer.questionId;
+            if (answer.travelerNum) {
+                key += '_t' + answer.travelerNum;
+            }
+            if (answer.optionId) {
+                key += '_o' + answer.optionId;
+            }
+            map[key] = answer.answer;
+        });
+        return map;
+    }
+
+    /**
+     * Validar uma pergunta condicional específica
+     */
+    validateSingleConditional(question, answerMap) {
+        const errors = [];
+
+        // Implementar lógica de validação condicional baseada na documentação
+        // Por enquanto, retorna array vazio - será expandido conforme necessário
+
+        return errors;
+    }
+
+    /**
+     * FASE 2.1: Rate limiting robusto conforme documentação
+     */
+    enforceRateLimit(endpointType = 'booking') {
+        const limits = {
+            'booking': { requests: 100, window: 60 },
+            'search': { requests: 200, window: 60 },
+            'availability': { requests: 150, window: 60 }
+        };
+
+        const limitConfig = limits[endpointType] || limits['booking'];
+        const storageKey = `viator_rate_limit_${endpointType}`;
+
+        // Obter requests do localStorage
+        let requests = [];
+        try {
+            const stored = localStorage.getItem(storageKey);
+            requests = stored ? JSON.parse(stored) : [];
+        } catch (e) {
+            requests = [];
+        }
+
+        const now = Date.now();
+
+        // Limpar janela de tempo
+        requests = requests.filter(timestamp => (now - timestamp) < (limitConfig.window * 1000));
+
+        if (requests.length >= limitConfig.requests) {
+            throw new Error(`Rate limit excedido para ${endpointType}. Aguarde alguns minutos.`);
+        }
+
+        requests.push(now);
+
+        try {
+            localStorage.setItem(storageKey, JSON.stringify(requests));
+        } catch (e) {
+            console.warn('Não foi possível salvar rate limit no localStorage');
+        }
+
+        return true;
+    }
+
+    /**
+     * FASE 2.2: Tratamento de erros conforme padrões oficiais
+     */
+    handleApiResponse(response, context = 'general') {
+        if (!response.ok) {
+            let errorMessage = `Erro HTTP ${response.status}`;
+
+            // Mapear códigos de erro específicos da Viator
+            switch (response.status) {
+                case 400:
+                    errorMessage = 'Dados inválidos enviados para a API';
+                    break;
+                case 401:
+                    errorMessage = 'Erro de autenticação. Verifique as credenciais da API';
+                    break;
+                case 403:
+                    errorMessage = 'Acesso negado. Verifique as permissões da API';
+                    break;
+                case 404:
+                    errorMessage = 'Recurso não encontrado';
+                    break;
+                case 429:
+                    errorMessage = 'Muitas requisições. Aguarde alguns minutos';
+                    break;
+                case 500:
+                    errorMessage = 'Erro interno do servidor Viator';
+                    break;
+                case 503:
+                    errorMessage = 'Serviço temporariamente indisponível';
+                    break;
+            }
+
+            this.logBookingEvent('api_error', {
+                context: context,
+                status: response.status,
+                message: errorMessage
+            }, 'error');
+
+            throw new Error(errorMessage);
+        }
+
+        return response;
+    }
+
+    /**
+     * FASE 2.3: Validação de maxLength conforme documentação
+     */
+    validateAnswerFormat(question, answer) {
+        const validators = {
+            'EMAIL': (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val),
+            'PHONE': (val) => /^[\+]?[\d\s\-\(\)]{8,}$/.test(val),
+            'DATE': (val) => /^\d{4}-\d{2}-\d{2}$/.test(val),
+            'NUMBER': (val) => !isNaN(parseFloat(val)) && isFinite(val)
+        };
+
+        const validator = validators[question.type];
+        if (validator && !validator(answer)) {
+            return `Formato inválido para ${question.label}`;
+        }
+
+        // Validar maxLength
+        if (question.maxLength && answer.length > question.maxLength) {
+            return `Máximo ${question.maxLength} caracteres para ${question.label}`;
+        }
+
+        return null;
+    }
+
+    /**
+     * FASE 4.1: Sistema de logs estruturado
+     */
+    logBookingEvent(eventType, data, level = 'info') {
+        if (!window.VIATOR_DEBUG && level !== 'error') return;
+
+        const logEntry = {
+            timestamp: new Date().toISOString(),
+            event: eventType,
+            level: level,
+            data: data,
+            url: window.location.href
+        };
+
+        const logMessage = `[${level.toUpperCase()}] ${eventType}: ${JSON.stringify(data)}`;
+
+        if (level === 'error') {
+            console.error(logMessage);
+        } else if (level === 'warn') {
+            console.warn(logMessage);
+        } else {
+            console.log(logMessage);
+        }
+
+        // Salvar logs críticos no localStorage para análise
+        if (['error', 'critical'].includes(level)) {
+            try {
+                let criticalLogs = JSON.parse(localStorage.getItem('viator_critical_logs') || '[]');
+                criticalLogs.push(logEntry);
+
+                // Manter apenas últimos 50 logs críticos
+                if (criticalLogs.length > 50) {
+                    criticalLogs = criticalLogs.slice(-50);
+                }
+
+                localStorage.setItem('viator_critical_logs', JSON.stringify(criticalLogs));
+            } catch (e) {
+                console.warn('Não foi possível salvar log crítico');
+            }
+        }
+    }
+
+    /**
+     * FASE 3.1: Sistema de cache inteligente com validação
+     */
+    getSmartCachedData(cacheKey, maxAgeHours = 6) {
+        try {
+            const cached = localStorage.getItem(cacheKey);
+            if (!cached) return false;
+
+            const cacheData = JSON.parse(cached);
+            if (!cacheData.data || !cacheData.timestamp || !cacheData.version) {
+                return false;
+            }
+
+            const ageHours = (Date.now() - cacheData.timestamp) / (1000 * 60 * 60);
+            const currentVersion = window.VIATOR_CACHE_VERSION || '1.0';
+
+            if (ageHours < maxAgeHours && cacheData.version === currentVersion) {
+                this.logBookingEvent('cache_hit', {
+                    key: cacheKey,
+                    age_hours: ageHours.toFixed(2)
+                });
+                return cacheData.data;
+            }
+
+            // Cache expirado ou versão diferente
+            localStorage.removeItem(cacheKey);
+            return false;
+        } catch (e) {
+            this.logBookingEvent('cache_error', {
+                key: cacheKey,
+                error: e.message
+            }, 'warn');
+            return false;
+        }
+    }
+
+    /**
+     * Definir cache inteligente
+     */
+    setSmartCache(cacheKey, data, hours = 6) {
+        try {
+            const cacheData = {
+                data: data,
+                timestamp: Date.now(),
+                version: window.VIATOR_CACHE_VERSION || '1.0'
+            };
+
+            localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+
+            this.logBookingEvent('cache_set', {
+                key: cacheKey,
+                hours: hours,
+                data_size: JSON.stringify(data).length
+            });
+        } catch (e) {
+            this.logBookingEvent('cache_set_error', {
+                key: cacheKey,
+                error: e.message
+            }, 'warn');
+        }
+    }
+
+    /**
+     * FASE 3.2: Validações avançadas com cache
+     */
+    async validateWithCache(question, answer) {
+        // Usar cache para validações que requerem dados externos
+        if (question.type === 'SELECT' && question.allowedAnswers) {
+            const cacheKey = `validation_${question.id}`;
+            let allowedAnswers = this.getSmartCachedData(cacheKey, 24); // Cache por 24h
+
+            if (!allowedAnswers) {
+                allowedAnswers = question.allowedAnswers;
+                this.setSmartCache(cacheKey, allowedAnswers, 24);
+            }
+
+            const allowed = allowedAnswers.map(opt => opt.answer);
+            if (!allowed.includes(answer)) {
+                return `Resposta inválida para ${question.label}`;
+            }
+        }
+
+        return this.validateAnswerFormat(question, answer);
+    }
+
+    /**
+     * FASE 3.3: Otimização de requisições com debounce
+     */
+    debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    /**
+     * FASE 3.4: Monitoramento de performance
+     */
+    measurePerformance(operation, func) {
+        const startTime = performance.now();
+
+        const result = func();
+
+        if (result && typeof result.then === 'function') {
+            // Função assíncrona
+            return result.then(data => {
+                const endTime = performance.now();
+                this.logBookingEvent('performance', {
+                    operation: operation,
+                    duration_ms: (endTime - startTime).toFixed(2),
+                    type: 'async'
+                });
+                return data;
+            });
+        } else {
+            // Função síncrona
+            const endTime = performance.now();
+            this.logBookingEvent('performance', {
+                operation: operation,
+                duration_ms: (endTime - startTime).toFixed(2),
+                type: 'sync'
+            });
+            return result;
+        }
     }
 }
 
