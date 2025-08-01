@@ -1525,8 +1525,7 @@ body.viator-modal-open {
 
 /* Confirmation */
 .confirmation-success {
-    text-align: center;
-    padding: 40px 20px;
+    text-align: right;
 }
 
 .success-icon {
@@ -2984,7 +2983,6 @@ body.viator-modal-open {
 
 .confirmation-step {
     text-align: center;
-    padding: 20px 0;
 }
 
 .confirmation-message {

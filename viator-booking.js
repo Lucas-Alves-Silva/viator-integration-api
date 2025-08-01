@@ -3,6 +3,16 @@
  * Gerencia a interface do usuário para o processo de reserva
  */
 
+// LOG CRÍTICO PARA VERIFICAR SE JAVASCRIPT ESTÁ SENDO CARREGADO
+console.log('🚨 [CRITICAL DEBUG] viator-booking.js CARREGADO!');
+console.log('🚨 [CRITICAL DEBUG] Timestamp de carregamento:', new Date().toISOString());
+console.log('🚨 [CRITICAL DEBUG] URL atual:', window.location.href);
+
+// JavaScript carregado com sucesso
+
+// VERSÃO DO ARQUIVO PARA QUEBRAR CACHE
+window.VIATOR_BOOKING_VERSION = '2025-08-01-16:10:00';
+
 // Sistema de perguntas condicionais da Viator
 const ViatorConditionalQuestions = {
     dependencies: {},
@@ -3767,17 +3777,85 @@ this.renderLocationOptions();
      * Coletar todas as respostas das booking questions (formato compatível com backend PHP)
      */
     collectBookingQuestionAnswers() {
-        console.log('📝 Coletando respostas das booking questions...');
+        try {
+            console.log('📝 Coletando respostas das booking questions...');
+            console.log('🚨 [CRITICAL DEBUG] Método collectBookingQuestionAnswers() foi chamado!');
+            console.log('🚨 [CRITICAL DEBUG] Timestamp:', new Date().toISOString());
+            console.error('🚨 [FORCE LOG] collectBookingQuestionAnswers() EXECUTADO!');
 
         const answers = [];
         const questionInputs = document.querySelectorAll('.question-input');
 
-        questionInputs.forEach(input => {
+        console.log(`🔍 [DEBUG] Encontrados ${questionInputs.length} elementos .question-input`);
+        console.log('🔍 [DEBUG] Booking questions disponíveis:', this.bookingQuestions);
+
+        questionInputs.forEach((input, index) => {
+            console.log(`🔍 [DEBUG] Processando input ${index + 1}:`, {
+                id: input.id,
+                name: input.name,
+                value: input.value,
+                classList: Array.from(input.classList)
+            });
+
             const questionId = this.extractQuestionId(input);
             const travelerIndex = this.extractTravelerNumber(input);
             const value = input.value.trim();
 
-            if (!questionId || !value) return;
+            console.log(`🔍 [DEBUG] Dados extraídos: questionId=${questionId}, travelerIndex=${travelerIndex}, value="${value}"`);
+
+            if (!questionId) {
+                console.warn(`⚠️ [DEBUG] QuestionId não encontrado para input:`, input);
+                return;
+            }
+
+            // CORREÇÃO: Validação robusta usando múltiplas fontes
+            let question = this.bookingQuestions?.find(q => q.id === questionId);
+
+            // FALLBACK 1: Se this.bookingQuestions está vazio, verificar window.productData
+            if (!question && (!this.bookingQuestions || this.bookingQuestions.length === 0)) {
+                console.warn(`🔍 [FALLBACK] this.bookingQuestions está vazio, verificando window.productData...`);
+
+                if (window.productData && window.productData.bookingQuestions) {
+                    const productQuestion = window.productData.bookingQuestions.find(q => q.id === questionId);
+                    if (productQuestion) {
+                        question = {...productQuestion, source: 'window.productData'};
+                        console.log(`✅ [FALLBACK] Pergunta ${questionId} encontrada em window.productData`);
+                        console.error(`🚨 [FORCE LOG] FALLBACK 1 ATIVADO! Usando window.productData para ${questionId}`);
+                    }
+                }
+            }
+
+            // FALLBACK 2: Para SPECIAL_REQUIREMENTS, aceitar sempre (é comum em produtos Viator)
+            if (!question && questionId === 'SPECIAL_REQUIREMENTS') {
+                console.warn(`🔍 [FALLBACK] SPECIAL_REQUIREMENTS não encontrado nas listas, mas é campo comum. Aceitando.`);
+                console.error(`🚨 [FORCE LOG] FALLBACK 2 ATIVADO! Aceitando SPECIAL_REQUIREMENTS como válido`);
+                question = {
+                    id: 'SPECIAL_REQUIREMENTS',
+                    type: 'STRING',
+                    group: 'PER_BOOKING',
+                    required: 'OPTIONAL',
+                    source: 'fallback-hardcoded'
+                };
+            }
+
+            if (!question) {
+                console.warn(`⚠️ Pergunta ${questionId} não encontrada em nenhuma fonte válida. Ignorando.`);
+                return;
+            }
+
+            console.log(`✅ [DEBUG] Pergunta ${questionId} é válida:`, question);
+            console.error(`🚨 [FORCE LOG] Pergunta ${questionId} ACEITA! Fonte: ${question.source || 'this.bookingQuestions'}`);
+
+            // CORREÇÃO: Para campos opcionais vazios, permitir envio se usuário preencheu
+            if (!value) {
+                if (question.required !== 'MANDATORY') {
+                    console.log(`📝 Campo opcional ${questionId} vazio, não enviando.`);
+                    return;
+                } else {
+                    console.warn(`⚠️ Campo obrigatório ${questionId} está vazio!`);
+                    return;
+                }
+            }
 
             // Determinar scope baseado no tipo de pergunta
             const scope = this.getQuestionScope(questionId, travelerIndex);
@@ -3801,30 +3879,152 @@ this.renderLocationOptions();
 
             // FASE 1.1: Usar novo método de formatação conforme documentação
             try {
-                const question = this.bookingQuestions?.find(q => q.id === questionId);
-                if (question) {
-                    const formattedAnswer = this.formatBookingAnswer(question, answer, travelerIndex);
-                    answers.push(formattedAnswer);
-                } else {
-                    answers.push(answer);
-                }
+                const formattedAnswer = this.formatBookingAnswer(question, answer, travelerIndex);
+                answers.push(formattedAnswer);
+                console.log(`✅ Resposta válida coletada para ${questionId}:`, formattedAnswer);
             } catch (error) {
                 this.logBookingEvent('format_answer_error', {
                     questionId: questionId,
                     error: error.message
                 }, 'error');
-                answers.push(answer); // Fallback para formato original
+                console.error(`❌ Erro ao formatar resposta para ${questionId}:`, error.message);
+                // Não adicionar resposta com erro
             }
         });
 
-        // Armazenar respostas no bookingData
-        this.bookingData.bookingQuestionAnswers = answers;
+        // CORREÇÃO: Debug adicional antes da validação final
+        console.log('🔍 [DEBUG] Respostas coletadas antes da validação final:', answers);
+        console.log('🔍 [DEBUG] Booking questions válidas:', (this.bookingQuestions || []).map(q => q.id));
 
-        console.log('📝 Respostas coletadas:', answers.length);
-        console.log('📝 Dados das respostas:', answers);
+        // CORREÇÃO: Preservar respostas já coletadas, especialmente SPECIAL_REQUIREMENTS
+        const validQuestionIds = (this.bookingQuestions || []).map(q => q.id);
+        const validAnswers = answers.filter(answer => {
+            const questionId = answer.question || answer.questionId;
+
+            // Verificar se está na lista de perguntas válidas
+            const isInValidList = validQuestionIds.includes(questionId);
+
+            // SPECIAL_REQUIREMENTS é sempre válido (campo comum da Viator)
+            const isSpecialRequirements = questionId === 'SPECIAL_REQUIREMENTS';
+
+            // Aceitar se está na lista válida OU é SPECIAL_REQUIREMENTS
+            const isValid = isInValidList || isSpecialRequirements;
+
+            if (!isValid) {
+                console.warn(`⚠️ Removendo resposta para pergunta inválida: ${questionId}`);
+                this.logBookingEvent('invalid_question_filtered', {
+                    questionId: questionId,
+                    answer: answer.answer
+                }, 'warn');
+            } else if (isSpecialRequirements && !isInValidList) {
+                console.log(`✅ [PRESERVANDO] SPECIAL_REQUIREMENTS aceito mesmo não estando na lista válida`);
+                console.error(`🚨 [FORCE LOG] SPECIAL_REQUIREMENTS PRESERVADO! Valor: ${answer.answer}`);
+            }
+
+            return isValid;
+        });
+
+        // Armazenar apenas respostas válidas no bookingData
+        this.bookingData.bookingQuestionAnswers = validAnswers;
+
+        console.log('📝 Respostas coletadas (total):', answers.length);
+        console.log('✅ Respostas válidas (filtradas):', validAnswers.length);
+        console.log('📝 Dados das respostas válidas:', validAnswers);
+
+        // CORREÇÃO: Debug adicional para investigar problema
+        if (validAnswers.length === 0 && this.bookingQuestions && this.bookingQuestions.length > 0) {
+            console.error('🚨 [DEBUG] PROBLEMA: Nenhuma resposta coletada mas há booking questions disponíveis!');
+            console.error('🚨 [DEBUG] Verificando se campos estão sendo renderizados...');
+
+            // Verificar se há campos de SPECIAL_REQUIREMENTS no DOM
+            const specialReqInputs = document.querySelectorAll('input[data-question-id="SPECIAL_REQUIREMENTS"], textarea[data-question-id="SPECIAL_REQUIREMENTS"], input[name*="SPECIAL_REQUIREMENTS"], textarea[name*="SPECIAL_REQUIREMENTS"]');
+            console.error('🚨 [DEBUG] Campos SPECIAL_REQUIREMENTS encontrados:', specialReqInputs.length);
+            specialReqInputs.forEach((input, i) => {
+                console.error(`🚨 [DEBUG] Campo ${i + 1}:`, {
+                    tagName: input.tagName,
+                    id: input.id,
+                    name: input.name,
+                    value: input.value,
+                    classList: Array.from(input.classList),
+                    dataQuestionId: input.dataset.questionId
+                });
+            });
+
+            // USAR MÉTODO ALTERNATIVO DE COLETA
+            console.error('🚨 [DEBUG] Tentando método alternativo de coleta...');
+            const fallbackAnswers = this.collectSpecialRequirementsDirectly();
+            if (fallbackAnswers.length > 0) {
+                console.log('✅ [FALLBACK] Respostas coletadas pelo método alternativo:', fallbackAnswers);
+                validAnswers.push(...fallbackAnswers);
+                this.bookingData.bookingQuestionAnswers = validAnswers;
+                console.log('✅ [FALLBACK] bookingData atualizado com respostas alternativas');
+            }
+        }
+
+        if (validAnswers.length !== answers.length) {
+            const removedCount = answers.length - validAnswers.length;
+            console.warn(`⚠️ ${removedCount} respostas foram removidas por serem para perguntas inválidas`);
+            this.logBookingEvent('invalid_questions_removed', {
+                totalCollected: answers.length,
+                validAnswers: validAnswers.length,
+                removedCount: removedCount
+            }, 'warn');
+        }
 
         // Atualizar contador no UI se existir
-        this.updateBookingQuestionsCount(answers.length);
+        this.updateBookingQuestionsCount(validAnswers.length);
+
+        console.error('🚨 [FORCE LOG] collectBookingQuestionAnswers() FINALIZADO!');
+        console.error('🚨 [FORCE LOG] Respostas coletadas:', validAnswers.length);
+
+        return validAnswers;
+
+        } catch (error) {
+            console.error('🚨 [ERROR] Erro em collectBookingQuestionAnswers():', error);
+            return [];
+        }
+    }
+
+    /**
+     * MÉTODO ALTERNATIVO: Coletar SPECIAL_REQUIREMENTS diretamente
+     */
+    collectSpecialRequirementsDirectly() {
+        console.log('🚨 [FALLBACK] Coletando SPECIAL_REQUIREMENTS diretamente...');
+
+        const answers = [];
+
+        // Buscar por múltiplos seletores possíveis
+        const selectors = [
+            'input[data-question-id="SPECIAL_REQUIREMENTS"]',
+            'textarea[data-question-id="SPECIAL_REQUIREMENTS"]',
+            'input[name*="SPECIAL_REQUIREMENTS"]',
+            'textarea[name*="SPECIAL_REQUIREMENTS"]',
+            'input[id*="SPECIAL_REQUIREMENTS"]',
+            'textarea[id*="SPECIAL_REQUIREMENTS"]',
+            '.question-input[data-question-id="SPECIAL_REQUIREMENTS"]',
+            '.question-input[name*="SPECIAL_REQUIREMENTS"]'
+        ];
+
+        for (const selector of selectors) {
+            const elements = document.querySelectorAll(selector);
+            console.log(`🚨 [FALLBACK] Seletor "${selector}": ${elements.length} elementos encontrados`);
+
+            elements.forEach((element, index) => {
+                const value = element.value ? element.value.trim() : '';
+                console.log(`🚨 [FALLBACK] Elemento ${index + 1}: valor="${value}"`);
+
+                if (value) {
+                    answers.push({
+                        question: 'SPECIAL_REQUIREMENTS',
+                        questionId: 'SPECIAL_REQUIREMENTS',
+                        answer: value,
+                        travelerNum: 1,
+                        unit: null
+                    });
+                    console.log('🚨 [FALLBACK] SPECIAL_REQUIREMENTS coletado com sucesso!');
+                }
+            });
+        }
 
         return answers;
     }
@@ -3851,12 +4051,38 @@ this.renderLocationOptions();
      * Extrair ID da pergunta do campo
      */
     extractQuestionId(input) {
-        // Formato: QUESTION_ID ou QUESTION_ID_traveler_X ou QUESTION_ID_unit
-        const id = input.id || input.name;
-        if (!id) return null;
+        // CORREÇÃO: Múltiplas formas de detectar o questionId
 
-        // Remover sufixos _traveler_X, _unit, etc.
-        return id.split('_')[0];
+        // 1. Verificar data-question-id primeiro
+        if (input.dataset && input.dataset.questionId) {
+            console.log(`🔍 [DEBUG] QuestionId encontrado via data-question-id: ${input.dataset.questionId}`);
+            return input.dataset.questionId;
+        }
+
+        // 2. Verificar atributo data-question-id
+        const dataQuestionId = input.getAttribute('data-question-id');
+        if (dataQuestionId) {
+            console.log(`🔍 [DEBUG] QuestionId encontrado via getAttribute: ${dataQuestionId}`);
+            return dataQuestionId;
+        }
+
+        // 3. Formato tradicional: QUESTION_ID ou QUESTION_ID_traveler_X ou QUESTION_ID_unit
+        const id = input.id || input.name;
+        if (!id) {
+            console.warn(`⚠️ [DEBUG] Nenhum ID ou name encontrado para input:`, input);
+            return null;
+        }
+
+        // 4. Verificar se é SPECIAL_REQUIREMENTS diretamente
+        if (id.includes('SPECIAL_REQUIREMENTS')) {
+            console.log(`🔍 [DEBUG] QuestionId SPECIAL_REQUIREMENTS encontrado via ID/name: ${id}`);
+            return 'SPECIAL_REQUIREMENTS';
+        }
+
+        // 5. Remover sufixos _traveler_X, _unit, etc.
+        const questionId = id.split('_')[0];
+        console.log(`🔍 [DEBUG] QuestionId extraído via split: ${questionId} (de ${id})`);
+        return questionId;
     }
 
     /**
@@ -4255,9 +4481,17 @@ this.renderLocationOptions();
      */
     async validateBookingQuestions() {
         console.log('🔍 Validando booking questions para step 3...');
+        console.log('🚨 [CRITICAL DEBUG] validateBookingQuestions() foi chamado!');
+        console.log('🚨 [CRITICAL DEBUG] Timestamp:', new Date().toISOString());
 
         // Primeiro, coletar todas as respostas atuais
+        console.log('🚨 [CRITICAL DEBUG] Chamando collectBookingQuestionAnswers()...');
+        console.error('🚨 [FORCE LOG] Chamando collectBookingQuestionAnswers()...');
+
         this.collectBookingQuestionAnswers();
+
+        console.log('🚨 [CRITICAL DEBUG] collectBookingQuestionAnswers() finalizado');
+        console.error('🚨 [FORCE LOG] collectBookingQuestionAnswers() finalizado');
 
         // Validar se todas as perguntas obrigatórias foram respondidas
         const validation = this.validateAllBookingQuestions();
@@ -7989,10 +8223,29 @@ this.renderLocationOptions();
     async requestBookingHoldForPayment() {
         try {
             console.log('📋 Iniciando hold request com booking questions...');
+            console.log('🚨 [CRITICAL DEBUG] requestBookingHoldForPayment() foi chamado!');
+            console.log('🚨 [CRITICAL DEBUG] Timestamp:', new Date().toISOString());
 
             // IMPORTANTE: Usar as respostas já coletadas das booking questions (não recoletar)
             // As respostas já foram coletadas e validadas no Step 3
             const bookingQuestionAnswers = this.bookingData.bookingQuestionAnswers || [];
+
+            console.log('🚨 [CRITICAL DEBUG] bookingQuestionAnswers do bookingData:', bookingQuestionAnswers);
+            console.log('🚨 [CRITICAL DEBUG] bookingQuestionAnswers.length:', bookingQuestionAnswers.length);
+
+            // VERIFICAÇÃO CRÍTICA: Se não há respostas, tentar coleta alternativa
+            if (bookingQuestionAnswers.length === 0) {
+                console.error('🚨 [CRITICAL] Nenhuma booking question coletada! Tentando método alternativo...');
+
+                const fallbackAnswers = this.collectSpecialRequirementsDirectly();
+                if (fallbackAnswers.length > 0) {
+                    console.log('✅ [CRITICAL FALLBACK] Respostas coletadas:', fallbackAnswers);
+                    this.bookingData.bookingQuestionAnswers = fallbackAnswers;
+                    bookingQuestionAnswers = fallbackAnswers;
+                } else {
+                    console.error('❌ [CRITICAL FALLBACK] Nenhuma resposta coletada pelo método alternativo');
+                }
+            }
 
             console.log('📝 Booking questions para hold (usando dados já coletados):', {
                 count: bookingQuestionAnswers.length,
@@ -8390,7 +8643,21 @@ this.renderLocationOptions();
             
             // Incluir perguntas de reserva se existirem
             if (bookingQuestionAnswers && bookingQuestionAnswers.length > 0) {
+                console.log('📝 Enviando booking questions:', bookingQuestionAnswers);
+
+                // CORREÇÃO: Log detalhado das perguntas sendo enviadas
+                bookingQuestionAnswers.forEach((answer, index) => {
+                    console.log(`📝 Pergunta ${index + 1}:`, {
+                        question: answer.question || answer.questionId,
+                        answer: answer.answer,
+                        travelerNum: answer.travelerNum,
+                        unit: answer.unit
+                    });
+                });
+
                 requestParams.bookingQuestionAnswers = JSON.stringify(bookingQuestionAnswers);
+            } else {
+                console.log('📝 Nenhuma booking question para enviar');
             }
 
             const response = await fetch(viatorBookingAjax.ajaxurl, {
@@ -8406,13 +8673,56 @@ this.renderLocationOptions();
             
             if (data.success) {
                 console.log('✅ Confirmação bem-sucedida, exibindo mensagem');
-                this.bookingData.confirmationData = data.data;
-                this.displayConfirmationMessage(data.data);
+                console.log('📊 Dados de confirmação recebidos:', data.data);
+
+                // CORREÇÃO: Melhorar detecção de status de sucesso
+                const confirmationData = data.data;
+
+                // Verificar se há dados de confirmação válidos
+                if (confirmationData && confirmationData.bookingInfo) {
+                    // Se há bookingRef, considerar como sucesso mesmo sem status explícito
+                    if (confirmationData.bookingInfo.bookingRef && !confirmationData.custom_data?.confirmationStatus) {
+                        console.log('📋 Reserva processada com sucesso, definindo status como CONFIRMED');
+                        confirmationData.custom_data = confirmationData.custom_data || {};
+                        confirmationData.custom_data.confirmationStatus = 'CONFIRMED';
+                    }
+                } else {
+                    console.warn('⚠️ Dados de confirmação incompletos:', confirmationData);
+                }
+
+                this.bookingData.confirmationData = confirmationData;
+                this.displayConfirmationMessage(confirmationData);
                 return true;
             } else {
                 console.error('❌ Erro na confirmação:', data);
-                const reasons = data.data.reasons ? data.data.reasons.map(r => r.message).join(', ') : 'Detalhes não fornecidos.';
-                this.showDateError(`Erro na confirmação: ${data.data.message} (${reasons})`);
+
+                // CORREÇÃO: Melhorar extração de mensagens de erro
+                let errorMessage = 'Ocorreu um problema durante o processamento da sua reserva';
+                let errorDetails = '';
+
+                if (data.data) {
+                    if (data.data.message) {
+                        errorMessage = data.data.message;
+                    }
+
+                    if (data.data.reasons && Array.isArray(data.data.reasons)) {
+                        errorDetails = data.data.reasons.map(r => r.message || r).join(', ');
+                    } else if (data.data.error) {
+                        errorDetails = data.data.error;
+                    }
+                }
+
+                const fullErrorMessage = errorDetails ?
+                    `${errorMessage} (${errorDetails})` :
+                    errorMessage;
+
+                this.logBookingEvent('booking_confirmation_error', {
+                    message: errorMessage,
+                    details: errorDetails,
+                    fullResponse: data
+                }, 'error');
+
+                this.showDateError(fullErrorMessage);
                 return false;
             }
         } catch (error) {
@@ -8433,27 +8743,133 @@ this.renderLocationOptions();
             return;
         }
 
-        const status = data.custom_data?.confirmationStatus || 'UNKNOWN';
-        const isRestricted = data.custom_data?.isVoucherRestrictionRequired || false;
-        const bookingInfo = data.bookingInfo || {};
-        const bookingRef = bookingInfo.bookingRef || 'N/A';
-        const voucherInfo = bookingInfo.voucherInfo || {};
-        const itemSummary = bookingInfo.itemSummary || {};
-        
-        console.log('📊 Status da confirmação:', status);
+        // CORREÇÃO: Extrair dados da estrutura correta (data.items[0])
+        const firstItem = data.items && data.items.length > 0 ? data.items[0] : {};
+        let status = firstItem.status || data.custom_data?.confirmationStatus || 'UNKNOWN';
+        const bookingRef = firstItem.bookingRef || 'N/A';
+        const voucherInfo = firstItem.voucherInfo || data.voucherInfo || {};
+        const isRestricted = voucherInfo.isVoucherRestrictionRequired || data.custom_data?.isVoucherRestrictionRequired || false;
+        const itemSummary = firstItem.itemSummary || {};
+
+        console.error('🚨 [FORCE LOG] Estrutura de dados:', data);
+        console.error('🚨 [FORCE LOG] Primeiro item:', firstItem);
+        console.error('🚨 [FORCE LOG] Status extraído:', status);
+        console.error('🚨 [FORCE LOG] BookingRef extraído:', bookingRef);
+        console.error('🚨 [FORCE LOG] VoucherInfo extraído:', voucherInfo);
+
+        // CORREÇÃO: Se ainda está UNKNOWN mas temos bookingRef válido, usar CONFIRMED
+        if (status === 'UNKNOWN' && bookingRef && bookingRef !== 'N/A') {
+            console.log('📋 Detectado bookingRef válido, considerando como CONFIRMED');
+            console.error('🚨 [FORCE LOG] Mudando status para CONFIRMED (bookingRef válido)');
+            status = 'CONFIRMED';
+        }
+
+        // Se há dados de voucher, também considerar como sucesso
+        if (status === 'UNKNOWN' && (voucherInfo.url || voucherInfo.voucherURL || voucherInfo.voucherKey)) {
+            console.log('🎫 Detectado dados de voucher, considerando como CONFIRMED');
+            console.error('🚨 [FORCE LOG] Mudando status para CONFIRMED (voucher válido)');
+            status = 'CONFIRMED';
+        }
+
+        console.log('📊 Status da confirmação (após correção):', status);
         console.log('🔒 Voucher restrito:', isRestricted);
         console.log('📋 Referência da reserva:', bookingRef);
         
-        // Extrair informações adicionais
-        const productName = this.bookingData?.productTitle || 'Experiência';
+        // Extrair informações adicionais - múltiplas fontes para o nome do produto
+        // Função para verificar se um nome é genérico
+        const isGenericName = (name) => {
+            if (!name || typeof name !== 'string') return true;
+            const genericNames = ['experiência', 'passeio', 'tour', 'atividade', 'atração'];
+            return genericNames.some(generic => name.toLowerCase().trim() === generic);
+        };
+
+        // Buscar nome específico, ignorando nomes genéricos
+        let productName = 'Experiência';
+
+        // 1ª fonte: dados salvos
+        const savedTitle = this.bookingData?.productTitle || this.bookingData?.availabilityData?.productTitle;
+        if (savedTitle && !isGenericName(savedTitle)) {
+            productName = savedTitle;
+        }
+        // 2ª fonte: dados globais
+        else if (window.productData?.title && !isGenericName(window.productData.title)) {
+            productName = window.productData.title;
+        }
+        // 3ª fonte: optionTitle dos dados de disponibilidade (NOVA FONTE!)
+        else if (this.bookingData?.selectedOption?.optionTitle && !isGenericName(this.bookingData.selectedOption.optionTitle)) {
+            productName = this.bookingData.selectedOption.optionTitle;
+        }
+        // 4ª fonte: extrair do .total-label
+        else {
+            const totalLabelText = document.querySelector('.total-label')?.textContent;
+            if (totalLabelText) {
+                const extractedName = totalLabelText.replace(/^Total\s*\(/, '').replace(/\):?$/, '').trim();
+                if (extractedName && !isGenericName(extractedName)) {
+                    productName = extractedName;
+                }
+            }
+        }
+
+        // 5ª fonte: DOM como último recurso (só se não for genérico)
+        if (productName === 'Experiência') {
+            const domTitle = document.querySelector('h1.entry-title, .product-title, h1')?.textContent?.trim();
+            if (domTitle && !isGenericName(domTitle)) {
+                productName = domTitle;
+            }
+        }
         const travelDate = this.bookingData?.travelDate || 'Data não especificada';
-        const totalPrice = itemSummary.totalPrice || this.bookingData?.selectedOption?.totalPrice;
-        const currency = totalPrice?.currency || 'USD';
-        const amount = totalPrice?.price?.recommendedRetailPrice || totalPrice?.recommendedRetailPrice || 0;
+
+        // Melhorar extração do preço
+        let currency = 'USD';
+        let amount = 0;
+
+        // Tentar extrair preço dos dados de confirmação primeiro
+        if (data.totalConfirmedPrice?.price) {
+            currency = data.currency || 'USD';
+            amount = data.totalConfirmedPrice.price.recommendedRetailPrice ||
+                    data.totalConfirmedPrice.price.partnerTotalPrice || 0;
+        }
+        // Fallback para dados do item
+        else if (firstItem.itemTotalPrice?.price) {
+            currency = data.currency || 'USD';
+            amount = firstItem.itemTotalPrice.price.recommendedRetailPrice ||
+                    firstItem.itemTotalPrice.price.partnerTotalPrice || 0;
+        }
+        // Fallback para dados salvos
+        else if (this.bookingData?.selectedOption?.totalPrice) {
+            const savedPrice = this.bookingData.selectedOption.totalPrice;
+            currency = savedPrice.currency || 'USD';
+            amount = savedPrice.recommendedRetailPrice || savedPrice.partnerTotalPrice || 0;
+        }
         
         // Informações do responsável
         const bookerData = this.collectDetailedTravelersData()?.bookerInfo || {};
         const bookerEmail = bookerData.email || 'Email não informado';
+
+        // Debug das variáveis e fontes
+        console.log('🔍 [DEBUG] Variáveis do resumo:');
+        console.log('📝 productName FINAL:', productName);
+        console.log('📝 productName type:', typeof productName);
+        console.log('📝 productName HTML?:', productName?.includes?.('<'));
+
+        // Debug das fontes de dados
+        console.log('🔍 [DEBUG] Fontes de dados para productName:');
+        console.log('📝 1ª fonte - this.bookingData?.productTitle:', this.bookingData?.productTitle);
+        console.log('📝 2ª fonte - window.productData?.title:', window.productData?.title);
+        console.log('📝 3ª fonte - selectedOption?.optionTitle:', this.bookingData?.selectedOption?.optionTitle);
+        console.log('📝 4ª fonte - .total-label:', document.querySelector('.total-label')?.textContent);
+        console.log('📝 5ª fonte - h1.entry-title:', document.querySelector('h1.entry-title, .product-title, h1')?.textContent?.trim());
+        console.log('📝 this.bookingData completo:', this.bookingData);
+
+        console.log('💰 currency:', currency);
+        console.log('💵 amount:', amount);
+        console.log('📧 bookerEmail:', bookerEmail);
+        console.log('📅 travelDate:', travelDate);
+
+        // Garantir que productName seja texto limpo
+        const cleanProductName = typeof productName === 'string' ?
+            productName.replace(/<[^>]*>/g, '').trim() :
+            String(productName || 'Experiência');
         
         let html = '';
 
@@ -8487,7 +8903,7 @@ this.renderLocationOptions();
                                 <div class="item-icon">🎯</div>
                                 <div class="item-content">
                                     <span class="item-label">Experiência</span>
-                                    <span class="item-value">${productName}</span>
+                                    <span class="item-value">${cleanProductName}</span>
                                 </div>
                             </div>
                             <div class="summary-item">
@@ -8787,7 +9203,7 @@ this.renderLocationOptions();
 
             /* Hero Section - Sucesso */
             .success-hero {
-                background: linear-gradient(135deg, var(--chart-2), var(--chart-4));
+                background: #28a745;
                 color: var(--primary-foreground);
                 padding: 2.5rem 1.5rem;
                 text-align: center;
@@ -8797,7 +9213,7 @@ this.renderLocationOptions();
 
             .viator-modal-body .success-hero {
                 padding: 2rem 1rem;
-                border-radius: 0;
+                border-radius: 10px;
             }
 
             .success-animation {
@@ -8922,6 +9338,33 @@ this.renderLocationOptions();
             .item-content {
                 display: flex;
                 flex-direction: column;
+                align-items: flex-end;
+            }
+
+            /* Espaçamento uniforme para divs internas do booking-step-content */
+            #booking-step-content > div,
+            #booking-step-content > .step-content,
+            #booking-step-content > .form-section,
+            #booking-step-content > .booking-section,
+            #booking-step-content > .confirmation-message {
+                margin-top: 20px;
+                margin-bottom: 20px;
+            }
+
+            #booking-step-content > div:first-child,
+            #booking-step-content > .step-content:first-child,
+            #booking-step-content > .form-section:first-child,
+            #booking-step-content > .booking-section:first-child,
+            #booking-step-content > .confirmation-message:first-child {
+                margin-top: 0;
+            }
+
+            #booking-step-content > div:last-child,
+            #booking-step-content > .step-content:last-child,
+            #booking-step-content > .form-section:last-child,
+            #booking-step-content > .booking-section:last-child,
+            #booking-step-content > .confirmation-message:last-child {
+                margin-bottom: 0;
             }
 
             .item-label {
