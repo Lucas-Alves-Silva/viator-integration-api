@@ -1,0 +1,357 @@
+/**
+ * Estilos para Sistema Dinâmico de Booking Questions
+ * 
+ * Estilos responsivos e acessíveis para todos os tipos de campos
+ * baseados na documentação oficial da Viator
+ */
+
+/* Container principal das booking questions dinâmicas */
+.dynamic-booking-questions {
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 20px 0;
+}
+
+/* Seções de perguntas */
+.per-booking-section,
+.per-traveler-section {
+    margin-bottom: 30px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 12px;
+    border: 1px solid #e9ecef;
+}
+
+.per-booking-section h4,
+.per-traveler-section h4 {
+    color: #495057;
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #dee2e6;
+}
+
+/* Seção individual de viajante */
+.traveler-questions {
+    margin-bottom: 25px;
+    padding: 15px;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.traveler-questions h5 {
+    color: #6c757d;
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin-bottom: 15px;
+    padding: 10px;
+    background: #e9ecef;
+    border-radius: 6px;
+}
+
+/* Grupos de perguntas */
+.question-group {
+    margin-bottom: 20px;
+}
+
+.question-label {
+    font-weight: 500;
+    color: #495057;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.question-label .required-asterisk {
+    color: #dc3545;
+    margin-left: 3px;
+}
+
+/* Hint/dica da pergunta */
+.question-hint {
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-bottom: 8px;
+    font-style: italic;
+}
+
+/* Campos de entrada */
+.question-input,
+.question-input-custom,
+.question-unit {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.question-input:focus,
+.question-input-custom:focus,
+.question-unit:focus {
+    border-color: #80bdff;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* Campos com erro */
+.question-input.is-invalid,
+.question-input-custom.is-invalid {
+    border-color: #dc3545;
+}
+
+.question-input.is-invalid:focus,
+.question-input-custom.is-invalid:focus {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+/* Mensagens de erro */
+.error-message {
+    color: #dc3545;
+    font-size: 0.875rem;
+    margin-top: 5px;
+    display: none;
+}
+
+.error-message.show {
+    display: block;
+}
+
+/* Campos de número com unidade */
+.input-group {
+    display: flex;
+    width: 100%;
+}
+
+.input-group .question-input {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    border-right: 0;
+}
+
+.input-group-append {
+    display: flex;
+}
+
+.input-group-append .question-unit {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-left: 0;
+    width: auto;
+    min-width: 80px;
+}
+
+/* Container de campo de localização */
+.location-field-container {
+    position: relative;
+}
+
+.location-field-container .question-input-custom {
+    margin-top: 10px;
+    display: none;
+}
+
+.location-field-container .question-input-custom.show {
+    display: block;
+}
+
+/* Campos de data */
+input[type="date"].question-input {
+    position: relative;
+}
+
+/* Campos de tempo */
+input[type="time"].question-input {
+    position: relative;
+}
+
+/* Textarea para SPECIAL_REQUIREMENTS */
+textarea.question-input {
+    resize: vertical;
+    min-height: 80px;
+}
+
+/* Campos condicionais (inicialmente ocultos) */
+.question-group.conditional {
+    display: none;
+}
+
+.question-group.conditional.show {
+    display: block;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Estilos para diferentes tipos de pickup */
+optgroup {
+    font-weight: bold;
+    color: #495057;
+}
+
+optgroup option {
+    font-weight: normal;
+    color: #212529;
+    padding-left: 15px;
+}
+
+/* Indicadores visuais para campos obrigatórios */
+.question-group.required .question-label::after {
+    content: " *";
+    color: #dc3545;
+}
+
+/* Estilos responsivos */
+@media (max-width: 768px) {
+    .dynamic-booking-questions {
+        padding: 15px 0;
+    }
+    
+    .per-booking-section,
+    .per-traveler-section {
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .traveler-questions {
+        padding: 12px;
+        margin-bottom: 20px;
+    }
+    
+    .input-group {
+        flex-direction: column;
+    }
+    
+    .input-group .question-input {
+        border-radius: 6px;
+        border-right: 1px solid #ced4da;
+        margin-bottom: 10px;
+    }
+    
+    .input-group-append .question-unit {
+        border-radius: 6px;
+        border-left: 1px solid #ced4da;
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .per-booking-section h4,
+    .per-traveler-section h4 {
+        font-size: 1.1rem;
+    }
+    
+    .traveler-questions h5 {
+        font-size: 1rem;
+        padding: 8px;
+    }
+    
+    .question-input,
+    .question-input-custom,
+    .question-unit {
+        font-size: 0.9rem;
+        padding: 8px 10px;
+    }
+}
+
+/* Estados de loading */
+.question-group.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.question-group.loading::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Estilos para validação em tempo real */
+.question-input.valid {
+    border-color: #28a745;
+}
+
+.question-input.valid:focus {
+    border-color: #28a745;
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+}
+
+/* Tooltips para hints */
+.question-hint.tooltip {
+    position: relative;
+    cursor: help;
+}
+
+.question-hint.tooltip:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    z-index: 1000;
+}
+
+/* Acessibilidade */
+.question-input:focus,
+.question-input-custom:focus,
+.question-unit:focus {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+}
+
+/* Modo escuro (se suportado) */
+@media (prefers-color-scheme: dark) {
+    .per-booking-section,
+    .per-traveler-section {
+        background: #2d3748;
+        border-color: #4a5568;
+    }
+    
+    .traveler-questions {
+        background: #1a202c;
+        border-color: #4a5568;
+    }
+    
+    .question-label,
+    .per-booking-section h4,
+    .per-traveler-section h4 {
+        color: #e2e8f0;
+    }
+    
+    .question-hint {
+        color: #a0aec0;
+    }
+    
+    .question-input,
+    .question-input-custom,
+    .question-unit {
+        background: #2d3748;
+        border-color: #4a5568;
+        color: #e2e8f0;
+    }
+}

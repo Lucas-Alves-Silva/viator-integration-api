@@ -2524,6 +2524,9 @@ function viator_enqueue_product_scripts() {
                 // Adicionar language guides se disponíveis
                 if (isset($product_data['languageGuides'])) {
                     $js_data['languageGuides'] = $product_data['languageGuides'];
+                    error_log('🔍 [LANGUAGE GUIDE DEBUG] Language guides found: ' . json_encode($product_data['languageGuides']));
+                } else {
+                    error_log('🔍 [LANGUAGE GUIDE DEBUG] No language guides found in product data');
                 }
 
                 // Adicionar dados de logística se disponíveis

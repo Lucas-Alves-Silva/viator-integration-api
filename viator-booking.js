@@ -519,6 +519,10 @@ class ViatorBookingManager {
     constructor() {
         this.currentStep = 1;
         this.totalSteps = 5; // Aumentado para incluir novos steps
+
+        // CORREÇÃO: Flag para evitar mensagens de erro duplicadas
+        this.specificErrorAlreadyDisplayed = false;
+
         this.bookingData = {
             productCode: null,
             selectedOption: null,
@@ -546,6 +550,571 @@ class ViatorBookingManager {
         // Cache para booking questions
         this.allBookingQuestions = null;
         this.productBookingQuestions = null;
+
+        // Sistema dinâmico de booking questions
+        this.dynamicBookingQuestions = {
+            allQuestions: null,
+            productQuestions: null,
+            locationData: null,
+            conditionalLogic: null
+        };
+
+        // CORREÇÃO: Sistema de cache para valores entre etapas
+        this.cachedPickupPoint = null;
+
+        // CORREÇÃO: Throttling para logs globais
+        this.lastGlobalLogTime = 0;
+
+        // CORREÇÃO: Configurar sistema de cache para PICKUP_POINT
+        this.setupPickupPointCache();
+    }
+
+    /**
+     * CORREÇÃO: Configurar sistema de cache para PICKUP_POINT
+     * Captura e armazena valores do PICKUP_POINT da Etapa 2 para uso na Etapa 3
+     */
+    setupPickupPointCache() {
+        console.log('🔧 [CACHE] Configurando sistema de cache para PICKUP_POINT...');
+
+        // Aguardar um pouco para garantir que o DOM esteja pronto
+        setTimeout(() => {
+            this.attachPickupPointListeners();
+        }, 1000);
+
+        // Também configurar listeners quando mudar de etapa
+        document.addEventListener('viator:step-changed', () => {
+            setTimeout(() => {
+                this.attachPickupPointListeners();
+            }, 500);
+        });
+    }
+
+    /**
+     * CORREÇÃO: Anexar listeners para capturar mudanças no PICKUP_POINT
+     * VERSÃO ROBUSTA - Investigação detalhada + múltiplas estratégias
+     */
+    attachPickupPointListeners() {
+        console.log('🔍 [CACHE DEBUG] Iniciando investigação detalhada do DOM...');
+
+        // 1. INVESTIGAÇÃO COMPLETA DO DOM
+        this.investigatePickupPointStructure();
+
+        // 2. SELETORES ESPECÍFICOS (originais)
+        this.attachSpecificListeners();
+
+        // 3. SELETORES GENÉRICOS (novos)
+        this.attachGenericListeners();
+
+        // 4. EVENT DELEGATION GLOBAL
+        this.setupGlobalEventDelegation();
+
+        // 5. MUTATION OBSERVER
+        this.setupMutationObserver();
+
+        // 6. INTERCEPTAÇÃO DE FUNÇÕES
+        this.interceptPickupPointFunctions();
+
+        console.log('🔧 [CACHE DEBUG] Todas as estratégias de captura configuradas');
+    }
+
+    /**
+     * CORREÇÃO: Investigar estrutura real dos campos PICKUP_POINT
+     */
+    investigatePickupPointStructure() {
+        console.log('🔍 [CACHE DEBUG] === INVESTIGAÇÃO DO DOM ===');
+
+        // Buscar todos os elementos que podem conter PICKUP_POINT
+        const allInputs = document.querySelectorAll('input, select, textarea, button');
+        const pickupRelated = [];
+
+        allInputs.forEach(element => {
+            const text = (element.id + ' ' + element.name + ' ' + element.className + ' ' + element.getAttribute('data-question-id') + ' ' + element.value).toLowerCase();
+            if (text.includes('pickup') || text.includes('point') || text.includes('encontro') || text.includes('buscar')) {
+                pickupRelated.push({
+                    tag: element.tagName,
+                    id: element.id,
+                    name: element.name,
+                    className: element.className,
+                    type: element.type,
+                    value: element.value,
+                    dataQuestionId: element.getAttribute('data-question-id'),
+                    element: element
+                });
+            }
+        });
+
+        console.log('🔍 [CACHE DEBUG] Elementos relacionados a PICKUP encontrados:', pickupRelated.length);
+        pickupRelated.forEach((item, index) => {
+            console.log(`🔍 [CACHE DEBUG] Elemento ${index}:`, item);
+        });
+
+        // Buscar por texto que contenha as opções mencionadas pelo usuário
+        const allElements = document.querySelectorAll('*');
+        const textRelated = [];
+
+        allElements.forEach(element => {
+            const text = element.textContent?.toLowerCase() || '';
+            if (text.includes('gostaria que me buscassem') ||
+                text.includes('vou por conta própria') ||
+                text.includes('vou decidir depois') ||
+                text.includes('ponto de encontro') ||
+                text.includes('local de encontro')) {
+                textRelated.push({
+                    tag: element.tagName,
+                    id: element.id,
+                    className: element.className,
+                    text: element.textContent?.substring(0, 100),
+                    element: element
+                });
+            }
+        });
+
+        console.log('🔍 [CACHE DEBUG] Elementos com texto relacionado encontrados:', textRelated.length);
+        textRelated.forEach((item, index) => {
+            console.log(`🔍 [CACHE DEBUG] Texto ${index}:`, item);
+        });
+    }
+
+    /**
+     * CORREÇÃO: Anexar listeners específicos (versão original)
+     */
+    attachSpecificListeners() {
+        const pickupSelectors = [
+            'input[data-question-id="PICKUP_POINT"]',
+            'input[name*="booking_question_PICKUP_POINT"]',
+            'input[id*="booking_question_PICKUP_POINT"]',
+            'input[type="radio"][name*="PICKUP_POINT"]',
+            'input[type="radio"][id*="PICKUP_POINT"]',
+            'select[data-question-id="PICKUP_POINT"]'
+        ];
+
+        let listenersAdded = 0;
+        pickupSelectors.forEach(selector => {
+            const elements = document.querySelectorAll(selector);
+            elements.forEach(element => {
+                element.removeEventListener('change', this.handlePickupPointChange.bind(this));
+                element.removeEventListener('input', this.handlePickupPointChange.bind(this));
+                element.addEventListener('change', this.handlePickupPointChange.bind(this));
+                element.addEventListener('input', this.handlePickupPointChange.bind(this));
+
+                console.log('🔧 [CACHE] Listener específico adicionado para:', selector, element.id || element.name);
+                listenersAdded++;
+            });
+        });
+
+        console.log('🔧 [CACHE DEBUG] Total de listeners específicos adicionados:', listenersAdded);
+    }
+
+    /**
+     * CORREÇÃO: Anexar listeners genéricos (nova estratégia)
+     */
+    attachGenericListeners() {
+        // Seletores mais amplos
+        const genericSelectors = [
+            'input[type="radio"]',
+            'input[type="text"]',
+            'select',
+            'button[type="button"]'
+        ];
+
+        let genericListenersAdded = 0;
+        genericSelectors.forEach(selector => {
+            const elements = document.querySelectorAll(selector);
+            elements.forEach(element => {
+                // Verificar se elemento pode estar relacionado a PICKUP_POINT
+                const elementText = (element.id + ' ' + element.name + ' ' + element.className + ' ' + element.value + ' ' + element.textContent).toLowerCase();
+
+                if (elementText.includes('pickup') ||
+                    elementText.includes('point') ||
+                    elementText.includes('encontro') ||
+                    elementText.includes('buscar') ||
+                    elementText.includes('departure') ||
+                    elementText.includes('meet') ||
+                    elementText.includes('contact') ||
+                    elementText.includes('supplier')) {
+
+                    element.removeEventListener('change', this.handlePickupPointChange.bind(this));
+                    element.removeEventListener('input', this.handlePickupPointChange.bind(this));
+                    element.removeEventListener('click', this.handlePickupPointChange.bind(this));
+
+                    element.addEventListener('change', this.handlePickupPointChange.bind(this));
+                    element.addEventListener('input', this.handlePickupPointChange.bind(this));
+                    element.addEventListener('click', this.handlePickupPointChange.bind(this));
+
+                    console.log('🔧 [CACHE] Listener genérico adicionado para:', element.tagName, element.id || element.name, 'texto:', elementText.substring(0, 50));
+                    genericListenersAdded++;
+                }
+            });
+        });
+
+        console.log('🔧 [CACHE DEBUG] Total de listeners genéricos adicionados:', genericListenersAdded);
+    }
+
+    /**
+     * CORREÇÃO: Event delegation global para capturar qualquer mudança
+     */
+    setupGlobalEventDelegation() {
+        // Remover listener existente se houver
+        document.removeEventListener('change', this.globalChangeHandler);
+        document.removeEventListener('input', this.globalInputHandler);
+        document.removeEventListener('click', this.globalClickHandler);
+
+        // Criar handlers bound
+        this.globalChangeHandler = this.handleGlobalChange.bind(this);
+        this.globalInputHandler = this.handleGlobalInput.bind(this);
+        this.globalClickHandler = this.handleGlobalClick.bind(this);
+
+        // Adicionar listeners globais
+        document.addEventListener('change', this.globalChangeHandler, true);
+        document.addEventListener('input', this.globalInputHandler, true);
+        document.addEventListener('click', this.globalClickHandler, true);
+
+        console.log('🔧 [CACHE DEBUG] Event delegation global configurado');
+    }
+
+    /**
+     * CORREÇÃO: Handler global para eventos de mudança (versão otimizada)
+     */
+    handleGlobalChange(event) {
+        const element = event.target;
+        const elementInfo = this.getElementInfo(element);
+
+        if (this.isPickupPointRelated(elementInfo)) {
+            // CORREÇÃO: Throttling de logs para evitar spam
+            if (!this.lastGlobalLogTime || Date.now() - this.lastGlobalLogTime > 2000) {
+                console.log('🔧 [CACHE GLOBAL] Change detectado em elemento relacionado:', {
+                    tag: elementInfo.tag,
+                    id: elementInfo.id,
+                    name: elementInfo.name,
+                    value: elementInfo.value
+                });
+                this.lastGlobalLogTime = Date.now();
+            }
+            this.handlePickupPointChange(event);
+        }
+    }
+
+    /**
+     * CORREÇÃO: Handler global para eventos de input (versão otimizada)
+     */
+    handleGlobalInput(event) {
+        const element = event.target;
+        const elementInfo = this.getElementInfo(element);
+
+        if (this.isPickupPointRelated(elementInfo)) {
+            // CORREÇÃO: Throttling de logs para evitar spam
+            if (!this.lastGlobalLogTime || Date.now() - this.lastGlobalLogTime > 2000) {
+                console.log('🔧 [CACHE GLOBAL] Input detectado em elemento relacionado:', {
+                    tag: elementInfo.tag,
+                    id: elementInfo.id,
+                    name: elementInfo.name,
+                    value: elementInfo.value
+                });
+                this.lastGlobalLogTime = Date.now();
+            }
+            this.handlePickupPointChange(event);
+        }
+    }
+
+    /**
+     * CORREÇÃO: Handler global para eventos de click (versão otimizada)
+     */
+    handleGlobalClick(event) {
+        const element = event.target;
+        const elementInfo = this.getElementInfo(element);
+
+        if (this.isPickupPointRelated(elementInfo)) {
+            // CORREÇÃO: Throttling de logs para evitar spam
+            if (!this.lastGlobalLogTime || Date.now() - this.lastGlobalLogTime > 2000) {
+                console.log('🔧 [CACHE GLOBAL] Click detectado em elemento relacionado:', {
+                    tag: elementInfo.tag,
+                    id: elementInfo.id,
+                    name: elementInfo.name,
+                    value: elementInfo.value
+                });
+                this.lastGlobalLogTime = Date.now();
+            }
+            // Aguardar um pouco para o valor ser atualizado
+            setTimeout(() => {
+                this.handlePickupPointChange(event);
+            }, 100);
+        }
+    }
+
+    /**
+     * CORREÇÃO: Obter informações do elemento
+     */
+    getElementInfo(element) {
+        return {
+            tag: element.tagName,
+            id: element.id,
+            name: element.name,
+            className: element.className,
+            type: element.type,
+            value: element.value,
+            textContent: element.textContent?.substring(0, 100),
+            dataQuestionId: element.getAttribute('data-question-id'),
+            allText: (element.id + ' ' + element.name + ' ' + element.className + ' ' + element.value + ' ' + element.textContent).toLowerCase()
+        };
+    }
+
+    /**
+     * CORREÇÃO: Verificar se elemento está relacionado a PICKUP_POINT (versão otimizada)
+     */
+    isPickupPointRelated(elementInfo) {
+        // CORREÇÃO: Filtrar apenas elementos de formulário para evitar falsos positivos
+        const validTags = ['INPUT', 'SELECT', 'BUTTON', 'TEXTAREA'];
+        if (!validTags.includes(elementInfo.tag)) {
+            return false;
+        }
+
+        // CORREÇÃO: Palavras-chave mais específicas para evitar spam
+        const keywords = [
+            'pickup_point', 'booking_question_pickup', 'ponto_encontro',
+            'local_encontro', 'departure_point', 'meet_point'
+        ];
+
+        // CORREÇÃO: Verificar apenas ID, name e data-question-id (não textContent)
+        const relevantText = (elementInfo.id + ' ' + elementInfo.name + ' ' + elementInfo.dataQuestionId).toLowerCase();
+
+        return keywords.some(keyword => relevantText.includes(keyword));
+    }
+
+    /**
+     * CORREÇÃO: MutationObserver para detectar mudanças no DOM
+     */
+    setupMutationObserver() {
+        // Desconectar observer existente se houver
+        if (this.pickupMutationObserver) {
+            this.pickupMutationObserver.disconnect();
+        }
+
+        this.pickupMutationObserver = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                // Verificar mudanças de atributos
+                if (mutation.type === 'attributes') {
+                    const element = mutation.target;
+                    const elementInfo = this.getElementInfo(element);
+
+                    if (this.isPickupPointRelated(elementInfo)) {
+                        console.log('🔧 [CACHE MUTATION] Atributo mudou em elemento relacionado:', elementInfo);
+                        this.handlePickupPointChange({ target: element });
+                    }
+                }
+
+                // Verificar novos nós adicionados
+                if (mutation.type === 'childList') {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            const element = node;
+                            const elementInfo = this.getElementInfo(element);
+
+                            if (this.isPickupPointRelated(elementInfo)) {
+                                console.log('🔧 [CACHE MUTATION] Novo elemento relacionado adicionado:', elementInfo);
+                                // Anexar listeners ao novo elemento
+                                setTimeout(() => {
+                                    this.attachPickupPointListeners();
+                                }, 100);
+                            }
+                        }
+                    });
+                }
+            });
+        });
+
+        // Observar mudanças no documento
+        this.pickupMutationObserver.observe(document.body, {
+            attributes: true,
+            childList: true,
+            subtree: true,
+            attributeFilter: ['value', 'checked', 'selected', 'data-question-id']
+        });
+
+        console.log('🔧 [CACHE DEBUG] MutationObserver configurado');
+    }
+
+    /**
+     * CORREÇÃO: Interceptar funções que definem valores de PICKUP_POINT
+     */
+    interceptPickupPointFunctions() {
+        // Interceptar console.log para capturar logs de PICKUP_POINT
+        const originalConsoleLog = console.log;
+        console.log = (...args) => {
+            const message = args.join(' ');
+
+            // Verificar se é um log de PICKUP_POINT sendo definido
+            if (message.includes('PICKUP_POINT valor') && (message.includes('definido') || message.includes('atualizado'))) {
+                // CORREÇÃO: Usar originalConsoleLog para evitar loop infinito
+                originalConsoleLog('🔧 [CACHE INTERCEPT] Log interceptado:', message);
+
+                // Extrair valor do log
+                const match = message.match(/PICKUP_POINT valor.*?:\s*(.+)/);
+                if (match) {
+                    const value = match[1].trim();
+                    // CORREÇÃO: Usar originalConsoleLog para evitar loop infinito
+                    originalConsoleLog('🔧 [CACHE INTERCEPT] Valor extraído do log:', value);
+
+                    // Salvar no cache
+                    this.cachedPickupPoint = {
+                        question: 'PICKUP_POINT',
+                        answer: value,
+                        unit: value.startsWith('LOC-') ? 'LOCATION_REFERENCE' : 'FREETEXT',
+                        source: 'intercepted_log'
+                    };
+
+                    // CORREÇÃO: Usar originalConsoleLog para evitar loop infinito
+                    originalConsoleLog('✅ [CACHE INTERCEPT] PICKUP_POINT salvo no cache via interceptação:', this.cachedPickupPoint);
+                }
+            }
+
+            // Chamar console.log original
+            originalConsoleLog.apply(console, args);
+        };
+
+        console.log('🔧 [CACHE DEBUG] Interceptação de funções configurada');
+    }
+
+    /**
+     * CORREÇÃO: Manipular mudanças no PICKUP_POINT (versão robusta)
+     */
+    handlePickupPointChange(event) {
+        const element = event.target;
+        const elementInfo = this.getElementInfo(element);
+
+        console.log('🔧 [CACHE] PICKUP_POINT mudou (ROBUSTA):', elementInfo);
+
+        let pickupValue = null;
+        let pickupUnit = 'LOCATION_REFERENCE';
+        let source = 'direct_input';
+
+        // ESTRATÉGIA 1: Radio buttons
+        if (element.type === 'radio') {
+            if (element.checked) {
+                pickupValue = element.value;
+                source = 'radio_button';
+
+                console.log('🔧 [CACHE] Radio button selecionado:', pickupValue);
+
+                // Se é CUSTOM_LOCATION, buscar campo de texto
+                if (element.value === 'CUSTOM_LOCATION') {
+                    const freetextSelectors = [
+                        'input[id*="_freetext"]',
+                        'input[id*="freetext"]',
+                        'input[name*="freetext"]',
+                        'input[type="text"]'
+                    ];
+
+                    for (const selector of freetextSelectors) {
+                        const freetextInput = document.querySelector(selector);
+                        if (freetextInput && freetextInput.value.trim()) {
+                            pickupValue = freetextInput.value.trim();
+                            pickupUnit = 'FREETEXT';
+                            source = 'freetext_input';
+                            console.log('🔧 [CACHE] Valor freetext encontrado:', pickupValue);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        // ESTRATÉGIA 2: Campos de texto
+        else if (element.type === 'text' && element.value && element.value.trim() !== '') {
+            pickupValue = element.value.trim();
+            pickupUnit = 'FREETEXT';
+            source = 'text_input';
+            console.log('🔧 [CACHE] Campo de texto preenchido:', pickupValue);
+        }
+        // ESTRATÉGIA 3: Select/dropdown
+        else if (element.tagName === 'SELECT' && element.value && element.value.trim() !== '') {
+            pickupValue = element.value.trim();
+            source = 'select_dropdown';
+            console.log('🔧 [CACHE] Select selecionado:', pickupValue);
+        }
+        // ESTRATÉGIA 4: Button/click
+        else if (element.tagName === 'BUTTON' || element.type === 'button') {
+            // Para botões, usar o texto ou valor
+            pickupValue = element.value || element.textContent?.trim();
+            source = 'button_click';
+            console.log('🔧 [CACHE] Botão clicado:', pickupValue);
+        }
+
+        // ESTRATÉGIA 5: Buscar valores em elementos próximos
+        if (!pickupValue) {
+            const parent = element.closest('div, fieldset, form');
+            if (parent) {
+                const relatedInputs = parent.querySelectorAll('input, select, textarea');
+                relatedInputs.forEach(input => {
+                    if (input.value && input.value.trim() !== '' && input !== element) {
+                        const inputInfo = this.getElementInfo(input);
+                        if (this.isPickupPointRelated(inputInfo)) {
+                            pickupValue = input.value.trim();
+                            source = 'related_input';
+                            console.log('🔧 [CACHE] Valor encontrado em input relacionado:', pickupValue);
+                        }
+                    }
+                });
+            }
+        }
+
+        // ESTRATÉGIA 6: Valores conhecidos da Viator
+        const knownValues = [
+            'MEET_AT_DEPARTURE_POINT',
+            'CONTACT_SUPPLIER_LATER',
+            'CUSTOM_LOCATION'
+        ];
+
+        if (!pickupValue && knownValues.includes(element.value)) {
+            pickupValue = element.value;
+            source = 'known_value';
+            console.log('🔧 [CACHE] Valor conhecido detectado:', pickupValue);
+        }
+
+        if (pickupValue && pickupValue.trim() !== '') {
+            // Determinar unidade baseada no valor
+            if (pickupValue.startsWith('LOC-')) {
+                pickupUnit = 'LOCATION_REFERENCE';
+            } else if (pickupValue === 'CUSTOM_LOCATION') {
+                pickupUnit = 'FREETEXT';
+            } else if (pickupValue === 'MEET_AT_DEPARTURE_POINT' || pickupValue === 'CONTACT_SUPPLIER_LATER') {
+                pickupUnit = 'LOCATION_REFERENCE';
+            } else if (element.id && element.id.includes('freetext')) {
+                pickupUnit = 'FREETEXT';
+            } else if (source === 'text_input' || source === 'freetext_input') {
+                pickupUnit = 'FREETEXT';
+            }
+
+            this.cachedPickupPoint = {
+                question: 'PICKUP_POINT',
+                answer: pickupValue,
+                unit: pickupUnit,
+                source: source,
+                timestamp: new Date().toISOString()
+            };
+
+            console.log('✅ [CACHE] PICKUP_POINT salvo no cache (ROBUSTA):', this.cachedPickupPoint);
+        } else {
+            console.log('⚠️ [CACHE] Nenhum valor válido encontrado para PICKUP_POINT');
+        }
+    }
+
+    /**
+     * CORREÇÃO: Manipular mudanças no campo de texto customizado
+     */
+    handlePickupPointFreetextChange(event) {
+        const element = event.target;
+
+        // Verificar se o radio button CUSTOM_LOCATION está selecionado
+        const customRadio = document.querySelector('input[type="radio"][value="CUSTOM_LOCATION"]:checked');
+
+        if (customRadio && element.value.trim()) {
+            this.cachedPickupPoint = {
+                question: 'PICKUP_POINT',
+                answer: element.value.trim(),
+                unit: 'FREETEXT'
+            };
+
+            console.log('✅ [CACHE] PICKUP_POINT freetext salvo no cache:', this.cachedPickupPoint);
+        }
     }
 
     /**
@@ -2369,7 +2938,7 @@ this.renderLocationOptions();
                     fallbackUsed: false
                 };
 
-                // Verificar e executar coleta de dados do dispositivo
+                // CORREÇÃO: Verificar e executar coleta de dados do dispositivo com tratamento robusto
                 if (typeof this.payment.collectDeviceData === 'function') {
                     try {
                         this.payment.collectDeviceData();
@@ -2377,15 +2946,18 @@ this.renderLocationOptions();
                         this.fraudDetectionStatus.deviceDataCollected = true;
                         console.log('✅ Coleta de dados de dispositivo iniciada');
                     } catch (collectError) {
-                        console.warn('⚠️ Erro ao coletar dados do dispositivo:', collectError);
-                        this.fraudDetectionStatus.collectDeviceDataAvailable = true; // Método existe mas falhou
+                        console.warn('⚠️ Erro ao coletar dados do dispositivo (digest/crypto):', collectError);
+                        // CORREÇÃO: Não falhar completamente, continuar com fallback
+                        this.fraudDetectionStatus.collectDeviceDataAvailable = true;
+                        this.fraudDetectionStatus.deviceDataCollected = false;
+                        console.log('🔄 Continuando com método alternativo devido ao erro de digest');
                     }
                 } else {
                     console.log('ℹ️ Método collectDeviceData não disponível - usando fallback (normal em desenvolvimento)');
                     this.initializeFraudDetectionFallback();
                 }
 
-                // Verificar e obter token de coleta de dados
+                // CORREÇÃO: Verificar e obter token de coleta de dados com tratamento robusto
                 if (typeof this.payment.getDeviceDataCollectionToken === 'function') {
                     try {
                         this.deviceDataCollectionToken = this.payment.getDeviceDataCollectionToken();
@@ -2393,8 +2965,12 @@ this.renderLocationOptions();
                         this.fraudDetectionStatus.tokenObtained = !!this.deviceDataCollectionToken;
                         console.log('✅ Token de coleta de dados obtido:', this.deviceDataCollectionToken ? 'Sim' : 'Não');
                     } catch (tokenError) {
-                        console.warn('⚠️ Erro ao obter token de detecção de fraude:', tokenError);
+                        console.warn('⚠️ Erro ao obter token de detecção de fraude (digest/crypto):', tokenError);
+                        // CORREÇÃO: Não falhar, gerar token alternativo
+                        this.fraudDetectionStatus.getTokenAvailable = true;
+                        this.fraudDetectionStatus.tokenObtained = false;
                         this.generateFallbackDeviceToken();
+                        console.log('🔄 Token alternativo gerado devido ao erro de digest');
                     }
                 } else {
                     console.log('ℹ️ Método getDeviceDataCollectionToken não disponível - gerando token fallback (normal em desenvolvimento)');
@@ -2709,6 +3285,151 @@ this.renderLocationOptions();
     }
 
     /**
+     * Buscar todas as booking questions disponíveis do endpoint oficial
+     */
+    async loadAllBookingQuestions() {
+        try {
+            console.log('🔄 Carregando todas as booking questions do endpoint oficial...');
+
+            // Verificar cache primeiro
+            const cacheKey = 'viator_all_booking_questions';
+            const cachedData = this.getSmartCachedData(cacheKey, 24); // Cache por 24 horas
+
+            if (cachedData) {
+                console.log('✅ Usando booking questions do cache');
+                this.dynamicBookingQuestions.allQuestions = cachedData;
+                return cachedData;
+            }
+
+            const response = await fetch(viatorBookingAjax.ajaxurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    action: 'viator_get_all_booking_questions',
+                    nonce: viatorBookingAjax.nonce
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            // Tratamento robusto de JSON
+            let result;
+            try {
+                const responseText = await response.text();
+                console.log('📡 Raw response text:', responseText.substring(0, 200) + '...');
+
+                if (!responseText || responseText.trim() === '') {
+                    throw new Error('Resposta vazia do servidor');
+                }
+
+                result = JSON.parse(responseText);
+                console.log('📡 All booking questions response:', result);
+            } catch (jsonError) {
+                console.error('❌ Erro ao fazer parse do JSON:', jsonError);
+                console.log('🔄 Tentando fallback para booking questions do produto...');
+                return this.fallbackToProductBookingQuestions();
+            }
+
+            if (result.success) {
+                this.dynamicBookingQuestions.allQuestions = result.data;
+
+                // Salvar no cache
+                this.setSmartCache(cacheKey, result.data, 24);
+
+                console.log('✅ Todas as booking questions carregadas:', result.data.length, 'perguntas');
+                return result.data;
+            } else {
+                throw new Error(result.data?.message || 'Erro ao carregar todas as booking questions');
+            }
+        } catch (error) {
+            console.error('❌ Erro ao carregar todas as booking questions:', error);
+            console.log('🔄 Usando fallback para booking questions do produto...');
+            return this.fallbackToProductBookingQuestions();
+        }
+    }
+
+    /**
+     * Fallback para usar booking questions do produto quando API falha
+     */
+    fallbackToProductBookingQuestions() {
+        try {
+            console.log('🔄 Executando fallback para booking questions do produto...');
+
+            // Tentar usar booking questions do window.productData
+            if (window.productData?.bookingQuestions) {
+                console.log('✅ Usando booking questions do window.productData');
+                return window.productData.bookingQuestions;
+            }
+
+            // Tentar usar booking questions já carregadas
+            if (this.bookingQuestions && this.bookingQuestions.length > 0) {
+                console.log('✅ Usando booking questions já carregadas');
+                return this.bookingQuestions;
+            }
+
+            // Tentar usar booking questions do produto atual
+            if (this.productBookingQuestions?.booking_questions) {
+                console.log('✅ Usando booking questions do produto atual');
+                return this.productBookingQuestions.booking_questions;
+            }
+
+            console.log('⚠️ Nenhuma fonte de booking questions disponível para fallback');
+            return [];
+
+        } catch (error) {
+            console.error('❌ Erro no fallback de booking questions:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Buscar dados de localização do endpoint /locations/bulk
+     */
+    async loadLocationData(locationRefs = []) {
+        try {
+            console.log('🔄 Carregando dados de localização...', locationRefs);
+
+            if (!locationRefs || locationRefs.length === 0) {
+                return [];
+            }
+
+            const response = await fetch(viatorBookingAjax.ajaxurl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    action: 'viator_get_locations_bulk',
+                    location_refs: JSON.stringify(locationRefs),
+                    nonce: viatorBookingAjax.nonce
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            console.log('📡 Location data response:', result);
+
+            if (result.success) {
+                this.dynamicBookingQuestions.locationData = result.data;
+                console.log('✅ Dados de localização carregados:', result.data.length, 'locais');
+                return result.data;
+            } else {
+                throw new Error(result.data?.message || 'Erro ao carregar dados de localização');
+            }
+        } catch (error) {
+            console.error('❌ Erro ao carregar dados de localização:', error);
+            return [];
+        }
+    }
+
+    /**
      * Buscar booking questions para o produto atual
      */
     async loadBookingQuestions() {
@@ -2717,6 +3438,11 @@ this.renderLocationOptions();
 
             if (!this.bookingData.productCode) {
                 throw new Error('Product code não encontrado');
+            }
+
+            // Primeiro, carregar todas as booking questions se não estiverem em cache
+            if (!this.dynamicBookingQuestions.allQuestions) {
+                await this.loadAllBookingQuestions();
             }
 
             console.log('📡 Fazendo requisição para:', viatorBookingAjax.ajaxurl);
@@ -2749,8 +3475,26 @@ this.renderLocationOptions();
 
             if (result.success) {
                 this.productBookingQuestions = result.data;
+
+                // CORREÇÃO: Populando this.bookingQuestions para compatibilidade
+                if (result.data.booking_questions && Array.isArray(result.data.booking_questions)) {
+                    this.bookingQuestions = result.data.booking_questions;
+                    console.log('✅ this.bookingQuestions populado com', this.bookingQuestions.length, 'perguntas');
+                } else if (result.data.booking_questions && typeof result.data.booking_questions === 'object') {
+                    // Se é um objeto, converter para array
+                    this.bookingQuestions = Object.values(result.data.booking_questions);
+                    console.log('✅ this.bookingQuestions populado com', this.bookingQuestions.length, 'perguntas (convertido de objeto)');
+                }
+
+                // Enriquecer com dados completos das booking questions
+                await this.enrichProductBookingQuestions();
+
+                // Carregar dados de localização se necessário
+                await this.loadPickupLocationData();
+
                 console.log('✅ Booking questions carregadas:', Object.keys(result.data.booking_questions || {}).length, 'perguntas');
                 console.log('✅ Dados completos:', result.data);
+                console.log('✅ this.bookingQuestions final:', this.bookingQuestions?.length || 0, 'perguntas');
                 this.debugLog('Booking questions loaded', {
                     product_code: this.bookingData.productCode,
                     questions_count: Object.keys(result.data.booking_questions || {}).length,
@@ -2775,6 +3519,82 @@ this.renderLocationOptions();
             };
 
             return this.productBookingQuestions;
+        }
+    }
+
+    /**
+     * Enriquecer booking questions do produto com dados completos
+     */
+    async enrichProductBookingQuestions() {
+        try {
+            console.log('🔍 [ENRICH DEBUG] Iniciando enriquecimento...');
+            console.log('🔍 [ENRICH DEBUG] this.productBookingQuestions?.booking_questions:', this.productBookingQuestions?.booking_questions);
+            console.log('🔍 [ENRICH DEBUG] this.dynamicBookingQuestions.allQuestions:', this.dynamicBookingQuestions.allQuestions?.length || 'null/undefined');
+
+            if (!this.productBookingQuestions?.booking_questions) {
+                console.log('⚠️ [ENRICH DEBUG] Sem booking_questions no produto, pulando enriquecimento');
+                return;
+            }
+
+            // CORREÇÃO: Se this.bookingQuestions já tem objetos completos, usar eles
+            if (this.bookingQuestions && this.bookingQuestions.length > 0 && typeof this.bookingQuestions[0] === 'object') {
+                console.log('✅ [ENRICH DEBUG] this.bookingQuestions já tem objetos completos, mantendo');
+                this.productBookingQuestions.booking_questions = this.bookingQuestions;
+                return;
+            }
+
+            if (!this.dynamicBookingQuestions.allQuestions) {
+                console.log('⚠️ [ENRICH DEBUG] Sem allQuestions disponível, pulando enriquecimento');
+                return;
+            }
+
+            const productQuestionIds = this.productBookingQuestions.booking_questions;
+            const enrichedQuestions = [];
+
+            console.log('🔍 [ENRICH DEBUG] IDs para enriquecer:', productQuestionIds);
+
+            // Para cada ID de pergunta do produto, buscar dados completos
+            productQuestionIds.forEach(questionId => {
+                console.log(`🔍 [ENRICH DEBUG] Buscando dados para: ${questionId}`);
+                const fullQuestion = this.dynamicBookingQuestions.allQuestions.find(q => q.id === questionId);
+                if (fullQuestion) {
+                    console.log(`✅ [ENRICH DEBUG] Pergunta encontrada: ${questionId}`);
+                    enrichedQuestions.push(fullQuestion);
+                } else {
+                    console.warn(`⚠️ [ENRICH DEBUG] Pergunta ${questionId} não encontrada na lista completa`);
+                }
+            });
+
+            // Substituir array de IDs por array de objetos completos
+            this.productBookingQuestions.booking_questions = enrichedQuestions;
+            this.bookingQuestions = enrichedQuestions; // Manter compatibilidade
+
+            console.log('✅ [ENRICH DEBUG] Booking questions enriquecidas:', enrichedQuestions.length);
+        } catch (error) {
+            console.error('❌ Erro ao enriquecer booking questions:', error);
+        }
+    }
+
+    /**
+     * Carregar dados de localização para pickup points
+     */
+    async loadPickupLocationData() {
+        try {
+            const logistics = this.productBookingQuestions?.logistics;
+            if (!logistics?.travelerPickup?.locations) {
+                return;
+            }
+
+            // Extrair referências de localização
+            const locationRefs = logistics.travelerPickup.locations
+                .map(loc => loc.location?.ref)
+                .filter(ref => ref && ref !== 'CONTACT_SUPPLIER_LATER' && ref !== 'MEET_AT_DEPARTURE_POINT');
+
+            if (locationRefs.length > 0) {
+                await this.loadLocationData(locationRefs);
+            }
+        } catch (error) {
+            console.error('❌ Erro ao carregar dados de pickup:', error);
         }
     }
 
@@ -2864,6 +3684,16 @@ this.renderLocationOptions();
             return;
         }
 
+        // Usar sistema dinâmico se disponível
+        if (this.dynamicBookingQuestions.allQuestions && this.productBookingQuestions?.booking_questions) {
+            console.log('✅ Usando sistema dinâmico para renderização');
+            this.renderDynamicBookingQuestions(formContainer);
+            return;
+        }
+
+        // Fallback para sistema legado
+        console.log('⚠️ Usando sistema legado para renderização');
+
         // As perguntas vêm como array, não como objeto
         const questions = questionsData.booking_questions || [];
 
@@ -2895,7 +3725,10 @@ this.renderLocationOptions();
 
         questions.forEach(question => {
             if (question.group === 'PER_BOOKING') {
+                // CORREÇÃO CRÍTICA: Incluir TODAS as perguntas PER_BOOKING na Etapa 3
+                // (incluindo PICKUP_POINT que foi removido da Etapa 2)
                 perBookingQuestions.push(question);
+                console.log('✅ Pergunta PER_BOOKING adicionada na Etapa 3:', question.id);
             } else if (question.group === 'PER_TRAVELER') {
                 perTravelerQuestions.push(question);
             }
@@ -2961,80 +3794,1004 @@ this.renderLocationOptions();
     }
 
     /**
+     * Renderizar campo dinâmico baseado na especificação oficial da Viator
+     */
+    renderDynamicBookingField(question, fieldId, isRequired, isPerTraveler, travelerIndex = null) {
+        const requiredAttr = isRequired ? 'required' : '';
+        const maxLengthAttr = question.maxLength ? `maxlength="${question.maxLength}"` : '';
+
+        switch (question.type) {
+            case 'DATE':
+                return this.renderDateField(question, fieldId, requiredAttr);
+
+            case 'NUMBER_AND_UNIT':
+                return this.renderNumberWithUnitField(question, fieldId, requiredAttr);
+
+            case 'LOCATION_REF_OR_FREE_TEXT':
+                return this.renderLocationField(question, fieldId, requiredAttr);
+
+            case 'STRING':
+                if (question.allowedAnswers && question.allowedAnswers.length > 0) {
+                    return this.renderSelectField(question, fieldId, requiredAttr);
+                } else {
+                    return this.renderStringField(question, fieldId, requiredAttr, maxLengthAttr);
+                }
+
+            case 'TIME':
+                return this.renderTimeField(question, fieldId, requiredAttr);
+
+            default:
+                return this.renderStringField(question, fieldId, requiredAttr, maxLengthAttr);
+        }
+    }
+
+    /**
+     * Renderizar campo de data (DATE_OF_BIRTH, PASSPORT_EXPIRY, etc.)
+     */
+    renderDateField(question, fieldId, requiredAttr) {
+        const placeholder = question.hint || 'DD/MM/AAAA';
+
+        return `
+            <input type="date"
+                   id="${fieldId}"
+                   name="${fieldId}"
+                   class="form-control question-input"
+                   ${requiredAttr}
+                   data-question-id="${question.id}"
+                   data-question-type="${question.type}"
+                   data-group="${question.group}">
+            ${question.hint ? `<small class="form-text text-muted">${question.hint}</small>` : ''}
+        `;
+    }
+
+    /**
+     * Renderizar campo de número com unidade (HEIGHT, WEIGHT)
+     */
+    renderNumberWithUnitField(question, fieldId, requiredAttr) {
+        const units = question.units || [];
+        const defaultUnit = units[0] || '';
+
+        let html = `<div class="input-group">`;
+
+        // Campo numérico
+        html += `
+            <input type="number"
+                   id="${fieldId}"
+                   name="${fieldId}"
+                   class="form-control question-input"
+                   ${requiredAttr}
+                   step="0.1"
+                   min="0"
+                   placeholder="${question.hint || 'Valor'}"
+                   data-question-id="${question.id}"
+                   data-question-type="${question.type}"
+                   data-group="${question.group}">
+        `;
+
+        // Seletor de unidade
+        if (units.length > 0) {
+            html += `
+                <div class="input-group-append">
+                    <select id="${fieldId}_unit"
+                            name="${fieldId}_unit"
+                            class="form-control question-unit"
+                            data-for="${fieldId}">
+            `;
+
+            units.forEach(unit => {
+                html += `<option value="${unit}">${unit}</option>`;
+            });
+
+            html += `
+                    </select>
+                </div>
+            `;
+        }
+
+        html += `</div>`;
+
+        if (question.hint) {
+            html += `<small class="form-text text-muted">${question.hint}</small>`;
+        }
+
+        return html;
+    }
+
+    /**
+     * Renderizar campo de localização (PICKUP_POINT)
+     */
+    renderLocationField(question, fieldId, requiredAttr) {
+        const logistics = this.productBookingQuestions?.logistics;
+        const allowCustomPickup = logistics?.travelerPickup?.allowCustomTravelerPickup || false;
+        const locations = logistics?.travelerPickup?.locations || [];
+
+        let html = `<div class="location-field-container">`;
+
+        // Se há localizações pré-definidas
+        if (locations.length > 0) {
+            html += `
+                <select id="${fieldId}"
+                        name="${fieldId}"
+                        class="form-control question-input"
+                        ${requiredAttr}
+                        data-question-id="${question.id}"
+                        data-question-type="${question.type}"
+                        data-group="${question.group}">
+                    <option value="">Selecione um local</option>
+            `;
+
+            // Agrupar por tipo de pickup
+            const groupedLocations = this.groupLocationsByType(locations);
+
+            Object.keys(groupedLocations).forEach(pickupType => {
+                if (groupedLocations[pickupType].length > 0) {
+                    html += `<optgroup label="${this.getPickupTypeLabel(pickupType)}">`;
+
+                    groupedLocations[pickupType].forEach(location => {
+                        const locationData = this.getLocationData(location.location.ref);
+                        const displayName = locationData?.name || location.location.ref;
+                        html += `<option value="${location.location.ref}" data-pickup-type="${pickupType}">${displayName}</option>`;
+                    });
+
+                    html += `</optgroup>`;
+                }
+            });
+
+            // Opção para texto livre se permitido
+            if (allowCustomPickup) {
+                html += `<option value="CUSTOM_LOCATION">Outro local (especificar)</option>`;
+            }
+
+            html += `</select>`;
+        }
+
+        // Campo de texto livre (mostrado condicionalmente)
+        if (allowCustomPickup) {
+            html += `
+                <input type="text"
+                       id="${fieldId}_custom"
+                       name="${fieldId}_custom"
+                       class="form-control question-input-custom"
+                       placeholder="Especifique o local de encontro"
+                       style="display: none; margin-top: 10px;"
+                       data-question-id="${question.id}"
+                       data-question-type="${question.type}"
+                       data-group="${question.group}">
+            `;
+        }
+
+        html += `</div>`;
+
+        if (question.hint) {
+            html += `<small class="form-text text-muted">${question.hint}</small>`;
+        }
+
+        return html;
+    }
+
+    /**
+     * Renderizar campo de seleção com opções pré-definidas
+     */
+    renderSelectField(question, fieldId, requiredAttr) {
+        let html = `
+            <select id="${fieldId}"
+                    name="${fieldId}"
+                    class="form-control question-input"
+                    ${requiredAttr}
+                    data-question-id="${question.id}"
+                    data-question-type="${question.type}"
+                    data-group="${question.group}">
+                <option value="">Selecione uma opção</option>
+        `;
+
+        question.allowedAnswers.forEach(answer => {
+            const displayText = this.getAnswerDisplayText(question.id, answer);
+            html += `<option value="${answer}">${displayText}</option>`;
+        });
+
+        html += `</select>`;
+
+        if (question.hint) {
+            html += `<small class="form-text text-muted">${question.hint}</small>`;
+        }
+
+        return html;
+    }
+
+    /**
+     * Renderizar campo de string simples
+     */
+    renderStringField(question, fieldId, requiredAttr, maxLengthAttr) {
+        const placeholder = question.hint || '';
+
+        if (question.id === 'SPECIAL_REQUIREMENTS') {
+            return `
+                <textarea id="${fieldId}"
+                          name="${fieldId}"
+                          class="form-control question-input"
+                          rows="3"
+                          ${requiredAttr}
+                          ${maxLengthAttr}
+                          placeholder="Restrições alimentares, acessibilidade, etc."
+                          data-question-id="${question.id}"
+                          data-question-type="${question.type}"
+                          data-group="${question.group}"></textarea>
+            `;
+        }
+
+        return `
+            <input type="text"
+                   id="${fieldId}"
+                   name="${fieldId}"
+                   class="form-control question-input"
+                   ${requiredAttr}
+                   ${maxLengthAttr}
+                   placeholder="${placeholder}"
+                   data-question-id="${question.id}"
+                   data-question-type="${question.type}"
+                   data-group="${question.group}">
+            ${question.hint ? `<small class="form-text text-muted">${question.hint}</small>` : ''}
+        `;
+    }
+
+    /**
+     * Renderizar campo de tempo
+     */
+    renderTimeField(question, fieldId, requiredAttr) {
+        return `
+            <input type="time"
+                   id="${fieldId}"
+                   name="${fieldId}"
+                   class="form-control question-input"
+                   ${requiredAttr}
+                   data-question-id="${question.id}"
+                   data-question-type="${question.type}"
+                   data-group="${question.group}">
+            ${question.hint ? `<small class="form-text text-muted">${question.hint}</small>` : ''}
+        `;
+    }
+
+    /**
+     * Agrupar localizações por tipo de pickup
+     */
+    groupLocationsByType(locations) {
+        const grouped = {
+            HOTEL: [],
+            AIRPORT: [],
+            PORT: [],
+            LOCATION: [],
+            OTHER: []
+        };
+
+        locations.forEach(location => {
+            const pickupType = location.pickupType || 'OTHER';
+            if (grouped[pickupType]) {
+                grouped[pickupType].push(location);
+            } else {
+                grouped.OTHER.push(location);
+            }
+        });
+
+        return grouped;
+    }
+
+    /**
+     * Obter label amigável para tipo de pickup
+     */
+    getPickupTypeLabel(pickupType) {
+        const labels = {
+            HOTEL: 'Hotéis',
+            AIRPORT: 'Aeroportos',
+            PORT: 'Portos',
+            LOCATION: 'Locais Específicos',
+            OTHER: 'Outros'
+        };
+
+        return labels[pickupType] || pickupType;
+    }
+
+    /**
+     * Obter dados de localização por referência
+     */
+    getLocationData(locationRef) {
+        if (!this.dynamicBookingQuestions.locationData) {
+            return null;
+        }
+
+        return this.dynamicBookingQuestions.locationData.find(loc => loc.reference === locationRef);
+    }
+
+    /**
+     * Obter texto de exibição para respostas pré-definidas
+     */
+    getAnswerDisplayText(questionId, answer) {
+        const displayTexts = {
+            AGEBAND: {
+                ADULT: 'Adulto',
+                SENIOR: 'Idoso',
+                YOUTH: 'Jovem',
+                CHILD: 'Criança',
+                INFANT: 'Bebê',
+                TRAVELER: 'Viajante'
+            },
+            TRANSFER_ARRIVAL_MODE: {
+                AIR: 'Avião',
+                RAIL: 'Trem',
+                SEA: 'Navio/Barco',
+                OTHER: 'Outro'
+            },
+            TRANSFER_DEPARTURE_MODE: {
+                AIR: 'Avião',
+                RAIL: 'Trem',
+                SEA: 'Navio/Barco',
+                OTHER: 'Outro'
+            }
+        };
+
+        return displayTexts[questionId]?.[answer] || answer;
+    }
+
+    /**
+     * Verificar se pergunta é condicional
+     */
+    isConditionalQuestion(questionId) {
+        const conditionalQuestions = [
+            'TRANSFER_AIR_ARRIVAL_AIRLINE',
+            'TRANSFER_AIR_ARRIVAL_FLIGHT_NO',
+            'TRANSFER_AIR_DEPARTURE_AIRLINE',
+            'TRANSFER_AIR_DEPARTURE_FLIGHT_NO',
+            'TRANSFER_PORT_CRUISE_SHIP',
+            'TRANSFER_PORT_ARRIVAL_TIME',
+            'TRANSFER_PORT_DEPARTURE_TIME',
+            'TRANSFER_RAIL_ARRIVAL_STATION',
+            'TRANSFER_RAIL_ARRIVAL_LINE',
+            'TRANSFER_RAIL_DEPARTURE_STATION',
+            'TRANSFER_RAIL_DEPARTURE_LINE',
+            'TRANSFER_ARRIVAL_DROP_OFF',
+            'TRANSFER_DEPARTURE_PICKUP',
+            'TRANSFER_ARRIVAL_TIME',
+            'TRANSFER_DEPARTURE_TIME',
+            'TRANSFER_DEPARTURE_DATE'
+        ];
+
+        return conditionalQuestions.includes(questionId);
+    }
+
+    /**
      * Renderizar uma única booking question
      */
     renderSingleQuestion(question, scope, travelerIndex = null) {
         const questionId = question.id;
         const fieldId = travelerIndex ? `${questionId}_traveler_${travelerIndex}` : questionId;
         const isRequired = question.required === 'MANDATORY';
-        const requiredAttr = isRequired ? 'required' : '';
+        const isPerTraveler = question.group === 'PER_TRAVELER';
         const requiredLabel = isRequired ? ' *' : '';
 
+        // Verificar se é pergunta condicional e se deve ser mostrada
+        if (this.isConditionalQuestion(questionId) && !this.shouldShowConditionalQuestion(questionId)) {
+            return '';
+        }
+
         let questionHTML = `<div class="form-group question-group" data-question-id="${questionId}" data-scope="${scope}">`;
+
+        // CORREÇÃO CRÍTICA: Label da pergunta com verificação dupla
+        const questionLabel = this.getQuestionLabel(question);
+
+        // CORREÇÃO: Garantir que questionLabel seja string válida
+        const safeQuestionLabel = this.ensureStringForHTML(questionLabel, 'Pergunta');
+
+        // Debug para identificar problemas
+        if (questionLabel !== safeQuestionLabel) {
+            console.warn('⚠️ Label convertido de objeto para string:', {
+                original: questionLabel,
+                converted: safeQuestionLabel,
+                questionId: question.id
+            });
+        }
+
         questionHTML += `<label for="${fieldId}" class="question-label">`;
-        questionHTML += `${question.label || question.id}${requiredLabel}`;
+        questionHTML += `${safeQuestionLabel}${requiredLabel}`;
         questionHTML += `</label>`;
 
-        // Adicionar hint se disponível
+        // CORREÇÃO: Adicionar hint se disponível, garantindo que seja string
         if (question.hint) {
-            questionHTML += `<div class="question-hint booker-note">${question.hint}</div>`;
+            const hintText = this.ensureStringForHTML(question.hint);
+            if (hintText.trim() !== '') {
+                questionHTML += `<div class="question-hint booker-note">${hintText}</div>`;
+            }
         }
 
-        // Renderizar campo baseado no tipo
-        switch (question.id) {
-            case 'FULL_NAMES_FIRST':
-                questionHTML += `<input type="text" id="${fieldId}" name="${fieldId}"
-                    class="form-control question-input" placeholder="Nome" ${requiredAttr}>`;
-                break;
+        // Renderizar campo usando sistema dinâmico
+        questionHTML += this.renderDynamicBookingField(question, fieldId, isRequired, isPerTraveler, travelerIndex);
 
-            case 'FULL_NAMES_LAST':
-                questionHTML += `<input type="text" id="${fieldId}" name="${fieldId}"
-                    class="form-control question-input" placeholder="Sobrenome" ${requiredAttr}>`;
-                break;
-
-            case 'DATE_OF_BIRTH':
-                questionHTML += `<input type="date" id="${fieldId}" name="${fieldId}"
-                    class="form-control question-input" ${requiredAttr}>`;
-                break;
-
-            case 'AGEBAND':
-                questionHTML += this.renderAgeBandSelect(fieldId, requiredAttr, question);
-                break;
-
-            case 'PICKUP_POINT':
-                questionHTML += this.renderPickupPointSelect(fieldId, requiredAttr, question);
-                break;
-
-            case 'SPECIAL_REQUIREMENTS':
-                questionHTML += `<textarea id="${fieldId}" name="${fieldId}"
-                    class="form-control question-input" rows="3"
-                    placeholder="Descreva quaisquer necessidades especiais ou solicitações"
-                    maxlength="${question.maxLength || 1000}"></textarea>`;
-                break;
-
-            case 'WEIGHT':
-                questionHTML += this.renderWeightInput(fieldId, requiredAttr, question, travelerIndex);
-                break;
-
-            default:
-                // Campo genérico baseado no tipo de dados esperado
-                if (question.type === 'STRING') {
-                    questionHTML += `<input type="text" id="${fieldId}" name="${fieldId}"
-                        class="form-control question-input" ${requiredAttr}
-                        maxlength="${question.maxLength || 255}">`;
-                } else if (question.type === 'NUMBER_AND_UNIT') {
-                    questionHTML += this.renderNumberWithUnitInput(fieldId, requiredAttr, question, travelerIndex);
-                } else {
-                    questionHTML += `<input type="text" id="${fieldId}" name="${fieldId}"
-                        class="form-control question-input" ${requiredAttr}>`;
-                }
-                break;
-        }
-
+        // Adicionar validação de erro
         questionHTML += `<div class="error-message" id="error_${fieldId}" style="display: none;"></div>`;
         questionHTML += `</div>`;
 
         return questionHTML;
+    }
+
+    /**
+     * CORREÇÃO: Função utilitária para garantir que valores sejam strings válidas para HTML
+     */
+    ensureStringForHTML(value, fallback = '') {
+        if (value === null || value === undefined) {
+            return fallback;
+        }
+
+        if (typeof value === 'string') {
+            return value;
+        }
+
+        if (typeof value === 'object') {
+            console.warn('⚠️ Objeto detectado onde esperava-se string, convertendo:', value);
+            // Tentar extrair propriedades comuns
+            if (value.text) return String(value.text);
+            if (value.label) return String(value.label);
+            if (value.title) return String(value.title);
+            if (value.name) return String(value.name);
+            // Como último recurso, usar JSON.stringify
+            return JSON.stringify(value);
+        }
+
+        return String(value);
+    }
+
+    /**
+     * Obter label amigável para a pergunta
+     */
+    getQuestionLabel(question) {
+        // CORREÇÃO: Verificar se question é um objeto válido
+        if (!question || typeof question !== 'object') {
+            console.warn('⚠️ getQuestionLabel recebeu parâmetro inválido:', question);
+            return 'Pergunta';
+        }
+
+        const labels = {
+            'FULL_NAMES_FIRST': 'Nome',
+            'FULL_NAMES_LAST': 'Sobrenome',
+            'DATE_OF_BIRTH': 'Data de Nascimento',
+            'AGEBAND': 'Faixa Etária',
+            'PICKUP_POINT': 'Local de Encontro',
+            'SPECIAL_REQUIREMENTS': 'Necessidades Especiais',
+            'WEIGHT': 'Peso',
+            'HEIGHT': 'Altura',
+            'PASSPORT_EXPIRY': 'Validade do Passaporte',
+            'PASSPORT_NATIONALITY': 'Nacionalidade do Passaporte',
+            'PASSPORT_PASSPORT_NO': 'Número do Passaporte',
+            'TRANSFER_ARRIVAL_MODE': 'Modo de Chegada',
+            'TRANSFER_DEPARTURE_MODE': 'Modo de Saída',
+            'TRANSFER_AIR_ARRIVAL_AIRLINE': 'Companhia Aérea (Chegada)',
+            'TRANSFER_AIR_ARRIVAL_FLIGHT_NO': 'Número do Voo (Chegada)',
+            'TRANSFER_AIR_DEPARTURE_AIRLINE': 'Companhia Aérea (Saída)',
+            'TRANSFER_AIR_DEPARTURE_FLIGHT_NO': 'Número do Voo (Saída)',
+            'TRANSFER_PORT_CRUISE_SHIP': 'Nome do Navio',
+            'TRANSFER_PORT_ARRIVAL_TIME': 'Horário de Chegada no Porto',
+            'TRANSFER_PORT_DEPARTURE_TIME': 'Horário de Saída do Porto',
+            'TRANSFER_RAIL_ARRIVAL_STATION': 'Estação de Chegada',
+            'TRANSFER_RAIL_ARRIVAL_LINE': 'Linha do Trem (Chegada)',
+            'TRANSFER_RAIL_DEPARTURE_STATION': 'Estação de Saída',
+            'TRANSFER_RAIL_DEPARTURE_LINE': 'Linha do Trem (Saída)',
+            'TRANSFER_ARRIVAL_DROP_OFF': 'Local de Desembarque',
+            'TRANSFER_DEPARTURE_PICKUP': 'Local de Embarque',
+            'TRANSFER_ARRIVAL_TIME': 'Horário de Chegada',
+            'TRANSFER_DEPARTURE_TIME': 'Horário de Saída',
+            'TRANSFER_DEPARTURE_DATE': 'Data de Saída'
+        };
+
+        // CORREÇÃO CRÍTICA: Usar função utilitária para garantir string válida
+        const labelText = this.ensureStringForHTML(question.label);
+
+        // Se conseguiu extrair um label válido, usar ele
+        if (labelText && labelText.trim() !== '') {
+            return labelText.trim();
+        }
+
+        // Fallback para labels predefinidos
+        if (question.id && labels[question.id]) {
+            return labels[question.id];
+        }
+
+        // Último fallback
+        return question.id || 'Pergunta';
+    }
+
+    /**
+     * Verificar se pergunta condicional deve ser mostrada
+     */
+    shouldShowConditionalQuestion(questionId) {
+        // Lógica para perguntas condicionais baseada na documentação oficial
+        const conditionalLogic = {
+            'TRANSFER_AIR_ARRIVAL_AIRLINE': () => this.getFieldValue('TRANSFER_ARRIVAL_MODE') === 'AIR',
+            'TRANSFER_AIR_ARRIVAL_FLIGHT_NO': () => this.getFieldValue('TRANSFER_ARRIVAL_MODE') === 'AIR',
+            'TRANSFER_AIR_DEPARTURE_AIRLINE': () => this.getFieldValue('TRANSFER_DEPARTURE_MODE') === 'AIR',
+            'TRANSFER_AIR_DEPARTURE_FLIGHT_NO': () => this.getFieldValue('TRANSFER_DEPARTURE_MODE') === 'AIR',
+            'TRANSFER_PORT_CRUISE_SHIP': () => this.getFieldValue('TRANSFER_ARRIVAL_MODE') === 'SEA' || this.getFieldValue('TRANSFER_DEPARTURE_MODE') === 'SEA',
+            'TRANSFER_PORT_ARRIVAL_TIME': () => this.getFieldValue('TRANSFER_ARRIVAL_MODE') === 'SEA',
+            'TRANSFER_PORT_DEPARTURE_TIME': () => this.getFieldValue('TRANSFER_DEPARTURE_MODE') === 'SEA',
+            'TRANSFER_RAIL_ARRIVAL_STATION': () => this.getFieldValue('TRANSFER_ARRIVAL_MODE') === 'RAIL',
+            'TRANSFER_RAIL_ARRIVAL_LINE': () => this.getFieldValue('TRANSFER_ARRIVAL_MODE') === 'RAIL',
+            'TRANSFER_RAIL_DEPARTURE_STATION': () => this.getFieldValue('TRANSFER_DEPARTURE_MODE') === 'RAIL',
+            'TRANSFER_RAIL_DEPARTURE_LINE': () => this.getFieldValue('TRANSFER_DEPARTURE_MODE') === 'RAIL'
+        };
+
+        const condition = conditionalLogic[questionId];
+        return condition ? condition() : true;
+    }
+
+    /**
+     * Obter valor de campo específico
+     */
+    getFieldValue(fieldId) {
+        const field = document.getElementById(fieldId);
+        return field ? field.value : null;
+    }
+
+    /**
+     * Configurar eventos para campos dinâmicos
+     */
+    setupDynamicFieldEvents() {
+        // Event listener para mudanças em campos de transfer mode
+        document.addEventListener('change', (e) => {
+            if (e.target.matches('[data-question-id="TRANSFER_ARRIVAL_MODE"], [data-question-id="TRANSFER_DEPARTURE_MODE"]')) {
+                this.handleTransferModeChange(e.target);
+            }
+
+            // Event listener para pickup point custom
+            if (e.target.matches('[data-question-id="PICKUP_POINT"]')) {
+                this.handlePickupPointChange(e.target);
+            }
+        });
+
+        // Event listener para validação em tempo real
+        document.addEventListener('blur', (e) => {
+            if (e.target.matches('.question-input')) {
+                this.validateField(e.target);
+            }
+        });
+    }
+
+    /**
+     * Lidar com mudança no modo de transfer
+     */
+    handleTransferModeChange(field) {
+        const mode = field.value;
+        const isArrival = field.dataset.questionId === 'TRANSFER_ARRIVAL_MODE';
+        const prefix = isArrival ? 'TRANSFER_AIR_ARRIVAL' : 'TRANSFER_AIR_DEPARTURE';
+
+        // Mostrar/esconder campos condicionais
+        const conditionalFields = document.querySelectorAll(`[data-question-id^="${prefix}"]`);
+        conditionalFields.forEach(conditionalField => {
+            const questionGroup = conditionalField.closest('.question-group');
+            if (questionGroup) {
+                questionGroup.style.display = mode === 'AIR' ? 'block' : 'none';
+            }
+        });
+
+        // Lógica similar para SEA e RAIL
+        if (isArrival) {
+            this.toggleConditionalFields('TRANSFER_PORT', mode === 'SEA');
+            this.toggleConditionalFields('TRANSFER_RAIL_ARRIVAL', mode === 'RAIL');
+        } else {
+            this.toggleConditionalFields('TRANSFER_PORT', mode === 'SEA');
+            this.toggleConditionalFields('TRANSFER_RAIL_DEPARTURE', mode === 'RAIL');
+        }
+    }
+
+    /**
+     * Alternar visibilidade de campos condicionais
+     */
+    toggleConditionalFields(prefix, show) {
+        const fields = document.querySelectorAll(`[data-question-id^="${prefix}"]`);
+        fields.forEach(field => {
+            const questionGroup = field.closest('.question-group');
+            if (questionGroup) {
+                questionGroup.style.display = show ? 'block' : 'none';
+            }
+        });
+    }
+
+    /**
+     * Lidar com mudança no pickup point
+     */
+    handlePickupPointChange(field) {
+        const value = field.value;
+        const customField = document.getElementById(field.id + '_custom');
+
+        if (customField) {
+            if (value === 'CUSTOM_LOCATION') {
+                customField.style.display = 'block';
+                customField.required = true;
+            } else {
+                customField.style.display = 'none';
+                customField.required = false;
+                customField.value = '';
+            }
+        }
+    }
+
+    /**
+     * Validar campo individual
+     */
+    validateField(field) {
+        const questionId = field.dataset.questionId;
+        const value = field.value.trim();
+        const isRequired = field.hasAttribute('required');
+        const errorElement = document.getElementById(`error_${field.id}`);
+
+        let isValid = true;
+        let errorMessage = '';
+
+        // Validação básica de campo obrigatório
+        if (isRequired && !value) {
+            isValid = false;
+            errorMessage = 'Este campo é obrigatório';
+        }
+
+        // Validações específicas por tipo de campo
+        if (value && questionId) {
+            switch (questionId) {
+                case 'DATE_OF_BIRTH':
+                    if (!this.isValidDate(value)) {
+                        isValid = false;
+                        errorMessage = 'Data inválida';
+                    }
+                    break;
+
+                case 'PASSPORT_EXPIRY':
+                    if (!this.isValidDate(value) || new Date(value) <= new Date()) {
+                        isValid = false;
+                        errorMessage = 'Data de validade deve ser futura';
+                    }
+                    break;
+
+                case 'WEIGHT':
+                case 'HEIGHT':
+                    if (isNaN(value) || parseFloat(value) <= 0) {
+                        isValid = false;
+                        errorMessage = 'Valor deve ser um número positivo';
+                    }
+                    break;
+            }
+        }
+
+        // Mostrar/esconder erro
+        if (errorElement) {
+            if (isValid) {
+                errorElement.style.display = 'none';
+                field.classList.remove('is-invalid');
+            } else {
+                errorElement.textContent = errorMessage;
+                errorElement.style.display = 'block';
+                field.classList.add('is-invalid');
+            }
+        }
+
+        return isValid;
+    }
+
+    /**
+     * Validar se data é válida
+     */
+    isValidDate(dateString) {
+        const date = new Date(dateString);
+        return date instanceof Date && !isNaN(date);
+    }
+
+    /**
+     * Sistema de cache inteligente para dados da API
+     */
+    getSmartCachedData(key, hoursValid = 24) {
+        try {
+            const cached = localStorage.getItem(key);
+            if (!cached) return null;
+
+            const data = JSON.parse(cached);
+            const now = new Date().getTime();
+            const cacheTime = new Date(data.timestamp).getTime();
+            const hoursElapsed = (now - cacheTime) / (1000 * 60 * 60);
+
+            if (hoursElapsed < hoursValid) {
+                return data.content;
+            } else {
+                localStorage.removeItem(key);
+                return null;
+            }
+        } catch (error) {
+            console.warn('Erro ao ler cache:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Salvar dados no cache inteligente
+     */
+    setSmartCache(key, data, hoursValid = 24) {
+        try {
+            const cacheData = {
+                content: data,
+                timestamp: new Date().toISOString(),
+                hoursValid: hoursValid
+            };
+            localStorage.setItem(key, JSON.stringify(cacheData));
+        } catch (error) {
+            console.warn('Erro ao salvar cache:', error);
+        }
+    }
+
+    /**
+     * Coletar respostas de booking questions dinamicamente
+     */
+    collectDynamicBookingAnswers() {
+        const answers = [];
+        const questionInputs = document.querySelectorAll('.question-input');
+
+        console.log('🔍 [DYNAMIC DEBUG] collectDynamicBookingAnswers() iniciado');
+        console.log('🔍 [DYNAMIC DEBUG] Elementos .question-input encontrados:', questionInputs.length);
+
+        // Debug: listar todos os elementos encontrados
+        questionInputs.forEach((input, index) => {
+            console.log(`🔍 [DYNAMIC DEBUG] Input ${index}:`, {
+                id: input.id,
+                name: input.name,
+                value: input.value,
+                questionId: input.dataset.questionId,
+                questionType: input.dataset.questionType,
+                group: input.dataset.group
+            });
+        });
+
+        questionInputs.forEach(input => {
+            const questionId = input.dataset.questionId;
+            const questionType = input.dataset.questionType;
+            const group = input.dataset.group;
+            const value = input.value ? input.value.trim() : '';
+
+            console.log(`🔍 [DYNAMIC DEBUG] Processando input:`, {
+                questionId,
+                questionType,
+                group,
+                value,
+                hasQuestionId: !!questionId,
+                hasValue: !!value
+            });
+
+            if (!questionId) {
+                console.log(`⚠️ [DYNAMIC DEBUG] Input ignorado - sem questionId`);
+                return;
+            }
+
+            if (!value || value.trim() === '') {
+                console.log(`⚠️ [DYNAMIC DEBUG] Input ignorado - campo vazio para ${questionId}`);
+                return;
+            }
+
+            // Construir resposta baseada na especificação oficial
+            const answer = {
+                question: questionId,
+                answer: value
+            };
+
+            // Adicionar travelerNum se for PER_TRAVELER
+            if (group === 'PER_TRAVELER') {
+                const travelerMatch = input.id.match(/_traveler_(\d+)$/);
+                if (travelerMatch) {
+                    answer.travelerNum = parseInt(travelerMatch[1]);
+                }
+            }
+
+            // Adicionar unidade se for NUMBER_AND_UNIT
+            if (questionType === 'NUMBER_AND_UNIT') {
+                const unitField = document.getElementById(input.id + '_unit');
+                if (unitField && unitField.value) {
+                    answer.unit = unitField.value;
+                }
+            }
+
+            // Tratar pickup point custom
+            if (questionId === 'PICKUP_POINT' && value === 'CUSTOM_LOCATION') {
+                const customField = document.getElementById(input.id + '_custom');
+                if (customField && customField.value.trim()) {
+                    answer.answer = customField.value.trim();
+                    answer.unit = 'FREETEXT';
+                } else {
+                    return; // Não adicionar se custom está vazio
+                }
+            } else if (questionId === 'PICKUP_POINT' && value !== 'CUSTOM_LOCATION') {
+                answer.unit = 'LOCATION_REFERENCE';
+            }
+
+            console.log(`✅ [DYNAMIC DEBUG] Resposta adicionada:`, answer);
+            answers.push(answer);
+        });
+
+        console.log('🔍 [DYNAMIC DEBUG] Total de respostas coletadas:', answers.length);
+        console.log('🔍 [DYNAMIC DEBUG] Respostas dinâmicas coletadas:', answers);
+
+        // CORREÇÃO: Coleta Cross-Step - buscar PICKUP_POINT da Etapa 2 com seletores corretos
+        const pickupSelectors = [
+            'input[data-question-id="PICKUP_POINT"]',           // Campo hidden principal
+            'input[name*="booking_question_PICKUP_POINT"]',     // Campo hidden com nome específico
+            'input[id*="booking_question_PICKUP_POINT"]',       // Campo hidden com ID específico
+            'input[type="radio"][name*="PICKUP_POINT"]',        // Radio buttons de locais
+            'input[type="radio"][id*="PICKUP_POINT"]',          // Radio buttons por ID
+            'input[id*="_freetext"]',                           // Campo de texto customizado
+            'select[data-question-id="PICKUP_POINT"]'           // Select se existir
+        ];
+
+        let allPickupInputs = [];
+        pickupSelectors.forEach(selector => {
+            const elements = document.querySelectorAll(selector);
+            allPickupInputs = allPickupInputs.concat(Array.from(elements));
+        });
+
+        // Remover duplicatas
+        allPickupInputs = allPickupInputs.filter((input, index, self) =>
+            self.findIndex(i => i.id === input.id) === index
+        );
+
+        console.log('🔍 [DYNAMIC DEBUG] Todos os campos PICKUP_POINT no DOM:', allPickupInputs.length);
+
+        allPickupInputs.forEach((input, index) => {
+            console.log(`🔍 [DYNAMIC DEBUG] PICKUP_POINT ${index}:`, {
+                id: input.id,
+                name: input.name,
+                value: input.value,
+                type: input.type,
+                tagName: input.tagName,
+                checked: input.checked,
+                dataQuestionId: input.getAttribute('data-question-id')
+            });
+
+            // CORREÇÃO: Coletar PICKUP_POINT da Etapa 2 se tiver valor
+            let pickupValue = null;
+            let pickupUnit = 'LOCATION_REFERENCE';
+
+            // Para radio buttons, verificar se está selecionado
+            if (input.type === 'radio' && input.checked) {
+                pickupValue = input.value;
+
+                // Se é CUSTOM_LOCATION, buscar o valor do campo de texto
+                if (input.value === 'CUSTOM_LOCATION') {
+                    const freetextInput = document.querySelector(`input[id*="_freetext"]`);
+                    if (freetextInput && freetextInput.value.trim()) {
+                        pickupValue = freetextInput.value.trim();
+                        pickupUnit = 'FREETEXT';
+                    }
+                }
+            }
+            // Para campos hidden ou outros tipos, usar o valor diretamente
+            else if (input.type !== 'radio' && input.value && input.value.trim() !== '') {
+                pickupValue = input.value.trim();
+            }
+
+            if (pickupValue) {
+                // Determinar unidade baseada no valor
+                if (pickupValue.startsWith('LOC-')) {
+                    pickupUnit = 'LOCATION_REFERENCE';
+                } else if (pickupValue === 'CUSTOM_LOCATION') {
+                    pickupUnit = 'FREETEXT';
+                } else if (input.id && input.id.includes('freetext')) {
+                    pickupUnit = 'FREETEXT';
+                }
+
+                const pickupAnswer = {
+                    question: 'PICKUP_POINT',
+                    answer: pickupValue,
+                    unit: pickupUnit
+                };
+
+                console.log(`✅ [DYNAMIC DEBUG] PICKUP_POINT coletado da Etapa 2:`, pickupAnswer);
+                answers.push(pickupAnswer);
+
+                // Parar após encontrar o primeiro valor válido
+                return;
+            }
+        });
+
+        // CORREÇÃO: Usar cache do PICKUP_POINT se disponível
+        if (this.cachedPickupPoint && this.cachedPickupPoint.answer) {
+            console.log('✅ [CACHE] PICKUP_POINT encontrado no cache:', this.cachedPickupPoint);
+
+            // Verificar se já não foi adicionado pelos seletores DOM
+            const existingPickup = answers.find(answer => answer.question === 'PICKUP_POINT');
+            if (!existingPickup) {
+                answers.push(this.cachedPickupPoint);
+                console.log('✅ [CACHE] PICKUP_POINT adicionado do cache às respostas');
+            } else {
+                console.log('ℹ️ [CACHE] PICKUP_POINT já existe nas respostas DOM, mantendo DOM');
+            }
+        } else {
+            console.log('⚠️ [CACHE] Nenhum PICKUP_POINT encontrado no cache');
+        }
+
+        console.log('🔍 [DYNAMIC DEBUG] Total final de respostas (incluindo cross-step + cache):', answers.length);
+
+        // CORREÇÃO: Coletar respostas de language guide
+        this.collectLanguageGuideAnswers(answers);
+
+        // CORREÇÃO REMOVIDA: Language guide NÃO é booking question
+        // Language guides devem ser tratados separadamente das booking questions
+        // API Viator rejeita LANGUAGE_GUIDE como booking question inválida
+
+        console.log('🔍 [LANGUAGE GUIDE DEBUG] Language guides detectados mas NÃO adicionados às booking questions');
+        console.log('🔍 [LANGUAGE GUIDE DEBUG] Language guides devem ser enviados como campo separado na requisição');
+
+        console.log('🔍 [DYNAMIC DEBUG] Total final após language guide:', answers.length);
+
+        return answers;
+    }
+
+    /**
+     * Renderizar booking questions usando sistema dinâmico
+     */
+    renderDynamicBookingQuestions(formContainer) {
+        console.log('🎨 Renderizando booking questions dinamicamente...');
+
+        const questions = this.productBookingQuestions.booking_questions;
+        const travelers = this.bookingData.selectedTravelers || [];
+
+        if (!questions || questions.length === 0) {
+            formContainer.innerHTML = `
+                <div class="booker-info-section">
+                    <h4>Tudo Pronto!</h4>
+                    <p>Nenhuma informação adicional é necessária para esta experiência.</p>
+                </div>
+            `;
+            return;
+        }
+
+        let html = '<div class="dynamic-booking-questions">';
+
+        // Separar perguntas por grupo
+        // CORREÇÃO CRÍTICA: Incluir TODAS as perguntas PER_BOOKING na Etapa 3
+        // (incluindo PICKUP_POINT que foi removido da Etapa 2)
+        const perBookingQuestions = questions.filter(q => q.group === 'PER_BOOKING');
+        const perTravelerQuestions = questions.filter(q => q.group === 'PER_TRAVELER');
+
+        console.log('🔄 [REORGANIZAÇÃO] Perguntas PER_BOOKING na Etapa 3 (incluindo PICKUP_POINT):', perBookingQuestions.length);
+        console.log('🔄 Perguntas PER_TRAVELER:', perTravelerQuestions.length);
+
+        // Renderizar perguntas PER_BOOKING
+        if (perBookingQuestions.length > 0) {
+            html += '<div class="per-booking-section">';
+            html += '<h4>Informações Gerais da Reserva</h4>';
+
+            perBookingQuestions.forEach(question => {
+                html += this.renderSingleQuestion(question, 'PER_BOOKING');
+            });
+
+            html += '</div>';
+        }
+
+        // Renderizar perguntas PER_TRAVELER
+        if (perTravelerQuestions.length > 0) {
+            html += '<div class="per-traveler-section">';
+            html += '<h4>Informações dos Viajantes</h4>';
+
+            travelers.forEach((traveler, index) => {
+                const travelerIndex = index + 1;
+                html += `<div class="traveler-questions" data-traveler="${travelerIndex}">`;
+                html += `<h5>Viajante ${travelerIndex}: ${traveler.firstName} ${traveler.lastName}</h5>`;
+
+                perTravelerQuestions.forEach(question => {
+                    html += this.renderSingleQuestion(question, 'PER_TRAVELER', travelerIndex);
+                });
+
+                html += '</div>';
+            });
+
+            html += '</div>';
+        }
+
+        html += '</div>';
+
+        formContainer.innerHTML = html;
+
+        // Configurar eventos dinâmicos
+        this.setupDynamicFieldEvents();
+
+        console.log('✅ Booking questions dinâmicas renderizadas');
     }
 
     /**
@@ -3282,7 +5039,8 @@ this.renderLocationOptions();
         const allUnitFields = document.querySelectorAll(`.unit-sync-field[data-question-type="${questionType}"]`);
 
         allUnitFields.forEach((field, index) => {
-            const fieldTravelerIndex = parseInt(field.dataset.traveler);
+            // CORREÇÃO: Verificar se dataset e traveler existem antes de acessar
+            const fieldTravelerIndex = field.dataset && field.dataset.traveler ? parseInt(field.dataset.traveler) : 0;
 
             if (fieldTravelerIndex !== 1) {
                 // Sincronizar unidade para outros viajantes
@@ -3319,8 +5077,14 @@ this.renderLocationOptions();
      * Lidar com mudanças no ponto de coleta
      */
     handlePickupPointChange(pickupPointField) {
+        // CORREÇÃO: Verificar se pickupPointField e dataset existem
+        if (!pickupPointField || !pickupPointField.dataset) {
+            console.warn('⚠️ handlePickupPointChange: pickupPointField ou dataset inválido', pickupPointField);
+            return;
+        }
+
         const selectedValue = pickupPointField.value;
-        const travelerIndex = pickupPointField.dataset.traveler;
+        const travelerIndex = pickupPointField.dataset.traveler || '0';
         
         console.log(`📍 Ponto de coleta alterado para: ${selectedValue} (Viajante ${travelerIndex})`);
         
@@ -3783,6 +5547,35 @@ this.renderLocationOptions();
             console.log('🚨 [CRITICAL DEBUG] Timestamp:', new Date().toISOString());
             console.error('🚨 [FORCE LOG] collectBookingQuestionAnswers() EXECUTADO!');
 
+        // CORREÇÃO: Verificar múltiplas fontes de dados dinâmicos
+        console.log('🔍 [DEBUG] this.dynamicBookingQuestions.allQuestions:', this.dynamicBookingQuestions.allQuestions?.length || 'null/undefined');
+        console.log('🔍 [DEBUG] this.bookingQuestions:', this.bookingQuestions?.length || 'null/undefined');
+        console.log('🔍 [DEBUG] window.productData?.bookingQuestions:', window.productData?.bookingQuestions?.length || 'null/undefined');
+
+        // Usar sistema dinâmico se disponível
+        if (this.dynamicBookingQuestions.allQuestions || this.bookingQuestions?.length > 0) {
+            console.log('✅ Usando sistema dinâmico de booking questions');
+
+            // Se não temos allQuestions mas temos bookingQuestions, usar elas
+            if (!this.dynamicBookingQuestions.allQuestions && this.bookingQuestions?.length > 0) {
+                console.log('🔄 Usando this.bookingQuestions como fonte de dados dinâmicos');
+                this.dynamicBookingQuestions.allQuestions = this.bookingQuestions;
+            }
+
+            const dynamicAnswers = this.collectDynamicBookingAnswers();
+
+            // Salvar no formato compatível
+            this.bookingData.bookingQuestionAnswers = dynamicAnswers;
+
+            console.log('✅ Respostas dinâmicas coletadas:', dynamicAnswers.length);
+            console.error('🚨 [FORCE LOG] collectBookingQuestionAnswers() FINALIZADO (DINÂMICO)!');
+            console.error('🚨 [FORCE LOG] Respostas coletadas:', dynamicAnswers.length);
+
+            return dynamicAnswers;
+        }
+
+        // Fallback para sistema antigo
+        console.log('⚠️ Usando sistema legado de booking questions');
         const answers = [];
         const questionInputs = document.querySelectorAll('.question-input');
 
@@ -4258,10 +6051,10 @@ this.renderLocationOptions();
         
         // PICKUP_POINT é obrigatório quando arrivalMode é OTHER
         if (arrivalMode === 'OTHER') {
-            const pickupValue = pickupPointInput.value.trim();
+            const pickupValue = pickupPointInput.value ? pickupPointInput.value.trim() : '';
             const freetextInput = document.querySelector('[id*="PICKUP_POINT"][id*="_freetext"]');
-            const freetextValue = freetextInput ? freetextInput.value.trim() : '';
-            
+            const freetextValue = freetextInput && freetextInput.value ? freetextInput.value.trim() : '';
+
             if (!pickupValue && !freetextValue) {
                 this.showFieldError(pickupPointInput, 'Ponto de encontro é obrigatório quando o modo de chegada é "Outro"');
                 console.warn('❌ PICKUP_POINT obrigatório não preenchido para arrivalMode: OTHER');
@@ -4666,7 +6459,7 @@ this.renderLocationOptions();
             // Verificar se temos IDs de perguntas no window.productData
             if (window.productData && window.productData.bookingQuestions && window.productData.bookingQuestions.length > 0) {
                 console.log('📋 [BOOKING QUESTIONS DEBUG] IDs de perguntas encontrados no window.productData:', window.productData.bookingQuestions);
-                
+
                 // Se são apenas strings (IDs), precisamos buscar os dados completos via AJAX
                 if (typeof window.productData.bookingQuestions[0] === 'string') {
                     console.log('📡 [BOOKING QUESTIONS DEBUG] IDs detectados, buscando dados completos via AJAX...');
@@ -4676,6 +6469,7 @@ this.renderLocationOptions();
                     // Se já são objetos completos, usar diretamente
                     this.bookingQuestions = window.productData.bookingQuestions;
                     console.log('✅ [BOOKING QUESTIONS DEBUG] Usando objetos completos do window.productData:', this.bookingQuestions);
+                    console.log('✅ [BOOKING QUESTIONS DEBUG] Sistema dinâmico ATIVADO com dados do window.productData');
                     return this.bookingQuestions;
                 }
             }
@@ -4758,9 +6552,11 @@ this.renderLocationOptions();
             console.log('🔍 [BOOKING QUESTIONS DEBUG] Resposta AJAX completa:', data);
             
             if (data.success) {
-                this.bookingQuestions = data.data.bookingQuestions || [];
+                // CORREÇÃO: A resposta PHP usa 'booking_questions', não 'bookingQuestions'
+                this.bookingQuestions = data.data.booking_questions || [];
                 console.log('🔍 [BOOKING QUESTIONS DEBUG] Perguntas extraídas da resposta:', this.bookingQuestions);
                 console.log('🔍 [BOOKING QUESTIONS DEBUG] Número de perguntas:', this.bookingQuestions.length);
+                console.log('🔍 [BOOKING QUESTIONS DEBUG] Estrutura da resposta completa:', data.data);
                 
                 // Verificar se todas as perguntas têm o campo 'group'
                 this.bookingQuestions.forEach((q, index) => {
@@ -4825,7 +6621,9 @@ this.renderLocationOptions();
             const displayStyle = shouldHideInitially ? 'style="display: none;"' : '';
             
             html += `<div class="booking-question-group" ${displayStyle}>`;
-            html += `<label for="${questionId}">${question.label}${requiredMark}</label>`;
+            // CORREÇÃO: Garantir que label seja string válida
+            const safeLabel = this.ensureStringForHTML(question.label, 'Pergunta');
+            html += `<label for="${questionId}">${safeLabel}${requiredMark}</label>`;
             
             html += this.renderQuestionField(question, questionId, isRequired, false, null);
             
@@ -4867,7 +6665,9 @@ this.renderLocationOptions();
             const requiredAttr = isRequired ? 'required' : '';
             
             html += '<div class="pickup-point-question-group">';
-            html += `<label for="${questionId}">${question.label}${requiredMark}</label>`;
+            // CORREÇÃO: Garantir que label seja string válida
+            const safeLabel = this.ensureStringForHTML(question.label, 'Local de Encontro');
+            html += `<label for="${questionId}">${safeLabel}${requiredMark}</label>`;
             html += this.renderQuestionField(question, questionId, isRequired, false, null);
             html += `<div class="error-message" id="error_${questionId}" style="display: none;"></div>`;
             html += '</div>';
@@ -4927,7 +6727,9 @@ this.renderLocationOptions();
         const requiredAttr = isRequired ? 'required' : '';
         
         let html = '<div class="language-guide-question-group">';
-        html += `<label for="${questionId}">${question.label}${requiredMark}</label>`;
+        // CORREÇÃO: Garantir que label seja string válida
+        const safeLabel = this.ensureStringForHTML(question.label, 'Idioma');
+        html += `<label for="${questionId}">${safeLabel}${requiredMark}</label>`;
         html += this.renderQuestionField(question, questionId, isRequired, false, null);
         html += `<div class="error-message" id="error_${questionId}" style="display: none;"></div>`;
         html += '</div>';
@@ -4988,7 +6790,9 @@ this.renderLocationOptions();
                 const displayStyle = shouldHideInitially ? 'style="display: none;"' : '';
                 
                 html += `<div class="form-group col-md-6" ${displayStyle}>`;
-                html += `<label for="${questionId}">${question.label}${requiredMark}</label>`;
+                // CORREÇÃO: Garantir que label seja string válida
+                const safeLabel = this.ensureStringForHTML(question.label, 'Pergunta');
+                html += `<label for="${questionId}">${safeLabel}${requiredMark}</label>`;
                 html += this.renderQuestionField(question, questionId, isRequired, true, travelerIndex);
                 html += `<div class="error-message" id="error_${questionId}" style="display: none;"></div>`;
                 html += '</div>';
@@ -5085,8 +6889,9 @@ this.renderLocationOptions();
 
         switch (question.type) {
             case 'STRING':
-                // Verificar se é uma pergunta de seleção de idioma
-                if (question.subType === 'LANGUAGE_GUIDE' || question.label.toLowerCase().includes('idioma') || question.label.toLowerCase().includes('language')) {
+                // CORREÇÃO: Verificar se é uma pergunta de seleção de idioma
+                const labelText = this.ensureStringForHTML(question.label, '').toLowerCase();
+                if (question.subType === 'LANGUAGE_GUIDE' || labelText.includes('idioma') || labelText.includes('language')) {
                     html += this.renderLanguageGuideSelection(questionId, dataAttrs, requiredAttr);
                 } else if (question.allowedAnswers && question.allowedAnswers.length > 0) {
                     // Verificar se é uma pergunta de faixa etária (AGEBAND)
@@ -6213,55 +8018,23 @@ this.renderLocationOptions();
             return;
         }
         
-        // Renderizar Ponto de Encontro em seção dedicada (seção 4)
+        // CORREÇÃO CRÍTICA: Etapa 2 deve ter APENAS dados dos viajantes
+        // Todas as booking questions (incluindo PICKUP_POINT) devem ir para a Etapa 3
+        console.log('🔄 [REORGANIZAÇÃO] Etapa 2 agora contém APENAS dados dos viajantes');
+        console.log('🔄 [REORGANIZAÇÃO] Todas as booking questions foram movidas para a Etapa 3');
+
+        // Ocultar todas as seções de booking questions na Etapa 2
         const pickupPointSection = document.getElementById('pickup-point-section');
-        const pickupPointContainer = document.getElementById('pickup-point-container');
-        if (pickupPointSection && pickupPointContainer) {
-            const pickupHTML = this.renderPickupPointSection();
-            if (pickupHTML) {
-                pickupPointContainer.innerHTML = pickupHTML;
-                pickupPointSection.style.display = 'block';
-            } else {
-                pickupPointSection.style.display = 'none';
-            }
-        }
-        
-        // Renderizar Informações Adicionais da Reserva (seção 5) - Idioma + Requisitos Especiais
         const additionalInfoSection = document.getElementById('additional-booking-info-section');
-        const languageGuideContainer = document.getElementById('language-guide-container');
-        const generalContainer2 = document.getElementById('general-booking-questions');
-        
+
+        if (pickupPointSection) {
+            pickupPointSection.style.display = 'none';
+            console.log('🔄 [REORGANIZAÇÃO] Seção de PICKUP_POINT ocultada na Etapa 2');
+        }
+
         if (additionalInfoSection) {
-            let hasAdditionalInfo = false;
-            
-            // Renderizar Idioma da Excursão
-            if (languageGuideContainer) {
-                const languageHTML = this.renderLanguageGuideSection();
-                if (languageHTML) {
-                    languageGuideContainer.innerHTML = languageHTML;
-                    hasAdditionalInfo = true;
-                }
-            }
-            
-            // Renderizar perguntas gerais (Requisitos Especiais e outras) excluindo PICKUP_POINT, LANGUAGE_GUIDE e perguntas de TRANSFER
-            const generalQuestions = this.bookingQuestions.filter(q => 
-                q.group === 'PER_BOOKING' && 
-                q.id !== 'PICKUP_POINT' && 
-                !q.id.startsWith('TRANSFER_') && 
-                !(q.subType === 'LANGUAGE_GUIDE' || q.label.toLowerCase().includes('idioma') || q.label.toLowerCase().includes('language'))
-            );
-            
-            if (generalQuestions.length > 0 && generalContainer2) {
-                generalContainer2.innerHTML = this.renderGeneralBookingQuestions(generalQuestions);
-                hasAdditionalInfo = true;
-            }
-            
-            // Mostrar/ocultar seção baseado no conteúdo
-            if (hasAdditionalInfo) {
-                additionalInfoSection.style.display = 'block';
-            } else {
-                additionalInfoSection.style.display = 'none';
-            }
+            additionalInfoSection.style.display = 'none';
+            console.log('🔄 [REORGANIZAÇÃO] Seção de informações adicionais ocultada na Etapa 2');
         }
         
         // Renderizar perguntas por viajante (PER_TRAVELER)
@@ -7704,35 +9477,44 @@ this.renderLocationOptions();
     }
     
     async checkAvailability() {
-        // Primeiro, verificar se uma data foi selecionada
-        const dateInput = document.getElementById('travel-date-value');
-        if (!dateInput || !dateInput.value) {
-            this.showDateError('Por favor, selecione uma data de viagem antes de continuar.');
-            return false;
-        }
-
-        // Declarar variável no escopo da função
+        // Estratégia robusta de detecção de data de viagem
         let travelDate = null;
 
-        // Estratégia abrangente de detecção de data de viagem
+        // 1. Tentar múltiplas fontes de data
         travelDate = this.getTravelDateFromMultipleSources();
 
-        if (!travelDate) {
-            // Se ainda não encontrou, tentar última estratégia de fallback
-            console.warn('⚠️ Data de viagem não encontrada em nenhuma fonte, tentando fallbacks finais...');
+        // 2. Se não encontrou, tentar dados já armazenados
+        if (!travelDate && this.bookingData.travelDate) {
+            travelDate = this.bookingData.travelDate;
+            console.log('✅ Usando data de viagem já armazenada:', travelDate);
+        }
 
-            // Verificar se temos dados de disponibilidade já carregados
-            if (this.bookingData.availabilityData?.travelDate) {
-                travelDate = this.bookingData.availabilityData.travelDate;
-                console.log('✅ Usando data de viagem dos dados de disponibilidade:', travelDate);
-            } else if (this.bookingData.travelDate) {
-                travelDate = this.bookingData.travelDate;
-                console.log('✅ Usando data de viagem já armazenada:', travelDate);
-            } else {
-                // Se chegou aqui, significa que não há data selecionada
-                this.showDateError('Por favor, selecione uma data de viagem antes de continuar.');
-                return false;
+        // 3. Se não encontrou, tentar dados de disponibilidade
+        if (!travelDate && this.bookingData.availabilityData?.travelDate) {
+            travelDate = this.bookingData.availabilityData.travelDate;
+            console.log('✅ Usando data de viagem dos dados de disponibilidade:', travelDate);
+        }
+
+        // 4. Se não encontrou, tentar input do DOM
+        if (!travelDate) {
+            const dateInput = document.getElementById('travel-date-value');
+            if (dateInput && dateInput.value) {
+                travelDate = dateInput.value;
+                console.log('✅ Usando data de viagem do input DOM:', travelDate);
             }
+        }
+
+        // 5. Se ainda não encontrou, verificar se é uma validação durante o pagamento
+        if (!travelDate) {
+            // Durante o pagamento, se já temos dados de hold válidos, não bloquear
+            if (this.bookingData.holdData && this.bookingData.selectedOption) {
+                console.warn('⚠️ Data não encontrada, mas usando dados de hold existentes');
+                return true; // Permitir continuar com dados de hold
+            }
+
+            // Se não há dados de hold, realmente precisamos da data
+            this.showDateError('Por favor, selecione uma data de viagem antes de continuar.');
+            return false;
         }
 
         // Atualizar referência para uso futuro
@@ -7758,6 +9540,18 @@ this.renderLocationOptions();
                                   priceDisplay.querySelector('.product-options-list');
 
         if (!hasOptionsDisplayed) {
+            // CORREÇÃO: Verificar se temos dados de hold válidos antes de bloquear
+            if (this.bookingData.holdData && this.bookingData.selectedOption) {
+                console.log('✅ [VALIDATION] Opções não exibidas, mas temos dados de hold válidos - permitindo continuar');
+                return true;
+            }
+
+            // Verificar se temos dados de disponibilidade em cache
+            if (this.bookingData.availabilityData && this.bookingData.selectedOption) {
+                console.log('✅ [VALIDATION] Opções não exibidas, mas temos dados de disponibilidade válidos - permitindo continuar');
+                return true;
+            }
+
             // Verificar se o botão ainda está no estado "Buscar Preços"
             const updateBtn = document.getElementById('update-price-btn');
             const buttonText = updateBtn ? updateBtn.textContent.trim() : '';
@@ -7765,13 +9559,19 @@ this.renderLocationOptions();
             if (buttonText.includes('Buscar')) {
                 this.showDateError('Por favor, clique em "Buscar Preços" para verificar a disponibilidade e opções de passeio.');
             } else {
-                this.showDateError('Por favor, clique em "Atualizar Preços" para verificar a disponibilidade e opções de passeio.');
+                this.showDateError('Por favor, atualize os preços para continuar com a reserva.');
             }
             return false;
         }
         
         // Verificar se uma opção foi selecionada
         if (!this.bookingData.selectedOption || !this.bookingData.selectedOption.fullOption) {
+            // CORREÇÃO: Verificar se temos dados de hold que indicam opção válida
+            if (this.bookingData.holdData && this.bookingData.holdData.items && this.bookingData.holdData.items.length > 0) {
+                console.log('✅ [VALIDATION] Opção não selecionada visualmente, mas temos dados de hold válidos - permitindo continuar');
+                return true;
+            }
+
             this.showDateError('Por favor, selecione uma das opções de passeio disponíveis antes de continuar.');
             // Destacar visualmente que uma opção precisa ser selecionada
             this.highlightOptionSelection();
@@ -7996,7 +9796,142 @@ this.renderLocationOptions();
             bookingQuestionAnswers: bookingQuestionAnswers
         };
     }
-    
+
+    /**
+     * Detectar e selecionar language guide automaticamente
+     */
+    detectAndSelectLanguageGuide() {
+        try {
+            console.log('🌐 [LANGUAGE GUIDE] Iniciando detecção...');
+
+            // Verificar se há language guides disponíveis no produto
+            const languageGuides = window.productData?.languageGuides || [];
+            console.log('🌐 [LANGUAGE GUIDE] Language guides disponíveis:', languageGuides);
+
+            if (!languageGuides || languageGuides.length === 0) {
+                console.log('🌐 [LANGUAGE GUIDE] Nenhum language guide disponível no produto');
+                return null;
+            }
+
+            // Se há apenas um language guide, selecionar automaticamente
+            if (languageGuides.length === 1) {
+                const selectedGuide = languageGuides[0];
+                console.log('🌐 [LANGUAGE GUIDE] Seleção automática (único disponível):', selectedGuide);
+                // CORREÇÃO: Garantir que retorna string, não array
+                return typeof selectedGuide === 'string' ? selectedGuide : selectedGuide.toString();
+            }
+
+            // Se há múltiplos language guides, selecionar o primeiro (pode ser melhorado com interface)
+            const selectedGuide = languageGuides[0];
+            console.log('🌐 [LANGUAGE GUIDE] Seleção automática (primeiro de múltiplos):', selectedGuide);
+            console.log('🌐 [LANGUAGE GUIDE] Outros disponíveis:', languageGuides.slice(1));
+
+            // CORREÇÃO: Garantir que retorna string, não array
+            return typeof selectedGuide === 'string' ? selectedGuide : selectedGuide.toString();
+
+        } catch (error) {
+            console.error('❌ [LANGUAGE GUIDE] Erro na detecção:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Extrair status de confirmação com múltiplas estratégias
+     */
+    extractConfirmationStatus(data, firstItem) {
+        // CORREÇÃO CRÍTICA: Verificar primeiro se é erro explícito
+        if (data?.error === true || data?.success === false) {
+            console.log('❌ Erro explícito detectado (error=true ou success=false)');
+            return 'FAILED';
+        }
+
+        // CORREÇÃO CRÍTICA: Expandir fontes de status para incluir mais possibilidades
+        const possibleStatuses = [
+            firstItem?.status,
+            data?.status,
+            data?.data?.status,
+            data?.custom_data?.confirmationStatus,
+            data?.bookingStatus,
+            firstItem?.bookingStatus,
+            // NOVO: Se temos success=true, considerar como CONFIRMED
+            (data?.success === true || data?.data?.success === true) ? 'CONFIRMED' : null,
+            // NOVO: Se não há erro e temos dados, considerar como CONFIRMED
+            (!data?.error && !data?.data?.error && (firstItem || data?.data)) ? 'CONFIRMED' : null
+        ];
+
+        for (const status of possibleStatuses) {
+            if (status && status !== 'UNKNOWN' && status !== null) {
+                console.log('✅ Status encontrado:', status);
+                return status;
+            }
+        }
+
+        // CORREÇÃO: Se chegou até aqui mas temos dados válidos, assumir CONFIRMED
+        if (data?.success === true || data?.data?.success === true) {
+            console.log('✅ Success=true detectado, assumindo CONFIRMED');
+            return 'CONFIRMED';
+        }
+
+        console.log('⚠️ Nenhum status válido encontrado, usando UNKNOWN');
+        return 'UNKNOWN';
+    }
+
+    /**
+     * Extrair bookingRef com múltiplas estratégias
+     */
+    extractBookingRef(data, firstItem) {
+        // CORREÇÃO CRÍTICA: Expandir fontes de bookingRef
+        const possibleRefs = [
+            firstItem?.bookingRef,
+            data?.bookingRef,
+            data?.data?.bookingRef,
+            firstItem?.partnerBookingRef,
+            data?.partnerBookingRef,
+            data?.data?.partnerBookingRef,
+            data?.custom_data?.bookingRef,
+            // NOVO: Tentar extrair de items array
+            data?.data?.items?.[0]?.bookingRef,
+            data?.items?.[0]?.bookingRef,
+            // NOVO: Tentar extrair de bookingData salvo
+            this.bookingData?.bookingRef,
+            this.bookingData?.holdData?.bookingRef
+        ];
+
+        for (const ref of possibleRefs) {
+            if (ref && ref !== 'N/A' && typeof ref === 'string' && ref.trim() !== '') {
+                console.log('✅ BookingRef encontrado:', ref);
+                return ref;
+            }
+        }
+
+        console.log('⚠️ Nenhum bookingRef válido encontrado');
+        return 'N/A';
+    }
+
+    /**
+     * Extrair voucherInfo com múltiplas estratégias
+     */
+    extractVoucherInfo(data, firstItem) {
+        // Tentar múltiplas fontes para voucherInfo
+        const voucherSources = [
+            firstItem.voucherInfo,
+            data.voucherInfo,
+            firstItem.voucher,
+            data.voucher,
+            data.custom_data?.voucherInfo
+        ];
+
+        for (const voucher of voucherSources) {
+            if (voucher && typeof voucher === 'object') {
+                console.log('✅ VoucherInfo encontrado:', voucher);
+                return voucher;
+            }
+        }
+
+        console.log('⚠️ Nenhum voucherInfo encontrado');
+        return {};
+    }
+
     async processPayment() {
         // Validação abrangente antes do processamento do pagamento
         try {
@@ -8172,7 +10107,17 @@ this.renderLocationOptions();
 
         } catch (error) {
             this.hidePaymentProgress();
-            this.showDateError('Erro no processamento do pagamento: ' + error.message);
+
+            // CORREÇÃO: Verificar se é erro da API Viator com trackingId
+            if (error.isViatorApiError && error.trackingId) {
+                console.log('🎯 Erro da API Viator detectado com trackingId:', error.trackingId);
+                this.showDateError(error.message, 'error', error.trackingId);
+            } else if (!this.specificErrorAlreadyDisplayed) {
+                // Erro genérico apenas se não há erro específico
+                this.showDateError('Erro no processamento do pagamento: ' + error.message);
+            } else {
+                console.log('⚠️ Erro genérico não exibido - erro específico da API já foi mostrado');
+            }
             return false;
         }
     }
@@ -8611,6 +10556,9 @@ this.renderLocationOptions();
     async confirmBooking() {
         try {
             console.log('🎯 confirmBooking iniciado');
+
+            // CORREÇÃO: Resetar flag de erro específico no início de nova tentativa
+            this.specificErrorAlreadyDisplayed = false;
             
             // Verificar se viatorBookingAjax está disponível
             if (typeof viatorBookingAjax === 'undefined') {
@@ -8623,12 +10571,16 @@ this.renderLocationOptions();
             const travelersData = this.collectDetailedTravelersData();
             const bookerInfo = travelersData.bookerInfo;
             const bookingQuestionAnswers = travelersData.bookingQuestionAnswers || [];
-            
+
+            // Detectar e incluir language guide se necessário
+            const languageGuide = this.detectAndSelectLanguageGuide();
+
             console.log('📋 Dados para confirmação:', {
                 cartId: this.bookingData.holdData.cartId,
                 hasPaymentToken: !!this.bookingData.paymentToken,
                 bookerInfo: bookerInfo,
-                bookingQuestionAnswers: bookingQuestionAnswers
+                bookingQuestionAnswers: bookingQuestionAnswers,
+                languageGuide: languageGuide
             });
 
             const requestParams = {
@@ -8640,6 +10592,12 @@ this.renderLocationOptions();
                 hold_data: JSON.stringify(this.bookingData.holdData.fullResponse || {}),
                 nonce: viatorBookingAjax.nonce
             };
+
+            // Incluir language guide se detectado
+            if (languageGuide) {
+                requestParams.language_guide = languageGuide;
+                console.log('🌐 Language guide incluído na requisição:', languageGuide);
+            }
             
             // Incluir perguntas de reserva se existirem
             if (bookingQuestionAnswers && bookingQuestionAnswers.length > 0) {
@@ -8671,12 +10629,48 @@ this.renderLocationOptions();
             const data = await response.json();
             console.log('📥 Resposta da confirmação:', data);
             
+            // CORREÇÃO CRÍTICA: Verificar se há erro interno mesmo com success=true
             if (data.success) {
-                console.log('✅ Confirmação bem-sucedida, exibindo mensagem');
+                console.log('✅ Resposta marcada como sucesso, verificando dados internos...');
                 console.log('📊 Dados de confirmação recebidos:', data.data);
 
-                // CORREÇÃO: Melhorar detecção de status de sucesso
                 const confirmationData = data.data;
+
+                // CORREÇÃO CRÍTICA: Verificar se há erro interno da API da Viator
+                if (confirmationData && (
+                    confirmationData.code === 'INTERNAL_SERVER_ERROR' ||
+                    confirmationData.message === 'Internal server error' ||
+                    confirmationData.code === 500 ||
+                    confirmationData.trackingId
+                )) {
+                    console.error('❌ ERRO 500 DETECTADO na resposta da API da Viator:', confirmationData);
+
+                    // Extrair informações do erro
+                    const errorMessage = confirmationData.message || 'Erro interno do servidor da Viator';
+                    const trackingId = confirmationData.trackingId || 'N/A';
+
+                    // Exibir erro ao usuário
+                    const userErrorMessage = `Erro no processamento da reserva: ${errorMessage}. ` +
+                                           `ID de rastreamento: ${trackingId}. ` +
+                                           `Por favor, entre em contato com o suporte.`;
+
+                    this.logBookingEvent('booking_confirmation_viator_500_error', {
+                        message: errorMessage,
+                        trackingId: trackingId,
+                        fullResponse: confirmationData
+                    }, 'error');
+
+                    // CORREÇÃO: Não exibir erro durante retry - apenas lançar exceção com trackingId
+                    // O erro será exibido apenas no final se todas as tentativas falharem
+                    const error = new Error(errorMessage);
+                    error.trackingId = trackingId;
+                    error.isViatorApiError = true;
+                    throw error;
+                    // return false; // Removido para permitir retry
+                }
+
+                // Se não há erro interno, prosseguir normalmente
+                console.log('✅ Confirmação bem-sucedida, exibindo mensagem');
 
                 // Verificar se há dados de confirmação válidos
                 if (confirmationData && confirmationData.bookingInfo) {
@@ -8722,52 +10716,85 @@ this.renderLocationOptions();
                     fullResponse: data
                 }, 'error');
 
-                this.showDateError(fullErrorMessage);
-                return false;
+                // CORREÇÃO: Lançar exceção em vez de return false para permitir retry
+                const error = new Error(fullErrorMessage);
+                error.isBookingError = true;
+                throw error;
             }
         } catch (error) {
             console.error('❌ Erro de conexão na confirmação:', error);
-            this.showDateError('Erro de conexão na confirmação.');
-            return false;
+
+            // CORREÇÃO: Lançar exceção em vez de return false para permitir retry
+            // Preservar erro original se for da API Viator
+            if (error.isViatorApiError) {
+                throw error; // Preservar erro específico da API
+            } else {
+                const connectionError = new Error('Erro de conexão na confirmação.');
+                connectionError.isConnectionError = true;
+                throw connectionError;
+            }
         }
     }
     
     displayConfirmationMessage(data) {
         console.log('🎨 displayConfirmationMessage chamado com dados:', data);
-        
-        const container = document.querySelector('.confirmation-message');
+
+        // CORREÇÃO: Busca mais robusta do container
+        let container = document.querySelector('.confirmation-message');
         console.log('📦 Container encontrado:', !!container);
-        
+
         if (!container) {
-            console.error('❌ Container .confirmation-message não encontrado!');
-            return;
+            console.warn('⚠️ Container .confirmation-message não encontrado, tentando criar...');
+
+            // Tentar encontrar container pai
+            const parentContainer = document.querySelector('.confirmation-container, .confirmation-step, #booking-step-content');
+            if (parentContainer) {
+                console.log('📦 Container pai encontrado, criando .confirmation-message');
+                container = document.createElement('div');
+                container.className = 'confirmation-message';
+                parentContainer.appendChild(container);
+            } else {
+                console.error('❌ Nenhum container pai encontrado para criar .confirmation-message!');
+                return;
+            }
         }
 
-        // CORREÇÃO: Extrair dados da estrutura correta (data.items[0])
+        // CORREÇÃO: Extrair dados com múltiplas estratégias
         const firstItem = data.items && data.items.length > 0 ? data.items[0] : {};
-        let status = firstItem.status || data.custom_data?.confirmationStatus || 'UNKNOWN';
-        const bookingRef = firstItem.bookingRef || 'N/A';
-        const voucherInfo = firstItem.voucherInfo || data.voucherInfo || {};
+
+        // Estratégia robusta para extrair status
+        let status = this.extractConfirmationStatus(data, firstItem);
+
+        // Estratégia robusta para extrair bookingRef
+        const bookingRef = this.extractBookingRef(data, firstItem);
+
+        // Estratégia robusta para extrair voucherInfo
+        const voucherInfo = this.extractVoucherInfo(data, firstItem);
+
         const isRestricted = voucherInfo.isVoucherRestrictionRequired || data.custom_data?.isVoucherRestrictionRequired || false;
         const itemSummary = firstItem.itemSummary || {};
 
-        console.error('🚨 [FORCE LOG] Estrutura de dados:', data);
-        console.error('🚨 [FORCE LOG] Primeiro item:', firstItem);
-        console.error('🚨 [FORCE LOG] Status extraído:', status);
-        console.error('🚨 [FORCE LOG] BookingRef extraído:', bookingRef);
-        console.error('🚨 [FORCE LOG] VoucherInfo extraído:', voucherInfo);
+        console.log('🚨 [CONFIRMATION DEBUG] Estrutura de dados:', data);
+        console.log('🚨 [CONFIRMATION DEBUG] Primeiro item:', firstItem);
+        console.log('🚨 [CONFIRMATION DEBUG] Status extraído:', status);
+        console.log('🚨 [CONFIRMATION DEBUG] BookingRef extraído:', bookingRef);
+        console.log('🚨 [CONFIRMATION DEBUG] VoucherInfo extraído:', voucherInfo);
 
         // CORREÇÃO: Se ainda está UNKNOWN mas temos bookingRef válido, usar CONFIRMED
         if (status === 'UNKNOWN' && bookingRef && bookingRef !== 'N/A') {
             console.log('📋 Detectado bookingRef válido, considerando como CONFIRMED');
-            console.error('🚨 [FORCE LOG] Mudando status para CONFIRMED (bookingRef válido)');
             status = 'CONFIRMED';
         }
 
         // Se há dados de voucher, também considerar como sucesso
         if (status === 'UNKNOWN' && (voucherInfo.url || voucherInfo.voucherURL || voucherInfo.voucherKey)) {
             console.log('🎫 Detectado dados de voucher, considerando como CONFIRMED');
-            console.error('🚨 [FORCE LOG] Mudando status para CONFIRMED (voucher válido)');
+            status = 'CONFIRMED';
+        }
+
+        // Se chegou até aqui com dados válidos, assumir CONFIRMED
+        if (status === 'UNKNOWN' && (bookingRef !== 'N/A' || Object.keys(voucherInfo).length > 0)) {
+            console.log('✅ Dados de confirmação válidos encontrados, assumindo CONFIRMED');
             status = 'CONFIRMED';
         }
 
@@ -8819,27 +10846,46 @@ this.renderLocationOptions();
         }
         const travelDate = this.bookingData?.travelDate || 'Data não especificada';
 
-        // Melhorar extração do preço
-        let currency = 'USD';
+        // CORREÇÃO CRÍTICA: Melhorar extração do preço com múltiplas fontes
+        let currency = 'BRL'; // CORREÇÃO: Padrão brasileiro
         let amount = 0;
 
-        // Tentar extrair preço dos dados de confirmação primeiro
-        if (data.totalConfirmedPrice?.price) {
-            currency = data.currency || 'USD';
+        // 1ª fonte: dados de confirmação
+        if (data?.totalConfirmedPrice?.price) {
+            currency = data.currency || data.data?.currency || 'BRL';
             amount = data.totalConfirmedPrice.price.recommendedRetailPrice ||
                     data.totalConfirmedPrice.price.partnerTotalPrice || 0;
         }
-        // Fallback para dados do item
-        else if (firstItem.itemTotalPrice?.price) {
-            currency = data.currency || 'USD';
+        // 2ª fonte: dados do item
+        else if (firstItem?.itemTotalPrice?.price) {
+            currency = data?.currency || data?.data?.currency || 'BRL';
             amount = firstItem.itemTotalPrice.price.recommendedRetailPrice ||
                     firstItem.itemTotalPrice.price.partnerTotalPrice || 0;
         }
-        // Fallback para dados salvos
-        else if (this.bookingData?.selectedOption?.totalPrice) {
-            const savedPrice = this.bookingData.selectedOption.totalPrice;
-            currency = savedPrice.currency || 'USD';
+        // 3ª fonte: dados salvos da opção selecionada
+        else if (this.bookingData?.selectedOption?.totalPrice?.price) {
+            const savedPrice = this.bookingData.selectedOption.totalPrice.price;
+            currency = this.bookingData.selectedOption.currency ||
+                      this.bookingData.availabilityData?.currency || 'BRL';
             amount = savedPrice.recommendedRetailPrice || savedPrice.partnerTotalPrice || 0;
+        }
+        // 4ª fonte: dados de disponibilidade salvos
+        else if (this.bookingData?.availabilityData?.bookableItems?.[0]?.totalPrice?.price) {
+            const availPrice = this.bookingData.availabilityData.bookableItems[0].totalPrice.price;
+            currency = this.bookingData.availabilityData.currency || 'BRL';
+            amount = availPrice.recommendedRetailPrice || availPrice.partnerTotalPrice || 0;
+        }
+        // 5ª fonte: extrair do DOM como último recurso
+        else {
+            const totalElement = document.querySelector('.total-price, .price-total, .final-price');
+            if (totalElement) {
+                const priceText = totalElement.textContent || '';
+                const priceMatch = priceText.match(/R\$\s*([\d.,]+)/);
+                if (priceMatch) {
+                    currency = 'BRL';
+                    amount = parseFloat(priceMatch[1].replace(',', '.'));
+                }
+            }
         }
         
         // Informações do responsável
@@ -9751,7 +11797,14 @@ this.renderLocationOptions();
                     return result;
                 }
 
-                throw new Error('Resultado inválido');
+                // CORREÇÃO: Não criar erro genérico que sobrescreve erro específico da API
+                // Se chegou aqui, significa que não houve exceção mas resultado é inválido
+                // Vamos preservar qualquer erro específico que já foi capturado
+                if (lastError && lastError.isViatorApiError) {
+                    throw lastError; // Preservar erro específico da API
+                } else {
+                    throw new Error('Resultado inválido');
+                }
 
             } catch (error) {
                 lastError = error;
@@ -10016,12 +12069,21 @@ this.renderLocationOptions();
                 this.stopButtonLoadingAnimation(); // Parar animação quando resultados aparecem
             } else {
                 console.log('❌ Erro na resposta:', data);
-                this.showPriceError('Erro: ' + (data.data?.message || 'Erro desconhecido'));
+
+                // Melhorar mensagem de erro para o usuário
+                let userMessage = 'Não foi possível verificar a disponibilidade. Tente novamente em alguns instantes.';
+
+                // Se há uma mensagem específica e amigável, usar ela
+                if (data.data?.message && !data.data.message.toLowerCase().includes('internal server error')) {
+                    userMessage = data.data.message;
+                }
+
+                this.showPriceError(userMessage);
                 this.stopButtonLoadingAnimation(); // Parar animação em caso de erro
             }
         } catch (error) {
             console.log('❌ Erro na requisição:', error);
-            this.showPriceError('Erro de conexão. Tente novamente.');
+            this.showPriceError('Erro de conexão. Verifique sua internet e tente novamente.');
             this.stopButtonLoadingAnimation(); // Parar animação em caso de erro de conexão
         }
     }
@@ -10507,14 +12569,23 @@ this.renderLocationOptions();
 
     showPriceError(message) {
         const priceDisplay = document.getElementById('price-display');
+
         priceDisplay.innerHTML = `
-            <div class="price-error">
-                <div class="error-icon">❌</div>
-                ${message}
+            <div class="price-error" style="
+                text-align: center;
+                padding: 20px;
+                background: #f8d7da;
+                border: 1px solid #f5c6cb;
+                border-radius: 8px;
+                color: #721c24;
+                margin: 20px 0;
+            ">
+                <div class="error-icon" style="font-size: 24px; margin-bottom: 10px;">⚠️</div>
+                <div>${message}</div>
             </div>
         `;
         priceDisplay.style.display = 'block';
-        
+
         // Esconder footer summary em caso de erro
         const footerSummary = document.getElementById('footer-price-summary');
         footerSummary.style.display = 'none';
@@ -10757,65 +12828,123 @@ this.renderLocationOptions();
         this.restorePageScroll();
     }
 
-    showDateError(message, type = 'error') {
+    showDateError(message, type = 'error', trackingId = null) {
+        // CORREÇÃO: Criar mensagem específica com trackingId se fornecido
+        let finalMessage = message;
+
+        // Se trackingId foi fornecido, criar mensagem específica
+        if (trackingId) {
+            finalMessage = `Erro no processamento da reserva: Internal server error. ID de rastreamento: ${trackingId}. Por favor, entre em contato com o suporte.`;
+            this.specificErrorAlreadyDisplayed = true;
+            console.log('✅ Erro específico da API com trackingId criado:', trackingId);
+        }
+
+        // Verificar se é uma mensagem genérica e já temos erro específico
+        const isGenericMessage = message.includes('Erro no processamento do pagamento') ||
+                                message.includes('Resultado inválido');
+
+        if (isGenericMessage && this.specificErrorAlreadyDisplayed && !trackingId) {
+            console.log('⚠️ Mensagem genérica ignorada - erro específico já foi exibido');
+            console.log('📝 Mensagem ignorada:', message);
+            console.log('✅ Erro específico já exibido anteriormente');
+            return; // Não exibir mensagem genérica se já temos erro específico
+        }
+
+        // Marcar se é uma mensagem específica da API (com trackingId)
+        const isSpecificApiError = finalMessage.includes('ID de rastreamento:') ||
+                                  finalMessage.includes('Internal server error') ||
+                                  finalMessage.includes('trackingId') ||
+                                  trackingId;
+
+        if (isSpecificApiError) {
+            this.specificErrorAlreadyDisplayed = true;
+            console.log('✅ Erro específico da API detectado - marcando como exibido');
+        }
+
+        // 1. Primeiro, tentar o elemento original (etapa 1)
         const errorElement = document.getElementById('date-error-message');
         if (errorElement) {
-            // Texto simples sem ícone, como na imagem da Etapa 2
-            errorElement.textContent = message;
+            errorElement.textContent = finalMessage;
             errorElement.style.display = 'block';
-
-            // Aplicar classe CSS baseada no tipo
             errorElement.className = type === 'warning' ? 'warning-message' : 'error-message';
 
             // Auto-hide warnings after 5 seconds
             if (type === 'warning') {
                 setTimeout(() => {
-                    if (errorElement.textContent.includes(message)) {
-                        this.hideDateError();
-                    }
+                    this.hideDateError();
                 }, 5000);
             }
-        } else {
-            // Fallback para console e alert
-            const prefix = type === 'warning' ? 'Aviso: ' : 'Erro: ';
-            console.log(prefix + message);
 
-            // Tentar encontrar container de erro alternativo
-            const altErrorContainer = document.getElementById('viator-error-message') ||
-                                    document.querySelector('.error-container') ||
-                                    document.querySelector('.alert-container');
+            this.debugLog(`User message displayed (${type})`, {
+                message: finalMessage,
+                type: type,
+                elementFound: true,
+                location: 'date-error-message',
+                isSpecificError: isSpecificApiError,
+                trackingId: trackingId
+            });
 
-            if (altErrorContainer) {
-                const alertClass = type === 'warning' ? 'alert-warning' : 'alert-danger';
-                // Texto simples sem ícone
-                altErrorContainer.innerHTML = `<div class="alert ${alertClass}">
-                    ${message}
-                </div>`;
-
-                if (type === 'warning') {
-                    setTimeout(() => {
-                        if (altErrorContainer.innerHTML.includes(message)) {
-                            altErrorContainer.innerHTML = '';
-                        }
-                    }, 5000);
-                }
-            }
+            return;
         }
 
-        // Log do erro/aviso para debug
-        this.debugLog(`User message displayed (${type})`, {
-            message: message,
+        // 2. Se não encontrou o elemento original, exibir na etapa 5 (Confirmação)
+        console.log('📍 Elemento date-error-message não encontrado, exibindo na etapa 5 (Confirmação)');
+
+        // Navegar para a etapa 5 se não estiver nela
+        const currentStep = this.currentStep || 1;
+        if (currentStep !== 5) {
+            console.log('🔄 Navegando para etapa 5 para exibir erro');
+            this.showStep(5);
+        }
+
+        // Exibir erro na etapa 5 usando displayConfirmationMessage
+        const errorData = {
+            success: false,
+            error: true,
+            message: finalMessage,
             type: type,
-            elementFound: !!errorElement
+            trackingId: trackingId || this.extractTrackingIdFromMessage(finalMessage)
+        };
+
+        // Usar a função de confirmação para exibir o erro
+        this.displayConfirmationMessage(errorData);
+
+        this.debugLog(`User message displayed (${type})`, {
+            message: finalMessage,
+            type: type,
+            elementFound: true,
+            location: 'confirmation-step',
+            navigatedToStep5: currentStep !== 5,
+            isSpecificError: isSpecificApiError
         });
+    }
+
+    /**
+     * CORREÇÃO: Extrair trackingId da mensagem de erro para exibição
+     */
+    extractTrackingIdFromMessage(message) {
+        const trackingMatch = message.match(/ID de rastreamento:\s*([A-Z0-9:_]+)/);
+        return trackingMatch ? trackingMatch[1] : null;
     }
     
     hideDateError() {
+        // CORREÇÃO: Ocultar erro do elemento principal (etapa 1)
         const errorElement = document.getElementById('date-error-message');
         if (errorElement) {
             errorElement.style.display = 'none';
             errorElement.textContent = '';
         }
+
+        // CORREÇÃO: Limpar mensagem de erro na etapa 5 (Confirmação)
+        // Isso é feito resetando o container de confirmação
+        const confirmationContainer = document.querySelector('.confirmation-message');
+        if (confirmationContainer) {
+            confirmationContainer.innerHTML = '';
+        }
+
+        // CORREÇÃO: Resetar flag de erro específico para permitir novos erros
+        this.specificErrorAlreadyDisplayed = false;
+        console.log('🔄 Flag de erro específico resetada');
     }
 
     highlightOptionSelection() {
@@ -11115,7 +13244,7 @@ this.renderLocationOptions();
         allAnswers.forEach(answer => {
             if (answer.optionId && selectedOptions.includes(answer.optionId)) {
                 perOptionAnswers.push({
-                    question: answer.questionId,
+                    question: answer.question || answer.questionId, // CORREÇÃO: Usar formato correto
                     answer: answer.answer,
                     optionId: answer.optionId
                 });
