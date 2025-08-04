@@ -1325,7 +1325,7 @@
                 flex-direction: column;
                 align-items: center;
                 justify-content: center; /* Centralizado no mobile */
-                gap: 10px;
+                gap: 20px;
                 width: 100%;
             }
 
@@ -1689,8 +1689,23 @@
     .viator-header-info-filter {
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        justify-content: center; /* Centralizado no mobile */
         width: 100%;
+        gap: 20px; /* Espaço entre botão e total */
+        padding: 0 15px; /* Padding lateral para não colar nas bordas */
+        flex-wrap: wrap; /* Permite quebra de linha se necessário */
+    }
+
+    /* Centralizar elementos filhos no mobile */
+    .viator-header-info-filter .viator-mobile-filter-button {
+        margin: 0; /* Remove margin auto para centralização manual */
+        flex-shrink: 0; /* Não encolher o botão */
+    }
+
+    .viator-header-info-filter .viator-total {
+        margin: 0; /* Remove margens padrão */
+        text-align: center; /* Centralizar texto */
+        flex-shrink: 0; /* Não encolher o texto */
     }
 }
 
