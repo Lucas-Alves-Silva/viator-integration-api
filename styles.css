@@ -1434,6 +1434,44 @@
                 100% { transform: scaleX(1); }
             }
             
+            /* Melhorias para mobile - loading effect mais visível */
+            @media (max-width: 768px) {
+                .viator-loading-effect {
+                    height: 5px;
+                    background: linear-gradient(90deg, #0056B3, #4da6ff, #0056B3);
+                    box-shadow: 0 2px 8px rgba(0, 86, 179, 0.3);
+                    animation: loading-progress-mobile 1.2s ease-in-out infinite;
+                }
+                
+                .viator-loading-effect.active {
+                    display: block;
+                    opacity: 1;
+                }
+                
+                @keyframes loading-progress-mobile {
+                    0% { 
+                        transform: scaleX(0);
+                        opacity: 0.8;
+                    }
+                    25% { 
+                        transform: scaleX(0.3);
+                        opacity: 1;
+                    }
+                    50% { 
+                        transform: scaleX(0.7);
+                        opacity: 1;
+                    }
+                    75% { 
+                        transform: scaleX(0.9);
+                        opacity: 1;
+                    }
+                    100% { 
+                        transform: scaleX(1);
+                        opacity: 0.9;
+                    }
+                }
+            }
+            
             /* Ajustes para o modal de filtros em mobile */
             .viator-filters-modal .viator-date-filter {
                 border-radius: 0;
