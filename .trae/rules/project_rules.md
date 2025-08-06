@@ -1,2 +1,3 @@
 To test a product/tour page in this project, use a URL in this example format http://ingressos-e-passeioscom.local/passeio/6613GRANDCELE/ or in this format http://localhost:{port}/passeio/6613GRANDCELE.
 The log test file for this project is viator-debug.log
+Standard URL for searching on the project site, example: http://ingressos-e-passeioscom.local/?viator_query=orlando

@@ -11,11 +11,30 @@ document.addEventListener('DOMContentLoaded', function () {
     function initializeMobileFilterButton() {
         const mobileFilterButton = document.getElementById('mobile-filter-button');
         if (mobileFilterButton) {
+            // Adicionar contador de filtros ao botão
+            if (!mobileFilterButton.querySelector('.viator-filter-counter')) {
+                const counter = document.createElement('div');
+                counter.className = 'viator-filter-counter';
+                counter.style.display = 'none'; // Inicialmente oculto
+                mobileFilterButton.appendChild(counter);
+            }
+            
             // Remover event listeners antigos para evitar duplicação
             mobileFilterButton.replaceWith(mobileFilterButton.cloneNode(true));
             
             // Obter a referência atualizada após a clonagem
             const updatedMobileFilterButton = document.getElementById('mobile-filter-button');
+            
+            // Re-adicionar o contador após clonagem
+            if (!updatedMobileFilterButton.querySelector('.viator-filter-counter')) {
+                const counter = document.createElement('div');
+                counter.className = 'viator-filter-counter';
+                counter.style.display = 'none';
+                updatedMobileFilterButton.appendChild(counter);
+            }
+            
+            // Atualizar contador inicialmente
+            updateFilterCounter();
             
             updatedMobileFilterButton.addEventListener('click', function() {
                 const filters = document.querySelector('.viator-filters');
@@ -47,8 +66,141 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
     
+    // Função para atualizar o contador de filtros ativos
+    function updateFilterCounter() {
+        const mobileFilterButton = document.getElementById('mobile-filter-button');
+        const counter = mobileFilterButton?.querySelector('.viator-filter-counter');
+
+        if (!counter) {
+            return;
+        }
+
+        let activeFiltersCount = 0;
+
+        /* ========================= PREÇO ========================= */
+        const minSlider = document.getElementById('min_price_slider');
+        const maxSlider = document.getElementById('max_price_slider');
+        const minHidden = document.getElementById('min_price_hidden');
+        const maxHidden = document.getElementById('max_price_hidden');
+
+        const minPriceDefault = minSlider ? parseInt(minSlider.min) || 0 : 0;
+        const maxPriceDefault = maxSlider ? parseInt(maxSlider.max) || 5000 : 5000;
+        const currentMin      = minHidden ? parseInt(minHidden.value) || minPriceDefault : minPriceDefault;
+        const currentMax      = maxHidden ? parseInt(maxHidden.value) || maxPriceDefault : maxPriceDefault;
+
+        if (currentMin > minPriceDefault || currentMax < maxPriceDefault) {
+            activeFiltersCount++;
+        }
+
+        /* ========================= CHECKBOXES & RADIOS ========================= */
+        // Conta todos os checkboxes marcados e, para cada grupo de radio, conta apenas uma vez.
+        const checkedInputs = document.querySelectorAll('.viator-filters input[type="checkbox"]:checked, .viator-filters input[type="radio"]:checked');
+        const radioGroups   = new Set();
+        checkedInputs.forEach(input => {
+            if (input.type === 'radio') {
+                if (!radioGroups.has(input.name)) {
+                    radioGroups.add(input.name);
+                    activeFiltersCount++;
+                }
+            } else {
+                activeFiltersCount++;
+            }
+        });
+
+        /* ========================= DATA ========================= */
+        // Considera a data como filtro ativo se houver valor selecionado OU presente nos parâmetros da URL
+        const dateInput = document.getElementById('viator-date-input');
+        let hasDateFilter = false;
+
+        if (dateInput && dateInput.value && dateInput.value.trim() !== '') {
+            hasDateFilter = true;
+        } else {
+            const paramsURL = new URLSearchParams(window.location.search);
+            if (paramsURL.get('viator_date_start') || paramsURL.get('viator_date_end')) {
+                hasDateFilter = true;
+            }
+        }
+
+        if (hasDateFilter) {
+            activeFiltersCount++;
+        }
+
+        /* ========================= ATUALIZA VISUAL ========================= */
+        console.log('Contador de filtros ativos:', activeFiltersCount);
+        if (activeFiltersCount > 0) {
+            counter.textContent = activeFiltersCount;
+            counter.style.display = 'flex'; // Exibe apenas quando houver filtros
+        } else {
+            counter.style.display = 'none'; // Oculta quando nenhum filtro está ativo
+        }
+    }
+    
     // Expor a função globalmente para poder ser chamada após atualizações AJAX
     window.initializeMobileFilterButton = initializeMobileFilterButton;
+    window.updateFilterCounter = updateFilterCounter;
+
+    // Função para configurar listeners de filtro usando delegação de eventos
+    /**
+ * Anexa o listener de mudança de data ao Flatpickr para atualizar o contador de filtros.
+ */
+function attachFlatpickrListener() {
+    const dateInput = document.getElementById('viator-date-input');
+    if (dateInput && dateInput._flatpickr) {
+        // Garante que o listener seja adicionado apenas uma vez.
+        const onChangeHandler = (selectedDates, dateStr, instance) => {
+            updateFilterCounter();
+        };
+
+        // Remove qualquer listener antigo para evitar duplicatas antes de adicionar um novo
+        const existingOnChange = dateInput._flatpickr.config.onChange;
+        if (Array.isArray(existingOnChange)) {
+            dateInput._flatpickr.config.onChange = existingOnChange.filter(f => f.name !== 'updateFilterCounterOnChange');
+        }
+
+        // Adiciona o novo listener
+        dateInput._flatpickr.config.onChange.push(Object.defineProperty(onChangeHandler, 'name', { value: 'updateFilterCounterOnChange' }));
+    }
+}
+
+function setupFilterListeners() {
+        console.log('Configurando listeners de filtro...');
+        const filtersContainer = document.querySelector('.viator-filters');
+
+        if (filtersContainer) {
+            filtersContainer.addEventListener('change', function(event) {
+                if (event.target.matches('.viator-duration-filter input, .viator-category-filter input, #min-price, #max-price')) {
+                    console.log('Filtro alterado (delegação):', event.target);
+                    updateFilterCounter();
+                }
+            });
+        }
+
+        // Tenta configurar o listener do flatpickr
+        attachFlatpickrListener();
+    }
+
+    // Observador para detectar quando os filtros (incluindo o de data) são adicionados ao DOM
+    const bodyObserver = new MutationObserver(function(mutations, me) {
+        const dateInput = document.getElementById('viator-date-input');
+        const filtersContainer = document.querySelector('.viator-filters');
+        
+        // Se o container de filtros e o input de data existem, configura os listeners
+        if (dateInput && filtersContainer) {
+            setupFilterListeners();
+            // Uma vez que os elementos foram encontrados e os listeners configurados, o observador pode parar
+            me.disconnect();
+        }
+    });
+
+    // Iniciar a observação no corpo do documento para mudanças na árvore de elementos
+    bodyObserver.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+
+    // Expor funções para que possam ser chamadas novamente se os filtros forem recarregados via AJAX
+    window.setupFilterListeners = setupFilterListeners;
+    window.attachFlatpickrListener = attachFlatpickrListener;
     
     // Adicionar elementos para o modal de filtros e o efeito de carregamento
     if (document.querySelector('.viator-content-wrapper')) {
@@ -2854,6 +3006,49 @@ function initializeCategoryEvents() {
         }
     });
 }
+
+// Adicionar listeners para atualizar o contador de filtros
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        // Listener para mudanças nos checkboxes de duração
+        document.addEventListener('change', function(e) {
+            if (e.target.matches('.viator-duration-filter input[type="checkbox"]')) {
+                updateFilterCounter();
+            }
+        });
+        
+        // Listener para mudanças nos checkboxes de categoria
+        document.addEventListener('change', function(e) {
+            if (e.target.matches('.viator-category-filter input[type="checkbox"]')) {
+                updateFilterCounter();
+            }
+        });
+        
+        // Listener para mudanças no slider de preço
+        document.addEventListener('input', function(e) {
+            if (e.target.matches('.viator-price-slider') || 
+                e.target.matches('#min-price') || 
+                e.target.matches('#max-price')) {
+                updateFilterCounter();
+            }
+        });
+        
+        // Listener para mudanças na data
+        document.addEventListener('change', function(e) {
+            if (e.target.matches('#viator-date-input')) {
+                updateFilterCounter();
+            }
+        });
+        
+        // Listener para mudanças via flatpickr
+        document.addEventListener('flatpickr-change', function() {
+            updateFilterCounter();
+        });
+        
+        // Atualizar contador inicialmente após um pequeno delay
+        setTimeout(updateFilterCounter, 500);
+    }, 100);
+});
 
 // Função melhorada para re-inicializar o Swiper das atrações
 function reinitializeAttractionsSwiper() {

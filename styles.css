@@ -508,7 +508,7 @@
 
 /* Botão de filtros para dispositivos móveis */
 .viator-mobile-filter-button {
-    display: none; /* Oculto por padrão, será exibido apenas em dispositivos móveis */
+    display: none; /* Oculto por padrão em desktops, será exibido apenas em mobile */
     padding: 12px 20px;
     background: #fff;
     color: #2D2D2D;
@@ -535,6 +535,29 @@
 
 .viator-mobile-filter-button .filter-icon {
     margin-right: 8px;
+}
+
+.viator-mobile-filter-button {
+    position: relative; /* Necessário para posicionar o contador */
+}
+
+.viator-filter-counter {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #0056b3; /* Azul padrão do projeto */
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+    min-width: 20px;
+    padding: 0 4px;
 }
 
 /* Responsive Styles */
