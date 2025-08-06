@@ -584,6 +584,14 @@
         display: block;
         animation: slideIn 0.3s ease-out;
     }
+
+    @media (max-width: 768px) {
+        .viator-filters.active {
+            height: 100vh; /* Ocupa toda a altura da tela */
+            overflow-y: scroll; /* Adiciona a barra de rolagem vertical */
+            -webkit-overflow-scrolling: touch; /* Melhora a experiência de rolagem no iOS */
+        }
+    }
     
     /* Botão de fechar para os filtros móveis */
     .viator-filters-close {
