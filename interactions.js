@@ -49,11 +49,11 @@ document.addEventListener('DOMContentLoaded', function () {
                         closeButton.style.position = 'absolute';
                         closeButton.style.top = '10px';
                         closeButton.style.right = '10px';
-                        closeButton.style.background = 'none';
+                        closeButton.style.background = '#fff';
                         closeButton.style.border = 'none';
                         closeButton.style.fontSize = '24px';
                         closeButton.style.cursor = 'pointer';
-                        closeButton.style.color = '#333';
+                        closeButton.style.color = '#0056B3';
                         
                         closeButton.addEventListener('click', function() {
                             filters.classList.remove('active');

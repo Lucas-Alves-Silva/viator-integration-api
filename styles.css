@@ -621,12 +621,33 @@
         position: absolute;
         top: 15px;
         right: 15px;
-        background: none;
-        border: none;
-        font-size: 24px;
-        color: #333;
+        background: #fff;
+        border: 2px solid #ddd;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        font-size: 20px;
+        color: #0056b3;
         cursor: pointer;
         z-index: 1001;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+    
+    .viator-filters-close:hover {
+        background: rgba(255, 255, 255, 1);
+        border-color: #0056B3;
+        color: #0056B3;
+        transform: scale(1.1);
+        box-shadow: 0 4px 12px rgba(0, 86, 179, 0.2);
+    }
+    
+    .viator-filters-close:active {
+        transform: scale(0.95);
+        background: #f0f8ff;
     }
     
     /* Animação para o slide-in dos filtros */
@@ -1617,11 +1638,58 @@
 }
 
 .viator-filters-close {
-    background: none;
-    border: none;
-    font-size: 24px;
-    color: #666;
+    background: rgba(255, 255, 255, 0.9);
+    border: 2px solid #ddd;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+    color: #333;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.viator-filters-close:hover {
+    background: rgba(255, 255, 255, 1);
+    border-color: #0056B3;
+    color: #0056B3;
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 86, 179, 0.2);
+}
+
+.viator-filters-close:active {
+    transform: scale(0.95);
+    background: #f0f8ff;
+}
+
+/* Melhorias específicas para mobile */
+@media (max-width: 768px) {
+    .viator-filters-close {
+        width: 30px;
+        height: 30px;
+        font-size: 22px;
+        top: 12px;
+        right: 12px;
+        background: #fff;
+        border: 2px solid #0056B3;
+        color: #0056B3;
+        font-weight: bold;
+    }
+    
+    .viator-filters-close:hover {
+        background: #0056B3;
+        color: white;
+        border-color: #0056B3;
+    }
+    
+    .viator-filters-close:active {
+        background: #004494;
+        border-color: #004494;
+    }
 }
 
 /* Classe para quando o modal está ativo */
