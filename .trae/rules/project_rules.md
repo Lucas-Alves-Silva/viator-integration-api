@@ -7,3 +7,4 @@ https://docs.viator.com/partner-api/technical/#section/Booking-concepts/Booking-
 https://docs.viator.com/partner-api/technical/#tag/Auxiliary/operation/locationsBulk
 https://docs.viator.com/partner-api/technical/#tag/Bookings/operation/bookingsCartBook
 https://docs.viator.com/partner-api/technical/
+Keep this document booking-questions-implementacao-funcional.md updated for each case of Booking Questions implementation that is 100% functional and compliant with the Viator API.
