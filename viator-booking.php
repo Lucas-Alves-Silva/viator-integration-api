@@ -209,8 +209,8 @@ class ViatorBookingSystem {
         if (!empty($booker_info)) {
             // Adicionar informações do lead traveler
             $request_data['items'][0]['leadTraveler'] = array(
-                'firstname' => $booker_info['firstname'] ?? '',
-                'lastname' => $booker_info['lastname'] ?? '',
+                'firstName' => $booker_info['firstName'] ?? '',
+                'lastName' => $booker_info['lastName'] ?? '',
                 'email' => $booker_info['email'] ?? '',
                 'phone' => $booker_info['phone'] ?? ''
             );
@@ -515,6 +515,16 @@ class ViatorBookingSystem {
         // Usar dados do hold passados como parâmetro ou fallback para last_hold_response
         $hold_response = !empty($hold_data) ? $hold_data : ($this->last_hold_response ?? []);
         $hold_items = $hold_response['items'] ?? [];
+
+        // CORREÇÃO: A API da Viator não retorna leadTraveler na resposta do hold
+        // Os dados do responsável devem vir do frontend via booker_info
+        viator_debug_log('Booker Info recebido na confirmação:', $booker_info);
+        
+        // Validar se os dados obrigatórios do responsável estão presentes
+        if (empty($booker_info['firstName']) || empty($booker_info['lastName'])) {
+            viator_debug_log('ERRO: Dados do responsável não fornecidos - firstName: ' . ($booker_info['firstName'] ?? 'vazio') . ', lastName: ' . ($booker_info['lastName'] ?? 'vazio'));
+            return array('error' => 'Dados obrigatórios do responsável não preenchidos: Nome e Sobrenome.');
+        }
         
         viator_debug_log('Hold Data recebido para confirmação:', [
             'hold_data_provided' => !empty($hold_data),
@@ -584,24 +594,99 @@ class ViatorBookingSystem {
         
         // CORREÇÃO CRÍTICA: Estruturar dados conforme documentação oficial da API da Viator
         // Baseado na documentação: https://docs.viator.com/partner-api/technical/#operation/bookingsCartBook
+        viator_debug_log('📋 [STRUCTURE] booker_info antes de aplicar aos itens:', $booker_info);
+        viator_debug_log('📋 [STRUCTURE] booker_info estrutura completa:', [
+            'keys' => array_keys($booker_info),
+            'values' => $booker_info
+        ]);
+        
+        // Garantir que booker_info tem as chaves necessárias com valores válidos
+        $booker_info = array_merge([
+            'firstName' => '',
+            'lastName' => '',
+            'email' => '',
+            'phone' => ''
+        ], $booker_info);
+
+        // Validação crítica dos dados do responsável
+        if (empty(trim($booker_info['firstName'])) || empty(trim($booker_info['lastName']))) {
+            $error_message = 'Dados obrigatórios do responsável não preenchidos: Nome e Sobrenome.';
+            viator_debug_log('❌ [CONFIRMATION VALIDATION] ' . $error_message, $booker_info);
+            return ['error' => true, 'success' => false, 'message' => $error_message];
+        }
+        
+        foreach ($confirm_items as &$item) {
+            viator_debug_log('📋 [STRUCTURE] Aplicando dados do responsável ao item:', [
+                'item_index' => array_search($item, $confirm_items),
+                'booker_info' => $booker_info
+            ]);
+            
+            // Verificar se booker_info tem as chaves necessárias
+            if (!isset($booker_info['email']) || !isset($booker_info['firstName']) || !isset($booker_info['lastName'])) {
+                viator_debug_log('❌ [STRUCTURE] booker_info está faltando chaves necessárias:', [
+                    'has_email' => isset($booker_info['email']),
+                    'has_firstName' => isset($booker_info['firstName']),
+                    'has_lastName' => isset($booker_info['lastName']),
+                    'booker_info_keys' => array_keys($booker_info)
+                ]);
+            }
+            
+            // Garantir que os valores não são vazios
+            $email = trim($booker_info['email'] ?? '');
+            $firstName = trim($booker_info['firstName'] ?? '');
+            $lastName = trim($booker_info['lastName'] ?? '');
+            $phone = trim($booker_info['phone'] ?? '');
+            
+            viator_debug_log('📋 [STRUCTURE] Valores extraídos do booker_info:', [
+                'email' => $email,
+                'firstName' => $firstName,
+                'lastName' => $lastName,
+                'phone' => $phone
+            ]);
+            
+            $item['communication'] = [
+                'email' => $email,
+            ];
+            if (!empty($phone)) {
+                $item['communication']['phone'] = $phone;
+            }
+        
+            // Adicionar informações do viajante ao item
+            $item['travelers'] = [
+                [
+                    'isLead' => true,
+                    'firstName' => $firstName,
+                    'lastName' => $lastName,
+                ]
+            ];
+            
+            viator_debug_log('✅ [STRUCTURE] Item estruturado:', [
+                'communication' => $item['communication'],
+                'travelers' => $item['travelers']
+            ]);
+        }
+        unset($item); // Unset reference
+
+        // CORREÇÃO CRÍTICA: Adicionar objeto bookerInfo obrigatório conforme documentação da Viator
         $request_data = array(
             'cartRef' => $cart_ref,
+            'paymentToken' => $payment_token,
             'bookerInfo' => array(
-                'firstName' => $booker_info['firstname'],
-                'lastName' => $booker_info['lastname'],
-                'email' => $booker_info['email']
+                'firstName' => trim($booker_info['firstName'] ?? ''),
+                'lastName' => trim($booker_info['lastName'] ?? '')
             ),
-            'paymentToken' => $payment_token
+            'communication' => array(
+                'email' => trim($booker_info['email'] ?? ''),
+                'phone' => trim($booker_info['phone'] ?? '')
+            ),
+            'items' => $confirm_items
         );
+        
+        viator_debug_log('✅ [STRUCTURE] Objeto bookerInfo adicionado:', $request_data['bookerInfo']);
+        viator_debug_log('✅ [STRUCTURE] Objeto communication adicionado:', $request_data['communication']);
 
-        // CORREÇÃO: Incluir phone apenas se fornecido e não vazio
-        if (!empty($booker_info['phone'])) {
-            $request_data['bookerInfo']['phone'] = $booker_info['phone'];
-        }
-
-        // CORREÇÃO CRÍTICA: Não incluir 'items' para endpoint /bookings/cart/book
-        // O endpoint /bookings/cart/book usa cartRef e não precisa de items
-        viator_debug_log('🔧 [STRUCTURE] Usando estrutura simplificada para /bookings/cart/book (sem items)');
+        // Log da estrutura da requisição
+        viator_debug_log('🔧 [STRUCTURE] Usando estrutura completa para /bookings/cart/book com items');
         
         // CORREÇÃO CRÍTICA: Validar e corrigir formato das booking questions
         if (!empty($booking_question_answers)) {
@@ -678,27 +763,99 @@ class ViatorBookingSystem {
             }
         }
 
+        // CORREÇÃO CRÍTICA: Verificar se os dados do responsável foram aplicados corretamente
+        viator_debug_log('🔍 [POST-CONSTRUCTION] Verificando estrutura final dos dados...');
+        
+        // Fallback crítico: se algum item não tem dados do responsável, aplicar do booker_info
+        foreach ($request_data['items'] as $index => &$item) {
+            $email = $item['communication']['email'] ?? '';
+            $firstName = $item['travelers'][0]['firstName'] ?? '';
+            $lastName = $item['travelers'][0]['lastName'] ?? '';
+            
+            if (empty($email) || empty($firstName) || empty($lastName)) {
+                viator_debug_log("⚠️ [POST-CONSTRUCTION] Item {$index} com dados incompletos - aplicando fallback", [
+                    'email' => $email,
+                    'firstName' => $firstName,
+                    'lastName' => $lastName,
+                    'booker_info' => $booker_info
+                ]);
+                
+                // Aplicar dados do responsável como fallback
+                $item['communication']['email'] = $booker_info['email'] ?? '';
+                $item['communication']['phone'] = $booker_info['phone'] ?? '';
+                $item['travelers'][0]['firstName'] = $booker_info['firstName'] ?? '';
+                $item['travelers'][0]['lastName'] = $booker_info['lastName'] ?? '';
+                
+                viator_debug_log("✅ [POST-CONSTRUCTION] Item {$index} corrigido com dados do responsável", [
+                    'novo_email' => $item['communication']['email'],
+                    'novo_firstName' => $item['travelers'][0]['firstName'],
+                    'novo_lastName' => $item['travelers'][0]['lastName']
+                ]);
+            }
+        }
+        unset($item); // Limpar referência
+        
         // CORREÇÃO CRÍTICA: Validar estrutura da requisição antes do envio
         $validation_errors = array();
+
+        viator_debug_log('🔍 [VALIDATION] Iniciando validação dos dados...');
+        viator_debug_log('🔍 [VALIDATION] booker_info original:', $booker_info);
+        viator_debug_log('🔍 [VALIDATION] request_data structure:', $request_data);
 
         if (empty($request_data['cartRef'])) {
             $validation_errors[] = 'cartRef vazio';
         }
 
-        if (empty($request_data['bookerInfo']['firstName'])) {
-            $validation_errors[] = 'firstName vazio';
-        }
-
-        if (empty($request_data['bookerInfo']['lastName'])) {
-            $validation_errors[] = 'lastName vazio';
-        }
-
-        if (empty($request_data['bookerInfo']['email'])) {
-            $validation_errors[] = 'email vazio';
-        }
-
         if (empty($request_data['paymentToken'])) {
             $validation_errors[] = 'paymentToken vazio';
+        }
+
+        // Validar dados do responsário em cada item
+        foreach ($request_data['items'] as $index => $item) {
+            viator_debug_log("🔍 [VALIDATION] Validando item {$index}:", [
+                'communication' => $item['communication'] ?? 'NÃO DEFINIDO',
+                'travelers' => $item['travelers'] ?? 'NÃO DEFINIDO',
+                'item_completo' => $item
+            ]);
+            
+            // Log detalhado dos valores reais
+            $email = $item['communication']['email'] ?? '';
+            $firstName = $item['travelers'][0]['firstName'] ?? '';
+            $lastName = $item['travelers'][0]['lastName'] ?? '';
+            
+            viator_debug_log("🔍 [VALIDATION] Item {$index} valores:", [
+                'email' => $email,
+                'email_empty' => empty($email),
+                'email_trim' => trim($email),
+                'firstName' => $firstName,
+                'firstName_empty' => empty($firstName),
+                'firstName_trim' => trim($firstName),
+                'lastName' => $lastName,
+                'lastName_empty' => empty($lastName),
+                'lastName_trim' => trim($lastName)
+            ]);
+            
+            if (empty($item['communication']['email']) || trim($item['communication']['email']) === '') {
+                viator_debug_log("❌ [VALIDATION] Item {$index}: email vazio ou inválido", [
+                    'communication' => $item['communication'] ?? [],
+                    'raw_email' => $item['communication']['email'] ?? ''
+                ]);
+                $validation_errors[] = "Item {$index}: email do responsável vazio";
+            }
+            if (empty($item['travelers'][0]['firstName']) || trim($item['travelers'][0]['firstName']) === '') {
+                viator_debug_log("❌ [VALIDATION] Item {$index}: firstName vazio ou inválido", [
+                    'traveler' => $item['travelers'][0] ?? [],
+                    'raw_firstName' => $item['travelers'][0]['firstName'] ?? ''
+                ]);
+                $validation_errors[] = "Item {$index}: firstName do responsável vazio";
+            }
+            if (empty($item['travelers'][0]['lastName']) || trim($item['travelers'][0]['lastName']) === '') {
+                viator_debug_log("❌ [VALIDATION] Item {$index}: lastName vazio ou inválido", [
+                    'traveler' => $item['travelers'][0] ?? [],
+                    'raw_lastName' => $item['travelers'][0]['lastName'] ?? ''
+                ]);
+                $validation_errors[] = "Item {$index}: lastName do responsável vazio";
+            }
         }
 
         // CORREÇÃO: Validar formato das booking questions se presentes
@@ -737,7 +894,7 @@ class ViatorBookingSystem {
 
         while ($attempt <= $max_attempts) {
             viator_debug_log("🔄 Booking Confirmation - Tentativa {$attempt}/{$max_attempts}");
-
+            
             $response = wp_remote_post($this->base_url . '/partner/bookings/cart/book', array(
                 'headers' => array(
                     'Accept' => 'application/json;version=2.0',
@@ -1987,12 +2144,119 @@ class ViatorBookingSystem {
         
         $cart_id = sanitize_text_field($_POST['cart_id']);
         $payment_token = sanitize_text_field($_POST['payment_token']);
-        $booker_info = json_decode(stripslashes($_POST['booker_info']), true);
+        
+        // Log detalhado dos dados recebidos
+        viator_debug_log('📥 [AJAX] Dados recebidos para confirmação:', [
+            'cart_id' => $cart_id,
+            'payment_token' => substr($payment_token, 0, 10) . '...',
+            'raw_booker_info' => $_POST['booker_info'] ?? 'NÃO ENCONTRADO',
+            'raw_booking_questions' => $_POST['bookingQuestionAnswers'] ?? 'NÃO ENCONTRADO',
+            'raw_hold_data' => $_POST['hold_data'] ?? 'NÃO ENCONTRADO'
+        ]);
+        
+        $booker_info_raw = $_POST['booker_info'] ?? '';
+        
+        // Log do valor bruto recebido
+        viator_debug_log('📥 [AJAX] booker_info raw:', $booker_info_raw);
+        
+        // Verificar se o JSON é válido antes de decodificar
+        if (empty($booker_info_raw)) {
+            viator_debug_log('❌ [AJAX] booker_info está vazio ou não foi enviado');
+            wp_send_json_error(['message' => 'Dados do responsável não foram enviados']);
+        }
+        
+        $booker_info = json_decode(stripslashes($booker_info_raw), true);
+        
+        // Verificar se a decodificação foi bem-sucedida
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            viator_debug_log('❌ [AJAX] Erro ao decodificar booker_info:', json_last_error_msg());
+            wp_send_json_error(['message' => 'Erro ao processar dados do responsável']);
+        }
+        
+        viator_debug_log('🔍 [AJAX] Booker info decodificado:', [
+            'structure' => $booker_info,
+            'keys' => array_keys($booker_info),
+            'has_required_fields' => [
+                'email' => isset($booker_info['email']),
+                'firstName' => isset($booker_info['firstName']),
+                'lastName' => isset($booker_info['lastName'])
+            ]
+        ]);
+        
         $booking_question_answers = isset($_POST['bookingQuestionAnswers']) ? json_decode(stripslashes($_POST['bookingQuestionAnswers']), true) : [];
         $hold_data = isset($_POST['hold_data']) ? json_decode(stripslashes($_POST['hold_data']), true) : [];
 
         if (empty($cart_id) || empty($payment_token) || empty($booker_info)) {
+            viator_debug_log('❌ [AJAX] Dados incompletos:', [
+                'cart_id_empty' => empty($cart_id),
+                'payment_token_empty' => empty($payment_token),
+                'booker_info_empty' => empty($booker_info),
+                'booker_info_structure' => $booker_info
+            ]);
             wp_send_json_error(['message' => 'Dados incompletos para confirmação']);
+        }
+        
+        // CORREÇÃO CRÍTICA: Verificar se os campos obrigatórios do responsável estão preenchidos
+        $required_fields = ['email', 'firstName', 'lastName'];
+        $missing_fields = [];
+        $field_names = [
+            'firstName' => 'Nome',
+            'lastName' => 'Sobrenome',
+            'email' => 'Email'
+        ];
+        
+        viator_debug_log('🔍 [AJAX] Validando campos obrigatórios:', [
+            'booker_info_keys' => array_keys($booker_info),
+            'field_values' => [
+                'firstName' => $booker_info['firstName'] ?? 'NÃO DEFINIDO',
+                'lastName' => $booker_info['lastName'] ?? 'NÃO DEFINIDO',
+                'email' => $booker_info['email'] ?? 'NÃO DEFINIDO'
+            ],
+            'field_lengths' => [
+                'firstName' => isset($booker_info['firstName']) ? strlen($booker_info['firstName']) : 0,
+                'lastName' => isset($booker_info['lastName']) ? strlen($booker_info['lastName']) : 0,
+                'email' => isset($booker_info['email']) ? strlen($booker_info['email']) : 0
+            ]
+        ]);
+        
+        foreach ($required_fields as $field) {
+            $field_value = $booker_info[$field] ?? '';
+            $trimmed_value = trim($field_value);
+            
+            viator_debug_log("🔍 [AJAX] Validando campo {$field}:", [
+                'original_value' => $field_value,
+                'trimmed_value' => $trimmed_value,
+                'is_empty_original' => empty($field_value),
+                'is_empty_trimmed' => empty($trimmed_value),
+                'isset' => isset($booker_info[$field])
+            ]);
+            
+            if (!isset($booker_info[$field]) || empty($trimmed_value)) {
+                $missing_fields[] = $field_names[$field];
+                viator_debug_log("❌ [AJAX] Campo {$field} considerado inválido");
+            } else {
+                viator_debug_log("✅ [AJAX] Campo {$field} válido: '{$trimmed_value}'");
+            }
+        }
+        
+        if (!empty($missing_fields)) {
+            viator_debug_log('❌ [AJAX] Campos obrigatórios do responsável vazios:', [
+                'missing_fields' => $missing_fields,
+                'booker_info' => $booker_info,
+                'raw_values' => [
+                    'firstName' => $booker_info['firstName'] ?? 'NÃO DEFINIDO',
+                    'lastName' => $booker_info['lastName'] ?? 'NÃO DEFINIDO',
+                    'email' => $booker_info['email'] ?? 'NÃO DEFINIDO'
+                ]
+            ]);
+            
+            $error_message = "Problemas encontrados:\n\nDados obrigatórios do responsável não preenchidos:\n• " . implode("\n• ", $missing_fields);
+            
+            wp_send_json_error([
+                'message' => $error_message,
+                'missing_fields' => $missing_fields,
+                'type' => 'error'
+            ]);
         }
 
         $result = $this->confirm_booking($cart_id, $payment_token, $booker_info, $booking_question_answers, $hold_data);

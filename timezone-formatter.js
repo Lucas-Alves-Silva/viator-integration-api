@@ -42,7 +42,16 @@ function formatTimezone(timezoneCode) {
                 console.log('Timezone API Response:', data);
                 
                 if (data.message) {
-                    throw new Error(data.message);
+                    // Garantir que a mensagem seja sempre uma string válida
+                    let errorMessage = 'Erro na API de timezone';
+                    if (typeof data.message === 'string') {
+                        errorMessage = data.message;
+                    } else if (typeof data.message === 'object') {
+                        errorMessage = data.message.message || data.message.error || JSON.stringify(data.message);
+                    } else {
+                        errorMessage = String(data.message);
+                    }
+                    throw new Error(errorMessage);
                 }
 
                 // Formata o fuso horário de forma amigável

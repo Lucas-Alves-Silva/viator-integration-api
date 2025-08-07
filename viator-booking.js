@@ -1244,6 +1244,17 @@ class ViatorBookingManager {
             // Também enviar para o PHP se necessário (opcional)
             if (typeof viatorBookingAjax !== 'undefined' && viatorBookingAjax.debug_enabled) {
                 try {
+                    // Garantir que os dados sejam serializados corretamente
+                    let serializedData = '';
+                    if (data !== null) {
+                        try {
+                            serializedData = JSON.stringify(data);
+                        } catch (jsonError) {
+                            // Se falhar ao serializar, converter para string de forma segura
+                            serializedData = String(data);
+                        }
+                    }
+
                     fetch(viatorBookingAjax.ajaxurl, {
                         method: 'POST',
                         headers: {
@@ -1252,7 +1263,7 @@ class ViatorBookingManager {
                         body: new URLSearchParams({
                             action: 'viator_debug_log_js',
                             message: message,
-                            data: data ? JSON.stringify(data) : '',
+                            data: serializedData,
                             nonce: viatorBookingAjax.nonce
                         })
                     }).catch(error => {
@@ -3558,10 +3569,10 @@ this.renderLocationOptions();
                 console.log(`🔍 [ENRICH DEBUG] Buscando dados para: ${questionId}`);
                 const fullQuestion = this.dynamicBookingQuestions.allQuestions.find(q => q.id === questionId);
                 if (fullQuestion) {
-                    console.log(`✅ [ENRICH DEBUG] Pergunta encontrada: ${questionId}`);
+                    console.log(`✅ [ENRICH DEBUG] Pergunta encontrada: ${typeof questionId === 'string' ? questionId : JSON.stringify(questionId)}`);
                     enrichedQuestions.push(fullQuestion);
                 } else {
-                    console.warn(`⚠️ [ENRICH DEBUG] Pergunta ${questionId} não encontrada na lista completa`);
+                    console.warn(`⚠️ [ENRICH DEBUG] Pergunta ${typeof questionId === 'string' ? questionId : JSON.stringify(questionId)} não encontrada na lista completa`);
                 }
             });
 
@@ -9147,14 +9158,14 @@ this.renderLocationOptions();
             };
         }
 
-        const requiredFields = ['firstname', 'lastname', 'email'];
+        const requiredFields = ['firstName', 'lastName', 'email'];
         const missingFields = [];
 
         requiredFields.forEach(field => {
             if (!bookerInfo[field] || bookerInfo[field].trim() === '') {
                 const fieldNames = {
-                    firstname: 'Nome',
-                    lastname: 'Sobrenome',
+                    firstName: 'Nome',
+                    lastName: 'Sobrenome',
                     email: 'Email'
                 };
                 missingFields.push(`• ${fieldNames[field]}`);
@@ -9633,7 +9644,18 @@ this.renderLocationOptions();
                 this.displayAvailabilityResult(data.data);
                 return true;
             } else {
-                this.showDateError('Erro: ' + data.data.message);
+                // Garantir que a mensagem seja sempre uma string válida
+                let errorMessage = 'Erro na busca de disponibilidade';
+                if (data.data && data.data.message) {
+                    if (typeof data.data.message === 'string') {
+                        errorMessage = 'Erro: ' + data.data.message;
+                    } else if (typeof data.data.message === 'object') {
+                        errorMessage = 'Erro: ' + (data.data.message.message || data.data.message.error || JSON.stringify(data.data.message));
+                    } else {
+                        errorMessage = 'Erro: ' + String(data.data.message);
+                    }
+                }
+                this.showDateError(errorMessage);
                 return false;
             }
         } catch (error) {
@@ -9704,6 +9726,19 @@ this.renderLocationOptions();
         const bookerPhone = document.getElementById('booker-phone');
         const bookerCountryCode = document.getElementById('booker-country-code');
 
+        console.log('🔍 [VALIDATE] Elementos encontrados:', {
+            firstname: !!bookerFirstname,
+            lastname: !!bookerLastname,
+            email: !!bookerEmail,
+            phone: !!bookerPhone,
+            values: {
+                firstname: bookerFirstname?.value || 'VAZIO',
+                lastname: bookerLastname?.value || 'VAZIO',
+                email: bookerEmail?.value || 'VAZIO',
+                phone: bookerPhone?.value || 'VAZIO'
+            }
+        });
+
         if (!bookerFirstname?.value.trim()) {
             this.showDateError('Por favor, informe o nome do responsável pela reserva.');
             bookerFirstname?.focus();
@@ -9736,20 +9771,21 @@ this.renderLocationOptions();
             return false;
         }
 
-        // Coletar dados detalhados dos viajantes
-        this.collectDetailedTravelersData();
-
-        // Armazenar dados do booker no bookingData para uso posterior
+        // CORREÇÃO CRÍTICA: Armazenar dados do booker ANTES de coletar dados detalhados
         this.bookingData.bookerInfo = {
-            firstname: bookerFirstname.value.trim(),
-            lastname: bookerLastname.value.trim(),
+            firstName: bookerFirstname.value.trim(),
+            lastName: bookerLastname.value.trim(),
             email: bookerEmail.value.trim(),
             phone: bookerPhone.value.trim(),
             countryCode: bookerCountryCode?.value || 'BR'
         };
 
-        console.log('✅ Dados do responsável armazenados:', this.bookingData.bookerInfo);
-        console.log('✅ Dados detalhados dos viajantes coletados:', this.bookingData.travelersDetails);
+        console.log('✅ [VALIDATE] Dados do responsável armazenados:', this.bookingData.bookerInfo);
+
+        // Coletar dados detalhados dos viajantes
+        this.collectDetailedTravelersData();
+
+        console.log('✅ [VALIDATE] Dados detalhados dos viajantes coletados:', this.bookingData.travelersDetails);
 
         return true;
     }
@@ -9761,29 +9797,42 @@ this.renderLocationOptions();
         // Usar dados dos viajantes já armazenados (paxMix)
         const paxMix = this.bookingData.selectedTravelers || this.collectTravelersData();
 
-        // Usar dados do booker armazenados ou tentar coletar do DOM (fallback)
+        // CORREÇÃO CRÍTICA: Usar dados do booker já validados e armazenados
         let bookerInfo = this.bookingData.bookerInfo;
 
-        if (!bookerInfo) {
+        // Validação adicional para garantir que os dados estão completos
+        if (!bookerInfo || !bookerInfo.firstName || !bookerInfo.lastName || !bookerInfo.email) {
+            console.warn('⚠️ [COLLECT] bookerInfo incompleto, tentando coletar do DOM como fallback');
+            
             // Fallback: tentar coletar do DOM se ainda não foram armazenados
-            const bookerFirstname = document.getElementById('booker-firstname')?.value || '';
-            const bookerLastname = document.getElementById('booker-lastname')?.value || '';
-            const bookerEmail = document.getElementById('booker-email')?.value || '';
-            const bookerPhone = document.getElementById('booker-phone')?.value || '';
+            const bookerFirstname = document.getElementById('booker-firstname');
+            const bookerLastname = document.getElementById('booker-lastname');
+            const bookerEmail = document.getElementById('booker-email');
+            const bookerPhone = document.getElementById('booker-phone');
+            const bookerCountryCode = document.getElementById('booker-country-code');
 
             bookerInfo = {
-                firstname: bookerFirstname,
-                lastname: bookerLastname,
-                email: bookerEmail,
-                phone: bookerPhone
+                firstName: bookerFirstname?.value?.trim() || '',
+                lastName: bookerLastname?.value?.trim() || '',
+                email: bookerEmail?.value?.trim() || '',
+                phone: bookerPhone?.value?.trim() || '',
+                countryCode: bookerCountryCode?.value || 'BR'
             };
+            
+            // Atualizar o bookingData com os dados coletados
+            this.bookingData.bookerInfo = bookerInfo;
         }
 
         // Usar respostas das perguntas de reserva já coletadas (não recoletar)
         const bookingQuestionAnswers = this.bookingData.bookingQuestionAnswers || [];
 
-        console.log('📋 Dados coletados do responsável:', bookerInfo);
-        console.log('📝 Respostas das perguntas de reserva:', bookingQuestionAnswers);
+        console.log('📋 [COLLECT] Dados coletados do responsável:', bookerInfo);
+        console.log('📝 [COLLECT] Respostas das perguntas de reserva:', bookingQuestionAnswers);
+        
+        // Validação final antes de retornar
+        if (!bookerInfo.firstName || !bookerInfo.lastName || !bookerInfo.email) {
+            console.error('❌ [COLLECT] Dados do bookerInfo ainda incompletos após fallback:', bookerInfo);
+        }
 
         return {
             // Informações dos viajantes (apenas quantidades por faixa etária)
@@ -10567,21 +10616,88 @@ this.renderLocationOptions();
                 return false;
             }
             
-            // Usar dados do responsável coletados na segunda etapa
+            // CORREÇÃO CRÍTICA: Usar dados do responsável já validados e armazenados
             const travelersData = this.collectDetailedTravelersData();
-            const bookerInfo = travelersData.bookerInfo;
+            let bookerInfo = this.bookingData.bookerInfo || travelersData.bookerInfo;
+            
+            console.log('🔍 [CONFIRM] Verificando bookerInfo:', {
+                fromBookingData: this.bookingData.bookerInfo,
+                fromTravelersData: travelersData.bookerInfo,
+                finalBookerInfo: bookerInfo
+            });
+            
+            // Verificar se os dados do bookerInfo estão completos
+            if (!bookerInfo || !bookerInfo.firstName || !bookerInfo.lastName || !bookerInfo.email) {
+                console.error('❌ [CONFIRM] Dados do bookerInfo incompletos ou ausentes:', bookerInfo);
+                
+                // Última tentativa: coletar diretamente do DOM
+                const bookerFirstname = document.getElementById('booker-firstname');
+                const bookerLastname = document.getElementById('booker-lastname');
+                const bookerEmail = document.getElementById('booker-email');
+                const bookerPhone = document.getElementById('booker-phone');
+                const bookerCountryCode = document.getElementById('booker-country-code');
+                
+                console.log('🔍 [CONFIRM] Elementos DOM encontrados:', {
+                    firstname: !!bookerFirstname,
+                    lastname: !!bookerLastname,
+                    email: !!bookerEmail,
+                    phone: !!bookerPhone,
+                    values: {
+                        firstname: bookerFirstname?.value || 'VAZIO',
+                        lastname: bookerLastname?.value || 'VAZIO',
+                        email: bookerEmail?.value || 'VAZIO'
+                    }
+                });
+                
+                if (bookerFirstname?.value?.trim() && bookerLastname?.value?.trim() && bookerEmail?.value?.trim()) {
+                    bookerInfo = {
+                        firstName: bookerFirstname.value.trim(),
+                        lastName: bookerLastname.value.trim(),
+                        email: bookerEmail.value.trim(),
+                        phone: bookerPhone?.value?.trim() || '',
+                        countryCode: bookerCountryCode?.value || 'BR'
+                    };
+                    
+                    console.log('✅ [CONFIRM] Dados do bookerInfo coletados do DOM como última tentativa:', bookerInfo);
+                    
+                    // Atualizar o bookingData
+                    this.bookingData.bookerInfo = bookerInfo;
+                } else {
+                    console.error('❌ [CONFIRM] Não foi possível coletar dados válidos do responsável');
+                    this.showDateError('Erro: Dados do responsável não encontrados ou incompletos. Por favor, preencha todos os campos obrigatórios (Nome, Sobrenome e Email).');
+                    return;
+                }
+            }
+            
             const bookingQuestionAnswers = travelersData.bookingQuestionAnswers || [];
 
             // Detectar e incluir language guide se necessário
             const languageGuide = this.detectAndSelectLanguageGuide();
 
+            // Log detalhado dos dados antes do envio
             console.log('📋 Dados para confirmação:', {
                 cartId: this.bookingData.holdData.cartId,
                 hasPaymentToken: !!this.bookingData.paymentToken,
                 bookerInfo: bookerInfo,
+                bookerInfoStringified: JSON.stringify(bookerInfo),
                 bookingQuestionAnswers: bookingQuestionAnswers,
                 languageGuide: languageGuide
             });
+            
+            // VALIDAÇÃO FINAL CRÍTICA antes do envio
+            if (!bookerInfo || !bookerInfo.firstName?.trim() || !bookerInfo.lastName?.trim() || !bookerInfo.email?.trim()) {
+                console.error('❌ [CONFIRM] Validação final falhou - Dados do bookerInfo inválidos:', {
+                    bookerInfo: bookerInfo,
+                    hasFirstName: !!(bookerInfo?.firstName?.trim()),
+                    hasLastName: !!(bookerInfo?.lastName?.trim()),
+                    hasEmail: !!(bookerInfo?.email?.trim()),
+                    bookingDataBookerInfo: this.bookingData.bookerInfo
+                });
+                this.showDateError('Erro: Dados do responsável incompletos. Por favor, verifique se todos os campos obrigatórios estão preenchidos (Nome, Sobrenome e Email).');
+                return;
+            }
+            
+            console.log('✅ [CONFIRM] Validação final aprovada - bookerInfo completo:', bookerInfo);
 
             const requestParams = {
                 action: 'viator_confirm_booking',
@@ -10696,7 +10812,17 @@ this.renderLocationOptions();
 
                 if (data.data) {
                     if (data.data.message) {
-                        errorMessage = data.data.message;
+                        // Garantir que a mensagem seja sempre uma string válida
+                        if (typeof data.data.message === 'string') {
+                            errorMessage = data.data.message;
+                        } else if (typeof data.data.message === 'object') {
+                            errorMessage = data.data.message.message || 
+                                         data.data.message.error || 
+                                         data.data.message.description || 
+                                         JSON.stringify(data.data.message);
+                        } else {
+                            errorMessage = String(data.data.message);
+                        }
                     }
 
                     if (data.data.reasons && Array.isArray(data.data.reasons)) {
@@ -11067,8 +11193,28 @@ this.renderLocationOptions();
             `;
             
         } else { // FAILED, CANCELLED, etc.
-            const errorMessage = data.message || 'Ocorreu um problema durante o processamento da sua reserva';
-            const errorCode = data.code || 'UNKNOWN_ERROR';
+            // Garantir que errorMessage seja sempre uma string válida
+            let errorMessage = 'Ocorreu um problema durante o processamento da sua reserva';
+            
+            if (data.message) {
+                if (typeof data.message === 'string') {
+                    errorMessage = data.message;
+                } else if (typeof data.message === 'object') {
+                    // Se for um objeto, tentar extrair uma mensagem útil
+                    errorMessage = data.message.message || 
+                                 data.message.error || 
+                                 data.message.description || 
+                                 JSON.stringify(data.message);
+                } else {
+                    errorMessage = String(data.message);
+                }
+            }
+            
+            const errorCode = data.code || data.trackingId || 'UNKNOWN_ERROR';
+            
+            console.log('🚨 [ERROR MESSAGE DEBUG] Tipo da mensagem:', typeof data.message);
+            console.log('🚨 [ERROR MESSAGE DEBUG] Mensagem original:', data.message);
+            console.log('🚨 [ERROR MESSAGE DEBUG] Mensagem processada:', errorMessage);
 
             html = `
                 <div class="confirmation-error">
@@ -12074,8 +12220,14 @@ this.renderLocationOptions();
                 let userMessage = 'Não foi possível verificar a disponibilidade. Tente novamente em alguns instantes.';
 
                 // Se há uma mensagem específica e amigável, usar ela
-                if (data.data?.message && !data.data.message.toLowerCase().includes('internal server error')) {
+                if (data.data?.message && typeof data.data.message === 'string' && !data.data.message.toLowerCase().includes('internal server error')) {
                     userMessage = data.data.message;
+                } else if (data.data?.message && typeof data.data.message === 'object') {
+                    // Se for um objeto, tentar extrair uma mensagem útil
+                    const extractedMessage = data.data.message.message || data.data.message.error || data.data.message.description;
+                    if (extractedMessage && typeof extractedMessage === 'string' && !extractedMessage.toLowerCase().includes('internal server error')) {
+                        userMessage = extractedMessage;
+                    }
                 }
 
                 this.showPriceError(userMessage);
@@ -12875,7 +13027,7 @@ this.renderLocationOptions();
                 }, 5000);
             }
 
-            this.debugLog(`User message displayed (${type})`, {
+            this.debugLog(`User message displayed (${type}) - Message: ${finalMessage}`, {
                 message: finalMessage,
                 type: type,
                 elementFound: true,
@@ -12909,13 +13061,14 @@ this.renderLocationOptions();
         // Usar a função de confirmação para exibir o erro
         this.displayConfirmationMessage(errorData);
 
-        this.debugLog(`User message displayed (${type})`, {
+        this.debugLog(`User message displayed (${type}) - Message: ${finalMessage}`, {
             message: finalMessage,
             type: type,
             elementFound: true,
             location: 'confirmation-step',
             navigatedToStep5: currentStep !== 5,
-            isSpecificError: isSpecificApiError
+            isSpecificError: isSpecificApiError,
+            errorData: errorData
         });
     }
 
