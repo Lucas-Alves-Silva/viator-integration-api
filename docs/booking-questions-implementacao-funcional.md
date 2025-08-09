@@ -171,6 +171,180 @@ As mensagens de erro agora são mais específicas:
 - "Item 0: email do responsável vazio"
 - "Erro ao processar dados do responsável"
 
+## 📋 Histórico de Implementações
+
+### ✅ Implementação 3: Sistema Dinâmico de Booking Questions
+**Data:** Dezembro 2024  
+**Status:** ✅ Funcional e Compatível com API Viator
+
+**Descrição:**
+Implementação completa do sistema dinâmico de booking questions seguindo a especificação oficial da Viator API.
+
+**Funcionalidades Implementadas:**
+- ✅ Carregamento dinâmico via endpoint `/wp-json/viator/v1/booking-questions/{productCode}`
+- ✅ Renderização automática baseada no tipo de pergunta (STRING, DATE, NUMBER_AND_UNIT, etc.)
+- ✅ Separação correta entre perguntas PER_BOOKING e PER_TRAVELER
+- ✅ Validação de campos obrigatórios
+- ✅ Coleta e formatação de respostas para envio à API
+- ✅ Fallback para sistema legado quando necessário
+- ✅ Cache inteligente para otimização de performance
+- ✅ Logs detalhados para debugging
+
+**Arquivos Principais:**
+- `viator-booking.js` - Lógica principal de renderização e coleta
+- `viator-dynamic-booking-questions.php` - Endpoint WordPress
+- `viator-dynamic-booking-questions.css` - Estilos específicos
+
+**Compatibilidade API:**
+- ✅ Formato de resposta compatível com POST `/bookings/cart/book`
+- ✅ Validação de tipos de dados conforme especificação
+- ✅ Tratamento correto de perguntas obrigatórias vs opcionais
+
+### ✅ Correção 1: Renderização da Seção de Idioma
+**Data:** Dezembro 2024  
+**Status:** ✅ Corrigido e Funcional
+
+**Problema Identificado:**
+A função `renderLanguageGuideSection()` estava implementada mas nunca era chamada, resultando na seção de idioma da excursão não sendo renderizada na Etapa 3. Além disso, a seção `additional-booking-info-section` estava sendo ocultada na etapa 2 mas nunca era exibida novamente na etapa 3.
+
+**Solução Implementada:**
+- ✅ Modificada a função `renderLanguageGuideSection()` para inserir o HTML diretamente no container `language-guide-container`
+- ✅ Adicionada lógica para exibir a seção `additional-booking-info-section` na etapa 3 em `renderDynamicBookingQuestions()`
+- ✅ Adicionada lógica para exibir a seção `additional-booking-info-section` na etapa 3 em `renderBookingQuestions()` (sistema legado)
+- ✅ Adicionada lógica para exibir a seção `additional-booking-info-section` em cenários sem perguntas (ambos os sistemas)
+- ✅ Adicionados logs de debug para rastreamento da renderização
+- ✅ Verificado que `collectLanguageGuideAnswers()` já estava sendo chamada corretamente
+
+**Arquivos Modificados:**
+- `viator-booking.js` - Função `renderLanguageGuideSection` (linhas 6668-6720) - Modificada para inserir HTML no DOM
+- `viator-booking.js` - Função `renderDynamicBookingQuestions` (linha 4770) - Exibição da seção
+- `viator-booking.js` - Função `renderBookingQuestions` (linha 3780) - Exibição da seção (sistema legado)
+- `viator-booking.js` - Cenário sem perguntas - sistema dinâmico (linha 4730)
+- `viator-booking.js` - Cenário sem perguntas - sistema legado (linha 3720)
+
+**Resultado:**
+✅ A seção de idioma da excursão agora é renderizada corretamente em todos os cenários (com/sem perguntas, sistema dinâmico/legado).
+✅ A seção `additional-booking-info-section` é exibida corretamente na etapa 3 das perguntas de reserva.
+
+### ✅ Implementação 3: PICKUP_POINT (validação condicional)
+**Data:** Agosto 2025  
+**Produto Testado:** `100143P7`  
+**Status:** ✅ Implementado e validado
+
+**Contexto:**
+- Booking Question `PICKUP_POINT` (type `LOCATION_REF_OR_FREE_TEXT`, `required: CONDITIONAL`).
+- A validação estava incorreta exigindo o campo quando `arrivalMode = OTHER`, gerando erro mesmo com o fluxo correto.
+
+**Ajustes aplicados (viator-booking.js):**
+- Regra de obrigatoriedade alinhada à UI e à lógica de negócio:
+  - Agora é obrigatório apenas quando `TRANSFER_ARRIVAL_MODE ∈ {HOTEL_PICKUP, CENTRAL_MEETING_POINT}`.
+  - Não é obrigatório quando `arrivalMode = OTHER`.
+- Preferência por texto livre quando ambos (`LOCATION_REFERENCE` e `FREETEXT`) forem preenchidos.
+- Funções adicionadas para coletar mensagens de erro específicas, evitando mensagem vazia com bullet solitário.
+
+**Trechos principais:**
+- `validatePickupPointConditional()` atualizado para checar obrigatoriedade apenas nos modos que exigem coleta.
+- Nova `validatePickupPointConditionalWithError()` para retornar mensagens agregáveis.
+- `validateAllBookingQuestions()` passou a agregar erros de validações específicas via `validateSpecificQuestionsWithErrors()`.
+
+**Resultado:**
+- Erro falso de `PICKUP_POINT` resolvido quando `arrivalMode = OTHER`.
+- Mensagens de erro apresentam itens específicos em vez de apenas "•".
+
+### ✅ Implementação 4: Correção Crítica PER_TRAVELER
+**Data:** Agosto 2025  
+**Produto Testado:** `100143P7`  
+**Status:** ✅ Implementado e validado
+
+**Contexto:**
+- Erro "Missing answers for: AGEBAND, FULL_NAMES_FIRST, FULL_NAMES_LAST, HEIGHT" na API da Viator.
+- Perguntas PER_TRAVELER não estavam sendo coletadas corretamente na confirmação.
+
+**Ajustes aplicados (viator-booking.js):**
+- **Coleta robusta de PER_TRAVELER:** Seletores combinados (`.question-input` + `[id*="traveler_"][data-question-id]`).
+- **Formato correto das respostas:** Seguindo documentação oficial da Viator:
+  ```json
+  {
+    "question": "AGEBAND",
+    "answer": "ADULT", 
+    "travelerNum": 1
+  }
+  ```
+- **Função de recuperação crítica:** `ensureCriticalPerTravelerAnswers()` para buscar especificamente AGEBAND, FULL_NAMES_FIRST, FULL_NAMES_LAST, HEIGHT.
+- **Extração robusta do travelerNum:** Múltiplos padrões (`traveler_(\d+)_`, `data-traveler`).
+- **Redução de logs spam:** Limitados a 5 objetos PICKUP_POINT para evitar poluição do console (502+ → 5 + mensagem resumo).
+
+**Documentação Consultada:**
+- [Implementing Booking Questions - Viator](https://partnerresources.viator.com/travel-commerce/merchant/implementing-booking-questions/)
+- API docs: `group: "PER_TRAVELER"` vs `group: "PER_BOOKING"`
+
+**Resultado:** ✅ Perguntas PER_TRAVELER coletadas corretamente com `travelerNum` apropriado
+
+---
+
+### ✅ Implementação 2: Correção de Duplicação de Formulário de Viajantes
+**Data:** Janeiro 2025  
+**Produto Testado:** `100143P7` (Excursão de Ciclismo às Ruínas dos Templos de Beng Mealea)  
+**Booking Questions:** `FULL_NAMES_FIRST`, `FULL_NAMES_LAST`, `HEIGHT`, `PICKUP_POINT`, `SPECIAL_REQUIREMENTS`, `AGEBAND`  
+**Status:** ✅ **RESOLVIDO**
+
+**Problema Identificado:**
+O formulário de viajantes estava sendo duplicado nas etapas 2 (Viajantes) e 3 (Informações), exibindo "undefined undefined" na etapa 3, causando erros na finalização do pagamento.
+
+**Causa Raiz:**
+A função `renderDynamicBookingQuestions` tentava acessar propriedades `firstName` e `lastName` dos viajantes que não existiam na estrutura de dados `selectedTravelers`, que contém apenas `ageBand` e `numberOfTravelers`.
+
+**Solução Implementada:**
+1. **Correção da Renderização de Viajantes** no arquivo `viator-booking.js`:
+   - Função `renderDynamicBookingQuestions()` corrigida para expandir grupos de viajantes em viajantes individuais
+   - Substituído acesso a `traveler.firstName` e `traveler.lastName` por identificação baseada em `ageBand`
+   - Implementado loop correto para processar `numberOfTravelers` por grupo
+
+2. **Estrutura de Dados Corrigida:**
+   - Reconhecimento da estrutura real: `[{ageBand: 'ADULT', numberOfTravelers: 1}]`
+   - Expansão correta para viajantes individuais: "Viajante 1 (ADULT)", "Viajante 2 (CHILD)", etc.
+
+**Arquivos Modificados:**
+- `viator-booking.js` (função `renderDynamicBookingQuestions`, linhas 4780-4790)
+
+**Resultado:**
+- ✅ Eliminação da duplicação do formulário de viajantes
+- ✅ Exibição correta de "Viajante X (AGEBAND)" ao invés de "undefined undefined"
+- ✅ Etapa 3 exibe apenas as Booking Questions apropriadas
+- ✅ Processo de reserva funcionando sem erros de renderização
+
+### ✅ Implementação 1: Correção de Validação de Campos Obrigatórios
+**Data:** Janeiro 2025  
+**Produto Testado:** `100143P7` (Excursão de Ciclismo às Ruínas dos Templos de Beng Mealea)  
+**Booking Questions:** `FULL_NAMES_FIRST`, `FULL_NAMES_LAST`  
+**Status:** ✅ **RESOLVIDO**
+
+**Problema Identificado:**
+O sistema apresentava erros de validação indicando que os campos obrigatórios do responsável (email, firstName, lastName) estavam vazios, mesmo com dados preenchidos corretamente.
+
+**Causa Raiz:**
+Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker-lastname`, `booker-email`) e os esperados no backend (`firstName`, `lastName`, `email`).
+
+**Solução Implementada:**
+1. **Correção do Mapeamento de Campos** no arquivo `viator-booking.js`:
+   - Função `collectBookerInfo()` corrigida para mapear corretamente os campos do DOM
+   - Adicionado mapeamento: `booker-firstname` → `firstName`, `booker-lastname` → `lastName`, `booker-email` → `email`
+
+2. **Melhorias na Validação:**
+   - Adicionados logs de debug para rastreamento
+   - Validação de campos obrigatórios aprimorada
+   - Tratamento de erros mais robusto
+
+**Arquivos Modificados:**
+- `viator-booking.js` (função `collectBookerInfo`)
+- Logs de debug adicionados para monitoramento
+
+**Resultado:**
+- ✅ Validação de campos obrigatórios funcionando corretamente
+- ✅ Dados do responsável sendo coletados e enviados adequadamente
+- ✅ Processo de reserva fluindo sem erros de validação
+- ✅ Booking Questions `FULL_NAMES_FIRST` e `FULL_NAMES_LAST` funcionais
+
 ## 📋 Implementações Funcionais Documentadas
 
 ### 🎯 Implementação #1: SPECIAL_REQUIREMENTS
@@ -278,7 +452,7 @@ As mensagens de erro agora são mais específicas:
 | Tipo | Status | Produto Teste | Complexidade | Prioridade |
 |------|--------|---------------|--------------|------------|
 | `SPECIAL_REQUIREMENTS` | ✅ **FUNCIONAL** | 47668MADAME | 🟢 Baixa | Alta |
-| `PICKUP_POINT` | ⏳ **PENDENTE** | - | 🟡 Média | Alta |
+| `PICKUP_POINT` | ✅ **FUNCIONAL** | 100143P7 | 🟡 Média | Alta |
 | `WEIGHT` | ⏳ **PENDENTE** | - | 🟢 Baixa | Média |
 | `FULL_NAMES_FIRST` | ⏳ **PENDENTE** | - | 🟡 Média | Alta |
 | `FULL_NAMES_LAST` | ⏳ **PENDENTE** | - | 🟡 Média | Alta |

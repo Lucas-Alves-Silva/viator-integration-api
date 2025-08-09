@@ -2423,13 +2423,38 @@ function viator_enqueue_product_scripts() {
     }
     if (is_a($post, 'WP_Post') && has_shortcode($post->post_content, 'viator_product')) {
         error_log('🔍 [BOOKING QUESTIONS DEBUG] Inside shortcode detection block - enqueuing scripts');
+        // Carregar Google Places API se houver chave configurada
+        $google_places_api_key = function_exists('viator_get_google_places_api_key') ? viator_get_google_places_api_key() : get_option('viator_google_places_api_key');
+        $booking_js_deps = ['jquery', 'viator-payment-lib'];
+        if (!empty($google_places_api_key)) {
+            wp_enqueue_script(
+                'google-places-api',
+                'https://maps.googleapis.com/maps/api/js?key=' . urlencode($google_places_api_key) . '&libraries=places&language=pt-BR&region=BR',
+                [],
+                null,
+                true
+            );
+            $booking_js_deps[] = 'google-places-api';
+        }
+
         wp_enqueue_script(
             'viator-booking-js',
             plugin_dir_url(__FILE__) . 'viator-booking.js',
-            ['jquery', 'viator-payment-lib'],
+            $booking_js_deps,
             '1.0.1',
             true
         );
+
+        // Adicionar async/defer ao script do Google Places para melhor performance
+        if (!empty($google_places_api_key)) {
+            add_filter('script_loader_tag', function($tag, $handle) {
+                if ($handle === 'google-places-api') {
+                    // Inserir async e defer
+                    $tag = str_replace('<script ', '<script async defer ', $tag);
+                }
+                return $tag;
+            }, 10, 2);
+        }
 
         wp_enqueue_style(
             'viator-booking-css',
@@ -2449,6 +2474,13 @@ function viator_enqueue_product_scripts() {
             'ajaxurl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('viator_booking_nonce'),
             'environment' => 'sandbox' // Change to 'production' when ready
+        ]);
+        
+        // Informar ao frontend se Google Places está habilitado
+        wp_localize_script('viator-booking-js', 'viatorPlacesConfig', [
+            'enabled' => !empty($google_places_api_key),
+            'language' => 'pt-BR',
+            'region' => 'BR'
         ]);
         error_log('🔍 [BOOKING QUESTIONS DEBUG] Scripts enqueued successfully');
     }

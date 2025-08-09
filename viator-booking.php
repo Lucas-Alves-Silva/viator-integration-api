@@ -79,7 +79,10 @@ class ViatorBookingSystem {
 
         $response_code = wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
-        $data = json_decode($body, true);
+        // Sanitizar possíveis caracteres de controle BOM/UTF-8 e espaços
+        $clean_body = preg_replace('/^\xEF\xBB\xBF|^\xFE\xFF|^\xFF\xFE/', '', $body);
+        $clean_body = trim($clean_body);
+        $data = json_decode($clean_body, true);
 
         // Tratamento abrangente de erros da API
         $error_result = $this->handle_api_error($response_code, $data, 'availability_check');
@@ -534,6 +537,7 @@ class ViatorBookingSystem {
         
         // Obter language guide se fornecido
         $language_guide = isset($_POST['language_guide']) ? sanitize_text_field($_POST['language_guide']) : null;
+        $language_guide_type = isset($_POST['language_guide_type']) ? sanitize_text_field($_POST['language_guide_type']) : null;
 
         // Construir array items para confirmação
         $confirm_items = [];
@@ -543,16 +547,12 @@ class ViatorBookingSystem {
                 'partnerBookingRef' => $item['partnerBookingRef'] ?? ('BOOK_' . $this->generate_unique_id())
             ];
 
-            // Incluir perguntas de reserva no item se fornecidas
+            // Incluir perguntas de reserva por item (compatível com docs)
             if (!empty($booking_question_answers)) {
                 $confirm_item['bookingQuestionAnswers'] = $booking_question_answers;
             }
 
-            // Incluir language guide se fornecido
-            if (!empty($language_guide)) {
-                $confirm_item['languageGuide'] = $language_guide;
-                viator_debug_log('Language Guide incluído na confirmação:', $language_guide);
-            }
+            // Language guide será incluído no nível raiz (abaixo)
 
             $confirm_items[] = $confirm_item;
         }
@@ -584,7 +584,7 @@ class ViatorBookingSystem {
                 viator_debug_log('ERRO: BookingRef não encontrado no hold_response');
             }
             
-            // Incluir perguntas de reserva no item se fornecidas
+            // Incluir perguntas de reserva por item (compatível com docs)
             if (!empty($booking_question_answers)) {
                 $confirm_item['bookingQuestionAnswers'] = $booking_question_answers;
             }
@@ -685,10 +685,20 @@ class ViatorBookingSystem {
         viator_debug_log('✅ [STRUCTURE] Objeto bookerInfo adicionado:', $request_data['bookerInfo']);
         viator_debug_log('✅ [STRUCTURE] Objeto communication adicionado:', $request_data['communication']);
 
+        // Incluir languageGuide no nível raiz se fornecido (objeto conforme docs)
+        if (!empty($language_guide)) {
+            $guide_obj = [
+                'type' => !empty($language_guide_type) ? $language_guide_type : 'GUIDE',
+                'language' => $language_guide
+            ];
+            $request_data['languageGuide'] = $guide_obj;
+            viator_debug_log('Language Guide incluído na confirmação (root - objeto):', $guide_obj);
+        }
+
         // Log da estrutura da requisição
         viator_debug_log('🔧 [STRUCTURE] Usando estrutura completa para /bookings/cart/book com items');
         
-        // CORREÇÃO CRÍTICA: Validar e corrigir formato das booking questions
+            // CORREÇÃO CRÍTICA: Validar e corrigir formato das booking questions
         if (!empty($booking_question_answers)) {
             viator_debug_log('📋 Booking Questions incluídas na confirmação:', $booking_question_answers);
             viator_debug_log('📋 [BOOKING QUESTIONS] Quantidade:', count($booking_question_answers));
@@ -735,10 +745,10 @@ class ViatorBookingSystem {
             $booking_question_answers = $corrected_answers;
             viator_debug_log('🔧 [BOOKING QUESTIONS] Total de respostas corrigidas:', count($booking_question_answers));
 
-            // CORREÇÃO CRÍTICA: Incluir booking questions na estrutura da requisição
+            // CORREÇÃO CRÍTICA: Incluir booking questions no nível raiz conforme docs
             if (!empty($booking_question_answers)) {
                 $request_data['bookingQuestionAnswers'] = $booking_question_answers;
-                viator_debug_log('✅ [BOOKING QUESTIONS] Incluindo ' . count($booking_question_answers) . ' respostas na confirmação');
+                viator_debug_log('✅ [BOOKING QUESTIONS] Incluídas no root: ' . count($booking_question_answers));
             }
         } else {
             viator_debug_log('⚠️ [BOOKING QUESTIONS] Nenhuma booking question fornecida para confirmação');
@@ -952,7 +962,7 @@ class ViatorBookingSystem {
 
         if (json_last_error() !== JSON_ERROR_NONE) {
             viator_debug_log('❌ Booking Confirmation JSON Error:', json_last_error_msg());
-            viator_debug_log('❌ Raw response body:', $body);
+            viator_debug_log('❌ Raw response body (len=' . strlen($body) . '):', substr($body, 0, 500) . '...');
             return array('error' => 'Erro ao decodificar resposta da confirmação: ' . json_last_error_msg());
         }
 
