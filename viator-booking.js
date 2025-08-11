@@ -514,7 +514,6 @@ class CustomCalendar {
         return date.toISOString().split('T')[0];
     }
 }
-
 class ViatorBookingManager {
     constructor() {
         this.currentStep = 1;
@@ -995,6 +994,13 @@ class ViatorBookingManager {
 
                 console.log('🔧 [CACHE] Radio button selecionado:', pickupValue);
 
+                // Se é SHOW_LOCATION_LIST, ainda não tem valor final (usuário precisa selecionar da lista)
+                if (element.value === 'SHOW_LOCATION_LIST') {
+                    pickupValue = null; // Ainda sem seleção final
+                    console.log('🔧 [CACHE] SHOW_LOCATION_LIST selecionado - aguardando seleção da lista');
+                    return; // Não armazenar valor ainda
+                }
+
                 // Se é CUSTOM_LOCATION, buscar campo de texto
                 if (element.value === 'CUSTOM_LOCATION') {
                     const freetextSelectors = [
@@ -1280,7 +1286,6 @@ class ViatorBookingManager {
         this.attachEvents();
         this.extractProductCode();
     }
-    
     extractProductCode() {
         // Extrair o código do produto da URL ou de um elemento hidden
         const urlParams = new URLSearchParams(window.location.search);
@@ -1309,7 +1314,6 @@ class ViatorBookingManager {
         this.bookingData.productCode = productCode;
         return productCode;
     }
-    
     attachEvents() {
         // Event listener para o botão "Check Availability"
         document.addEventListener('click', (e) => {
@@ -2023,7 +2027,6 @@ class ViatorBookingManager {
             </div>
         `;
     }
-    
     initializeAvailabilityStep() {
         console.log('🚀 initializeAvailabilityStep chamado');
         
@@ -2099,7 +2102,6 @@ class ViatorBookingManager {
         // Não há mais necessidade de buscar datas específicas da API para o calendário
         // A validação real acontece no momento do check de disponibilidade
     }
-
     initializeBookingDatePicker() {
         const dateSelector = document.querySelector('.viator-booking-date-selector');
         const hiddenInput = document.getElementById('travel-date-value');
@@ -2791,7 +2793,6 @@ this.renderLocationOptions();
         clearError();
         return true;
     }
-    
     /**
      * Atualizar contador de caracteres
      */
@@ -2902,7 +2903,6 @@ this.renderLocationOptions();
         
         this.initializeViatorPayment();
     }
-    
     /**
      * Inicializar sistema de pagamento da Viator
      */
@@ -3585,7 +3585,6 @@ this.renderLocationOptions();
             console.error('❌ Erro ao enriquecer booking questions:', error);
         }
     }
-
     /**
      * Carregar dados de localização para pickup points
      */
@@ -3615,7 +3614,7 @@ this.renderLocationOptions();
     getBookingQuestionsStepHTML() {
         return `
             <div class="booking-step booking-questions-step">
-                <h3>Informações Adicionais</h3>
+                <h3 id="booking-questions-title" style="display: none;">Informações Adicionais</h3>
 
                 <div id="booking-questions-loading" class="loading-container">
                     <div class="loading-spinner"></div>
@@ -3629,7 +3628,7 @@ this.renderLocationOptions();
 
                     <!-- Seção fixa para Idioma da Excursão e Requisitos Especiais (etapa 3) -->
                     <div id="additional-booking-info-section" class="additional-booking-info-section" style="display: none;">
-                        <h4>Informações Adicionais da Reserva</h4>
+                        <h4 id="additional-info-title" style="display: none;">Informações Adicionais da Reserva</h4>
 
                         <div class="additional-info-row">
                             <!-- Idioma da Excursão -->
@@ -3648,7 +3647,6 @@ this.renderLocationOptions();
             </div>
         `;
     }
-
     /**
      * Inicializar step de booking questions
      */
@@ -3694,7 +3692,6 @@ this.renderLocationOptions();
             if (errorElement) errorElement.style.display = 'block';
         }
     }
-
     /**
      * Renderizar booking questions dinamicamente
      */
@@ -4365,7 +4362,6 @@ this.renderLocationOptions();
             }
         });
     }
-
     /**
      * Lidar com mudança no modo de transfer
      */
@@ -4405,7 +4401,6 @@ this.renderLocationOptions();
             }
         });
     }
-
     /**
      * Lidar com mudança no pickup point
      */
@@ -4471,7 +4466,6 @@ this.renderLocationOptions();
             }
         }
     }
-
     /**
      * Validar campo individual
      */
@@ -4644,6 +4638,12 @@ this.renderLocationOptions();
                 return;
             }
 
+            // Evitar coletar PICKUP_POINT aqui; trataremos em bloco específico mais abaixo
+            if (questionId === 'PICKUP_POINT') {
+                console.log('ℹ️ [DYNAMIC DEBUG] Ignorando PICKUP_POINT neste passo; coleta especializada ocorrerá adiante');
+                return;
+            }
+
             // Construir resposta baseada na especificação oficial
             const answer = {
                 question: questionId,
@@ -4705,108 +4705,53 @@ this.renderLocationOptions();
         console.log('🔍 [DYNAMIC DEBUG] Total de respostas coletadas:', answers.length);
         console.log('🔍 [DYNAMIC DEBUG] Respostas dinâmicas coletadas:', answers);
 
-        // CORREÇÃO: Coleta Cross-Step - buscar PICKUP_POINT da Etapa 2 com seletores corretos
-        const pickupSelectors = [
-            'input[data-question-id="PICKUP_POINT"]',           // Campo hidden principal
-            'input[name*="booking_question_PICKUP_POINT"]',     // Campo hidden com nome específico
-            'input[id*="booking_question_PICKUP_POINT"]',       // Campo hidden com ID específico
-            'input[type="radio"][name*="PICKUP_POINT"]',        // Radio buttons de locais
-            'input[type="radio"][id*="PICKUP_POINT"]',          // Radio buttons por ID
-            'input[id*="_freetext"]',                           // Campo de texto customizado
-            'select[data-question-id="PICKUP_POINT"]'           // Select se existir
-        ];
+        // CORREÇÃO: Coleta Cross-Step com prioridade (lista > freetext > hidden)
+        const hiddenPickupField = document.querySelector('input[type="hidden"][data-question-id="PICKUP_POINT"]');
+        const baseId = hiddenPickupField?.id || 'booking_question_PICKUP_POINT';
 
-        let allPickupInputs = [];
-        pickupSelectors.forEach(selector => {
-            const elements = document.querySelectorAll(selector);
-            allPickupInputs = allPickupInputs.concat(Array.from(elements));
-        });
+        const listChoiceSelected = document.querySelector(`input[name="${baseId}_list_choice"]:checked`);
+        const customRadioSelected = document.getElementById(`${baseId}_custom`);
+        const freetextInputEl = document.getElementById(`${baseId}_freetext`);
 
-        // Remover duplicatas
-        allPickupInputs = allPickupInputs.filter((input, index, self) =>
-            self.findIndex(i => i.id === input.id) === index
-        );
+        let pickupAnswer = null;
 
-        console.log('🔍 [DYNAMIC DEBUG] Todos os campos PICKUP_POINT no DOM:', allPickupInputs.length);
+        if (listChoiceSelected && listChoiceSelected.value && listChoiceSelected.value.startsWith('LOC-')) {
+            pickupAnswer = {
+                question: 'PICKUP_POINT',
+                answer: listChoiceSelected.value,
+                unit: 'LOCATION_REFERENCE'
+            };
+            console.log('✅ [DYNAMIC DEBUG] PICKUP_POINT via lista:', pickupAnswer);
+        } else if (customRadioSelected?.checked && freetextInputEl && freetextInputEl.value.trim()) {
+            pickupAnswer = {
+                question: 'PICKUP_POINT',
+                answer: freetextInputEl.value.trim(),
+                unit: 'FREETEXT'
+            };
+            console.log('✅ [DYNAMIC DEBUG] PICKUP_POINT via freetext:', pickupAnswer);
+        } else if (hiddenPickupField && hiddenPickupField.value && !['CONTACT_SUPPLIER_LATER','CHOOSE_FROM_LIST'].includes(hiddenPickupField.value)) {
+            const hiddenVal = hiddenPickupField.value.trim();
+            pickupAnswer = {
+                question: 'PICKUP_POINT',
+                answer: hiddenVal,
+                unit: hiddenVal.startsWith('LOC-') ? 'LOCATION_REFERENCE' : (hiddenPickupField.getAttribute('data-unit') || 'FREETEXT')
+            };
+            console.log('✅ [DYNAMIC DEBUG] PICKUP_POINT via hidden:', pickupAnswer);
+        } else {
+            console.log('⚠️ [DYNAMIC DEBUG] Nenhum PICKUP_POINT válido selecionado ainda');
+        }
 
-        // CORREÇÃO: Limitar logs para evitar spam no console
-        const maxLogsToShow = 5;
-        allPickupInputs.forEach((input, index) => {
-            if (index < maxLogsToShow) {
-            console.log(`🔍 [DYNAMIC DEBUG] PICKUP_POINT ${index}:`, {
-                id: input.id,
-                name: input.name,
-                value: input.value,
-                type: input.type,
-                tagName: input.tagName,
-                checked: input.checked,
-                dataQuestionId: input.getAttribute('data-question-id')
-            });
-            } else if (index === maxLogsToShow) {
-                console.log(`🔍 [DYNAMIC DEBUG] ... e mais ${allPickupInputs.length - maxLogsToShow} campos PICKUP_POINT (logs limitados para evitar spam)`);
-            }
-
-            // CORREÇÃO: Coletar PICKUP_POINT da Etapa 2 se tiver valor
-            let pickupValue = null;
-            let pickupUnit = 'LOCATION_REFERENCE';
-
-            // Para radio buttons, verificar se está selecionado
-            if (input.type === 'radio' && input.checked) {
-                pickupValue = input.value;
-
-                // Se é CUSTOM_LOCATION, buscar o valor do campo de texto
-                if (input.value === 'CUSTOM_LOCATION') {
-                    const freetextInput = document.querySelector(`input[id*="_freetext"]`);
-                    if (freetextInput && freetextInput.value.trim()) {
-                        pickupValue = freetextInput.value.trim();
-                        pickupUnit = 'FREETEXT';
-                    }
-                }
-            }
-            // Para campos hidden ou outros tipos, usar o valor diretamente
-            else if (input.type !== 'radio' && input.value && input.value.trim() !== '') {
-                pickupValue = input.value.trim();
-            }
-
-            if (pickupValue) {
-                // Determinar unidade baseada no valor
-                if (pickupValue.startsWith('LOC-')) {
-                    pickupUnit = 'LOCATION_REFERENCE';
-                } else if (pickupValue === 'CUSTOM_LOCATION') {
-                    pickupUnit = 'FREETEXT';
-                } else if (input.id && input.id.includes('freetext')) {
-                    pickupUnit = 'FREETEXT';
-                }
-
-                const pickupAnswer = {
-                    question: 'PICKUP_POINT',
-                    answer: pickupValue,
-                    unit: pickupUnit
-                };
-
-                console.log(`✅ [DYNAMIC DEBUG] PICKUP_POINT coletado da Etapa 2:`, pickupAnswer);
-                // Evitar duplicar se já coletado acima
-                if (!answers.find(a => a.question === 'PICKUP_POINT')) {
-                answers.push(pickupAnswer);
-                }
-
-                // Parar após encontrar o primeiro valor válido
-                return;
-            }
-        });
+        if (pickupAnswer && !answers.find(a => a.question === 'PICKUP_POINT')) {
+            answers.push(pickupAnswer);
+        }
 
         // CORREÇÃO: Usar cache do PICKUP_POINT se disponível
-        if (this.cachedPickupPoint && this.cachedPickupPoint.answer) {
+        if (this.cachedPickupPoint && this.cachedPickupPoint.answer && !answers.find(a => a.question === 'PICKUP_POINT')) {
             console.log('✅ [CACHE] PICKUP_POINT encontrado no cache:', this.cachedPickupPoint);
 
             // Verificar se já não foi adicionado pelos seletores DOM
-            const existingPickup = answers.find(answer => answer.question === 'PICKUP_POINT');
-            if (!existingPickup) {
-                answers.push(this.cachedPickupPoint);
-                console.log('✅ [CACHE] PICKUP_POINT adicionado do cache às respostas');
-            } else {
-                console.log('ℹ️ [CACHE] PICKUP_POINT já existe nas respostas DOM, mantendo DOM');
-            }
+            answers.push(this.cachedPickupPoint);
+            console.log('✅ [CACHE] PICKUP_POINT adicionado do cache às respostas');
         } else {
             console.log('⚠️ [CACHE] Nenhum PICKUP_POINT encontrado no cache');
         }
@@ -5033,11 +4978,22 @@ this.renderLocationOptions();
 
         formContainer.innerHTML = html;
 
-        // Exibir a seção de informações adicionais na etapa 3
+        // Exibir a seção de informações adicionais na etapa 3 (apenas se houver conteúdo)
         const additionalInfoSection = document.getElementById('additional-booking-info-section');
+        const pageH3 = document.getElementById('booking-questions-title');
+        const addInfoH4 = document.getElementById('additional-info-title');
+        const hasGeneral = generalPerBookingQuestions.length > 0;
+        const hasLanguageGuides = Array.isArray(window.productData?.languageGuides) && window.productData.languageGuides.length > 0;
         if (additionalInfoSection) {
-            additionalInfoSection.style.display = 'block';
-            console.log('✅ [LANGUAGE GUIDE] Seção additional-booking-info-section exibida na etapa 3');
+            if (hasGeneral || hasLanguageGuides) {
+                additionalInfoSection.style.display = 'block';
+                if (pageH3) pageH3.style.display = 'block';
+                if (addInfoH4) addInfoH4.style.display = 'none';
+            } else {
+                additionalInfoSection.style.display = 'none';
+                if (pageH3) pageH3.style.display = 'none';
+            }
+            console.log('✅ [LANGUAGE GUIDE] Seção additional-booking-info-section visível?', hasGeneral || hasLanguageGuides);
         }
 
         // Preencher coluna de perguntas gerais (especialmente SPECIAL_REQUIREMENTS)
@@ -5135,7 +5091,6 @@ this.renderLocationOptions();
 
         return selectHTML;
     }
-
     /**
      * Renderizar input de peso
      */
@@ -5168,7 +5123,6 @@ this.renderLocationOptions();
         html += `</select></div></div>`;
         return html;
     }
-
     /**
      * Renderizar input de número com unidade
      */
@@ -5225,7 +5179,6 @@ this.renderLocationOptions();
 
         return labels[ageBand] || ageBand;
     }
-
     /**
      * Inicializar eventos das booking questions
      */
@@ -5799,7 +5752,6 @@ this.renderLocationOptions();
         document.head.appendChild(style);
         console.log('🎨 Estilos de validação padronizados injetados');
     }
-
     /**
      * Coletar todas as respostas das booking questions (formato compatível com backend PHP)
      */
@@ -6590,7 +6542,6 @@ this.renderLocationOptions();
         errorElement.style.display = 'block';
         errorElement.classList.add('show');
     }
-
     /**
      * Esconder erro no campo (padrão etapa 2)
      */
@@ -7359,7 +7310,6 @@ this.renderLocationOptions();
         html += '</div>';
         return html;
     }
-
     /**
      * Renderizar um campo de pergunta individual
      */
@@ -7649,17 +7599,14 @@ this.renderLocationOptions();
     }
 
     /**
-     * Renderizar campo especializado para PICKUP_POINT conforme documentação Viator
+     * Interface SIMPLIFICADA de pickup point - UX equivalente à Viator oficial
+     * Baseada na documentação: https://partnerresources.viator.com/travel-commerce/merchant/implementing-booking-questions/
      */
     renderPickupPointField(question, questionId, cssClass, dataAttrs, requiredAttr) {
         let html = '';
         const pickupData = this.getPickupData();
         
-        if (!pickupData || !pickupData.locations || pickupData.locations.length === 0) {
-            // Fallback para campo de texto se não há dados de pickup
-            html += `<input type="text" id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr} placeholder="Digite o local de encontro">`;
-            return html;
-        }
+        console.log('🎨 [PICKUP RENDER] Dados de pickup:', pickupData);
         
         // Container principal para pickup point
         html += `<div id="${questionId}_container" class="pickup-point-container">`;
@@ -7668,168 +7615,123 @@ this.renderLocationOptions();
         html += `<input type="hidden" id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr}>`;
         
         // Verificar se permite texto livre (allowCustomTravelerPickup)
-        // Conforme documentação oficial da Viator: https://docs.viator.com/partner-api/technical/
-        // "Whether freetext is allowed for this answer depends on the value of logistics.travelerPickup.allowCustomTravelerPickup"
         const allowCustomPickup = this.isCustomPickupAllowed();
         
-        if (!allowCustomPickup) {
-            console.log('ℹ️ Pickup customizado não permitido para este produto. Apenas locais pré-definidos serão exibidos.');
+        if (!pickupData || !pickupData.locations || pickupData.locations.length === 0) {
+            console.log('⚠️ [PICKUP RENDER] Fallback: sem dados específicos de pickup');
+            // Interface simplificada quando não há dados
+            html += `
+                <div class="pickup-simple-options">
+                    <div class="pickup-option-wrapper">
+                        <input type="radio" id="${questionId}_contact_later" name="${questionId}" value="CONTACT_SUPPLIER_LATER" checked>
+                        <label for="${questionId}_contact_later" class="pickup-option-label">
+                            <div class="pickup-option-title">📞 Entrarei em contato depois</div>
+                            <div class="pickup-option-description">O fornecedor entrará em contato para definir o local</div>
+                        </label>
+                    </div>
+            `;
+            
+            if (allowCustomPickup) {
+                html += `
+                    <div class="pickup-option-wrapper">
+                        <input type="radio" id="${questionId}_custom" name="${questionId}" value="CUSTOM_LOCATION">
+                        <label for="${questionId}_custom" class="pickup-option-label">
+                            <div class="pickup-option-title">📍 Informar endereço específico</div>
+                            <div class="pickup-option-description">Digite o endereço do seu hotel ou local desejado</div>
+                        </label>
+                    </div>
+                    <div id="${questionId}_custom_input" class="pickup-custom-input" style="display: none;">
+                        <input type="text" id="${questionId}_freetext" placeholder="Digite o endereço completo do seu hotel ou local" autocomplete="off">
+                        <div id="${questionId}_outside_warning" class="pickup-warning pickup-warning-outside" style="display: none;">
+                            ⚠️ Este local pode estar fora da área de pickup. Você poderá escolher um ponto mais próximo depois.
+                        </div>
+                    </div>
+                `;
+            }
+            
+                html += `</div>`;
+                html += `</div>`;
+            return html;
         }
         
-        // Agrupar locais por tipo conforme recomendação da Viator
-        const groupedLocations = this.groupPickupLocationsByType(pickupData.locations);
+        // Interface principal com 3 opções claras (como Viator oficial)
+        console.log(`📋 [PICKUP] Renderizando interface principal com ${pickupData.locations.length} locais disponíveis`);
         
-        // Renderizar dropdown por tipo de local
-        Object.keys(groupedLocations).forEach(pickupType => {
-            const locations = groupedLocations[pickupType];
-            const typeLabel = this.getPickupTypeLabel(pickupType);
-            
-            if (locations.length > 0) {
-                html += `<div class="pickup-type-section" data-pickup-type="${pickupType}">`;
-                html += `<h4 class="pickup-type-title">${typeLabel}</h4>`;
-                html += `<div class="pickup-locations-list" id="${questionId}_${pickupType}_list">`;
-                html += `<div class="loading-pickup-locations">Carregando ${typeLabel.toLowerCase()}... <span class="spinner"></span></div>`;
-                html += `</div>`;
-                html += `</div>`;
-            }
-        });
+        html += `
+            <div class="pickup-main-options">
+                <!-- Opção 1: Entrarei em contato depois -->
+                <div class="pickup-option-wrapper">
+                    <input type="radio" id="${questionId}_contact_later" name="${questionId}" value="CONTACT_SUPPLIER_LATER" checked>
+                    <label for="${questionId}_contact_later" class="pickup-option-label">
+                        <div class="pickup-option-title">📞 Entrarei em contato depois</div>
+                        <div class="pickup-option-description">O fornecedor entrará em contato para confirmar o local de encontro</div>
+                    </label>
+                </div>
+                
+                <!-- Opção 2: Escolher de uma lista de locais -->
+                <div class="pickup-option-wrapper">
+                    <input type="radio" id="${questionId}_choose_location" name="${questionId}" value="CHOOSE_FROM_LIST">
+                    <label for="${questionId}_choose_location" class="pickup-option-label">
+                        <div class="pickup-option-title">🏨 Escolher de uma lista</div>
+                        <div class="pickup-option-description" id="${questionId}_choose_desc">Selecionar hotel, aeroporto ou ponto turístico</div>
+                    </label>
+                    <div id="${questionId}_chosen_preview" class="pickup-chosen-preview" style="display:none; margin:8px 0 0 32px; font-size: 0.95em; color:#333;"></div>
+                </div>
+        `;
         
-        // Opção "Não vejo meu local" se permitir texto livre
         if (allowCustomPickup) {
-            html += `<div class="pickup-custom-section">`;
-            html += `<div class="pickup-option-wrapper">`;
-            html += `<input type="radio" id="${questionId}_custom" name="${questionId}" value="CUSTOM_LOCATION" data-question-id="${questionId}">`;
-            html += `<label for="${questionId}_custom" class="pickup-option-label">`;
-            html += `<div class="pickup-option-title">Não vejo meu local de pickup</div>`;
-            html += `<div class="pickup-option-description">Digite o endereço do seu hotel ou local desejado</div>`;
-            html += `</label>`;
+            html += `
+                <!-- Opção 3: Informar endereço específico -->
+                <div class="pickup-option-wrapper">
+                    <input type="radio" id="${questionId}_custom" name="${questionId}" value="CUSTOM_LOCATION">
+                    <label for="${questionId}_custom" class="pickup-option-label">
+                        <div class="pickup-option-title">📍 Informar endereço específico</div>
+                        <div class="pickup-option-description">Digite o endereço exato do seu hotel ou local</div>
+                    </label>
+                </div>
+            `;
+        }
+        
             html += `</div>`;
-            html += `<div class="pickup-custom-input" style="display: none;">`;
-            html += `<input type="text" id="${questionId}_freetext" placeholder="Digite o endereço completo do seu hotel ou local" class="pickup-freetext-input" autocomplete="off">`;
-            html += `<div id="${questionId}_places_suggestions" class="places-suggestions" style="display:none;"></div>`;
-            html += `</div>`;
-            html += `</div>`;
-        } else {
-            // Informação quando pickup customizado não é permitido
-            html += `<div class="pickup-info-section">`;
-            html += `<div class="pickup-info-message">`;
-            html += `<i class="fas fa-info-circle"></i> `;
-            html += `Para este produto, você deve selecionar um dos locais de pickup listados acima. `;
-            html += `Locais personalizados não são aceitos pelo fornecedor.`;
-            html += `</div>`;
-            html += `</div>`;
+        
+        // Lista de locais: deve aparecer IMEDIATAMENTE após "Escolher de uma lista"
+        html += `
+            <div id="${questionId}_locations_list" class="pickup-locations-list" style="display: none; margin-top: 15px; padding: 15px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #f9f9f9;">
+                <div class="pickup-search-container">
+                    <input type="text" id="${questionId}_search" class="form-control pickup-search-input" 
+                           placeholder="🔍 Buscar hotel, aeroporto ou local..." autocomplete="off">
+                </div>
+                <div id="${questionId}_locations_container" class="pickup-locations-container">
+                    <div class="loading-pickup-locations">⏳ Carregando locais... <span class="spinner"></span></div>
+                </div>
+            </div>
+        `;
+        
+        if (allowCustomPickup) {
+            // Campo de endereço customizado (inicialmente oculto)
+            html += `
+                <div id="${questionId}_custom_input" class="pickup-custom-input" style="display: none;">
+                    <input type="text" id="${questionId}_freetext" class="form-control" 
+                           placeholder="Digite o endereço completo do seu hotel ou local" autocomplete="off">
+                    <div id="${questionId}_outside_warning" class="pickup-warning pickup-warning-outside" style="display: none;">
+                        ⚠️ Este local pode estar fora da área de pickup. Você poderá escolher um ponto mais próximo depois.
+                    </div>
+                </div>
+            `;
         }
         
         html += `</div>`;
         
-        // Carregar detalhes das localizações via API
+        // Carregar localizações em background
         setTimeout(() => {
+            const groupedLocations = this.groupPickupLocationsByType(pickupData.locations);
             this.loadPickupLocationDetails(pickupData.locations, questionId, groupedLocations);
         }, 100);
         
-        // Script para gerenciar seleção customizada
-        if (allowCustomPickup) {
-            html += `
-                <script>
-                (function() {
-                    // Aguardar um pouco para garantir que o DOM esteja pronto
-                    setTimeout(function() {
-                        const container = document.getElementById('${questionId}_container');
-                        if (!container) return;
-                        
-                        const customRadio = document.getElementById('${questionId}_custom');
-                        const customInput = container.querySelector('.pickup-custom-input');
-                        const freetextInput = document.getElementById('${questionId}_freetext');
-                        const suggestionsBox = document.getElementById('${questionId}_places_suggestions');
-                        
-                        console.log('🔧 Pickup Point Script - Elementos encontrados:', {
-                            customRadio: !!customRadio,
-                            customInput: !!customInput,
-                            freetextInput: !!freetextInput,
-                            suggestionsBox: !!suggestionsBox
-                        });
-                        
-                        if (customRadio && customInput && freetextInput) {
-                            customRadio.addEventListener('change', function() {
-                                console.log('📍 Radio customizado selecionado');
-                                if (this.checked) {
-                                    customInput.style.display = 'block';
-                                    freetextInput.focus();
-                                    console.log('✅ Campo de texto livre exibido');
-                                }
-                            });
-                            
-                            // Ocultar campo customizado quando outra opção for selecionada
-                            container.addEventListener('change', function(e) {
-                                if (e.target.name === '${questionId}' && e.target.value !== 'CUSTOM_LOCATION') {
-                                    console.log('🔄 Outra opção selecionada, ocultando campo customizado');
-                                    customInput.style.display = 'none';
-                                    freetextInput.value = '';
-                                    if (suggestionsBox) { suggestionsBox.style.display = 'none'; suggestionsBox.innerHTML = ''; }
-                                }
-                            });
-                            
-                            // Autocomplete com Google Places se disponível
-                            if (window.viatorPlacesConfig && window.viatorPlacesConfig.enabled && window.google && window.google.maps && window.google.maps.places) {
-                                const autocompleteService = new google.maps.places.AutocompleteService();
-                                const placesService = new google.maps.places.PlacesService(document.createElement('div'));
-                                let debounceTimer = null;
-
-                                freetextInput.addEventListener('input', function() {
-                                    const query = this.value.trim();
-                                    if (!query) {
-                                        if (suggestionsBox) { suggestionsBox.style.display = 'none'; suggestionsBox.innerHTML = ''; }
-                                        return;
-                                    }
-                                    clearTimeout(debounceTimer);
-                                    debounceTimer = setTimeout(() => {
-                                        autocompleteService.getPlacePredictions({ input: query, types: ['establishment','geocode'], componentRestrictions: { country: ['br'] }, language: (window.viatorPlacesConfig.language || 'pt-BR') }, function(predictions, status) {
-                                            if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions) {
-                                                if (suggestionsBox) { suggestionsBox.style.display = 'none'; suggestionsBox.innerHTML = ''; }
-                                                return;
-                                            }
-                                            if (!suggestionsBox) return;
-                                            suggestionsBox.innerHTML = predictions.slice(0,5).map(function(p){ return '<div class="suggestion-item" data-place-id="' + p.place_id + '\">' + p.description + '</div>'; }).join('');
-                                            suggestionsBox.style.display = 'block';
-
-                                            suggestionsBox.querySelectorAll('.suggestion-item').forEach(item => {
-                                                item.addEventListener('click', function() {
-                                                    const placeId = this.getAttribute('data-place-id');
-                                                    placesService.getDetails({ placeId: placeId, fields: ['name','formatted_address','geometry'] }, function(place, detailsStatus) {
-                                                        if (detailsStatus === google.maps.places.PlacesServiceStatus.OK && place) {
-                                                            const fullAddress = place.formatted_address || this.textContent;
-                                                            freetextInput.value = fullAddress;
-                                                            suggestionsBox.style.display = 'none';
-                                                            suggestionsBox.innerHTML = '';
-
-                                                            // Preencher hidden principal com FREETEXT
-                                                            const hiddenField = document.getElementById('${questionId}');
-                                                            if (hiddenField) {
-                                                                hiddenField.value = fullAddress;
-                                                                hiddenField.setAttribute('data-unit', 'FREETEXT');
-                                                            }
-                                                        }
-                                                    });
-                                                });
-                                            });
-                                        });
-                                    }, 250);
-                                });
-                            }
-                            
-                            console.log('✅ Event listeners configurados para pickup point');
-                        } else {
-                            console.error('❌ Elementos não encontrados para pickup point:', {
-                                customRadio: customRadio ? 'OK' : 'MISSING',
-                                customInput: customInput ? 'OK' : 'MISSING', 
-                                freetextInput: freetextInput ? 'OK' : 'MISSING'
-                            });
-                        }
-                    }, 200);
-                })();
-                </script>
-            `;
-        }
+        // Anexar scripts simplificados
+        setTimeout(() => {
+            this.attachSimplifiedPickupScripts(questionId, allowCustomPickup);
+        }, 300);
         
         return html;
     }
@@ -7843,33 +7745,580 @@ this.renderLocationOptions();
 
     /**
      * Obter dados de pickup do produto atual
+     * Considera múltiplas fontes conforme documentação Viator
      */
     getPickupData() {
-        if (window.productData && window.productData.logistics && window.productData.logistics.travelerPickup) {
+        console.log('🔍 [PICKUP DATA] Verificando dados de pickup...');
+        
+        // Primeiro tentar logistics.travelerPickup (fonte principal)
+        if (window.productData?.logistics?.travelerPickup) {
+            console.log('✅ [PICKUP DATA] Dados encontrados em logistics.travelerPickup');
             return window.productData.logistics.travelerPickup;
         }
+        
+        // Verificar se há pergunta PICKUP_POINT nas booking questions
+        const hasPickupQuestion = this.bookingQuestions?.some(q => q.id === 'PICKUP_POINT') || 
+                                  window.productData?.bookingQuestions?.some(q => q.id === 'PICKUP_POINT');
+        
+        if (hasPickupQuestion) {
+            console.log('✅ [PICKUP DATA] PICKUP_POINT detectado nas booking questions, criando dados padrão');
+            // Criar dados padrão quando há pergunta mas não há logistics
+            return {
+                pickupOptionType: 'PICKUP_EVERYONE', // Assumir que pickup é disponível
+                allowCustomTravelerPickup: true, // Permitir texto livre por padrão
+                locations: [
+                    { location: { ref: 'MEET_AT_DEPARTURE_POINT' }, pickupType: 'OTHER' },
+                    { location: { ref: 'CONTACT_SUPPLIER_LATER' }, pickupType: 'OTHER' }
+                ]
+            };
+        }
+        
+        console.log('❌ [PICKUP DATA] Nenhum dado de pickup encontrado');
         return null;
     }
     
     /**
-     * Verificar se o produto permite pickup customizado
-     * Conforme documentação Viator: allowCustomTravelerPickup deve ser true
+     * Anexar scripts de funcionalidade ao pickup point via JavaScript puro
+     * Solução para problema de scripts inline não executados em conteúdo dinâmico
      */
-    isCustomPickupAllowed() {
-        const pickupData = this.getPickupData();
-        if (!pickupData) {
-            console.log('❌ Nenhum dado de pickup encontrado');
-            return false;
+    attachPickupPointScripts(questionId, allowCustomPickup) {
+        console.log('🔧 [PICKUP SCRIPT] Inicializando script de pickup para', questionId);
+        
+        const container = document.getElementById(`${questionId}_container`);
+        if (!container) {
+            console.error('❌ [PICKUP SCRIPT] Container não encontrado:', `${questionId}_container`);
+            return;
         }
         
-        const allowed = pickupData.allowCustomTravelerPickup === true;
-        console.log('🔍 Verificação de pickup customizado:', {
-            allowCustomTravelerPickup: pickupData.allowCustomTravelerPickup,
-            isAllowed: allowed,
-            productData: window.productData?.productCode || 'N/A'
+        const hiddenField = document.getElementById(questionId);
+        const searchInput = document.getElementById(`${questionId}_search`);
+        const showListRadio = document.getElementById(`${questionId}_show_list`);
+        const locationsContainer = document.getElementById(`${questionId}_locations_container`);
+        
+        console.log('🔧 [PICKUP SCRIPT] Elementos base encontrados:', {
+            container: !!container,
+            hiddenField: !!hiddenField,
+            searchInput: !!searchInput,
+            showListRadio: !!showListRadio,
+            locationsContainer: !!locationsContainer
         });
         
-        return allowed;
+        // Configurar controle de exibição da lista
+        if (showListRadio && locationsContainer) {
+            showListRadio.addEventListener('change', function() {
+                if (this.checked) {
+                    console.log('📋 [PICKUP SCRIPT] Exibindo lista de localizações');
+                    locationsContainer.style.display = 'block';
+                    // Focar no campo de busca se disponível
+                    if (searchInput) {
+                        setTimeout(() => searchInput.focus(), 100);
+                    }
+                }
+            });
+            
+            // Listener para ocultar lista quando outras opções são selecionadas
+            const otherRadios = container.querySelectorAll(`input[name="${questionId}"][type="radio"]:not(#${questionId}_show_list)`);
+            otherRadios.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    if (this.checked && locationsContainer) {
+                        console.log('📋 [PICKUP SCRIPT] Ocultando lista de localizações');
+                        locationsContainer.style.display = 'none';
+                    }
+                });
+            });
+        }
+        
+        // Typeahead local sempre disponível
+        if (searchInput) {
+            console.log('🔍 [PICKUP SCRIPT] Configurando busca typeahead');
+            const norm = (s) => (s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'');
+            
+            searchInput.addEventListener('input', function() {
+                const q = norm(this.value);
+                const wrappers = container.querySelectorAll('.pickup-option-wrapper');
+                let visibleCount = 0;
+                
+                wrappers.forEach(w => {
+                    const text = norm(w.textContent);
+                    const shouldShow = !q || text.includes(q);
+                    w.style.display = shouldShow ? '' : 'none';
+                    if (shouldShow) visibleCount++;
+                });
+                
+                console.log(`🔍 [PICKUP TYPEAHEAD] "${q}" -> ${visibleCount} resultados`);
+                
+                // Ocultar cabeçalhos de seção vazios
+                container.querySelectorAll('.pickup-type-section').forEach(sec => {
+                    const anyVisible = Array.from(sec.querySelectorAll('.pickup-option-wrapper'))
+                        .some(el => el.style.display !== 'none');
+                    sec.style.display = anyVisible ? '' : 'none';
+                });
+            });
+        }
+        
+        // Filtro por modo de chegada
+        const arrivalModeEl = document.querySelector('[data-question-id="TRANSFER_ARRIVAL_MODE"]');
+        const applyModeFilter = (mode) => {
+            if (!mode) return;
+            console.log(`🚗 [PICKUP FILTER] Aplicando filtro para modo: ${mode}`);
+            
+            const allowedByMode = {
+                AIR: ['AIRPORT','HOTEL','OTHER'],
+                SEA: ['PORT','HOTEL','OTHER'], 
+                RAIL: ['LOCATION','HOTEL','OTHER'],
+                OTHER: ['LOCATION','HOTEL','OTHER']
+            };
+            
+            const allowed = allowedByMode[mode] || ['HOTEL','AIRPORT','PORT','LOCATION','OTHER'];
+            let visibleSections = 0;
+            
+            container.querySelectorAll('.pickup-type-section').forEach(sec => {
+                const type = sec.getAttribute('data-pickup-type');
+                const shouldShow = allowed.includes(type);
+                sec.style.display = shouldShow ? '' : 'none';
+                if (shouldShow) visibleSections++;
+            });
+            
+            console.log(`🚗 [PICKUP FILTER] ${visibleSections} seções visíveis para modo ${mode}`);
+        };
+        
+        if (arrivalModeEl) {
+            console.log('🚗 [PICKUP FILTER] Configurando filtro por modo de chegada');
+            applyModeFilter(arrivalModeEl.value);
+            arrivalModeEl.addEventListener('change', function(){ applyModeFilter(this.value); });
+        }
+        
+        // Funcionalidades de pickup customizado (se permitido)
+        if (allowCustomPickup) {
+            this.attachCustomPickupScripts(questionId, container, hiddenField);
+        } else {
+            console.log('ℹ️ [PICKUP SCRIPT] Pickup customizado não permitido para este produto');
+        }
+        
+        console.log('✅ [PICKUP SCRIPT] Inicialização concluída para', questionId);
+    }
+
+    /**
+     * Scripts simplificados para nova interface de pickup point
+     */
+    attachSimplifiedPickupScripts(questionId, allowCustomPickup) {
+        console.log('🔧 [PICKUP SIMPLIFIED] Inicializando scripts para', questionId);
+        
+        const container = document.getElementById(`${questionId}_container`);
+        if (!container) {
+            console.error('❌ [PICKUP SIMPLIFIED] Container não encontrado');
+            return;
+        }
+        
+        const hiddenField = document.getElementById(questionId);
+        const chooseLocationRadio = document.getElementById(`${questionId}_choose_location`);
+        const locationsList = document.getElementById(`${questionId}_locations_list`);
+        const searchInput = document.getElementById(`${questionId}_search`);
+        const customRadio = document.getElementById(`${questionId}_custom`);
+        const customInput = document.getElementById(`${questionId}_custom_input`);
+        const freetextInput = document.getElementById(`${questionId}_freetext`);
+        const locationsContainer = document.getElementById(`${questionId}_locations_container`);
+        const chooseDesc = document.getElementById(`${questionId}_choose_desc`);
+        const chosenPreview = document.getElementById(`${questionId}_chosen_preview`);
+        
+        console.log('🔧 [PICKUP SIMPLIFIED] Elementos encontrados:', {
+            hiddenField: !!hiddenField,
+            chooseLocationRadio: !!chooseLocationRadio,
+            locationsList: !!locationsList,
+            searchInput: !!searchInput,
+            customRadio: !!customRadio,
+            customInput: !!customInput,
+            freetextInput: !!freetextInput,
+            locationsContainer: !!locationsContainer,
+            chooseDesc: !!chooseDesc,
+            chosenPreview: !!chosenPreview
+        });
+        
+        // 1. Controlar exibição da lista de locais
+        if (chooseLocationRadio && locationsList) {
+            const showList = () => {
+                console.log('📋 [PICKUP SIMPLIFIED] Exibindo lista de locais');
+                locationsList.style.display = 'block';
+                if (searchInput) setTimeout(() => searchInput.focus(), 100);
+            };
+            chooseLocationRadio.addEventListener('change', function() { if (this.checked) showList(); });
+            // Mostrar a lista imediatamente ao clicar na caixa da descrição
+            const chooseLabel = container.querySelector(`label[for="${questionId}_choose_location"]`);
+            if (chooseLabel) chooseLabel.addEventListener('click', showList);
+        }
+        
+        // 2. Controlar exibição do campo customizado
+        if (allowCustomPickup && customRadio && customInput) {
+            customRadio.addEventListener('change', function() {
+                if (this.checked) {
+                    console.log('📍 [PICKUP SIMPLIFIED] Exibindo campo customizado');
+                    customInput.style.display = 'block';
+                    if (freetextInput) {
+                        setTimeout(() => freetextInput.focus(), 100);
+                    }
+                }
+            });
+        }
+        
+        // 3. Ocultar seções quando outras opções são selecionadas
+        const allRadios = container.querySelectorAll(`input[name="${questionId}"][type="radio"], input[name="${questionId}_list_choice"][type="radio"]`);
+        allRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                if (this.checked) {
+                    const isListChoice = this.name === `${questionId}_list_choice`;
+                    // Ocultar lista se não for a opção "escolher de lista" nem um item da lista
+                    if (!isListChoice && this.id !== `${questionId}_choose_location` && locationsList) {
+                        locationsList.style.display = 'none';
+                    }
+                    
+                    // Ocultar campo customizado se não for a opção customizada
+                    if (this.id !== `${questionId}_custom` && customInput) {
+                        customInput.style.display = 'none';
+                    }
+                    
+                    // Atualizar campo hidden somente para rádios principais
+                    if (hiddenField && this.name === `${questionId}`) {
+                        hiddenField.value = this.value;
+                        hiddenField.setAttribute('data-unit', this.value === 'CUSTOM_LOCATION' ? 'FREETEXT' : (this.value.startsWith('LOC-') ? 'LOCATION_REFERENCE' : 'LOCATION_REFERENCE'));
+                        console.log('✅ [PICKUP SIMPLIFIED] Valor atualizado:', this.value);
+                    }
+                }
+            });
+        });
+        
+        // 4. Busca typeahead na lista
+        if (searchInput && locationsContainer) {
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase().trim();
+                const locationOptions = locationsContainer.querySelectorAll('input[type="radio"][value^="LOC-"]');
+                const typeSections = locationsContainer.querySelectorAll('.pickup-type-section');
+                let totalVisible = 0;
+                
+                locationOptions.forEach(radio => {
+                    const wrapper = radio.closest('.pickup-option-wrapper');
+                    if (wrapper) {
+                        const text = wrapper.textContent.toLowerCase();
+                        const matches = !searchTerm || text.includes(searchTerm);
+                        wrapper.style.display = matches ? 'block' : 'none';
+                        if (matches) totalVisible++;
+                    }
+                });
+                
+                // Atualizar cabeçalhos de categoria
+                if (typeSections.length > 0) {
+                    typeSections.forEach(section => {
+                        const visibleOptions = section.querySelectorAll('.pickup-option-wrapper:not([style*="display: none"])');
+                        section.style.display = visibleOptions.length > 0 ? 'block' : 'none';
+                    });
+                }
+                
+                console.log(`🔍 [PICKUP SIMPLIFIED] ${totalVisible} locais encontrados para "${searchTerm}"`);
+            });
+        }
+        
+        // 4.1 Atualizar resumo ao selecionar um item da lista e manter 'Escolher de uma lista' marcado
+        if (locationsContainer) {
+            locationsContainer.addEventListener('change', (ev) => {
+                const target = ev.target;
+                if (target && target.matches(`input[name="${questionId}_list_choice"][type="radio"]`)) {
+                    // Manter o rádio principal "Escolher de uma lista" marcado
+                    if (chooseLocationRadio) {
+                        chooseLocationRadio.checked = true;
+                        chooseLocationRadio.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+
+                    const wrapper = target.closest('.pickup-option-wrapper');
+                    const titleEl = wrapper ? wrapper.querySelector('.pickup-option-title') : null;
+                    const addrEl = wrapper ? wrapper.querySelector('.pickup-option-address span:last-child') : null;
+                    const title = (titleEl?.textContent || '').trim();
+                    const addr = (addrEl?.textContent || '').trim();
+                    const summaryText = addr ? `${title} — ${addr}` : title || target.value;
+
+                    const chooseDescEl = document.getElementById(`${questionId}_choose_desc`);
+                    const chosenPreviewEl = document.getElementById(`${questionId}_chosen_preview`);
+                    if (chooseDescEl) chooseDescEl.textContent = summaryText;
+                    if (chosenPreviewEl) {
+                        chosenPreviewEl.textContent = summaryText;
+                        chosenPreviewEl.style.display = 'block';
+                    }
+
+                    if (hiddenField) {
+                        hiddenField.value = target.value;
+                        hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
+                    }
+                }
+            });
+        }
+        
+        // 5. Input customizado com Google Places Autocomplete (se permitido)
+        if (allowCustomPickup && freetextInput) {
+            // Verificar se Google Places está disponível
+            if (typeof google !== 'undefined' && google.maps && google.maps.places) {
+                console.log('🌍 [PICKUP SIMPLIFIED] Configurando Google Places Autocomplete');
+                
+                const autocomplete = new google.maps.places.Autocomplete(freetextInput, {
+                    types: ['address'],
+                    componentRestrictions: { country: 'br' }
+                });
+
+                autocomplete.addListener('place_changed', () => {
+                    const place = autocomplete.getPlace();
+                    if (place.geometry && place.formatted_address) {
+                        freetextInput.value = place.formatted_address;
+                        hiddenField.value = place.formatted_address;
+                        hiddenField.setAttribute('data-unit', 'FREETEXT');
+                        console.log('🌍 [PICKUP SIMPLIFIED] Endereço selecionado via Google:', place.formatted_address);
+                    }
+                });
+            } else {
+                console.log('⚠️ [PICKUP SIMPLIFIED] Google Places não disponível, usando input simples');
+            }
+            
+            // Input manual
+            freetextInput.addEventListener('input', function() {
+                const value = this.value.trim();
+                if (hiddenField && value) {
+                    hiddenField.value = value;
+                    hiddenField.setAttribute('data-unit', 'FREETEXT');
+                    console.log('📝 [PICKUP SIMPLIFIED] Endereço customizado:', value);
+                }
+            });
+        }
+        
+        // 6. Não definir valor inicial por padrão para forçar escolha explícita quando necessário
+        if (hiddenField) {
+            hiddenField.value = '';
+            hiddenField.removeAttribute('data-unit');
+        }
+
+        // 6.1 Limpar escolha da lista quando trocar para outras opções
+        if (container) {
+            container.addEventListener('change', (ev) => {
+                const target = ev.target;
+                if (target && target.matches(`input[name="${questionId}"][type="radio"]`) && target.id !== `${questionId}_choose_location`) {
+                    const chooseDescEl = document.getElementById(`${questionId}_choose_desc`);
+                    const chosenPreviewEl = document.getElementById(`${questionId}_chosen_preview`);
+                    if (chosenPreviewEl) {
+                        chosenPreviewEl.textContent = '';
+                        chosenPreviewEl.style.display = 'none';
+                    }
+                    if (chooseDescEl) chooseDescEl.textContent = 'Selecionar hotel, aeroporto ou ponto turístico';
+                }
+            });
+        }
+        
+        if (locationsContainer) {
+            locationsContainer.addEventListener('change', (ev) => {
+                const target = ev.target;
+                if (target && target.matches(`input[name="${questionId}"][type="radio"]`)) {
+                    const wrapper = target.closest('.pickup-option-wrapper');
+                    const titleEl = wrapper ? wrapper.querySelector('.pickup-option-title') : null;
+                    const addrEl = wrapper ? wrapper.querySelector('.pickup-option-address span:last-child') : null;
+                    const title = (titleEl?.textContent || '').trim();
+                    const addr = (addrEl?.textContent || '').trim();
+                    const summaryText = addr ? `${title} — ${addr}` : title || target.value;
+
+                    if (chooseDesc) chooseDesc.textContent = summaryText;
+                    if (chosenPreview) {
+                        chosenPreview.textContent = summaryText;
+                        chosenPreview.style.display = 'block';
+                    }
+
+                    if (locationsList) locationsList.style.display = 'block';
+
+                    if (hiddenField) {
+                        hiddenField.value = target.value;
+                        hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
+                    }
+                }
+            });
+        }
+        
+        console.log('✅ [PICKUP SIMPLIFIED] Scripts configurados com sucesso');
+    }
+    
+    /**
+     * Anexar scripts específicos para pickup customizado
+     */
+    attachCustomPickupScripts(questionId, container, hiddenField) {
+        const customRadio = document.getElementById(`${questionId}_custom`);
+                        const customInput = container.querySelector('.pickup-custom-input');
+        const freetextInput = document.getElementById(`${questionId}_freetext`);
+        const suggestionsBox = document.getElementById(`${questionId}_places_suggestions`);
+        const outsideWarning = document.getElementById(`${questionId}_outside_warning`);
+                        
+        console.log('🔧 [PICKUP CUSTOM] Elementos customizados encontrados:', {
+                            customRadio: !!customRadio,
+                            customInput: !!customInput,
+            freetextInput: !!freetextInput,
+            suggestionsBox: !!suggestionsBox,
+            outsideWarning: !!outsideWarning
+        });
+        
+        if (!customRadio || !customInput || !freetextInput) {
+            console.warn('⚠️ [PICKUP CUSTOM] Elementos obrigatórios não encontrados');
+            return;
+        }
+        
+        // Mostrar/ocultar campo customizado
+                            customRadio.addEventListener('change', function() {
+                                if (this.checked) {
+                console.log('📍 [PICKUP CUSTOM] Radio customizado selecionado');
+                                    customInput.style.display = 'block';
+                                    freetextInput.focus();
+                console.log('✅ [PICKUP CUSTOM] Campo de texto livre exibido');
+                                }
+                            });
+                            
+                            // Ocultar campo customizado quando outra opção for selecionada
+                            container.addEventListener('change', function(e) {
+            if (e.target.name === questionId && e.target.value !== 'CUSTOM_LOCATION') {
+                console.log('🔄 [PICKUP CUSTOM] Outra opção selecionada, ocultando campo customizado');
+                                    customInput.style.display = 'none';
+                                    freetextInput.value = '';
+                if (suggestionsBox) { 
+                    suggestionsBox.style.display = 'none'; 
+                    suggestionsBox.innerHTML = ''; 
+                }
+                if (outsideWarning) outsideWarning.style.display = 'none';
+                                }
+                            });
+                            
+        // Configurar Google Places ou fallback simples
+        if (window.viatorPlacesConfig?.enabled && window.google?.maps?.places) {
+            this.setupGooglePlacesAutocomplete(freetextInput, suggestionsBox, outsideWarning, hiddenField, customRadio);
+                        } else {
+            this.setupSimpleFreetextInput(freetextInput, outsideWarning, hiddenField, customRadio);
+        }
+    }
+    /**
+     * Configurar Google Places Autocomplete
+     */
+    setupGooglePlacesAutocomplete(freetextInput, suggestionsBox, outsideWarning, hiddenField, customRadio) {
+        console.log('🌍 [PICKUP GOOGLE] Configurando Google Places Autocomplete');
+        
+        const autocompleteService = new google.maps.places.AutocompleteService();
+        const placesService = new google.maps.places.PlacesService(document.createElement('div'));
+        let debounceTimer = null;
+        
+        freetextInput.addEventListener('input', function() {
+            const query = this.value.trim();
+            
+            if (!query) {
+                if (suggestionsBox) { 
+                    suggestionsBox.style.display = 'none'; 
+                    suggestionsBox.innerHTML = ''; 
+                }
+                if (outsideWarning) outsideWarning.style.display = 'none';
+                if (hiddenField && customRadio?.checked) hiddenField.value = '';
+                return;
+            }
+            
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                autocompleteService.getPlacePredictions({ 
+                    input: query, 
+                    types: ['establishment','geocode'], 
+                    componentRestrictions: { country: ['br'] }, 
+                    language: (window.viatorPlacesConfig.language || 'pt-BR') 
+                }, (predictions, status) => {
+                    if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions) {
+                        if (suggestionsBox) { 
+                            suggestionsBox.style.display = 'none'; 
+                            suggestionsBox.innerHTML = ''; 
+                        }
+                        if (outsideWarning) outsideWarning.style.display = 'block';
+                        return;
+                    }
+                    
+                    if (!suggestionsBox) return;
+                    
+                    suggestionsBox.innerHTML = predictions.slice(0,5).map(p => 
+                        `<div class="suggestion-item" data-place-id="${p.place_id}">${p.description}</div>`
+                    ).join('');
+                    suggestionsBox.style.display = 'block';
+                    
+                    suggestionsBox.querySelectorAll('.suggestion-item').forEach(item => {
+                        item.addEventListener('click', function() {
+                            const placeId = this.getAttribute('data-place-id');
+                            placesService.getDetails({ 
+                                placeId: placeId, 
+                                fields: ['name','formatted_address','geometry'] 
+                            }, (place, detailsStatus) => {
+                                if (detailsStatus === google.maps.places.PlacesServiceStatus.OK && place) {
+                                    const fullAddress = place.formatted_address || this.textContent;
+                                    freetextInput.value = fullAddress;
+                                    suggestionsBox.style.display = 'none';
+                                    suggestionsBox.innerHTML = '';
+                                    
+                                    if (hiddenField && customRadio?.checked) {
+                                        hiddenField.value = fullAddress;
+                                        hiddenField.setAttribute('data-unit', 'FREETEXT');
+                                    }
+                                    if (outsideWarning) outsideWarning.style.display = 'none';
+                                    console.log('✅ [PICKUP GOOGLE] Endereço selecionado:', fullAddress);
+                                }
+                            });
+                        });
+                    });
+                });
+            }, 250);
+        });
+    }
+    
+    /**
+     * Configurar input simples de texto livre (fallback sem Google Places)
+     */
+    setupSimpleFreetextInput(freetextInput, outsideWarning, hiddenField, customRadio) {
+        console.log('⚠️ [PICKUP CUSTOM] Google Places não disponível, usando input simples');
+        
+        freetextInput.addEventListener('input', function() {
+            const val = this.value.trim();
+            
+            if (!val) {
+                if (outsideWarning) outsideWarning.style.display = 'none';
+                if (hiddenField && customRadio?.checked) hiddenField.value = '';
+                return;
+            }
+            
+            if (hiddenField && customRadio?.checked) {
+                hiddenField.value = val;
+                hiddenField.setAttribute('data-unit', 'FREETEXT');
+            }
+            if (outsideWarning) outsideWarning.style.display = 'block';
+        });
+    }
+    
+    /**
+     * Verificar se o produto permite pickup customizado
+     * Verifica múltiplas fontes: logistics e units da pergunta PICKUP_POINT
+     */
+    isCustomPickupAllowed() {
+        // 1. Verificar via logistics (fonte principal)
+        const pickupData = this.getPickupData();
+        if (pickupData?.allowCustomTravelerPickup === true) {
+            console.log('✅ Pickup customizado permitido via logistics.allowCustomTravelerPickup');
+            return true;
+        }
+        
+        // 2. Verificar via units da pergunta PICKUP_POINT (fallback)
+        const pickupQuestion = this.bookingQuestions?.find(q => q.id === 'PICKUP_POINT');
+        if (pickupQuestion && Array.isArray(pickupQuestion.units)) {
+            const hasFreetext = pickupQuestion.units.includes('FREETEXT');
+            console.log('🔍 Verificação de pickup customizado via booking question units:', {
+                units: pickupQuestion.units,
+                hasFreetext: hasFreetext,
+                productCode: window.productData?.productCode || 'N/A'
+            });
+            
+            if (hasFreetext) {
+                console.log('✅ Pickup customizado permitido via PICKUP_POINT.units (FREETEXT presente)');
+                return true;
+            }
+        }
+        
+        console.log('❌ Pickup customizado NÃO permitido - sem logistics.allowCustomTravelerPickup e sem FREETEXT');
+        return false;
     }
 
     /**
@@ -7986,92 +8435,105 @@ this.renderLocationOptions();
     updatePickupLocationDisplay(locationDetails, questionId, originalLocations, groupedLocations) {
         console.log('🎨 updatePickupLocationDisplay chamada com:', { locationDetails, questionId, originalLocations, groupedLocations });
         
+        // Usar o container principal da nova interface simplificada
+        const mainContainer = document.getElementById(`${questionId}_locations_container`);
+        if (!mainContainer) {
+            console.error(`❌ Container principal não encontrado: ${questionId}_locations_container`);
+            return;
+        }
+        
+        console.log(`✅ Container principal encontrado, renderizando ${locationDetails.length} locais`);
+        
         // Criar mapa de detalhes por referência para acesso rápido
         const detailsMap = {};
         locationDetails.forEach(detail => {
             detailsMap[detail.reference] = detail;
         });
         
-        // Atualizar cada seção por tipo de pickup
+        let allHTML = '';
+        
+        // Renderizar cada seção por tipo de pickup
         Object.keys(groupedLocations).forEach(pickupType => {
-            const container = document.getElementById(`${questionId}_${pickupType}_list`);
-            if (!container) {
-                console.error(`❌ Container não encontrado: ${questionId}_${pickupType}_list`);
-                return;
+            const locations = groupedLocations[pickupType];
+            
+            // FILTRAR locais especiais que não devem aparecer na lista de seleção
+            const filteredLocations = locations.filter(loc => {
+                const ref = loc.location.ref;
+                return ref !== 'CONTACT_SUPPLIER_LATER' && ref !== 'MEET_AT_DEPARTURE_POINT';
+            });
+
+            if (filteredLocations.length === 0) {
+                return; // Pular esta seção se não houver locais válidos
             }
             
-            const locationsOfType = groupedLocations[pickupType];
-            let html = '';
+            let html = `<h5>${this.getPickupTypeLabel(pickupType)}</h5>`;
             
-            locationsOfType.forEach((location, index) => {
-                const locationRef = location.location?.ref;
-                const detail = detailsMap[locationRef];
-                
-                if (!detail) {
-                    // Evitar spam de console quando detalhes não estão em cache
-                    if (index < 5) {
-                    console.warn(`⚠️ Detalhes não encontrados para: ${locationRef}`);
-                    }
+            // Usar os locais filtrados para gerar o HTML
+            filteredLocations.forEach((location, index) => {
+                const detail = detailsMap[location.location.ref] || {};
+
+                // Garantir referência válida; evitar radios com value undefined
+                const reference = detail.reference || (location.location && location.location.ref) || '';
+                if (!reference) {
+                    return; // pular itens sem referência válida
+                }
+
+                // Nome do local (evitar 'Local não especificado')
+                const locationNameRaw = detail.name || location.name || '';
+
+                // Endereço/infos formatadas; se vazio, não renderizar a linha de endereço
+                const formattedInfo = this.getFormattedLocationInfo(detail);
+
+                // Se não há nome nem info, não renderizar o item (evita entradas confusas)
+                if (!locationNameRaw && !formattedInfo) {
                     return;
                 }
-                
-                // Limitar logs para evitar spam massivo
-                if (index < 10) {
-                console.log(`🏷️ Processando localização ${pickupType}[${index}]:`, detail);
-                } else if (index === 10) {
-                    console.log(`🏷️ ... (${pickupType}) mais ${locationsOfType.length - 10} itens omitidos`);
-                }
-                
-                // Obter informações formatadas da localização
-                const locationInfo = this.getFormattedLocationInfo(detail);
-                let address = locationInfo || this.getDefaultAddressForReference(detail);
+
+                const locationName = locationNameRaw || 'Local de pickup';
                 
                 const radioId = `${questionId}_${pickupType}_${index}`;
-                const isFirstOption = Object.keys(groupedLocations).indexOf(pickupType) === 0 && index === 0;
                 
                 html += `
                     <div class="pickup-option-wrapper" data-pickup-type="${pickupType}">
-                        <input type="radio" id="${radioId}" name="${questionId}" value="${detail.reference}" data-question-id="${questionId}" ${isFirstOption ? 'checked' : ''}>
+                        <input type="radio" id="${radioId}" name="${questionId}_list_choice" value="${reference}" data-question-id="${questionId}">
                         <label for="${radioId}" class="pickup-option-label">
-                            <div class="pickup-option-title">${detail.name}</div>
+                            <div class="pickup-option-title">${locationName}</div>
+                            ${formattedInfo ? `
                             <div class="pickup-option-address">
                                 <span class="pickup-option-icon">${this.getPickupTypeIcon(pickupType)}</span>
-                                <span>${address}</span>
-                            </div>
+                                <span>${formattedInfo}</span>
+                            </div>` : ''}
                             ${detail.provider === 'TRIPADVISOR' ? '<div class="pickup-option-badge">TripAdvisor</div>' : ''}
                         </label>
                     </div>
                 `;
             });
             
-            // Adicionar opção especial "Entrar em contato depois" se for do tipo OTHER
-            if (pickupType === 'OTHER') {
-                const contactLaterId = `${questionId}_contact_later`;
-                html += `
-                    <div class="pickup-option-wrapper pickup-option-special">
-                        <input type="radio" id="${contactLaterId}" name="${questionId}" value="CONTACT_SUPPLIER_LATER" data-question-id="${questionId}">
-                        <label for="${contactLaterId}" class="pickup-option-label">
-                            <div class="pickup-option-title">Vou decidir depois</div>
-                            <div class="pickup-option-description">O fornecedor entrará em contato para confirmar o local de encontro</div>
-                        </label>
-                    </div>
-                `;
-            }
-            
-            container.innerHTML = html || '<p>Nenhum local disponível nesta categoria</p>';
+            allHTML += html;
         });
+        
+        // Atualizar o container principal com todos os locais agrupados
+        mainContainer.innerHTML = allHTML || '<p>Nenhum local disponível</p>';
+        console.log(`✅ ${locationDetails.length} locais renderizados no container principal`);
 
         // Adicionar event listeners para sincronizar radio buttons com campo hidden
         setTimeout(() => {
             const hiddenField = document.getElementById(questionId);
             const radioButtons = document.querySelectorAll(`input[name="${questionId}"][type="radio"]`);
 
+            console.log('🔧 [PICKUP SYNC] Configurando sincronização:', {
+                hiddenField: !!hiddenField,
+                radioButtons: radioButtons.length,
+                questionId: questionId
+            });
+
             if (hiddenField && radioButtons.length > 0) {
                 // Definir valor inicial se há um radio button marcado
                 const checkedRadio = document.querySelector(`input[name="${questionId}"][type="radio"]:checked`);
                 if (checkedRadio) {
                     hiddenField.value = checkedRadio.value;
-                    console.log('📍 PICKUP_POINT valor inicial definido:', checkedRadio.value);
+                    hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
+                    console.log('📍 [PICKUP SYNC] Valor inicial definido:', checkedRadio.value);
                 }
 
                 // Adicionar listeners para mudanças
@@ -8079,7 +8541,8 @@ this.renderLocationOptions();
                     radio.addEventListener('change', function() {
                         if (this.checked) {
                             hiddenField.value = this.value;
-                            console.log('📍 PICKUP_POINT valor atualizado:', this.value);
+                            hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
+                            console.log('📍 [PICKUP SYNC] Valor atualizado:', this.value);
 
                             // Remover classe de erro se existir
                             hiddenField.classList.remove('error');
@@ -8089,8 +8552,15 @@ this.renderLocationOptions();
                         }
                     });
                 });
+                
+                console.log('✅ [PICKUP SYNC] Listeners configurados para', radioButtons.length, 'radio buttons');
+            } else {
+                console.warn('⚠️ [PICKUP SYNC] Falha na configuração:', {
+                    hiddenFieldExists: !!hiddenField,
+                    radioButtonsCount: radioButtons.length
+                });
             }
-        }, 100);
+        }, 300);
     }
     
     /**
@@ -8107,9 +8577,9 @@ this.renderLocationOptions();
      */
     getDefaultAddressForReference(detail) {
         if (detail.reference === 'CONTACT_SUPPLIER_LATER') {
-            return 'O fornecedor entrará em contato para confirmar o local';
+            return '';
         } else if (detail.reference === 'MEET_AT_DEPARTURE_POINT') {
-            return 'Detalhes do ponto de encontro serão fornecidos após a reserva';
+            return '';
         } else if (detail.address && typeof detail.address === 'object') {
             // Verificar se o endereço tem dados úteis
             const parts = [];
@@ -8130,14 +8600,11 @@ this.renderLocationOptions();
                 return parts.join(', ');
             }
         } else if (detail.reference && detail.reference.startsWith('LOC-')) {
-            if (detail.provider === 'GOOGLE' && detail.providerReference) {
-                return 'Local específico (detalhes fornecidos no dia)';
-            } else if (detail.provider === 'TRIPADVISOR' && detail.providerReference) {
-                return 'Ponto de interesse conhecido (detalhes confirmados após reserva)';
-            }
+            // Não exibir mensagens genéricas; manter limpo
+            return '';
         }
-        
-        return 'Local será confirmado pelo fornecedor';
+
+        return '';
     }
     
     /**
@@ -8361,7 +8828,6 @@ this.renderLocationOptions();
             }
         });
     }
-
     /**
      * Coletar resposta de uma pergunta específica
      */
@@ -8537,7 +9003,6 @@ this.renderLocationOptions();
         
         return answerObj;
     }
-    
     /**
      * Renderizar perguntas de reserva na etapa de viajantes
      */
@@ -9088,7 +9553,6 @@ this.renderLocationOptions();
             indicator.style.display = 'none';
         }
     }
-
     /**
      * Inicializar validação de campos de pagamento
      */
@@ -9814,7 +10278,6 @@ this.renderLocationOptions();
 
         return { isValid: true };
     }
-
     /**
      * Validar se a disponibilidade ainda é válida
      */
@@ -10462,7 +10925,22 @@ this.renderLocationOptions();
 
             // Preferir escolha do usuário, se existir
             const userSelected = this.bookingData?.selectedLanguageGuideCode;
-            const code = (userSelected && String(userSelected).trim()) || normalize(languageGuides[0]);
+            let code = (userSelected && String(userSelected).trim()) || normalize(languageGuides[0]);
+            
+            // CORREÇÃO CRÍTICA: Garantir que sempre temos um código válido se há language guides
+            if (!code && languageGuides.length > 0) {
+                // Fallback mais agressivo - pegar o primeiro language disponível
+                const firstGuide = languageGuides[0];
+                code = firstGuide?.language || firstGuide?.code || 'en';
+                console.warn('⚠️ [LANGUAGE GUIDE] Fallback aplicado para primeiro guide disponível:', code);
+            }
+            
+            // Se ainda não tem código mas há guides, forçar 'en'
+            if (!code && languageGuides.length > 0) {
+                code = 'en';
+                console.warn('⚠️ [LANGUAGE GUIDE] Fallback final aplicado: "en"');
+            }
+            
             console.log('🌐 [LANGUAGE GUIDE] Selecionado (normalizado):', code);
             return code || null;
 
@@ -10568,7 +11046,6 @@ this.renderLocationOptions();
         console.log('⚠️ Nenhum voucherInfo encontrado');
         return {};
     }
-
     async processPayment() {
         // Validação abrangente antes do processamento do pagamento
         try {
@@ -11189,13 +11666,24 @@ this.renderLocationOptions();
             return false;
         }
     }
-    
     async confirmBooking() {
         try {
             console.log('🎯 confirmBooking iniciado');
 
             // CORREÇÃO: Resetar flag de erro específico no início de nova tentativa
             this.specificErrorAlreadyDisplayed = false;
+
+            // CORREÇÃO: Evitar reconfirmação desnecessária (idempotência)
+            try {
+                const alreadyRef = this.bookingData?.confirmationData?.bookingInfo?.bookingRef
+                    || this.bookingData?.confirmationData?.custom_data?.bookingRef
+                    || this.bookingData?.confirmationData?.bookingRef;
+                if (alreadyRef) {
+                    console.log('ℹ️ [CONFIRM] Reserva já confirmada anteriormente. Pulando nova confirmação.', alreadyRef);
+                    this.displayConfirmationMessage(this.bookingData.confirmationData);
+                    return true;
+                }
+            } catch (e) {}
             
             // Verificar se viatorBookingAjax está disponível
             if (typeof viatorBookingAjax === 'undefined') {
@@ -11282,8 +11770,23 @@ this.renderLocationOptions();
                 bookingQuestionAnswers = merged;
             }
 
-            // Detectar e incluir language guide se necessário
-            const languageGuide = this.detectAndSelectLanguageGuide();
+            // Detectar e incluir language guide de forma ROBUSTA
+            let languageGuide = this.detectAndSelectLanguageGuide();
+            
+            // CORREÇÃO CRÍTICA: Garantir que language guide seja enviado se o produto exige
+            const hasLanguageGuides = Array.isArray(window.productData?.languageGuides) && window.productData.languageGuides.length > 0;
+            if (hasLanguageGuides && !languageGuide) {
+                console.warn('⚠️ [LANGUAGE GUIDE] ERRO na detecção inicial, aplicando fallback robusto...');
+                // Fallback super agressivo
+                const guides = window.productData.languageGuides;
+                languageGuide = guides[0]?.language || guides[0]?.code || 'en';
+                console.warn('🔧 [LANGUAGE GUIDE] Fallback final aplicado:', languageGuide);
+            }
+            
+            if (hasLanguageGuides && !languageGuide) {
+                console.error('❌ [LANGUAGE GUIDE] ERRO CRÍTICO: Produto exige language guide mas não foi detectado mesmo com fallbacks!');
+                throw new Error('Language guide é obrigatório para este produto. Selecione um idioma.');
+            }
 
             // Log detalhado dos dados antes do envio
             console.log('📋 Dados para confirmação:', {
@@ -11331,7 +11834,33 @@ this.renderLocationOptions();
 
                 requestParams.language_guide = languageGuide;
                 requestParams.language_guide_type = languageGuideType;
-                console.log('🌐 Language guide incluído na requisição:', { languageGuide, languageGuideType });
+                
+                // CORREÇÃO CRÍTICA: Incluir contagem de language guides para lógica no backend
+                const languageGuideCount = Array.isArray(window.productData?.languageGuides) ? window.productData.languageGuides.length : 0;
+                requestParams.language_guide_count = languageGuideCount;
+                requestParams.language_guide_present = true;
+                
+                console.log('🌐 Language guide incluído na requisição:', { 
+                    languageGuide, 
+                    languageGuideType, 
+                    languageGuideCount,
+                    logica: languageGuideCount > 1 ? 'Múltiplos guides - ENVIAR à API' : 'Guide único - NÃO enviar à API'
+                });
+                
+                // CORREÇÃO CRÍTICA: Language guide NUNCA deve ser uma booking question
+                // A API rejeita com "Answer provided for an invalid booking question"
+                // Language guide deve ser enviado como parâmetro separado no backend apenas
+                
+                // CONFORME DOCS: languageGuide deve ser enviado APENAS no root
+                // Remover QUALQUER ocorrência de LANGUAGE_GUIDE das booking questions
+                const before = bookingQuestionAnswers.length;
+                bookingQuestionAnswers = bookingQuestionAnswers.filter(answer => 
+                    answer.question !== 'LANGUAGE_GUIDE' && answer.questionId !== 'LANGUAGE_GUIDE'
+                );
+                const after = bookingQuestionAnswers.length;
+                if (before !== after) {
+                    console.log('🔧 [LANGUAGE GUIDE] Removidas ocorrências de LANGUAGE_GUIDE das booking questions:', before - after);
+                }
             } else {
                 // Forçar fallback para 'pt' quando o produto tem languageGuides mas não conseguimos normalizar
                 const hasGuides = Array.isArray(window.productData?.languageGuides) && window.productData.languageGuides.length > 0;
@@ -11468,7 +11997,25 @@ this.renderLocationOptions();
                     fullResponse: data
                 }, 'error');
 
-                // CORREÇÃO: Lançar exceção em vez de return false para permitir retry
+                // CORREÇÃO: Tratar erro idempotente de cartRef já confirmado como SUCESSO
+                const msg = (data?.data?.message || '').toString();
+                if (/cartRef already exists/i.test(msg)) {
+                    console.warn('⚠️ [CONFIRM] Booking já existente para este cartRef. Tratando como confirmado.');
+                    // Construir dados mínimos de confirmação se ainda não tivermos
+                    if (!this.bookingData.confirmationData) {
+                        const bookingRef = this.bookingData?.holdData?.bookingRef || 'N/A';
+                        this.bookingData.confirmationData = {
+                            custom_data: { confirmationStatus: 'CONFIRMED' },
+                            bookingInfo: { bookingRef },
+                            items: [],
+                            currency: this.bookingData?.holdData?.currency || 'BRL'
+                        };
+                    }
+                    this.displayConfirmationMessage(this.bookingData.confirmationData);
+                    return true;
+                }
+
+                // Caso não seja idempotente, lançar para retry
                 const error = new Error(fullErrorMessage);
                 error.isBookingError = true;
                 throw error;
@@ -11931,7 +12478,6 @@ this.renderLocationOptions();
 
         console.log('✅ Mensagem de confirmação exibida com sucesso');
     }
-
     /**
      * Injetar estilos CSS para animações
      */
@@ -12621,6 +13167,18 @@ this.renderLocationOptions();
         }
     }
 
+    // CORREÇÃO: Método utilitário faltante usado na confirmação
+    formatDate(date) {
+        try {
+            if (!date) return '';
+            const d = (date instanceof Date) ? date : new Date(date);
+            if (isNaN(d.getTime())) return String(date);
+            return d.toISOString().split('T')[0];
+        } catch (_e) {
+            return String(date || '');
+        }
+    }
+
     /**
      * Mostrar erro com opções de retry
      */
@@ -12686,7 +13244,6 @@ this.renderLocationOptions();
             }, 15000);
         }
     }
-
     /**
      * Validar dados críticos antes de prosseguir (contextual ao step)
      */
@@ -12736,28 +13293,6 @@ this.renderLocationOptions();
             isValid: errors.length === 0,
             errors: errors
         };
-    }
-
-    // MÉTODO REMOVIDO - DUPLICATA (mantendo apenas a primeira definição na linha 6454)
-    
-    /**
-     * Formatar data para exibição amigável
-     */
-    formatDate(dateString) {
-        if (!dateString) return 'Data não especificada';
-        
-        try {
-            const date = new Date(dateString);
-            const options = {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            };
-            return date.toLocaleDateString('pt-BR', options);
-        } catch (error) {
-            return dateString; // Retorna a string original se não conseguir formatar
-        }
     }
     
     setupPriceUpdater() {
@@ -13450,7 +13985,6 @@ this.renderLocationOptions();
             console.log('❌ Ícone do botão não encontrado para parar animação');
         }
     }
-
     setupPriceDetailsToggle() {
         const toggleBtn = document.getElementById('price-details-toggle');
         const priceDetails = document.getElementById('price-details');
@@ -13496,7 +14030,6 @@ this.renderLocationOptions();
             }
         });
     }
-
     /**
      * Configurar sincronização de unidades para campos WEIGHT e HEIGHT
      */
@@ -14231,7 +14764,6 @@ this.renderLocationOptions();
             }
         }
     }
-
     /**
      * FASE 3.1: Sistema de cache inteligente com validação
      */
@@ -14293,7 +14825,6 @@ this.renderLocationOptions();
             }, 'warn');
         }
     }
-
     /**
      * FASE 3.2: Validações avançadas com cache
      */

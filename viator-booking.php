@@ -538,6 +538,14 @@ class ViatorBookingSystem {
         // Obter language guide se fornecido
         $language_guide = isset($_POST['language_guide']) ? sanitize_text_field($_POST['language_guide']) : null;
         $language_guide_type = isset($_POST['language_guide_type']) ? sanitize_text_field($_POST['language_guide_type']) : null;
+        
+        // Debug language guide
+        viator_debug_log('🌐 [BACKEND DEBUG] Language guide recebido:', [
+            'language_guide' => $language_guide,
+            'language_guide_type' => $language_guide_type,
+            'language_guide_empty' => empty($language_guide),
+            'POST_keys' => array_keys($_POST)
+        ]);
 
         // Construir array items para confirmação
         $confirm_items = [];
@@ -547,7 +555,7 @@ class ViatorBookingSystem {
                 'partnerBookingRef' => $item['partnerBookingRef'] ?? ('BOOK_' . $this->generate_unique_id())
             ];
 
-            // Incluir perguntas de reserva por item (compatível com docs)
+            // Incluir perguntas de reserva por item também (compatível com docs/implementações)
             if (!empty($booking_question_answers)) {
                 $confirm_item['bookingQuestionAnswers'] = $booking_question_answers;
             }
@@ -584,7 +592,7 @@ class ViatorBookingSystem {
                 viator_debug_log('ERRO: BookingRef não encontrado no hold_response');
             }
             
-            // Incluir perguntas de reserva por item (compatível com docs)
+            // Incluir perguntas de reserva por item também (compatível com docs/implementações)
             if (!empty($booking_question_answers)) {
                 $confirm_item['bookingQuestionAnswers'] = $booking_question_answers;
             }
@@ -685,14 +693,31 @@ class ViatorBookingSystem {
         viator_debug_log('✅ [STRUCTURE] Objeto bookerInfo adicionado:', $request_data['bookerInfo']);
         viator_debug_log('✅ [STRUCTURE] Objeto communication adicionado:', $request_data['communication']);
 
-        // Incluir languageGuide no nível raiz se fornecido (objeto conforme docs)
+        // CORREÇÃO FINAL: Language guide deve ser enviado como campo separado na raiz
+        // Teste descobriu que NÃO pode ser booking question ("Answer provided for an invalid booking question")
         if (!empty($language_guide)) {
             $guide_obj = [
                 'type' => !empty($language_guide_type) ? $language_guide_type : 'GUIDE',
                 'language' => $language_guide
             ];
             $request_data['languageGuide'] = $guide_obj;
-            viator_debug_log('Language Guide incluído na confirmação (root - objeto):', $guide_obj);
+
+            // Também aplicar aos items para cobrir implementações que exigem por item
+            if (!empty($request_data['items']) && is_array($request_data['items'])) {
+                foreach ($request_data['items'] as $idx => &$it) {
+                    $it['languageGuide'] = $guide_obj;
+                }
+                unset($it);
+                viator_debug_log('🌐 [LANGUAGE GUIDE] Aplicado também aos items:', [
+                    'items_count' => count($request_data['items']),
+                    'languageGuide' => $guide_obj
+                ]);
+            }
+
+            viator_debug_log('🌐 [LANGUAGE GUIDE] Incluído como campo separado na raiz (formato correto):', [
+                'languageGuide' => $guide_obj,
+                'note' => 'Language guide NUNCA deve ser booking question'
+            ]);
         }
 
         // Log da estrutura da requisição
@@ -741,9 +766,11 @@ class ViatorBookingSystem {
                 viator_debug_log("✅ [BOOKING QUESTIONS] Resposta {$index} corrigida: question={$corrected_answer['question']}, answer={$corrected_answer['answer']}");
             }
 
-            // Substituir array original pelo corrigido
-            $booking_question_answers = $corrected_answers;
-            viator_debug_log('🔧 [BOOKING QUESTIONS] Total de respostas corrigidas:', count($booking_question_answers));
+            // Substituir array original pelo corrigido e REMOVER qualquer LANGUAGE_GUIDE (não permitido nas booking questions)
+            $booking_question_answers = array_values(array_filter($corrected_answers, function($ans){
+                return isset($ans['question']) && strtoupper($ans['question']) !== 'LANGUAGE_GUIDE';
+            }));
+            viator_debug_log('🔧 [BOOKING QUESTIONS] Total de respostas corrigidas (LANGUAGE_GUIDE removido se presente):', count($booking_question_answers));
 
             // CORREÇÃO CRÍTICA: Incluir booking questions no nível raiz conforme docs
             if (!empty($booking_question_answers)) {
@@ -887,15 +914,49 @@ class ViatorBookingSystem {
 
         // CORREÇÃO: Log detalhado da estrutura da requisição
         viator_debug_log('✅ Booking Confirmation Request (Validado):', $request_data);
-        viator_debug_log('🔍 [DETAILED REQUEST] URL:', $this->base_url . '/partner/bookings/cart/book');
+        // Verificação adicional: languageGuide por item
+        $items_language_guide = array_map(function($it){ return isset($it['languageGuide']); }, $request_data['items']);
+        viator_debug_log('🧪 [LANG_CHECK_ITEMS] languageGuide por item:', [
+            'items_count' => count($request_data['items']),
+            'has_on_all_items' => count($request_data['items']) > 0 ? (count(array_filter($items_language_guide)) === count($request_data['items'])) : false,
+            'map' => $items_language_guide
+        ]);
+        // Preparar elementos do request para logs e envio
+        $__confirm_url = $this->base_url . '/partner/bookings/cart/book';
+        // Se language_guide foi definido, alinhar Accept-Language ao idioma escolhido
+        $accept_language_header = $locale_settings['language'];
+        if (!empty($language_guide)) {
+            // Usar apenas o código ISO informado (ex.: 'en')
+            $accept_language_header = $language_guide;
+        }
+
+        $__confirm_headers = array(
+            'Accept' => 'application/json;version=2.0',
+            'Content-Type' => 'application/json;version=2.0',
+            'exp-api-key' => $this->api_key,
+            'Accept-Language' => $accept_language_header
+        );
+        $__confirm_body_json = json_encode($request_data);
+
+        viator_debug_log('🔍 [DETAILED REQUEST] URL:', $__confirm_url);
         viator_debug_log('🔍 [DETAILED REQUEST] Headers:', array(
             'Accept' => 'application/json;version=2.0',
             'Content-Type' => 'application/json;version=2.0',
             'exp-api-key' => substr($this->api_key, 0, 10) . '...',
-            'Accept-Language' => $locale_settings['language']
+            'Accept-Language' => $accept_language_header
         ));
         viator_debug_log('🔍 [DETAILED REQUEST] Body JSON:', json_encode($request_data, JSON_PRETTY_PRINT));
-        viator_debug_log('🔍 [DETAILED REQUEST] Body Size:', strlen(json_encode($request_data)) . ' bytes');
+        viator_debug_log('🔍 [DETAILED REQUEST] Body Size:', strlen($__confirm_body_json) . ' bytes');
+
+        // Verificação explícita de languageGuide no payload
+        viator_debug_log('🧪 [LANG_CHECK] Verificação de languageGuide antes do envio:', [
+            'exists_languageGuide' => isset($request_data['languageGuide']),
+            'languageGuide_value' => isset($request_data['languageGuide']) ? $request_data['languageGuide'] : null,
+            'contains_languageGuide_in_json' => (strpos($__confirm_body_json, '"languageGuide"') !== false),
+            'accept_language_header' => $__confirm_headers['Accept-Language'] ?? null,
+            'booking_questions_count' => isset($request_data['bookingQuestionAnswers']) ? count($request_data['bookingQuestionAnswers']) : 0,
+            'booking_questions_sample' => isset($request_data['bookingQuestionAnswers']) ? array_slice($request_data['bookingQuestionAnswers'], 0, 2) : []
+        ]);
         
         // CORREÇÃO: Implementar retry com timeout maior para confirmação
         $max_attempts = 3;
@@ -905,14 +966,9 @@ class ViatorBookingSystem {
         while ($attempt <= $max_attempts) {
             viator_debug_log("🔄 Booking Confirmation - Tentativa {$attempt}/{$max_attempts}");
             
-            $response = wp_remote_post($this->base_url . '/partner/bookings/cart/book', array(
-                'headers' => array(
-                    'Accept' => 'application/json;version=2.0',
-                    'Content-Type' => 'application/json;version=2.0',
-                    'exp-api-key' => $this->api_key,
-                    'Accept-Language' => $locale_settings['language']
-                ),
-                'body' => json_encode($request_data),
+            $response = wp_remote_post($__confirm_url, array(
+                'headers' => $__confirm_headers,
+                'body' => $__confirm_body_json,
                 'timeout' => 120 // CORREÇÃO: Timeout aumentado para 2 minutos
             ));
 
@@ -936,6 +992,17 @@ class ViatorBookingSystem {
             break;
         }
         
+        // Log da requisição para debug
+        viator_debug_log('📤 [BOOKING CONFIRMATION REQUEST] Dados completos da requisição:', [
+            'method' => 'POST',
+            'url' => $__confirm_url,
+            // mascarar exp-api-key
+            'headers' => array_merge($__confirm_headers, ['exp-api-key' => substr($__confirm_headers['exp-api-key'], 0, 10) . '...']),
+            'body_length' => strlen($__confirm_body_json),
+            'request_data_keys' => array_keys($request_data),
+            'request_data_full' => $request_data // Log completo para debug
+        ]);
+
         if (is_wp_error($response)) {
             viator_debug_log('❌ Booking Confirmation WP_Error:', $response->get_error_message());
             return array('error' => 'Erro de conexão: ' . $response->get_error_message());
@@ -953,21 +1020,56 @@ class ViatorBookingSystem {
             'body_preview' => substr($body, 0, 200) . '...'
         ));
 
+        // Log do corpo bruto (limitado) antes da sanitização
+        viator_debug_log('📡 [CONFIRM RAW BODY] (primeiros 2000 chars):', substr($body, 0, 2000));
+
         if (empty($body)) {
             viator_debug_log('❌ Booking Confirmation: Resposta vazia do servidor');
             return array('error' => 'Resposta vazia do servidor de confirmação');
         }
 
+        // Limpar possíveis caracteres inválidos antes do JSON decode
+        $body = preg_replace('/[\x00-\x1F\x80-\xFF]/', '', $body);
+        $body = trim($body);
+        
+        // Remover BOM se presente
+        $body = preg_replace('/^\xEF\xBB\xBF/', '', $body);
+        
+        // Verificar se a resposta parece ser HTML (erro da API)
+        if (stripos($body, '<html') !== false || stripos($body, '<!doctype') !== false) {
+            viator_debug_log('❌ API retornou HTML em vez de JSON (erro 500 provável)');
+            viator_debug_log('❌ HTML response body:', $body);
+            return array('error' => 'API da Viator retornou erro interno (HTTP 500). Verifique os dados da requisição.');
+        }
+        
         $data = json_decode($body, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
             viator_debug_log('❌ Booking Confirmation JSON Error:', json_last_error_msg());
-            viator_debug_log('❌ Raw response body (len=' . strlen($body) . '):', substr($body, 0, 500) . '...');
+            viator_debug_log('❌ Raw response body (len=' . strlen($body) . '):', substr($body, 0, 1000) . '...');
+            viator_debug_log('❌ Response headers:', wp_remote_retrieve_headers($response));
+            viator_debug_log('❌ HTTP Status Code:', wp_remote_retrieve_response_code($response));
             return array('error' => 'Erro ao decodificar resposta da confirmação: ' . json_last_error_msg());
         }
 
         // Log da resposta completa
         viator_debug_log('✅ Booking Confirmation Response (Parsed):', $data);
+        // Se a API devolver mensagem conhecida de language guide, dar evidência do request
+        if (is_array($data) && isset($data['message']) && stripos($data['message'], 'Language guide required') !== false) {
+            viator_debug_log('🚨 [LANGUAGE GUIDE REQUIRED] A API retornou exigência de language guide. Dump do payload enviado:', [
+                'has_languageGuide' => isset($request_data['languageGuide']),
+                'languageGuide' => $request_data['languageGuide'] ?? null,
+                'bookingQuestionAnswers_count' => isset($request_data['bookingQuestionAnswers']) ? count($request_data['bookingQuestionAnswers']) : 0
+            ]);
+        }
+        if (isset($data['code']) && $data['code'] === 'BAD_REQUEST') {
+            viator_debug_log('❌ [CONFIRM ERROR DETAIL] BAD_REQUEST detectado:', [
+                'message' => $data['message'] ?? null,
+                'trackingId' => $data['trackingId'] ?? null,
+                'has_languageGuide_in_request' => isset($request_data['languageGuide']),
+                'request_languageGuide' => $request_data['languageGuide'] ?? null
+            ]);
+        }
         
         if (isset($data['error'])) {
              return array(
@@ -2161,7 +2263,9 @@ class ViatorBookingSystem {
             'payment_token' => substr($payment_token, 0, 10) . '...',
             'raw_booker_info' => $_POST['booker_info'] ?? 'NÃO ENCONTRADO',
             'raw_booking_questions' => $_POST['bookingQuestionAnswers'] ?? 'NÃO ENCONTRADO',
-            'raw_hold_data' => $_POST['hold_data'] ?? 'NÃO ENCONTRADO'
+            'raw_hold_data' => $_POST['hold_data'] ?? 'NÃO ENCONTRADO',
+            'raw_language_guide' => $_POST['language_guide'] ?? 'NÃO ENVIADO',
+            'raw_language_guide_type' => $_POST['language_guide_type'] ?? 'NÃO ENVIADO'
         ]);
         
         $booker_info_raw = $_POST['booker_info'] ?? '';
