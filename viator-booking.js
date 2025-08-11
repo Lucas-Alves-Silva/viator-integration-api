@@ -4717,7 +4717,7 @@ this.renderLocationOptions();
 
         if (listChoiceSelected && listChoiceSelected.value && listChoiceSelected.value.startsWith('LOC-')) {
             pickupAnswer = {
-                question: 'PICKUP_POINT',
+                    question: 'PICKUP_POINT',
                 answer: listChoiceSelected.value,
                 unit: 'LOCATION_REFERENCE'
             };
@@ -4729,7 +4729,7 @@ this.renderLocationOptions();
                 unit: 'FREETEXT'
             };
             console.log('✅ [DYNAMIC DEBUG] PICKUP_POINT via freetext:', pickupAnswer);
-        } else if (hiddenPickupField && hiddenPickupField.value && !['CONTACT_SUPPLIER_LATER','CHOOSE_FROM_LIST'].includes(hiddenPickupField.value)) {
+        } else if (hiddenPickupField && hiddenPickupField.value && hiddenPickupField.value !== 'CHOOSE_FROM_LIST') {
             const hiddenVal = hiddenPickupField.value.trim();
             pickupAnswer = {
                 question: 'PICKUP_POINT',
@@ -4742,16 +4742,16 @@ this.renderLocationOptions();
         }
 
         if (pickupAnswer && !answers.find(a => a.question === 'PICKUP_POINT')) {
-            answers.push(pickupAnswer);
-        }
+                answers.push(pickupAnswer);
+            }
 
         // CORREÇÃO: Usar cache do PICKUP_POINT se disponível
         if (this.cachedPickupPoint && this.cachedPickupPoint.answer && !answers.find(a => a.question === 'PICKUP_POINT')) {
             console.log('✅ [CACHE] PICKUP_POINT encontrado no cache:', this.cachedPickupPoint);
 
             // Verificar se já não foi adicionado pelos seletores DOM
-            answers.push(this.cachedPickupPoint);
-            console.log('✅ [CACHE] PICKUP_POINT adicionado do cache às respostas');
+                answers.push(this.cachedPickupPoint);
+                console.log('✅ [CACHE] PICKUP_POINT adicionado do cache às respostas');
         } else {
             console.log('⚠️ [CACHE] Nenhum PICKUP_POINT encontrado no cache');
         }
@@ -4986,7 +4986,7 @@ this.renderLocationOptions();
         const hasLanguageGuides = Array.isArray(window.productData?.languageGuides) && window.productData.languageGuides.length > 0;
         if (additionalInfoSection) {
             if (hasGeneral || hasLanguageGuides) {
-                additionalInfoSection.style.display = 'block';
+            additionalInfoSection.style.display = 'block';
                 if (pageH3) pageH3.style.display = 'block';
                 if (addInfoH4) addInfoH4.style.display = 'none';
             } else {
@@ -6367,7 +6367,8 @@ this.renderLocationOptions();
      */
     validatePickupPointConditional() {
         const arrivalModeInput = document.querySelector('[id*="TRANSFER_ARRIVAL_MODE"]');
-        const pickupPointInput = document.querySelector('[id*="PICKUP_POINT"]');
+        // Usar especificamente o hidden principal do PICKUP_POINT
+        const pickupPointInput = document.querySelector('input[type="hidden"][data-question-id="PICKUP_POINT"]') || document.getElementById('booking_question_PICKUP_POINT');
         
         if (!pickupPointInput) {
             return true; // Não há campo PICKUP_POINT, validação não se aplica
@@ -6381,11 +6382,19 @@ this.renderLocationOptions();
         console.log('🚗 Validando PICKUP_POINT para arrivalMode:', arrivalMode);
         
         // PICKUP_POINT é obrigatório quando arrivalMode exige coleta
-        const arrivalModesRequiringPickup = ['HOTEL_PICKUP', 'CENTRAL_MEETING_POINT'];
+        // Usar validação mais rígida: quando arrivalMode é OTHER, AIR, RAIL, SEA, exigir PICKUP_POINT
+        const arrivalModesRequiringPickup = ['OTHER', 'AIR', 'RAIL', 'SEA', 'HOTEL_PICKUP', 'CENTRAL_MEETING_POINT'];
         if (arrivalModesRequiringPickup.includes(arrivalMode)) {
-            const pickupValue = pickupPointInput.value ? pickupPointInput.value.trim() : '';
-            const freetextInput = document.querySelector('[id*="PICKUP_POINT"][id*="_freetext"]');
+            let pickupValue = pickupPointInput.value ? pickupPointInput.value.trim() : '';
+            // Buscar freetext específico do componente simplificado
+            const baseId = pickupPointInput.id || 'booking_question_PICKUP_POINT';
+            const freetextInput = document.getElementById(`${baseId}_freetext`) || document.querySelector('[id*="PICKUP_POINT"][id*="_freetext"]');
             const freetextValue = freetextInput && freetextInput.value ? freetextInput.value.trim() : '';
+
+            // CONTACT_SUPPLIER_LATER não atende quando arrivalMode exige endereço
+            if (pickupValue === 'CONTACT_SUPPLIER_LATER') {
+                pickupValue = '';
+            }
 
             if (!pickupValue && !freetextValue) {
                 this.showFieldError(pickupPointInput, 'Ponto de encontro é obrigatório para o modo de chegada selecionado');
@@ -6407,7 +6416,7 @@ this.renderLocationOptions();
      */
     validatePickupPointConditionalWithError() {
         const arrivalModeInput = document.querySelector('[id*="TRANSFER_ARRIVAL_MODE"]');
-        const pickupPointInput = document.querySelector('[id*="PICKUP_POINT"]');
+        const pickupPointInput = document.querySelector('input[type="hidden"][data-question-id="PICKUP_POINT"]') || document.getElementById('booking_question_PICKUP_POINT');
         if (!pickupPointInput) {
             return { isValid: true };
         }
@@ -6415,11 +6424,17 @@ this.renderLocationOptions();
         if (arrivalModeInput && arrivalModeInput.value) {
             arrivalMode = arrivalModeInput.value;
         }
-        const arrivalModesRequiringPickup = ['HOTEL_PICKUP', 'CENTRAL_MEETING_POINT'];
+        const arrivalModesRequiringPickup = ['OTHER', 'AIR', 'RAIL', 'SEA', 'HOTEL_PICKUP', 'CENTRAL_MEETING_POINT'];
         if (arrivalModesRequiringPickup.includes(arrivalMode)) {
-            const pickupValue = pickupPointInput.value ? pickupPointInput.value.trim() : '';
-            const freetextInput = document.querySelector('[id*="PICKUP_POINT"][id*="_freetext"]');
+            let pickupValue = pickupPointInput.value ? pickupPointInput.value.trim() : '';
+            const baseId = pickupPointInput.id || 'booking_question_PICKUP_POINT';
+            const freetextInput = document.getElementById(`${baseId}_freetext`) || document.querySelector('[id*="PICKUP_POINT"][id*="_freetext"]');
             const freetextValue = freetextInput && freetextInput.value ? freetextInput.value.trim() : '';
+
+            if (pickupValue === 'CONTACT_SUPPLIER_LATER') {
+                pickupValue = '';
+            }
+
             if (!pickupValue && !freetextValue) {
                 this.showFieldError(pickupPointInput, 'Ponto de encontro é obrigatório para o modo de chegada selecionado');
                 return { isValid: false, error: 'Ponto de Encontro' };
@@ -7623,7 +7638,7 @@ this.renderLocationOptions();
             html += `
                 <div class="pickup-simple-options">
                     <div class="pickup-option-wrapper">
-                        <input type="radio" id="${questionId}_contact_later" name="${questionId}" value="CONTACT_SUPPLIER_LATER" checked>
+                        <input type="radio" id="${questionId}_contact_later" name="${questionId}" value="CONTACT_SUPPLIER_LATER">
                         <label for="${questionId}_contact_later" class="pickup-option-label">
                             <div class="pickup-option-title">📞 Entrarei em contato depois</div>
                             <div class="pickup-option-description">O fornecedor entrará em contato para definir o local</div>
@@ -7661,7 +7676,7 @@ this.renderLocationOptions();
             <div class="pickup-main-options">
                 <!-- Opção 1: Entrarei em contato depois -->
                 <div class="pickup-option-wrapper">
-                    <input type="radio" id="${questionId}_contact_later" name="${questionId}" value="CONTACT_SUPPLIER_LATER" checked>
+                    <input type="radio" id="${questionId}_contact_later" name="${questionId}" value="CONTACT_SUPPLIER_LATER">
                     <label for="${questionId}_contact_later" class="pickup-option-label">
                         <div class="pickup-option-title">📞 Entrarei em contato depois</div>
                         <div class="pickup-option-description">O fornecedor entrará em contato para confirmar o local de encontro</div>
@@ -7920,6 +7935,8 @@ this.renderLocationOptions();
         const locationsContainer = document.getElementById(`${questionId}_locations_container`);
         const chooseDesc = document.getElementById(`${questionId}_choose_desc`);
         const chosenPreview = document.getElementById(`${questionId}_chosen_preview`);
+        const contactLaterRadio = document.getElementById(`${questionId}_contact_later`);
+        const arrivalModeInput = document.querySelector('[id*="TRANSFER_ARRIVAL_MODE"]');
         
         console.log('🔧 [PICKUP SIMPLIFIED] Elementos encontrados:', {
             hiddenField: !!hiddenField,
@@ -7946,6 +7963,20 @@ this.renderLocationOptions();
             const chooseLabel = container.querySelector(`label[for="${questionId}_choose_location"]`);
             if (chooseLabel) chooseLabel.addEventListener('click', showList);
         }
+
+        // Ocultar "Entrarei em contato depois" quando arrival mode exigir endereço
+        const requiresPickup = () => {
+            const mode = arrivalModeInput && arrivalModeInput.value ? arrivalModeInput.value : 'OTHER';
+            return ['OTHER', 'AIR', 'RAIL', 'SEA'].includes(mode);
+        };
+        const applyContactLaterVisibility = () => {
+            if (contactLaterRadio) {
+                const wrapper = contactLaterRadio.closest('.pickup-option-wrapper');
+                if (wrapper) wrapper.style.display = requiresPickup() ? 'none' : '';
+            }
+        };
+        applyContactLaterVisibility();
+        if (arrivalModeInput) arrivalModeInput.addEventListener('change', applyContactLaterVisibility);
         
         // 2. Controlar exibição do campo customizado
         if (allowCustomPickup && customRadio && customInput) {
@@ -7964,23 +7995,43 @@ this.renderLocationOptions();
         const allRadios = container.querySelectorAll(`input[name="${questionId}"][type="radio"], input[name="${questionId}_list_choice"][type="radio"]`);
         allRadios.forEach(radio => {
             radio.addEventListener('change', function() {
-                if (this.checked) {
-                    const isListChoice = this.name === `${questionId}_list_choice`;
-                    // Ocultar lista se não for a opção "escolher de lista" nem um item da lista
-                    if (!isListChoice && this.id !== `${questionId}_choose_location` && locationsList) {
-                        locationsList.style.display = 'none';
-                    }
-                    
-                    // Ocultar campo customizado se não for a opção customizada
-                    if (this.id !== `${questionId}_custom` && customInput) {
-                        customInput.style.display = 'none';
-                    }
-                    
-                    // Atualizar campo hidden somente para rádios principais
-                    if (hiddenField && this.name === `${questionId}`) {
+                if (!this.checked) return;
+
+                const isListChoice = this.name === `${questionId}_list_choice`;
+
+                // Ocultar lista se não for a opção "escolher de lista" nem um item da lista
+                if (!isListChoice && this.id !== `${questionId}_choose_location` && locationsList) {
+                    locationsList.style.display = 'none';
+                }
+
+                // Ocultar campo customizado se não for a opção customizada
+                if (this.id !== `${questionId}_custom` && customInput) {
+                    customInput.style.display = 'none';
+                }
+
+                // Atualizar campo hidden somente para rádios principais
+                if (hiddenField && this.name === `${questionId}`) {
+                    if (this.id === `${questionId}_contact_later`) {
+                        hiddenField.value = 'CONTACT_SUPPLIER_LATER';
+                        hiddenField.removeAttribute('data-unit');
+                        console.log('✅ [PICKUP SIMPLIFIED] Valor atualizado: CONTACT_SUPPLIER_LATER');
+                    } else if (this.id === `${questionId}_custom`) {
+                        // Esperar o usuário digitar o endereço antes de setar o hidden
+                        hiddenField.value = '';
+                        hiddenField.removeAttribute('data-unit');
+                        if (customInput) customInput.style.display = 'block';
+                        if (freetextInput) setTimeout(() => freetextInput.focus(), 50);
+                        console.log('ℹ️ [PICKUP SIMPLIFIED] Aguardando endereço customizado');
+                    } else if (this.id === `${questionId}_choose_location`) {
+                        // Não sobrescrever o hidden aqui; ele será definido quando um item da lista for escolhido
+                        if (locationsList) locationsList.style.display = 'block';
+                        if (searchInput) setTimeout(() => searchInput.focus(), 50);
+                        console.log('ℹ️ [PICKUP SIMPLIFIED] Aguardando escolha da lista');
+                    } else if (this.value && this.value.startsWith('LOC-')) {
+                        // Caso algum radio principal use um LOC diretamente (raro)
                         hiddenField.value = this.value;
-                        hiddenField.setAttribute('data-unit', this.value === 'CUSTOM_LOCATION' ? 'FREETEXT' : (this.value.startsWith('LOC-') ? 'LOCATION_REFERENCE' : 'LOCATION_REFERENCE'));
-                        console.log('✅ [PICKUP SIMPLIFIED] Valor atualizado:', this.value);
+                        hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
+                        console.log('✅ [PICKUP SIMPLIFIED] Valor atualizado (LOC direto):', this.value);
                     }
                 }
             });
@@ -8020,32 +8071,31 @@ this.renderLocationOptions();
         if (locationsContainer) {
             locationsContainer.addEventListener('change', (ev) => {
                 const target = ev.target;
-                if (target && target.matches(`input[name="${questionId}_list_choice"][type="radio"]`)) {
-                    // Manter o rádio principal "Escolher de uma lista" marcado
-                    if (chooseLocationRadio) {
-                        chooseLocationRadio.checked = true;
-                        chooseLocationRadio.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
+                if (!target || !target.matches(`input[name="${questionId}_list_choice"][type="radio"]`)) return;
 
-                    const wrapper = target.closest('.pickup-option-wrapper');
-                    const titleEl = wrapper ? wrapper.querySelector('.pickup-option-title') : null;
-                    const addrEl = wrapper ? wrapper.querySelector('.pickup-option-address span:last-child') : null;
-                    const title = (titleEl?.textContent || '').trim();
-                    const addr = (addrEl?.textContent || '').trim();
-                    const summaryText = addr ? `${title} — ${addr}` : title || target.value;
+                // Manter o rádio principal "Escolher de uma lista" marcado
+                if (chooseLocationRadio) {
+                    chooseLocationRadio.checked = true;
+                    // Não redefinir o hidden aqui para CHOOSE_FROM_LIST; apenas manter o estado visual
+                }
 
-                    const chooseDescEl = document.getElementById(`${questionId}_choose_desc`);
-                    const chosenPreviewEl = document.getElementById(`${questionId}_chosen_preview`);
-                    if (chooseDescEl) chooseDescEl.textContent = summaryText;
-                    if (chosenPreviewEl) {
-                        chosenPreviewEl.textContent = summaryText;
-                        chosenPreviewEl.style.display = 'block';
-                    }
+                const wrapper = target.closest('.pickup-option-wrapper');
+                const titleEl = wrapper ? wrapper.querySelector('.pickup-option-title') : null;
+                const addrEl = wrapper ? wrapper.querySelector('.pickup-option-address span:last-child') : null;
+                const title = (titleEl?.textContent || '').trim();
+                const addr = (addrEl?.textContent || '').trim();
+                const summaryText = addr ? `${title} — ${addr}` : title || target.value;
 
-                    if (hiddenField) {
-                        hiddenField.value = target.value;
-                        hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
-                    }
+                // Atualizar label principal e ocultar a lista após escolha
+                const chooseLabelTitle = document.querySelector(`label[for="${questionId}_choose_location"] .pickup-option-title`);
+                if (chooseLabelTitle) chooseLabelTitle.textContent = summaryText;
+                if (locationsList) locationsList.style.display = 'none';
+
+                // Persistir seleção
+                if (hiddenField) {
+                    hiddenField.value = target.value;
+                    hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
+                    hiddenField.classList.remove('is-invalid');
                 }
             });
         }
@@ -8095,15 +8145,15 @@ this.renderLocationOptions();
         if (container) {
             container.addEventListener('change', (ev) => {
                 const target = ev.target;
-                if (target && target.matches(`input[name="${questionId}"][type="radio"]`) && target.id !== `${questionId}_choose_location`) {
-                    const chooseDescEl = document.getElementById(`${questionId}_choose_desc`);
-                    const chosenPreviewEl = document.getElementById(`${questionId}_chosen_preview`);
-                    if (chosenPreviewEl) {
-                        chosenPreviewEl.textContent = '';
-                        chosenPreviewEl.style.display = 'none';
-                    }
-                    if (chooseDescEl) chooseDescEl.textContent = 'Selecionar hotel, aeroporto ou ponto turístico';
-                }
+                if (!target || !target.matches(`input[name="${questionId}"][type="radio"]`)) return;
+                if (target.id === `${questionId}_choose_location`) return; // não limpar ao reabrir a lista
+
+                // Resetar título do label para o texto padrão
+                const chooseLabelTitle = document.querySelector(`label[for="${questionId}_choose_location"] .pickup-option-title`);
+                if (chooseLabelTitle) chooseLabelTitle.textContent = '🏨 Escolher de uma lista';
+
+                // Ocultar lista ao trocar para outras opções
+                if (locationsList) locationsList.style.display = 'none';
             });
         }
         
@@ -8528,27 +8578,70 @@ this.renderLocationOptions();
             });
 
             if (hiddenField && radioButtons.length > 0) {
-                // Definir valor inicial se há um radio button marcado
+                // NUNCA definir automaticamente CONTACT_SUPPLIER_LATER quando a pergunta for MANDATORY
                 const checkedRadio = document.querySelector(`input[name="${questionId}"][type="radio"]:checked`);
+                const isMandatory = !!document.querySelector(`#${questionId}[required]`);
                 if (checkedRadio) {
+                    if (checkedRadio.id === `${questionId}_choose_location`) {
+                        const listSelected = document.querySelector(`input[name="${questionId}_list_choice"]:checked`);
+                        if (listSelected && listSelected.value) {
+                            hiddenField.value = listSelected.value;
+                            hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
+                            console.log('📍 [PICKUP SYNC] Valor inicial (lista selecionada):', listSelected.value);
+                        } else if (isMandatory) {
+                            hiddenField.value = '';
+                            hiddenField.removeAttribute('data-unit');
+                            console.log('📍 [PICKUP SYNC] Campo obrigatório: aguardando escolha da lista');
+                        } else {
+                            hiddenField.value = 'CHOOSE_FROM_LIST';
+                            hiddenField.removeAttribute('data-unit');
+                        }
+                    } else if (isMandatory && checkedRadio.value === 'CONTACT_SUPPLIER_LATER') {
+                        hiddenField.value = '';
+                        hiddenField.removeAttribute('data-unit');
+                        console.log('📍 [PICKUP SYNC] Campo obrigatório: ignorando CONTACT_SUPPLIER_LATER');
+                    } else {
                     hiddenField.value = checkedRadio.value;
-                    hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
-                    console.log('📍 [PICKUP SYNC] Valor inicial definido:', checkedRadio.value);
+                        hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
+                        console.log('📍 [PICKUP SYNC] Valor inicial definido:', checkedRadio.value);
+                    }
                 }
 
                 // Adicionar listeners para mudanças
                 radioButtons.forEach(radio => {
                     radio.addEventListener('change', function() {
                         if (this.checked) {
+                            if (this.id === `${questionId}_choose_location`) {
+                                const listSelected = document.querySelector(`input[name="${questionId}_list_choice"]:checked`);
+                                if (listSelected && listSelected.value) {
+                                    hiddenField.value = listSelected.value;
+                                    hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
+                                    console.log('📍 [PICKUP SYNC] Valor atualizado (lista selecionada):', listSelected.value);
+                                } else {
+                                    hiddenField.value = 'CHOOSE_FROM_LIST';
+                                    hiddenField.removeAttribute('data-unit');
+                                    console.log('📍 [PICKUP SYNC] Aguardando escolha da lista');
+                                }
+                            } else {
                             hiddenField.value = this.value;
-                            hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
-                            console.log('📍 [PICKUP SYNC] Valor atualizado:', this.value);
+                                hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
+                                console.log('📍 [PICKUP SYNC] Valor atualizado:', this.value);
+                            }
 
                             // Remover classe de erro se existir
                             hiddenField.classList.remove('error');
 
                             // Trigger change event para validação
                             hiddenField.dispatchEvent(new Event('change', { bubbles: true }));
+
+                                // Se for CONTACT_SUPPLIER_LATER, limpar qualquer freetext e desmarcar seleção da lista
+                                if (this.value === 'CONTACT_SUPPLIER_LATER') {
+                                    const baseId = hiddenField.id;
+                                    const freetextInput = document.getElementById(`${baseId}_freetext`);
+                                    if (freetextInput) freetextInput.value = '';
+                                    const listRadios = document.querySelectorAll(`input[name="${baseId}_list_choice"]`);
+                                    listRadios.forEach(r => { r.checked = false; });
+                                }
                         }
                     });
                 });
@@ -9085,7 +9178,8 @@ this.renderLocationOptions();
                         
                         travelerQuestionsHTML += `<div class="traveler-questions-section">`;
                         travelerQuestionsHTML += `<h5>👤 Viajante ${globalTravelerNumber}</h5>`;
-                        const travelerHTML = this.renderTravelerBookingQuestions(travelerIndex + 1);
+                        // Usar número sequencial do viajante para travelerNum correto (1,2,3...)
+                        const travelerHTML = this.renderTravelerBookingQuestions(globalTravelerNumber);
                         console.log(`🔍 [DEBUG] HTML gerado para viajante ${globalTravelerNumber}:`, travelerHTML);
                         travelerQuestionsHTML += travelerHTML;
                         travelerQuestionsHTML += `</div>`;
@@ -12174,6 +12268,11 @@ this.renderLocationOptions();
             currency = this.bookingData.availabilityData.currency || 'BRL';
             amount = availPrice.recommendedRetailPrice || availPrice.partnerTotalPrice || 0;
         }
+        // NOVO: usar preço pendente do response quando confirmado é 0
+        if ((amount === 0 || !amount) && data?.totalPendingPrice?.price) {
+            currency = data.currency || 'BRL';
+            amount = data.totalPendingPrice.price.recommendedRetailPrice || data.totalPendingPrice.price.partnerTotalPrice || amount || 0;
+        }
         // 5ª fonte: extrair do DOM como último recurso
         else {
             const totalElement = document.querySelector('.total-price, .price-total, .final-price');
@@ -12326,41 +12425,84 @@ this.renderLocationOptions();
             html += `</div>`;
             
         } else if (status === 'PENDING') {
+            const displayAmount = amount && amount > 0 ? `${currency} ${amount.toFixed(2)}` : 'A confirmar';
+            const cleanName = cleanProductName;
             html = `
                 <div class="confirmation-pending">
                     <div class="confirmation-header">
                         <div class="pending-icon">⏳</div>
-                        <h3>⏰ Reserva Pendente</h3>
+                        <div class="header-text">
+                            <h3>Reserva Pendente</h3>
+                            <span class="status-badge">Em análise</span>
                         <p class="confirmation-subtitle">Aguardando confirmação do fornecedor</p>
                     </div>
-                    
+                    </div>
+                    <div class="progress-steps">
+                        <div class="progress-step completed"><span class="step-dot"></span><span class="step-label">Pedido recebido</span></div>
+                        <div class="progress-line"></div>
+                        <div class="progress-step active"><span class="step-dot"></span><span class="step-label">Análise do fornecedor</span></div>
+                        <div class="progress-line"></div>
+                        <div class="progress-step"><span class="step-dot"></span><span class="step-label">Confirmação</span></div>
+                    </div>
                     <div class="booking-details-card">
                         <div class="detail-row">
                             <span class="detail-label">📋 Referência da Reserva:</span>
                             <span class="detail-value booking-ref">${bookingRef}</span>
+                            <button id="copy-booking-ref-btn" class="mini-btn" title="Copiar">Copiar</button>
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">🎯 Experiência:</span>
-                            <span class="detail-value">${productName}</span>
+                            <span class="detail-value">${cleanName}</span>
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">📅 Data da Viagem:</span>
                             <span class="detail-value">${this.formatDate(travelDate)}</span>
                         </div>
                         <div class="detail-row">
-                            <span class="detail-label">💳 Status do Pagamento:</span>
+                            <span class="detail-label">💰 Valor Total:</span>
+                            <span class="detail-value">${displayAmount}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">💳 Pagamento:</span>
                             <span class="detail-value">Pré-autorizado (não cobrado ainda)</span>
                         </div>
                     </div>
-                    
-                    <div class="pending-info">
-                        <h4>Informações Importantes:</h4>
+                    <div class="pending-info next-steps-card">
+                        <h4>Próximos passos</h4>
                         <ul>
                             <li>⏱️ A confirmação pode levar até <strong>48 horas</strong></li>
-                            <li>💳 Seu cartão foi apenas <strong>pré-autorizado</strong>, não cobrado</li>
                             <li>📧 Você receberá um email assim que o status for atualizado</li>
                             <li>✅ A cobrança só será efetivada após a confirmação</li>
                         </ul>
+                    </div>
+                    <div class="actions-card">
+                        <h4>Ações rápidas</h4>
+                        <div class="actions-grid">
+                            <div class="action-item">
+                                <div class="action-icon">🖨️</div>
+                                <div class="action-content">
+                                    <h4>Imprimir resumo</h4>
+                                    <p>Salve ou imprima os detalhes da sua reserva</p>
+                                    <button id="print-confirmation-btn" class="action-btn">Imprimir</button>
+                                </div>
+                            </div>
+                            <div class="action-item">
+                                <div class="action-icon">🔗</div>
+                                <div class="action-content">
+                                    <h4>Copiar referência</h4>
+                                    <p>Use a referência em qualquer contato conosco</p>
+                                    <button id="copy-booking-ref-btn-2" class="action-btn secondary-btn">Copiar</button>
+                                </div>
+                            </div>
+                            <div class="action-item">
+                                <div class="action-icon">🏠</div>
+                                <div class="action-content">
+                                    <h4>Voltar ao início</h4>
+                                    <p>Continuar navegando pelo site</p>
+                                    <button id="back-home-btn" class="action-btn contact-btn">Voltar</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             `;
@@ -12467,6 +12609,27 @@ this.renderLocationOptions();
 
         // Adicionar CSS específico para a tela de confirmação
         this.addConfirmationStyles();
+
+        // Ações rápidas (PENDING)
+        try {
+            const copyRef = () => {
+                if (!bookingRef) return;
+                if (navigator.clipboard?.writeText) {
+                    navigator.clipboard.writeText(bookingRef).then(() => console.log('📋 Referência copiada'));
+                } else {
+                    const tmp = document.createElement('input');
+                    tmp.value = bookingRef;
+                    document.body.appendChild(tmp);
+                    tmp.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(tmp);
+                }
+            };
+            container.querySelector('#copy-booking-ref-btn')?.addEventListener('click', copyRef);
+            container.querySelector('#copy-booking-ref-btn-2')?.addEventListener('click', copyRef);
+            container.querySelector('#print-confirmation-btn')?.addEventListener('click', () => window.print());
+            container.querySelector('#back-home-btn')?.addEventListener('click', () => { window.location.href = window.location.origin || '/'; });
+        } catch(_) {}
 
         // Scroll para o topo da confirmação
         container.scrollIntoView({ behavior: 'smooth', block: 'start' });
