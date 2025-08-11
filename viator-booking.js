@@ -7687,7 +7687,7 @@ this.renderLocationOptions();
                 <div class="pickup-option-wrapper">
                     <input type="radio" id="${questionId}_choose_location" name="${questionId}" value="CHOOSE_FROM_LIST">
                     <label for="${questionId}_choose_location" class="pickup-option-label">
-                        <div class="pickup-option-title">🏨 Escolher de uma lista</div>
+                        <div class="pickup-option-title">🏨 Gostaria que me buscassem</div>
                         <div class="pickup-option-description" id="${questionId}_choose_desc">Selecionar hotel, aeroporto ou ponto turístico</div>
                     </label>
                     <div id="${questionId}_chosen_preview" class="pickup-chosen-preview" style="display:none; margin:8px 0 0 32px; font-size: 0.95em; color:#333;"></div>
@@ -12429,69 +12429,104 @@ this.renderLocationOptions();
             const cleanName = cleanProductName;
             html = `
                 <div class="confirmation-pending">
-                    <div class="confirmation-header">
-                        <div class="pending-icon">⏳</div>
-                        <div class="header-text">
-                            <h3>Reserva Pendente</h3>
-                            <span class="status-badge">Em análise</span>
-                        <p class="confirmation-subtitle">Aguardando confirmação do fornecedor</p>
-                    </div>
-                    </div>
-                    <div class="progress-steps">
-                        <div class="progress-step completed"><span class="step-dot"></span><span class="step-label">Pedido recebido</span></div>
-                        <div class="progress-line"></div>
-                        <div class="progress-step active"><span class="step-dot"></span><span class="step-label">Análise do fornecedor</span></div>
-                        <div class="progress-line"></div>
-                        <div class="progress-step"><span class="step-dot"></span><span class="step-label">Confirmação</span></div>
-                    </div>
-                    <div class="booking-details-card">
-                        <div class="detail-row">
-                            <span class="detail-label">📋 Referência da Reserva:</span>
-                            <span class="detail-value booking-ref">${bookingRef}</span>
-                            <button id="copy-booking-ref-btn" class="mini-btn" title="Copiar">Copiar</button>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">🎯 Experiência:</span>
-                            <span class="detail-value">${cleanName}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">📅 Data da Viagem:</span>
-                            <span class="detail-value">${this.formatDate(travelDate)}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">💰 Valor Total:</span>
-                            <span class="detail-value">${displayAmount}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">💳 Pagamento:</span>
-                            <span class="detail-value">Pré-autorizado (não cobrado ainda)</span>
-                        </div>
-                    </div>
-                    <div class="pending-info next-steps-card">
-                        <h4>Próximos passos</h4>
-                        <ul>
-                            <li>⏱️ A confirmação pode levar até <strong>48 horas</strong></li>
-                            <li>📧 Você receberá um email assim que o status for atualizado</li>
-                            <li>✅ A cobrança só será efetivada após a confirmação</li>
-                        </ul>
-                    </div>
-                    <div class="actions-card">
-                        <h4>Ações rápidas</h4>
-                        <div class="actions-grid">
-                            <div class="action-item">
-                                <div class="action-icon">🖨️</div>
-                                <div class="action-content">
-                                    <h4>Imprimir resumo</h4>
-                                    <p>Salve ou imprima os detalhes da sua reserva</p>
-                                    <button id="print-confirmation-btn" class="action-btn">Imprimir</button>
+                    <div class="pending-hero">
+                        <div class="pending-animation">
+                            <div class="pending-circle">
+                                <div class="pending-icon">
+                                    <svg viewBox="0 0 52 52" class="pending-clock">
+                                        <circle class="clock-circle" cx="26" cy="26" r="25" fill="none"/>
+                                        <path class="clock-hand hour-hand" d="M26 26 L26 18" stroke-linecap="round"/>
+                                        <path class="clock-hand minute-hand" d="M26 26 L30 14" stroke-linecap="round"/>
+                                    </svg>
                                 </div>
                             </div>
+                        </div>
+                        <div class="pending-content">
+                            <h1 class="pending-title">Reserva Pendente</h1>
+                            <p class="pending-subtitle">Aguardando confirmação do fornecedor</p>
+                            <div class="booking-ref-highlight">
+                                <span class="ref-label">Referência da Reserva</span>
+                                <div class="ref-value-container">
+                                    <span class="ref-value">${bookingRef}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Resumo da Reserva -->
+                    <div class="booking-summary-card">
+                        <h3>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M8 2v4"></path>
+                                <path d="M16 2v4"></path>
+                                <rect x="3" y="4" width="18" height="18" rx="2"></rect>
+                                <path d="M3 10h18"></path>
+                            </svg>
+                            Resumo da Reserva
+                        </h3>
+                        <div class="summary-grid">
+                            <div class="summary-item">
+                                <span class="summary-label">🎯 Experiência:</span>
+                                <span class="summary-value">${cleanName}</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">📅 Data da Viagem:</span>
+                                <span class="summary-value">${this.formatDate(travelDate)}</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">💰 Valor Total:</span>
+                                <span class="summary-value">${displayAmount}</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">💳 Pagamento:</span>
+                                <span class="summary-value payment-status">Pré-autorizado (não cobrado ainda)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Próximos Passos -->
+                    <div class="next-steps-card">
+                        <h3>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="12,6 12,12 16,14"></polyline>
+                            </svg>
+                            Próximos passos
+                        </h3>
+                        <div class="steps-grid">
+                            <div class="step-item">
+                                <div class="step-icon">⏰</div>
+                                <div class="step-content">
+                                    <h4>A confirmação pode levar até 48 horas</h4>
+                                    <p>O fornecedor está analisando sua solicitação</p>
+                                </div>
+                            </div>
+                            <div class="step-item">
+                                <div class="step-icon">📧</div>
+                                <div class="step-content">
+                                    <h4>Você receberá um email assim que o status for atualizado</h4>
+                                    <p>Fique atento à sua caixa de entrada</p>
+                                </div>
+                            </div>
+                            <div class="step-item">
+                                <div class="step-icon">✅</div>
+                                <div class="step-content">
+                                    <h4>A cobrança só será efetivada após a confirmação</h4>
+                                    <p>Seu cartão foi apenas pré-autorizado</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ações Rápidas -->
+                    <div class="actions-card">
+                        <div class="actions-grid">
                             <div class="action-item">
-                                <div class="action-icon">🔗</div>
+                                <div class="action-icon">📋</div>
                                 <div class="action-content">
                                     <h4>Copiar referência</h4>
-                                    <p>Use a referência em qualquer contato conosco</p>
-                                    <button id="copy-booking-ref-btn-2" class="action-btn secondary-btn">Copiar</button>
+                                    <p>Use a referência em qualquer contato</p>
+                                    <button id="copy-ref-pending-btn" class="action-btn secondary-btn">Copiar código</button>
                                 </div>
                             </div>
                             <div class="action-item">
@@ -12499,7 +12534,7 @@ this.renderLocationOptions();
                                 <div class="action-content">
                                     <h4>Voltar ao início</h4>
                                     <p>Continuar navegando pelo site</p>
-                                    <button id="back-home-btn" class="action-btn contact-btn">Voltar</button>
+                                    <button class="action-btn contact-btn" onclick="window.location.href='/'">Ir para a página inicial</button>
                                 </div>
                             </div>
                         </div>
@@ -12612,10 +12647,29 @@ this.renderLocationOptions();
 
         // Ações rápidas (PENDING)
         try {
-            const copyRef = () => {
+            const copyRef = (ev) => {
                 if (!bookingRef) return;
+                const btn = ev?.currentTarget || container.querySelector('#copy-ref-pending-btn');
+                const setCopiedLabel = () => {
+                    if (btn) btn.textContent = 'Copiado!';
+                };
                 if (navigator.clipboard?.writeText) {
-                    navigator.clipboard.writeText(bookingRef).then(() => console.log('📋 Referência copiada'));
+                    navigator.clipboard
+                        .writeText(bookingRef)
+                        .then(() => {
+                            console.log('📋 Referência copiada');
+                            setCopiedLabel();
+                        })
+                        .catch(() => {
+                            // Fallback caso a API falhe
+                            const tmp = document.createElement('input');
+                            tmp.value = bookingRef;
+                            document.body.appendChild(tmp);
+                            tmp.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(tmp);
+                            setCopiedLabel();
+                        });
                 } else {
                     const tmp = document.createElement('input');
                     tmp.value = bookingRef;
@@ -12623,10 +12677,15 @@ this.renderLocationOptions();
                     tmp.select();
                     document.execCommand('copy');
                     document.body.removeChild(tmp);
+                    setCopiedLabel();
                 }
             };
             container.querySelector('#copy-booking-ref-btn')?.addEventListener('click', copyRef);
             container.querySelector('#copy-booking-ref-btn-2')?.addEventListener('click', copyRef);
+            const pendingCopyBtn = container.querySelector('#copy-ref-pending-btn');
+            if (pendingCopyBtn) {
+                pendingCopyBtn.addEventListener('click', copyRef);
+            }
             container.querySelector('#print-confirmation-btn')?.addEventListener('click', () => window.print());
             container.querySelector('#back-home-btn')?.addEventListener('click', () => { window.location.href = window.location.origin || '/'; });
         } catch(_) {}
@@ -12738,16 +12797,49 @@ this.renderLocationOptions();
                 overflow: hidden;
             }
 
+            /* Hero Section - Pendente */
+            .pending-hero {
+                background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+                color: var(--primary-foreground);
+                padding: 2.5rem 1.5rem;
+                text-align: center;
+                position: relative;
+                overflow: hidden;
+            }
+
             .viator-modal-body .success-hero {
                 padding: 2rem 1rem;
                 border-radius: 10px;
             }
 
-            .success-animation {
+            .viator-modal-body .pending-hero {
+                padding: 2rem 1rem;
+                border-radius: 10px;
+            }
+
+            .success-animation, .pending-animation {
                 margin-bottom: 1.5rem;
             }
 
-            .success-circle {
+            /* Centralização do bloco de próximos passos */
+            .next-steps-card h3 {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                margin-bottom: 0.25rem;
+            }
+
+            /* Alinhar ao centro apenas na tela Pendente */
+            .confirmation-pending .next-steps-card .steps-grid {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 1rem;
+                padding: 1rem 1.25rem;
+                justify-items: center;
+            }
+
+            .success-circle, .pending-circle {
                 width: 80px;
                 height: 80px;
                 margin: 0 auto;
@@ -12781,13 +12873,65 @@ this.renderLocationOptions();
                 animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
             }
 
-            .success-title {
+            /* Animação do relógio para reserva pendente */
+            .pending-clock {
+                width: 80px;
+                height: 80px;
+                border-radius: 50%;
+                display: block;
+                stroke-width: 3;
+                stroke: var(--primary-foreground);
+                stroke-miterlimit: 10;
+                animation: pendingPulse 2.4s ease-in-out infinite;
+            }
+
+            .clock-circle {
+                stroke-dasharray: 166;
+                stroke-dashoffset: 166;
+                stroke-width: 3;
+                stroke: var(--primary-foreground);
+                fill: none;
+                animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+            }
+
+            .clock-hand {
+                stroke: var(--primary-foreground);
+                stroke-width: 3;
+                stroke-linecap: round;
+            }
+
+            .hour-hand {
+                transform-origin: 26px 26px;
+                animation: rotateHour 6s linear infinite;
+            }
+
+            .minute-hand {
+                transform-origin: 26px 26px;
+                animation: rotateMinute 3s linear infinite;
+            }
+
+            @keyframes pendingPulse {
+                0%, 100% { opacity: 1; transform: scale(1); }
+                50% { opacity: 0.7; transform: scale(1.05); }
+            }
+
+            @keyframes rotateHour {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+            }
+
+            @keyframes rotateMinute {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+            }
+
+            .success-title, .pending-title {
                 font-size: 1.8rem;
                 font-weight: 700;
                 margin: 0 0 0.5rem 0;
             }
 
-            .success-subtitle {
+            .success-subtitle, .pending-subtitle {
                 font-size: 1rem;
                 margin: 0 0 1.5rem 0;
                 opacity: 0.9;
@@ -12825,6 +12969,7 @@ this.renderLocationOptions();
                 box-shadow: var(--shadow-md, 0px 2px 4px -1px rgba(0,0,0,0.1));
                 border: 1px solid var(--border);
                 overflow: hidden;
+                padding: 1.25rem 1.5rem; /* padding melhorado */
             }
 
             .card-header {
@@ -13034,9 +13179,9 @@ this.renderLocationOptions();
             .actions-grid {
                 padding: 1.5rem;
                 display: grid;
-                grid-template-columns: 1fr;
-                gap: 1.5rem;
-                max-width: 600px;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 1.25rem;
+                max-width: 720px;
                 margin: 0 auto;
                 width: 100%;
             }
@@ -13045,7 +13190,7 @@ this.renderLocationOptions();
                 display: flex;
                 align-items: center;
                 gap: 1rem;
-                padding: 1.5rem;
+                padding: 1.25rem 1.5rem;
                 background: var(--background);
                 border: 1px solid var(--border);
                 border-radius: var(--radius-md, 1rem);
@@ -13213,16 +13358,12 @@ this.renderLocationOptions();
 
             /* Responsividade para mobile */
             @media (max-width: 768px) {
-                .success-hero, .error-hero {
+                .success-hero, .pending-hero, .error-hero {
                     padding: 40px 20px;
                 }
 
-                .success-title, .error-title {
+                .success-title, .pending-title, .error-title {
                     font-size: 2rem;
-                }
-
-                .booking-summary-card, .next-steps-card, .error-details-card, .error-actions-card {
-                    margin: 20px 15px;
                 }
 
                 .steps-grid, .actions-grid {

@@ -3218,11 +3218,7 @@ body.viator-modal-open {
 }
 
 /* Responsividade para Confirmação */
-@media (max-width: 768px) {
-    .confirmation-message {
-        padding: 0 10px;
-    }
-    
+@media (max-width: 768px) {  
     .confirmation-status {
         padding: 20px 15px;
         margin-bottom: 20px;
