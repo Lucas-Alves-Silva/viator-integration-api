@@ -7363,32 +7363,43 @@ this.renderLocationOptions();
                 } else if (question.allowedAnswers && question.allowedAnswers.length > 0) {
                     // Verificar se é uma pergunta de faixa etária (AGEBAND)
                     const isAgeBand = question.id === 'AGEBAND' || questionId.includes('AGEBAND');
-                    
+
                     html += `<select id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr}>`;
                     html += '<option value="">Selecione uma opção</option>';
-                    
-                    question.allowedAnswers.forEach(answer => {
-                        let displayText = answer;
-                        
-                        // Aplicar traduções para faixas etárias
-                        if (isAgeBand) {
-                            const ageBandTranslations = {
-                                'ADULT': 'Adulto (18+ anos)',
-                                'CHILD': 'Criança (2-17 anos)',
-                                'INFANT': 'Bebê (0-1 anos)',
-                                'SENIOR': 'Idoso (65+ anos)',
-                                'YOUTH': 'Jovem (12-17 anos)',
-                                'TODDLER': 'Criança pequena (2-4 anos)',
-                                'STUDENT': 'Estudante',
-                                'MILITARY': 'Militar',
-                                'TRAVELER': 'Viajante'
-                            };
-                            displayText = ageBandTranslations[answer] || answer;
+
+                    // Filtro: manter somente faixas etárias disponíveis no produto e selecionadas na Etapa 1
+                    let filteredAnswers = question.allowedAnswers;
+                    if (isAgeBand) {
+                        const availableBands = Array.isArray(this.ageBands) ? new Set(this.ageBands.map(b => b.ageBand)) : new Set();
+                        const selectedBands = Array.isArray(this.bookingData.selectedTravelers) ? new Set(this.bookingData.selectedTravelers.map(t => t.ageBand)) : new Set();
+                        filteredAnswers = (question.allowedAnswers || []).filter(a => availableBands.has(a) && selectedBands.has(a));
+                    }
+
+                    // Pré-selecionar automaticamente conforme a distribuição escolhida na Etapa 1
+                    let preselectValue = null;
+                    if (isAgeBand && isTraveler) {
+                        if (!Array.isArray(this.bookingData.travelerAgeBandAllocation) || this.bookingData.travelerAgeBandAllocation.length === 0) {
+                            const allocation = [];
+                            (this.bookingData.selectedTravelers || []).forEach(group => {
+                                const count = Number(group.numberOfTravelers) || 0;
+                                for (let i = 0; i < count; i++) allocation.push(group.ageBand);
+                            });
+                            this.bookingData.travelerAgeBandAllocation = allocation;
                         }
-                        
-                        html += `<option value="${answer}">${displayText}</option>`;
+                        preselectValue = this.bookingData.travelerAgeBandAllocation?.[Number(travelerIndex) - 1] || null;
+                    }
+
+                    filteredAnswers.forEach(answer => {
+                        // Usar label do produto quando disponível
+                        let displayText = answer;
+                        if (isAgeBand) {
+                            const band = Array.isArray(this.ageBands) ? this.ageBands.find(b => b.ageBand === answer) : null;
+                            displayText = band?.label || this.getAgeBandDisplayName?.(answer) || answer;
+                        }
+                        const selectedAttr = preselectValue && preselectValue === answer ? ' selected' : '';
+                        html += `<option value="${answer}"${selectedAttr}>${displayText}</option>`;
                     });
-                    
+
                     html += '</select>';
                 } else {
                     // Placeholder específico para requisitos especiais ou usar hint
@@ -10239,7 +10250,7 @@ this.renderLocationOptions();
         const travelerQuestions = document.querySelectorAll('#traveler-booking-questions-inner [required]');
         travelerQuestions.forEach(field => {
             if (!field.value || field.value.trim() === '') {
-                const label = field.closest('.form-group')?.querySelector('label')?.textContent || field.id;
+                const label = field.closest('.form-group, .booking-question-group')?.querySelector('label')?.textContent || field.id;
                 missingQuestions.push(`• ${label.replace('*', '').trim()}`);
             }
         });
@@ -10894,6 +10905,28 @@ this.renderLocationOptions();
 
         // Coletar dados detalhados dos viajantes
         this.collectDetailedTravelersData();
+
+        // Validação inteligente: cada viajante deve ter uma Faixa Etária compatível
+        try {
+            const totalTravelers = this.getTotalTravelersCount();
+            const ageSelectors = document.querySelectorAll('#traveler-booking-questions-inner select[data-question-id="AGEBAND"]');
+            if (ageSelectors.length > 0 && ageSelectors.length !== totalTravelers) {
+                this.showDateError('Atenção: todos os viajantes precisam ter uma faixa etária definida.');
+                return false;
+            }
+            // Validar se os valores escolhidos pertencem às faixas permitidas (Etapa 1)
+            const allowed = new Set((this.bookingData.selectedTravelers || []).map(t => t.ageBand));
+            for (const sel of ageSelectors) {
+                const val = sel.value.trim();
+                if (!val || !allowed.has(val)) {
+                    this.showDateError('Selecione faixas etárias apenas entre as disponíveis escolhidas na Etapa 1.');
+                    sel.focus();
+                    return false;
+                }
+            }
+        } catch (e) {
+            console.warn('⚠️ [VALIDATE] Falha na validação inteligente de age bands:', e);
+        }
 
         console.log('✅ [VALIDATE] Dados detalhados dos viajantes coletados:', this.bookingData.travelersDetails);
 
@@ -13580,6 +13613,22 @@ this.renderLocationOptions();
             if (!this.bookingData.selectedTravelers) {
                 errors.push('Dados de viajantes não coletados');
             }
+            // Verificar consistência entre seleção da Etapa 1 e faixas etárias atribuídas aos viajantes
+            try {
+                const allocation = this.bookingData.travelerAgeBandAllocation || [];
+                const expected = [];
+                (this.bookingData.selectedTravelers || []).forEach(group => {
+                    const count = Number(group.numberOfTravelers) || 0;
+                    for (let i = 0; i < count; i++) expected.push(group.ageBand);
+                });
+                if (allocation.length > 0 && expected.length > 0) {
+                    const allocSorted = [...allocation].sort();
+                    const expSorted = [...expected].sort();
+                    if (allocSorted.join(',') !== expSorted.join(',')) {
+                        errors.push('Distribuição de faixas etárias inconsistente com a Etapa 1');
+                    }
+                }
+            } catch (_) {}
         }
 
         // Validações para Step 4+ (antes do pagamento)
