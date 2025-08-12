@@ -4481,7 +4481,7 @@ this.renderLocationOptions();
         // Validação básica de campo obrigatório
         if (isRequired && !value) {
             isValid = false;
-            errorMessage = 'Este campo é obrigatório';
+            errorMessage = 'Obrigatório';
         }
 
         // Validações específicas por tipo de campo
@@ -10871,18 +10871,27 @@ this.renderLocationOptions();
 
         if (!bookerFirstname?.value.trim()) {
             this.showDateError('Por favor, informe o nome do responsável pela reserva.');
+            bookerFirstname?.classList.add('is-invalid');
+            const e = document.getElementById('error_booker-firstname');
+            if (e) { e.textContent = 'Obrigatório.'; e.style.display = 'block'; e.classList.add('show'); }
             bookerFirstname?.focus();
             return false;
         }
 
         if (!bookerLastname?.value.trim()) {
             this.showDateError('Por favor, informe o sobrenome do responsável pela reserva.');
+            bookerLastname?.classList.add('is-invalid');
+            const e = document.getElementById('error_booker-lastname');
+            if (e) { e.textContent = 'Obrigatório.'; e.style.display = 'block'; e.classList.add('show'); }
             bookerLastname?.focus();
             return false;
         }
 
         if (!bookerEmail?.value.trim()) {
             this.showDateError('Por favor, informe o email do responsável pela reserva.');
+            bookerEmail?.classList.add('is-invalid');
+            const e = document.getElementById('error_booker-email');
+            if (e) { e.textContent = 'Obrigatório.'; e.style.display = 'block'; e.classList.add('show'); }
             bookerEmail?.focus();
             return false;
         }
@@ -10891,12 +10900,18 @@ this.renderLocationOptions();
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(bookerEmail.value.trim())) {
             this.showDateError('Por favor, informe um email válido.');
+            bookerEmail?.classList.add('is-invalid');
+            const e = document.getElementById('error_booker-email');
+            if (e) { e.textContent = 'Email inválido.'; e.style.display = 'block'; e.classList.add('show'); }
             bookerEmail?.focus();
             return false;
         }
 
         if (!bookerPhone?.value.trim()) {
             this.showDateError('Por favor, informe o telefone do responsável pela reserva.');
+            bookerPhone?.classList.add('is-invalid');
+            const e = document.getElementById('error_booker-phone');
+            if (e) { e.textContent = 'Obrigatório.'; e.style.display = 'block'; e.classList.add('show'); }
             bookerPhone?.focus();
             return false;
         }
@@ -10926,6 +10941,13 @@ this.renderLocationOptions();
             ];
             const missing = requiredBookerFields.filter(el => !el || !el.value || !el.value.trim());
             if (missing.length > 0) {
+                // Marcar campos com erro visual
+                missing.forEach((el) => {
+                    if (!el) return;
+                    el.classList.add('is-invalid');
+                    const err = document.getElementById(`error_${el.id}`);
+                    if (err) { err.textContent = 'Obrigatório.'; err.style.display = 'block'; err.classList.add('show'); }
+                });
                 this.showDateError('Por favor, preencha os dados obrigatórios do responsável pela reserva antes de continuar.');
                 (missing[0] && missing[0].focus && missing[0].focus());
                 return false;
@@ -10944,6 +10966,34 @@ this.renderLocationOptions();
                 if (!val || !allowed.has(val)) {
                     this.showDateError('Selecione faixas etárias apenas entre as disponíveis escolhidas na Etapa 1.');
                     sel.focus();
+                    return false;
+                }
+            }
+
+            // Validar todos os campos obrigatórios por viajante (nome, sobrenome, altura, etc.)
+            const travelerContainer = document.getElementById('traveler-booking-questions-inner');
+            if (travelerContainer) {
+                const requiredFields = travelerContainer.querySelectorAll('[required]');
+                const missingTravelerFields = [];
+                requiredFields.forEach((field) => {
+                    const value = (field.value || '').trim();
+                    if (!value) {
+                        missingTravelerFields.push(field);
+                        field.classList.add('is-invalid');
+                        const err = document.getElementById(`error_${field.id}`);
+                        if (err) { err.textContent = 'Obrigatório.'; err.style.display = 'block'; err.classList.add('show'); }
+                    } else {
+                        field.classList.remove('is-invalid');
+                        const err = document.getElementById(`error_${field.id}`);
+                        if (err) { err.style.display = 'none'; err.classList.remove('show'); }
+                    }
+                });
+                if (missingTravelerFields.length > 0) {
+                    const firstMissing = missingTravelerFields[0];
+                    const firstLabel = firstMissing.closest('.form-group, .booking-question-group')?.querySelector('label')?.textContent || firstMissing.id;
+                    this.showDateError(`Por favor, preencha os campos obrigatórios dos viajantes. Ex.: ${firstLabel.replace('*','').trim()}`);
+                    firstMissing.focus();
+                    firstMissing.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     return false;
                 }
             }
@@ -14574,36 +14624,56 @@ this.renderLocationOptions();
             return;
         }
 
-        // 2. Se não encontrou o elemento original, exibir na etapa 5 (Confirmação)
-        console.log('📍 Elemento date-error-message não encontrado, exibindo na etapa 5 (Confirmação)');
-
-        // Navegar para a etapa 5 se não estiver nela
+        // 2. Exibir erro no topo da etapa ATUAL (sem navegar)
         const currentStep = this.currentStep || 1;
-        if (currentStep !== 5) {
-            console.log('🔄 Navegando para etapa 5 para exibir erro');
-            this.showStep(5);
+        const stepContainer = document.querySelector('#booking-step-content .booking-step');
+
+        // Criar/usar um contêiner genérico de erro por etapa
+        let stepErrorEl = stepContainer ? stepContainer.querySelector('#step-error-message') : null;
+        if (!stepErrorEl && stepContainer) {
+            stepErrorEl = document.createElement('div');
+            stepErrorEl.id = 'step-error-message';
+            stepErrorEl.className = type === 'warning' ? 'warning-message' : 'error-message';
+            stepContainer.insertBefore(stepErrorEl, stepContainer.firstChild);
         }
 
-        // Exibir erro na etapa 5 usando displayConfirmationMessage
-        const errorData = {
-            success: false,
-            error: true,
-            message: finalMessage,
-            type: type,
-            trackingId: trackingId || this.extractTrackingIdFromMessage(finalMessage)
-        };
+        if (stepErrorEl) {
+            stepErrorEl.textContent = finalMessage;
+            stepErrorEl.style.display = 'block';
+            stepErrorEl.className = type === 'warning' ? 'warning-message' : 'error-message';
 
-        // Usar a função de confirmação para exibir o erro
-        this.displayConfirmationMessage(errorData);
+            // Scroll para o topo da área da modal para garantir visibilidade
+            const modalBody = document.querySelector('.viator-modal-body');
+            if (modalBody) {
+                modalBody.scrollTop = 0;
+            } else {
+                stepErrorEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+
+            // Focar no primeiro campo inválido se existir
+            const firstInvalid = document.querySelector('#booking-step-content .is-invalid, #booking-step-content [required]:invalid, #booking-step-content .question-input.is-invalid');
+            if (firstInvalid && typeof firstInvalid.focus === 'function') {
+                setTimeout(() => firstInvalid.focus(), 0);
+            }
+
+            // Auto-hide para avisos
+            if (type === 'warning') {
+                setTimeout(() => {
+                    if (stepErrorEl) {
+                        stepErrorEl.style.display = 'none';
+                        stepErrorEl.textContent = '';
+                    }
+                }, 5000);
+            }
+        }
 
         this.debugLog(`User message displayed (${type}) - Message: ${finalMessage}`, {
             message: finalMessage,
             type: type,
-            elementFound: true,
-            location: 'confirmation-step',
-            navigatedToStep5: currentStep !== 5,
-            isSpecificError: isSpecificApiError,
-            errorData: errorData
+            elementFound: Boolean(stepErrorEl),
+            location: 'current-step',
+            navigatedToStep5: false,
+            isSpecificError: isSpecificApiError
         });
     }
 
