@@ -6381,9 +6381,9 @@ this.renderLocationOptions();
         
         console.log('🚗 Validando PICKUP_POINT para arrivalMode:', arrivalMode);
         
-        // PICKUP_POINT é obrigatório quando arrivalMode exige coleta
-        // Usar validação mais rígida: quando arrivalMode é OTHER, AIR, RAIL, SEA, exigir PICKUP_POINT
-        const arrivalModesRequiringPickup = ['OTHER', 'AIR', 'RAIL', 'SEA', 'HOTEL_PICKUP', 'CENTRAL_MEETING_POINT'];
+        // PICKUP_POINT obrigatório apenas quando o produto exigir explicitamente (não for CONTACT_SUPPLIER_LATER)
+        // Respeitar CONTACT_SUPPLIER_LATER quando oferecido pelo produto
+        const arrivalModesRequiringPickup = [];
         if (arrivalModesRequiringPickup.includes(arrivalMode)) {
             let pickupValue = pickupPointInput.value ? pickupPointInput.value.trim() : '';
             // Buscar freetext específico do componente simplificado
@@ -6391,10 +6391,7 @@ this.renderLocationOptions();
             const freetextInput = document.getElementById(`${baseId}_freetext`) || document.querySelector('[id*="PICKUP_POINT"][id*="_freetext"]');
             const freetextValue = freetextInput && freetextInput.value ? freetextInput.value.trim() : '';
 
-            // CONTACT_SUPPLIER_LATER não atende quando arrivalMode exige endereço
-            if (pickupValue === 'CONTACT_SUPPLIER_LATER') {
-                pickupValue = '';
-            }
+            // Não invalidar CONTACT_SUPPLIER_LATER aqui – a decisão de ofertar é do produto
 
             if (!pickupValue && !freetextValue) {
                 this.showFieldError(pickupPointInput, 'Ponto de encontro é obrigatório para o modo de chegada selecionado');
@@ -6424,16 +6421,14 @@ this.renderLocationOptions();
         if (arrivalModeInput && arrivalModeInput.value) {
             arrivalMode = arrivalModeInput.value;
         }
-        const arrivalModesRequiringPickup = ['OTHER', 'AIR', 'RAIL', 'SEA', 'HOTEL_PICKUP', 'CENTRAL_MEETING_POINT'];
+        const arrivalModesRequiringPickup = [];
         if (arrivalModesRequiringPickup.includes(arrivalMode)) {
             let pickupValue = pickupPointInput.value ? pickupPointInput.value.trim() : '';
             const baseId = pickupPointInput.id || 'booking_question_PICKUP_POINT';
             const freetextInput = document.getElementById(`${baseId}_freetext`) || document.querySelector('[id*="PICKUP_POINT"][id*="_freetext"]');
             const freetextValue = freetextInput && freetextInput.value ? freetextInput.value.trim() : '';
 
-            if (pickupValue === 'CONTACT_SUPPLIER_LATER') {
-                pickupValue = '';
-            }
+            // CONTACT_SUPPLIER_LATER continua válido se o produto oferecer
 
             if (!pickupValue && !freetextValue) {
                 this.showFieldError(pickupPointInput, 'Ponto de encontro é obrigatório para o modo de chegada selecionado');
@@ -7363,7 +7358,7 @@ this.renderLocationOptions();
                 } else if (question.allowedAnswers && question.allowedAnswers.length > 0) {
                     // Verificar se é uma pergunta de faixa etária (AGEBAND)
                     const isAgeBand = question.id === 'AGEBAND' || questionId.includes('AGEBAND');
-
+                    
                     // Pré-selecionar automaticamente conforme a distribuição escolhida na Etapa 1
                     let preselectValue = null;
                     if (isAgeBand && isTraveler) {
@@ -7392,7 +7387,7 @@ this.renderLocationOptions();
 
                     html += `<select id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr} ${disabledAttr} ${isLockedAgeBand ? 'data-locked-ageband="true"' : ''}>`;
                     html += '<option value="">Selecione uma opção</option>';
-
+                    
                     // Se houver valor de alocação, eliminar as demais opções para este viajante
                     const finalAnswers = (isAgeBand && isTraveler && preselectValue)
                         ? [preselectValue]
@@ -7408,7 +7403,7 @@ this.renderLocationOptions();
                         const selectedAttr = preselectValue && preselectValue === answer ? ' selected' : '';
                         html += `<option value="${answer}"${selectedAttr}>${displayText}</option>`;
                     });
-
+                    
                     html += '</select>';
                 } else {
                     // Placeholder específico para requisitos especiais ou usar hint
@@ -7689,11 +7684,14 @@ this.renderLocationOptions();
             return html;
         }
         
-        // Interface principal com 3 opções claras (como Viator oficial)
+        // Interface principal com opções baseadas nos dados do produto (como Viator oficial)
         console.log(`📋 [PICKUP] Renderizando interface principal com ${pickupData.locations.length} locais disponíveis`);
+        const hasContactLater = Array.isArray(pickupData.locations) && pickupData.locations.some(l => l && l.location && l.location.ref === 'CONTACT_SUPPLIER_LATER');
+        const hasLocationRefs = Array.isArray(pickupData.locations) && pickupData.locations.some(l => (l && l.location && typeof l.location.ref === 'string' && l.location.ref.startsWith('LOC-')));
         
         html += `
             <div class="pickup-main-options">
+                ${hasContactLater ? `
                 <!-- Opção 1: Entrarei em contato depois -->
                 <div class="pickup-option-wrapper">
                     <input type="radio" id="${questionId}_contact_later" name="${questionId}" value="CONTACT_SUPPLIER_LATER">
@@ -7701,8 +7699,9 @@ this.renderLocationOptions();
                         <div class="pickup-option-title">📞 Entrarei em contato depois</div>
                         <div class="pickup-option-description">O fornecedor entrará em contato para confirmar o local de encontro</div>
                     </label>
-                </div>
+                </div>` : ''}
                 
+                ${hasLocationRefs ? `
                 <!-- Opção 2: Escolher de uma lista de locais -->
                 <div class="pickup-option-wrapper">
                     <input type="radio" id="${questionId}_choose_location" name="${questionId}" value="CHOOSE_FROM_LIST">
@@ -7711,7 +7710,7 @@ this.renderLocationOptions();
                         <div class="pickup-option-description" id="${questionId}_choose_desc">Selecionar hotel, aeroporto ou ponto turístico</div>
                     </label>
                     <div id="${questionId}_chosen_preview" class="pickup-chosen-preview" style="display:none; margin:8px 0 0 32px; font-size: 0.95em; color:#333;"></div>
-                </div>
+                </div>` : ''}
         `;
         
         if (allowCustomPickup) {
@@ -7729,18 +7728,20 @@ this.renderLocationOptions();
         
             html += `</div>`;
         
-        // Lista de locais: deve aparecer IMEDIATAMENTE após "Escolher de uma lista"
-        html += `
-            <div id="${questionId}_locations_list" class="pickup-locations-list" style="display: none; margin-top: 15px; padding: 15px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #f9f9f9;">
-                <div class="pickup-search-container">
-                    <input type="text" id="${questionId}_search" class="form-control pickup-search-input" 
-                           placeholder="🔍 Buscar hotel, aeroporto ou local..." autocomplete="off">
+        // Lista de locais: somente se houver LOC- disponíveis
+        if (hasLocationRefs) {
+            html += `
+                <div id="${questionId}_locations_list" class="pickup-locations-list" style="display: none; margin-top: 15px; padding: 15px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #f9f9f9;">
+                    <div class="pickup-search-container">
+                        <input type="text" id="${questionId}_search" class="form-control pickup-search-input" 
+                               placeholder="🔍 Buscar hotel, aeroporto ou local..." autocomplete="off">
+                    </div>
+                    <div id="${questionId}_locations_container" class="pickup-locations-container">
+                        <div class="loading-pickup-locations">⏳ Carregando locais... <span class="spinner"></span></div>
+                    </div>
                 </div>
-                <div id="${questionId}_locations_container" class="pickup-locations-container">
-                    <div class="loading-pickup-locations">⏳ Carregando locais... <span class="spinner"></span></div>
-                </div>
-            </div>
-        `;
+            `;
+        }
         
         if (allowCustomPickup) {
             // Campo de endereço customizado (inicialmente oculto)
@@ -7757,11 +7758,13 @@ this.renderLocationOptions();
         
         html += `</div>`;
         
-        // Carregar localizações em background
-        setTimeout(() => {
-            const groupedLocations = this.groupPickupLocationsByType(pickupData.locations);
-            this.loadPickupLocationDetails(pickupData.locations, questionId, groupedLocations);
-        }, 100);
+        // Carregar localizações em background, apenas se existirem LOC-
+        if (hasLocationRefs) {
+            setTimeout(() => {
+                const groupedLocations = this.groupPickupLocationsByType(pickupData.locations);
+                this.loadPickupLocationDetails(pickupData.locations, questionId, groupedLocations);
+            }, 100);
+        }
         
         // Anexar scripts simplificados
         setTimeout(() => {
@@ -7984,19 +7987,8 @@ this.renderLocationOptions();
             if (chooseLabel) chooseLabel.addEventListener('click', showList);
         }
 
-        // Ocultar "Entrarei em contato depois" quando arrival mode exigir endereço
-        const requiresPickup = () => {
-            const mode = arrivalModeInput && arrivalModeInput.value ? arrivalModeInput.value : 'OTHER';
-            return ['OTHER', 'AIR', 'RAIL', 'SEA'].includes(mode);
-        };
-        const applyContactLaterVisibility = () => {
-            if (contactLaterRadio) {
-                const wrapper = contactLaterRadio.closest('.pickup-option-wrapper');
-                if (wrapper) wrapper.style.display = requiresPickup() ? 'none' : '';
-            }
-        };
-        applyContactLaterVisibility();
-        if (arrivalModeInput) arrivalModeInput.addEventListener('change', applyContactLaterVisibility);
+        // Não ocultar "Entrarei em contato depois" por arrival mode.
+        // A presença/ausência dessa opção deve seguir os dados do produto (locations).
         
         // 2. Controlar exibição do campo customizado
         if (allowCustomPickup && customRadio && customInput) {
@@ -12558,7 +12550,7 @@ this.renderLocationOptions();
                             </div>
                         </div>
                     </div>
-
+                    
                     <!-- Resumo da Reserva -->
                     <div class="booking-summary-card">
                         <h3>
@@ -12574,22 +12566,22 @@ this.renderLocationOptions();
                             <div class="summary-item">
                                 <span class="summary-label">🎯 Experiência:</span>
                                 <span class="summary-value">${cleanName}</span>
-                            </div>
+                        </div>
                             <div class="summary-item">
                                 <span class="summary-label">📅 Data da Viagem:</span>
                                 <span class="summary-value">${this.formatDate(travelDate)}</span>
-                            </div>
+                        </div>
                             <div class="summary-item">
                                 <span class="summary-label">💰 Valor Total:</span>
                                 <span class="summary-value">${displayAmount}</span>
-                            </div>
+                        </div>
                             <div class="summary-item">
                                 <span class="summary-label">💳 Pagamento:</span>
                                 <span class="summary-value payment-status">Pré-autorizado (não cobrado ainda)</span>
                             </div>
                         </div>
                     </div>
-
+                    
                     <!-- Próximos Passos -->
                     <div class="next-steps-card">
                         <h3>
