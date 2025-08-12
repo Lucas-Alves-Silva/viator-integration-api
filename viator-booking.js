@@ -7364,17 +7364,6 @@ this.renderLocationOptions();
                     // Verificar se é uma pergunta de faixa etária (AGEBAND)
                     const isAgeBand = question.id === 'AGEBAND' || questionId.includes('AGEBAND');
 
-                    html += `<select id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr}>`;
-                    html += '<option value="">Selecione uma opção</option>';
-
-                    // Filtro: manter somente faixas etárias disponíveis no produto e selecionadas na Etapa 1
-                    let filteredAnswers = question.allowedAnswers;
-                    if (isAgeBand) {
-                        const availableBands = Array.isArray(this.ageBands) ? new Set(this.ageBands.map(b => b.ageBand)) : new Set();
-                        const selectedBands = Array.isArray(this.bookingData.selectedTravelers) ? new Set(this.bookingData.selectedTravelers.map(t => t.ageBand)) : new Set();
-                        filteredAnswers = (question.allowedAnswers || []).filter(a => availableBands.has(a) && selectedBands.has(a));
-                    }
-
                     // Pré-selecionar automaticamente conforme a distribuição escolhida na Etapa 1
                     let preselectValue = null;
                     if (isAgeBand && isTraveler) {
@@ -7389,7 +7378,27 @@ this.renderLocationOptions();
                         preselectValue = this.bookingData.travelerAgeBandAllocation?.[Number(travelerIndex) - 1] || null;
                     }
 
-                    filteredAnswers.forEach(answer => {
+                    // Filtro: manter somente faixas etárias disponíveis no produto e selecionadas na Etapa 1
+                    let filteredAnswers = question.allowedAnswers;
+                    if (isAgeBand) {
+                        const availableBands = Array.isArray(this.ageBands) ? new Set(this.ageBands.map(b => b.ageBand)) : new Set();
+                        const selectedBands = Array.isArray(this.bookingData.selectedTravelers) ? new Set(this.bookingData.selectedTravelers.map(t => t.ageBand)) : new Set();
+                        filteredAnswers = (question.allowedAnswers || []).filter(a => availableBands.has(a) && selectedBands.has(a));
+                    }
+
+                    // Se AGE BAND por viajante já foi alocado, travar o campo
+                    const isLockedAgeBand = Boolean(isAgeBand && isTraveler);
+                    const disabledAttr = (isLockedAgeBand && preselectValue) ? 'disabled' : '';
+
+                    html += `<select id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr} ${disabledAttr} ${isLockedAgeBand ? 'data-locked-ageband="true"' : ''}>`;
+                    html += '<option value="">Selecione uma opção</option>';
+
+                    // Se houver valor de alocação, eliminar as demais opções para este viajante
+                    const finalAnswers = (isAgeBand && isTraveler && preselectValue)
+                        ? [preselectValue]
+                        : filteredAnswers;
+
+                    finalAnswers.forEach(answer => {
                         // Usar label do produto quando disponível
                         let displayText = answer;
                         if (isAgeBand) {
@@ -10906,8 +10915,22 @@ this.renderLocationOptions();
         // Coletar dados detalhados dos viajantes
         this.collectDetailedTravelersData();
 
-        // Validação inteligente: cada viajante deve ter uma Faixa Etária compatível
+        // Validação inteligente: cada viajante deve ter uma Faixa Etária compatível e dados do responsável preenchidos
         try {
+            // Checar dados do responsável obrigatórios antes de prosseguir
+            const requiredBookerFields = [
+                document.getElementById('booker-firstname'),
+                document.getElementById('booker-lastname'),
+                document.getElementById('booker-email'),
+                document.getElementById('booker-phone')
+            ];
+            const missing = requiredBookerFields.filter(el => !el || !el.value || !el.value.trim());
+            if (missing.length > 0) {
+                this.showDateError('Por favor, preencha os dados obrigatórios do responsável pela reserva antes de continuar.');
+                (missing[0] && missing[0].focus && missing[0].focus());
+                return false;
+            }
+
             const totalTravelers = this.getTotalTravelersCount();
             const ageSelectors = document.querySelectorAll('#traveler-booking-questions-inner select[data-question-id="AGEBAND"]');
             if (ageSelectors.length > 0 && ageSelectors.length !== totalTravelers) {
@@ -10917,7 +10940,7 @@ this.renderLocationOptions();
             // Validar se os valores escolhidos pertencem às faixas permitidas (Etapa 1)
             const allowed = new Set((this.bookingData.selectedTravelers || []).map(t => t.ageBand));
             for (const sel of ageSelectors) {
-                const val = sel.value.trim();
+                const val = (sel.value || '').trim();
                 if (!val || !allowed.has(val)) {
                     this.showDateError('Selecione faixas etárias apenas entre as disponíveis escolhidas na Etapa 1.');
                     sel.focus();
