@@ -3753,6 +3753,7 @@ body.viator-modal-open {
 
 .error-message.show {
     display: block;
+    margin-bottom: 15px;
 }
 
 .booking-question-group .error-message {

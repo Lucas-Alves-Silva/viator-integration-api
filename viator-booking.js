@@ -1765,6 +1765,30 @@ class ViatorBookingManager {
         }
     }
     
+    /**
+     * Atualiza o estado do botão "Próximo" (Processar Pagamento) durante o processamento
+     */
+    setProcessingButtonState(isProcessing, text = 'Processando...') {
+        const nextBtn = document.getElementById('booking-next-btn');
+        if (!nextBtn) return;
+        if (isProcessing) {
+            if (!nextBtn.dataset.prevText) {
+                nextBtn.dataset.prevText = nextBtn.textContent || 'Processar Pagamento';
+            }
+            if (nextBtn.textContent !== text) {
+                nextBtn.textContent = text;
+            }
+            nextBtn.disabled = true;
+            nextBtn.setAttribute('aria-busy', 'true');
+        } else {
+            const prev = nextBtn.dataset.prevText || 'Processar Pagamento';
+            nextBtn.textContent = prev;
+            nextBtn.disabled = false;
+            nextBtn.removeAttribute('aria-busy');
+            delete nextBtn.dataset.prevText;
+        }
+    }
+    
     getAvailabilityStepHTML() {
         // Gerador dinâmico para os seletores de viajantes
         let travelersHTML = '';
@@ -1921,6 +1945,7 @@ class ViatorBookingManager {
         return `
             <div class="booking-step payment-step">
                 <h3>Informações de Pagamento</h3>
+                <div id="step-error-message" class="error-message" style="display:none;"></div>
 
                 <div class="traveler-summary-section payment-summary">
                     <h4>Resumo da Reserva</h4>
@@ -1941,7 +1966,7 @@ class ViatorBookingManager {
                             <div id="card-type-indicator" class="card-type-indicator" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 24px; display: none;"></div>
                         </div>
                         <small class="form-text">Digite apenas os números do cartão</small>
-                        <div id="card-number-error" class="field-error" style="display: none;"></div>
+                        <!-- Os erros por campo são gerados dinamicamente via showFieldError -->
                     </div>
 
                     <div class="form-row">
@@ -4962,7 +4987,7 @@ this.renderLocationOptions();
         const pickupHtml = this.renderPickupPointSection();
         if (pickupHtml) {
             html += '<div class="per-booking-section">';
-            html += '<h4>Informações Gerais da Reserva</h4>';
+            // Removido título "Informações Gerais da Reserva" conforme solicitado
             html += pickupHtml;
             html += '</div>';
         }
@@ -5779,26 +5804,45 @@ this.renderLocationOptions();
 
             const dynamicAnswers = this.collectDynamicBookingAnswers();
 
-            // NÃO sobrescrever respostas PER_TRAVELER persistidas da Etapa 2
+            // BUGFIX: Nunca perder respostas já coletadas (ex.: PICKUP_POINT) quando dynamicAnswers vier vazio
             const perTravelerIds = ['AGEBAND', 'FULL_NAMES_FIRST', 'FULL_NAMES_LAST', 'HEIGHT'];
             const existing = Array.isArray(this.bookingData.bookingQuestionAnswers) ? this.bookingData.bookingQuestionAnswers : [];
-            const perTravelerExisting = existing.filter(function(a){
-                const q = a.question || a.questionId;
-                return perTravelerIds.indexOf(q) !== -1 && (typeof a.travelerNum !== 'undefined');
+
+            // Mapa por (question, travelerNum|PB)
+            const keyOf = (ans) => {
+                const q = ans.question || ans.questionId || '';
+                const t = (typeof ans.travelerNum === 'undefined' && typeof ans.travelerIndex === 'undefined') ? 'PB' : String(ans.travelerNum ?? ans.travelerIndex);
+                return `${q}::${t}`;
+            };
+            const mergedMap = new Map();
+
+            // 1) Começar com existentes (preserva PER_BOOKING já coletadas)
+            existing.forEach((ans) => {
+                mergedMap.set(keyOf(ans), ans);
             });
 
-            // Mesclar garantindo no máximo 1 por (question, travelerNum)
-            const merged = dynamicAnswers.slice();
-            perTravelerExisting.forEach(function(ans){
-                const q = ans.question || ans.questionId;
-                const already = merged.find(function(x){
-                    const xq = x.question || x.questionId;
-                    return xq === q && x.travelerNum === ans.travelerNum;
-                });
-                if (!already) merged.push(ans);
+            // 2) Adicionar/atualizar com dynamicAnswers (apenas se houver valor)
+            dynamicAnswers.forEach((ans) => {
+                if (ans && (ans.answer ?? '') !== '') {
+                    mergedMap.set(keyOf(ans), ans);
+                }
             });
 
-            // Salvar mesclado
+            // 3) Garantir que PER_TRAVELER persistidas estejam presentes
+            const perTravelerExisting = existing.filter((a) => {
+                const q = a.question || a.questionId; 
+                return perTravelerIds.indexOf(q) !== -1 && (typeof a.travelerNum !== 'undefined' || typeof a.travelerIndex !== 'undefined');
+            });
+            perTravelerExisting.forEach((ans) => {
+                const k = keyOf(ans);
+                if (!mergedMap.has(k)) {
+                    mergedMap.set(k, ans);
+                }
+            });
+
+            // 4) Converter mapa em array final estável
+            const merged = Array.from(mergedMap.values());
+
             this.bookingData.bookingQuestionAnswers = merged;
 
             console.log('✅ Respostas dinâmicas coletadas (PER_BOOKING):', dynamicAnswers.length);
@@ -6369,42 +6413,30 @@ this.renderLocationOptions();
         const arrivalModeInput = document.querySelector('[id*="TRANSFER_ARRIVAL_MODE"]');
         // Usar especificamente o hidden principal do PICKUP_POINT
         const pickupPointInput = document.querySelector('input[type="hidden"][data-question-id="PICKUP_POINT"]') || document.getElementById('booking_question_PICKUP_POINT');
-        
+
         if (!pickupPointInput) {
             return true; // Não há campo PICKUP_POINT, validação não se aplica
         }
-        
+
         let arrivalMode = 'OTHER'; // Padrão se não especificado
         if (arrivalModeInput && arrivalModeInput.value) {
             arrivalMode = arrivalModeInput.value;
         }
-        
+
         console.log('🚗 Validando PICKUP_POINT para arrivalMode:', arrivalMode);
-        
-        // PICKUP_POINT obrigatório apenas quando o produto exigir explicitamente (não for CONTACT_SUPPLIER_LATER)
-        // Respeitar CONTACT_SUPPLIER_LATER quando oferecido pelo produto
-        const arrivalModesRequiringPickup = [];
-        if (arrivalModesRequiringPickup.includes(arrivalMode)) {
-            let pickupValue = pickupPointInput.value ? pickupPointInput.value.trim() : '';
-            // Buscar freetext específico do componente simplificado
-            const baseId = pickupPointInput.id || 'booking_question_PICKUP_POINT';
-            const freetextInput = document.getElementById(`${baseId}_freetext`) || document.querySelector('[id*="PICKUP_POINT"][id*="_freetext"]');
-            const freetextValue = freetextInput && freetextInput.value ? freetextInput.value.trim() : '';
 
-            // Não invalidar CONTACT_SUPPLIER_LATER aqui – a decisão de ofertar é do produto
+        // REQUISITO: Usuário só pode avançar se uma opção de PICKUP_POINT estiver selecionada na Etapa 3
+        // Aceita-se CONTACT_SUPPLIER_LATER quando ofertado pelo produto
+        let pickupValue = pickupPointInput.value ? pickupPointInput.value.trim() : '';
+        const baseId = pickupPointInput.id || 'booking_question_PICKUP_POINT';
+        const freetextInput = document.getElementById(`${baseId}_freetext`) || document.querySelector('[id*="PICKUP_POINT"][id*="_freetext"]');
+        const freetextValue = freetextInput && freetextInput.value ? freetextInput.value.trim() : '';
 
-            if (!pickupValue && !freetextValue) {
-                this.showFieldError(pickupPointInput, 'Ponto de encontro é obrigatório para o modo de chegada selecionado');
-                console.warn('❌ PICKUP_POINT obrigatório não preenchido para arrivalMode que exige coleta');
-                return false;
-            }
-            
-            // Se selecionou uma opção mas também preencheu texto livre, dar preferência ao texto livre
-            if (pickupValue && freetextValue) {
-                console.log('ℹ️ Texto livre tem preferência sobre seleção de pickup point');
-            }
+        if (!pickupValue && !freetextValue) {
+            this.showFieldError(pickupPointInput, 'Selecione uma opção de ponto de encontro ou informe um endereço.');
+            return false;
         }
-        
+
         return true;
     }
 
@@ -6421,19 +6453,15 @@ this.renderLocationOptions();
         if (arrivalModeInput && arrivalModeInput.value) {
             arrivalMode = arrivalModeInput.value;
         }
-        const arrivalModesRequiringPickup = [];
-        if (arrivalModesRequiringPickup.includes(arrivalMode)) {
-            let pickupValue = pickupPointInput.value ? pickupPointInput.value.trim() : '';
-            const baseId = pickupPointInput.id || 'booking_question_PICKUP_POINT';
-            const freetextInput = document.getElementById(`${baseId}_freetext`) || document.querySelector('[id*="PICKUP_POINT"][id*="_freetext"]');
-            const freetextValue = freetextInput && freetextInput.value ? freetextInput.value.trim() : '';
 
-            // CONTACT_SUPPLIER_LATER continua válido se o produto oferecer
+        let pickupValue = pickupPointInput.value ? pickupPointInput.value.trim() : '';
+        const baseId = pickupPointInput.id || 'booking_question_PICKUP_POINT';
+        const freetextInput = document.getElementById(`${baseId}_freetext`) || document.querySelector('[id*="PICKUP_POINT"][id*="_freetext"]');
+        const freetextValue = freetextInput && freetextInput.value ? freetextInput.value.trim() : '';
 
-            if (!pickupValue && !freetextValue) {
-                this.showFieldError(pickupPointInput, 'Ponto de encontro é obrigatório para o modo de chegada selecionado');
-                return { isValid: false, error: 'Ponto de Encontro' };
-            }
+        if (!pickupValue && !freetextValue) {
+            this.showFieldError(pickupPointInput, 'Selecione uma opção de ponto de encontro ou informe um endereço.');
+            return { isValid: false, error: 'Ponto de Encontro' };
         }
         return { isValid: true };
     }
@@ -7655,7 +7683,7 @@ this.renderLocationOptions();
                     <div class="pickup-option-wrapper">
                         <input type="radio" id="${questionId}_contact_later" name="${questionId}" value="CONTACT_SUPPLIER_LATER">
                         <label for="${questionId}_contact_later" class="pickup-option-label">
-                            <div class="pickup-option-title">📞 Entrarei em contato depois</div>
+                            <div class="pickup-option-title">📞 Vou decidir depois</div>
                             <div class="pickup-option-description">O fornecedor entrará em contato para definir o local</div>
                         </label>
                     </div>
@@ -7692,11 +7720,11 @@ this.renderLocationOptions();
         html += `
             <div class="pickup-main-options">
                 ${hasContactLater ? `
-                <!-- Opção 1: Entrarei em contato depois -->
+                <!-- Opção 1: Vou decidir depois -->
                 <div class="pickup-option-wrapper">
                     <input type="radio" id="${questionId}_contact_later" name="${questionId}" value="CONTACT_SUPPLIER_LATER">
                     <label for="${questionId}_contact_later" class="pickup-option-label">
-                        <div class="pickup-option-title">📞 Entrarei em contato depois</div>
+                        <div class="pickup-option-title">📞 Vou decidir depois</div>
                         <div class="pickup-option-description">O fornecedor entrará em contato para confirmar o local de encontro</div>
                     </label>
                 </div>` : ''}
@@ -7941,6 +7969,7 @@ this.renderLocationOptions();
      */
     attachSimplifiedPickupScripts(questionId, allowCustomPickup) {
         console.log('🔧 [PICKUP SIMPLIFIED] Inicializando scripts para', questionId);
+        const self = this;
         
         const container = document.getElementById(`${questionId}_container`);
         if (!container) {
@@ -7980,6 +8009,11 @@ this.renderLocationOptions();
                 console.log('📋 [PICKUP SIMPLIFIED] Exibindo lista de locais');
                 locationsList.style.display = 'block';
                 if (searchInput) setTimeout(() => searchInput.focus(), 100);
+                if (hiddenField) {
+                    hiddenField.classList.remove('is-invalid');
+                    self.hideFieldError(hiddenField);
+                }
+                self.hideDateError();
             };
             chooseLocationRadio.addEventListener('change', function() { if (this.checked) showList(); });
             // Mostrar a lista imediatamente ao clicar na caixa da descrição
@@ -7999,6 +8033,11 @@ this.renderLocationOptions();
                     if (freetextInput) {
                         setTimeout(() => freetextInput.focus(), 100);
                     }
+                    if (hiddenField) {
+                        hiddenField.classList.remove('is-invalid');
+                        self.hideFieldError(hiddenField);
+                    }
+                    self.hideDateError();
                 }
             });
         }
@@ -8027,6 +8066,9 @@ this.renderLocationOptions();
                         hiddenField.value = 'CONTACT_SUPPLIER_LATER';
                         hiddenField.removeAttribute('data-unit');
                         console.log('✅ [PICKUP SIMPLIFIED] Valor atualizado: CONTACT_SUPPLIER_LATER');
+                        hiddenField.classList.remove('is-invalid');
+                        self.hideFieldError(hiddenField);
+                        self.hideDateError();
                     } else if (this.id === `${questionId}_custom`) {
                         // Esperar o usuário digitar o endereço antes de setar o hidden
                         hiddenField.value = '';
@@ -8034,16 +8076,25 @@ this.renderLocationOptions();
                         if (customInput) customInput.style.display = 'block';
                         if (freetextInput) setTimeout(() => freetextInput.focus(), 50);
                         console.log('ℹ️ [PICKUP SIMPLIFIED] Aguardando endereço customizado');
+                        hiddenField.classList.remove('is-invalid');
+                        self.hideFieldError(hiddenField);
+                        self.hideDateError();
                     } else if (this.id === `${questionId}_choose_location`) {
                         // Não sobrescrever o hidden aqui; ele será definido quando um item da lista for escolhido
                         if (locationsList) locationsList.style.display = 'block';
                         if (searchInput) setTimeout(() => searchInput.focus(), 50);
                         console.log('ℹ️ [PICKUP SIMPLIFIED] Aguardando escolha da lista');
+                        hiddenField.classList.remove('is-invalid');
+                        self.hideFieldError(hiddenField);
+                        self.hideDateError();
                     } else if (this.value && this.value.startsWith('LOC-')) {
                         // Caso algum radio principal use um LOC diretamente (raro)
                         hiddenField.value = this.value;
                         hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
                         console.log('✅ [PICKUP SIMPLIFIED] Valor atualizado (LOC direto):', this.value);
+                        hiddenField.classList.remove('is-invalid');
+                        self.hideFieldError(hiddenField);
+                        self.hideDateError();
                     }
                 }
             });
@@ -8108,6 +8159,8 @@ this.renderLocationOptions();
                     hiddenField.value = target.value;
                     hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
                     hiddenField.classList.remove('is-invalid');
+                    self.hideFieldError(hiddenField);
+                    self.hideDateError();
                 }
             });
         }
@@ -8143,6 +8196,9 @@ this.renderLocationOptions();
                     hiddenField.value = value;
                     hiddenField.setAttribute('data-unit', 'FREETEXT');
                     console.log('📝 [PICKUP SIMPLIFIED] Endereço customizado:', value);
+                    hiddenField.classList.remove('is-invalid');
+                    self.hideFieldError(hiddenField);
+                    self.hideDateError();
                 }
             });
         }
@@ -8191,6 +8247,9 @@ this.renderLocationOptions();
                     if (hiddenField) {
                         hiddenField.value = target.value;
                         hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
+                        hiddenField.classList.remove('is-invalid');
+                        self.hideFieldError(hiddenField);
+                        self.hideDateError();
                     }
                 }
             });
@@ -9425,8 +9484,7 @@ this.renderLocationOptions();
             
             e.target.value = formattedValue;
 
-            // Validação em tempo real mais inteligente
-            const errorElement = document.getElementById('card-number-error');
+            // Validação em tempo real mais inteligente - usar padrão etapa 2 (showFieldError/hideFieldError)
             
             // Definir comprimentos mínimos por tipo de cartão
             const minLengths = {
@@ -9442,20 +9500,17 @@ this.renderLocationOptions();
             const minLength = minLengths[cardType] || 13;
             
             if (value.length === 0) {
-                // Campo vazio - remover todas as classes
+                // Campo vazio - remover classes e esconder erro
                 cardInput.classList.remove('is-valid', 'is-invalid');
-                if (errorElement) errorElement.style.display = 'none';
+                this.hideFieldError(cardInput);
             } else if (value.length < minLength) {
                 // Ainda digitando - mostrar apenas se tipo desconhecido
                 cardInput.classList.remove('is-valid', 'is-invalid');
                 if (cardType === 'unknown' && value.length >= 4) {
                     cardInput.classList.add('is-invalid');
-                    if (errorElement) {
-                        errorElement.textContent = 'Tipo de cartão não reconhecido. Bandeiras aceitas: Visa, Mastercard, Amex, Elo, Hipercard, Mercado Livre';
-                        errorElement.style.display = 'block';
-                    }
+                    this.showFieldError(cardInput, 'Tipo de cartão não reconhecido. Bandeiras aceitas: Visa, Mastercard, Amex, Elo, Hipercard, Mercado Livre');
                 } else {
-                    if (errorElement) errorElement.style.display = 'none';
+                    this.hideFieldError(cardInput);
                 }
             } else {
                 // Número completo - validação rigorosa
@@ -9463,22 +9518,18 @@ this.renderLocationOptions();
                 if (isValid) {
                     cardInput.classList.remove('is-invalid');
                     cardInput.classList.add('is-valid');
-                    if (errorElement) errorElement.style.display = 'none';
+                    this.hideFieldError(cardInput);
                 } else {
                     cardInput.classList.remove('is-valid');
                     cardInput.classList.add('is-invalid');
-                    if (errorElement) {
-                        errorElement.textContent = 'Número do cartão inválido para a bandeira ' + cardType.charAt(0).toUpperCase() + cardType.slice(1);
-                        errorElement.style.display = 'block';
-                    }
+                    this.showFieldError(cardInput, 'Número do cartão inválido para a bandeira ' + cardType.charAt(0).toUpperCase() + cardType.slice(1));
                 }
             }
         });
 
-        // Validação mais robusta ao sair do campo
+        // Validação mais robusta ao sair do campo (padrão etapa 2)
         cardInput.addEventListener('blur', (e) => {
             const value = e.target.value.replace(/\s/g, '');
-            const errorElement = document.getElementById('card-number-error');
             const cardType = this.detectCardType(value);
             
             // Definir comprimentos mínimos por tipo de cartão
@@ -9497,23 +9548,20 @@ this.renderLocationOptions();
             if (value.length > 0) {
                 if (cardType === 'unknown') {
                     cardInput.classList.add('is-invalid');
-                    if (errorElement) {
-                        errorElement.textContent = 'Tipo de cartão não reconhecido. Bandeiras aceitas: Visa, Mastercard, Amex, Elo, Hipercard, Mercado Livre';
-                        errorElement.style.display = 'block';
-                    }
+                    this.showFieldError(cardInput, 'Tipo de cartão não reconhecido. Bandeiras aceitas: Visa, Mastercard, Amex, Elo, Hipercard, Mercado Livre');
                 } else if (value.length < minLength) {
                     cardInput.classList.add('is-invalid');
-                    if (errorElement) {
-                        errorElement.textContent = `Número do cartão muito curto para ${cardType.charAt(0).toUpperCase() + cardType.slice(1)} (mínimo ${minLength} dígitos)`;
-                        errorElement.style.display = 'block';
-                    }
+                    this.showFieldError(cardInput, `Número do cartão muito curto para ${cardType.charAt(0).toUpperCase() + cardType.slice(1)} (mínimo ${minLength} dígitos)`);
                 } else if (!this.validateCreditCard(value)) {
                     cardInput.classList.add('is-invalid');
-                    if (errorElement) {
-                        errorElement.textContent = 'Número do cartão inválido para a bandeira ' + cardType.charAt(0).toUpperCase() + cardType.slice(1);
-                        errorElement.style.display = 'block';
-                    }
+                    this.showFieldError(cardInput, 'Número do cartão inválido para a bandeira ' + cardType.charAt(0).toUpperCase() + cardType.slice(1));
+                } else {
+                    // válido no blur
+                    this.hideFieldError(cardInput);
+                    cardInput.classList.add('is-valid');
                 }
+            } else {
+                this.hideFieldError(cardInput);
             }
         });
 
@@ -10594,6 +10642,9 @@ this.renderLocationOptions();
                 this.ensurePerTravelerAnswersPersisted();
                 return await this.validateBookingQuestions();
             case 4:
+                // Ao iniciar a validação do pagamento, indicar processamento e limpar erros antigos
+                this.setProcessingButtonState(true);
+                this.hideDateError();
                 // Validar conectividade antes do pagamento
                 const isConnected = await this.validateApiConnectivity();
                 if (!isConnected) {
@@ -10601,6 +10652,7 @@ this.renderLocationOptions();
                         'Problema de conectividade detectado. Verifique sua conexão com a internet.',
                         () => this.processPayment()
                     );
+                    this.setProcessingButtonState(false);
                     return false;
                 }
                 return await this.processPayment();
@@ -11257,7 +11309,10 @@ this.renderLocationOptions();
                     // Aguardar 2 segundos para o usuário ver o aviso
                     await new Promise(resolve => setTimeout(resolve, 2000));
                 } else {
+                    // Mostrar erros com o padrão visual unificado (Etapa 2)
                     this.showDateError(validationResult.errorMessage);
+                    // Ao mostrar erros e bloquear o fluxo, voltar o botão ao estado normal
+                    this.setProcessingButtonState(false);
                     return false;
                 }
             }
@@ -11274,6 +11329,7 @@ this.renderLocationOptions();
                 travelDate: this.bookingData.travelDate
             });
             this.showDateError('Por favor, selecione uma opção antes de prosseguir com o pagamento.');
+            this.setProcessingButtonState(false);
             // Destacar visualmente as opções disponíveis
             const optionsContainer = document.querySelector('.viator-options-container');
             if (optionsContainer) {
@@ -11297,43 +11353,57 @@ this.renderLocationOptions();
         
         // Validação específica para cada campo
         if (!cardNumber.value.replace(/\s/g, '')) {
-            this.showDateError('Por favor, informe o número do cartão.');
+            this.showFieldError(cardNumber, 'Por favor, informe o número do cartão.');
+            this.showDateError('Problemas encontrados:\n\n• Número do cartão');
+            this.setProcessingButtonState(false);
             cardNumber.focus();
             return false;
         }
         
         if (!cvv.value.trim()) {
-            this.showDateError('Por favor, informe o CVV do cartão.');
+            this.showFieldError(cvv, 'Por favor, informe o CVV do cartão.');
+            this.showDateError('Problemas encontrados:\n\n• CVV');
+            this.setProcessingButtonState(false);
             cvv.focus();
             return false;
         }
         
         if (!expMonth.value) {
-            this.showDateError('Por favor, selecione o mês de vencimento.');
+            this.showFieldError(expMonth, 'Por favor, selecione o mês de vencimento.');
+            this.showDateError('Problemas encontrados:\n\n• Mês de vencimento');
+            this.setProcessingButtonState(false);
             expMonth.focus();
             return false;
         }
         
         if (!expYear.value) {
-            this.showDateError('Por favor, selecione o ano de vencimento.');
+            this.showFieldError(expYear, 'Por favor, selecione o ano de vencimento.');
+            this.showDateError('Problemas encontrados:\n\n• Ano de vencimento');
+            this.setProcessingButtonState(false);
             expYear.focus();
             return false;
         }
         
         if (!name.value.trim()) {
-            this.showDateError('Por favor, informe o nome como aparece no cartão.');
+            this.showFieldError(name, 'Por favor, informe o nome como aparece no cartão.');
+            this.showDateError('Problemas encontrados:\n\n• Nome no cartão');
+            this.setProcessingButtonState(false);
             name.focus();
             return false;
         }
         
         if (!country.value) {
-            this.showDateError('Por favor, selecione o país.');
+            this.showFieldError(country, 'Por favor, selecione o país.');
+            this.showDateError('Problemas encontrados:\n\n• País');
+            this.setProcessingButtonState(false);
             country.focus();
             return false;
         }
         
         if (!postalCode.value.trim()) {
-            this.showDateError('Por favor, informe o CEP/código postal.');
+            this.showFieldError(postalCode, 'Por favor, informe o CEP/código postal.');
+            this.showDateError('Problemas encontrados:\n\n• CEP/Código Postal');
+            this.setProcessingButtonState(false);
             postalCode.focus();
             return false;
         }
@@ -11341,14 +11411,18 @@ this.renderLocationOptions();
         // Validação básica do número do cartão (apenas dígitos e comprimento)
         const cardDigits = cardNumber.value.replace(/\s/g, '');
         if (!/^\d{13,19}$/.test(cardDigits)) {
-            this.showDateError('Por favor, informe um número de cartão válido (13-19 dígitos).');
+            this.showFieldError(cardNumber, 'Por favor, informe um número de cartão válido (13-19 dígitos).');
+            this.showDateError('Problemas encontrados:\n\n• Número do cartão (13-19 dígitos)');
+            this.setProcessingButtonState(false);
             cardNumber.focus();
             return false;
         }
         
         // Validação do CVV
         if (!/^\d{3,4}$/.test(cvv.value)) {
-            this.showDateError('Por favor, informe um CVV válido (3 ou 4 dígitos).');
+            this.showFieldError(cvv, 'Por favor, informe um CVV válido (3 ou 4 dígitos).');
+            this.showDateError('Problemas encontrados:\n\n• CVV (3 ou 4 dígitos)');
+            this.setProcessingButtonState(false);
             cvv.focus();
             return false;
         }
@@ -11358,6 +11432,7 @@ this.renderLocationOptions();
             // Verificar se já temos um hold válido (feito na inicialização)
             if (!this.bookingData.holdData || !this.bookingData.holdData.paymentDataSubmissionUrl) {
                 this.showDateError('Sessão de pagamento expirada. Por favor, recarregue a página e tente novamente.');
+                this.setProcessingButtonState(false);
                 return false;
             }
 
@@ -11373,6 +11448,7 @@ this.renderLocationOptions();
 
             if (!paymentResult) {
                 this.hidePaymentProgress();
+                this.setProcessingButtonState(false);
                 return false;
             }
 
@@ -11407,12 +11483,14 @@ this.renderLocationOptions();
             await new Promise(resolve => setTimeout(resolve, 2000));
 
             this.hidePaymentProgress();
+            this.setProcessingButtonState(false);
 
             console.log('✅ Pagamento e reserva processados com sucesso, pronto para step 5');
             return true;
 
         } catch (error) {
             this.hidePaymentProgress();
+            this.setProcessingButtonState(false);
 
             // CORREÇÃO: Verificar se é erro da API Viator com trackingId
             if (error.isViatorApiError && error.trackingId) {
@@ -11939,27 +12017,52 @@ this.renderLocationOptions();
                 }
             }
             
-            // Garantir que respostas PER_TRAVELER (Etapa 2) estejam mescladas com as PER_BOOKING (Etapa 3)
-            let bookingQuestionAnswers = travelersData.bookingQuestionAnswers || this.bookingData.bookingQuestionAnswers || [];
+            // Garantir que respostas PER_TRAVELER (Etapa 2) e PER_BOOKING (Etapa 3) estejam mescladas
+            // BUGFIX: anteriormente respostas de travelersData podiam sobrescrever e REMOVER PER_BOOKING (ex.: PICKUP_POINT)
             const perTravelerIds = ['AGEBAND', 'FULL_NAMES_FIRST', 'FULL_NAMES_LAST', 'HEIGHT'];
+
+            // 1) Base: usar respostas persistidas do step 3 (contém PER_BOOKING + PER_TRAVELER)
+            let bookingQuestionAnswers = Array.isArray(this.bookingData.bookingQuestionAnswers)
+                ? this.bookingData.bookingQuestionAnswers.slice()
+                : [];
+
+            // 2) Se collectDetailedTravelersData trouxe algo, mesclar sem perder PER_BOOKING
+            const travelerBQ = Array.isArray(travelersData.bookingQuestionAnswers)
+                ? travelersData.bookingQuestionAnswers
+                : [];
+
+            if (travelerBQ.length > 0) {
+                const makeKey = (ans) => {
+                    const q = ans.question || ans.questionId || '';
+                    const t = typeof ans.travelerNum === 'undefined' ? 'PB' : String(ans.travelerNum);
+                    return `${q}::${t}`;
+                };
+                const existingKeys = new Set(bookingQuestionAnswers.map(makeKey));
+                travelerBQ.forEach((ans) => {
+                    const key = makeKey(ans);
+                    if (!existingKeys.has(key)) {
+                        bookingQuestionAnswers.push(ans);
+                        existingKeys.add(key);
+                    }
+                });
+            }
+
+            // 3) Segurança adicional: se por algum motivo não há PER_TRAVELER, reintroduzir os persistidos
             const persisted = Array.isArray(this.bookingData.bookingQuestionAnswers) ? this.bookingData.bookingQuestionAnswers : [];
             const perTravelerPersisted = persisted.filter(function(a){
                 const q = a.question || a.questionId; return perTravelerIds.indexOf(q) !== -1; });
-            // Se a lista atual NÃO contém PER_TRAVELER, mesclar
             const hasPerTraveler = bookingQuestionAnswers.some(function(a){
                 const q = a.question || a.questionId; return perTravelerIds.indexOf(q) !== -1; });
             if (!hasPerTraveler && perTravelerPersisted.length > 0) {
-                // Evitar duplicidade por (question, travelerNum)
-                const merged = bookingQuestionAnswers.slice();
+                const existingKeys = new Set(bookingQuestionAnswers.map(function(ans){
+                    const q = ans.question || ans.questionId || ''; const t = typeof ans.travelerNum === 'undefined' ? 'PB' : String(ans.travelerNum); return `${q}::${t}`; }));
                 perTravelerPersisted.forEach(function(ans){
-                    const q = ans.question || ans.questionId;
-                    const already = merged.find(function(x){
-                        const xq = x.question || x.questionId;
-                        return xq === q && x.travelerNum === ans.travelerNum;
-                    });
-                    if (!already) merged.push(ans);
+                    const q = ans.question || ans.questionId; const t = typeof ans.travelerNum === 'undefined' ? 'PB' : String(ans.travelerNum); const key = `${q}::${t}`;
+                    if (!existingKeys.has(key)) {
+                        bookingQuestionAnswers.push(ans);
+                        existingKeys.add(key);
+                    }
                 });
-                bookingQuestionAnswers = merged;
             }
 
             // Detectar e incluir language guide de forma ROBUSTA
@@ -14616,7 +14719,7 @@ this.renderLocationOptions();
             return;
         }
 
-        // 2. Exibir erro no topo da etapa ATUAL (sem navegar)
+        // 2. Exibir erro no topo da etapa ATUAL (sem navegar) com o mesmo padrão visual da etapa 2
         const currentStep = this.currentStep || 1;
         const stepContainer = document.querySelector('#booking-step-content .booking-step');
 
@@ -14633,6 +14736,7 @@ this.renderLocationOptions();
             stepErrorEl.textContent = finalMessage;
             stepErrorEl.style.display = 'block';
             stepErrorEl.className = type === 'warning' ? 'warning-message' : 'error-message';
+            stepErrorEl.classList.add('show');
 
             // Scroll para o topo da área da modal para garantir visibilidade
             const modalBody = document.querySelector('.viator-modal-body');
@@ -14654,6 +14758,7 @@ this.renderLocationOptions();
                     if (stepErrorEl) {
                         stepErrorEl.style.display = 'none';
                         stepErrorEl.textContent = '';
+                        stepErrorEl.classList.remove('show');
                     }
                 }, 5000);
             }
@@ -14683,6 +14788,14 @@ this.renderLocationOptions();
         if (errorElement) {
             errorElement.style.display = 'none';
             errorElement.textContent = '';
+        }
+
+        // Ocultar erro do topo da etapa atual (mensagem padronizada)
+        const stepErrorEl = document.querySelector('#booking-step-content #step-error-message');
+        if (stepErrorEl) {
+            stepErrorEl.style.display = 'none';
+            stepErrorEl.textContent = '';
+            stepErrorEl.classList.remove('show');
         }
 
         // CORREÇÃO: Limpar mensagem de erro na etapa 5 (Confirmação)
