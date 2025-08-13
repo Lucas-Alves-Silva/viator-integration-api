@@ -5191,7 +5191,7 @@ this.renderLocationOptions();
                         data-traveler="${travelerIndex || 1}"
                         ${shouldDisableUnit ? 'disabled' : ''}
                         ${requiredAttr}
-                        style="width: 100%; height: 100%; padding-right: 30px;">`;
+                        style="width: 100%; height: 100%; padding-right: 36px; background-position: calc(100% - 12px) center; background-size: 16px;">`;
 
             units.forEach(unit => {
                 const selected = (questionType === 'HEIGHT' && unit === 'cm') ||
@@ -12491,15 +12491,20 @@ this.renderLocationOptions();
             currency = data.currency || 'BRL';
             amount = data.totalPendingPrice.price.recommendedRetailPrice || data.totalPendingPrice.price.partnerTotalPrice || amount || 0;
         }
-        // 5ª fonte: extrair do DOM como último recurso
+        // 5ª fonte: extrair do DOM como último recurso (corrigindo locale pt-BR para número)
         else {
             const totalElement = document.querySelector('.total-price, .price-total, .final-price');
             if (totalElement) {
-                const priceText = totalElement.textContent || '';
-                const priceMatch = priceText.match(/R\$\s*([\d.,]+)/);
-                if (priceMatch) {
-                    currency = 'BRL';
-                    amount = parseFloat(priceMatch[1].replace(',', '.'));
+                const priceText = (totalElement.textContent || '').trim();
+                // Remover tudo exceto dígitos, ponto e vírgula; depois remover separador de milhar e normalizar vírgula para ponto
+                const numericPart = priceText.replace(/[^0-9.,-]/g, '');
+                if (numericPart) {
+                    const normalized = numericPart.replace(/\./g, '').replace(',', '.');
+                    const parsed = Number(normalized);
+                    if (!Number.isNaN(parsed) && parsed > 0) {
+                        currency = 'BRL';
+                        amount = parsed;
+                    }
                 }
             }
         }
@@ -12572,7 +12577,7 @@ this.renderLocationOptions();
                                 <div class="item-icon">📅</div>
                                 <div class="item-content">
                                     <span class="item-label">Data da Viagem</span>
-                                    <span class="item-value">${this.formatDate(travelDate)}</span>
+                                    <span class="item-value">${this.formatDateDisplayPtBR(travelDate)}</span>
                                 </div>
                             </div>
                             <div class="summary-item">
@@ -12689,7 +12694,7 @@ this.renderLocationOptions();
                         </div>
                             <div class="summary-item">
                                 <span class="summary-label">📅 Data da Viagem:</span>
-                                <span class="summary-value">${this.formatDate(travelDate)}</span>
+                                <span class="summary-value">${this.formatDateDisplayPtBR(travelDate)}</span>
                         </div>
                             <div class="summary-item">
                                 <span class="summary-label">💰 Valor Total:</span>
@@ -13700,6 +13705,32 @@ this.renderLocationOptions();
             return String(date || '');
         }
     }
+
+	// Novo: formatação apenas para exibição em pt-BR (dd/MM/yyyy)
+	formatDateDisplayPtBR(date) {
+		try {
+			if (!date) return '';
+			// Se já vier no padrão ISO (YYYY-MM-DD[...]) formatar sem risco de timezone
+			if (typeof date === 'string') {
+				const m = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
+				if (m) {
+					return `${m[3]}/${m[2]}/${m[1]}`;
+				}
+				// Se já estiver em dd/MM/yyyy, apenas retornar
+				const br = date.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+				if (br) return date;
+			}
+			// Fallback: tentar construir Date e formatar manualmente
+			const d = (date instanceof Date) ? date : new Date(date);
+			if (isNaN(d.getTime())) return String(date);
+			const yyyy = d.getFullYear();
+			const mm = String(d.getMonth() + 1).padStart(2, '0');
+			const dd = String(d.getDate()).padStart(2, '0');
+			return `${dd}/${mm}/${yyyy}`;
+		} catch (_e) {
+			return String(date || '');
+		}
+	}
 
     /**
      * Mostrar erro com opções de retry

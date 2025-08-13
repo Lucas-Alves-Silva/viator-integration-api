@@ -315,6 +315,33 @@ A função `renderLanguageGuideSection()` estava implementada mas nunca era cham
 
 **Resultado:** ✅ Perguntas PER_TRAVELER coletadas corretamente com `travelerNum` apropriado
 
+### ✅ Implementação 5: Conjunto PER_TRAVELER + PER_BOOKING (Produto 100427P4)
+**Data:** Agosto 2025  
+**Produto Testado:** `100427P4`  
+**Status:** ✅ Funcional e Reserva concluída com sucesso
+
+**Resumo do caso:**
+- bookingQuestions presentes (conforme logs):
+```json
+["AGEBAND","DATE_OF_BIRTH","FULL_NAMES_FIRST","FULL_NAMES_LAST","PASSPORT_EXPIRY","PASSPORT_NATIONALITY","PASSPORT_PASSPORT_NO","PICKUP_POINT","SPECIAL_REQUIREMENTS","WEIGHT"]
+```
+- Disponibilidade confirmada: BRL; total recomendado 8889.92; travelDate 2025-08-14/15 (formato API: YYYY-MM-DD)
+- Todas as etapas do fluxo preenchidas; confirmação exibida como CONFIRMED
+
+**Detalhamento por grupo:**
+- PER_TRAVELER obrigatórios: `DATE_OF_BIRTH`, `PASSPORT_EXPIRY`, `PASSPORT_NATIONALITY`, `PASSPORT_PASSPORT_NO`, `WEIGHT`, além de `FULL_NAMES_FIRST`, `FULL_NAMES_LAST`, `AGEBAND`.
+- PER_BOOKING: `PICKUP_POINT` (CONDICIONAL) e `SPECIAL_REQUIREMENTS` (OPCIONAL).
+
+**Validações aplicadas:**
+- Etapa 2: coleta e persistência de todos os PER_TRAVELER acima, com máscara/unidade (WEIGHT) e validação de formato.
+- Etapa 3: bloqueio de avanço sem `PICKUP_POINT`; limpeza dinâmica de erro ao selecionar/digitar.
+- Etapa 4: validação padronizada; botão “Processando...” durante verificação/pagamento.
+- Etapa 5: exibição da data no padrão pt-BR (dd/MM/yyyy) apenas na UI; sem impacto no payload (continua ISO YYYY-MM-DD). Correção de formatação do preço (pt-BR) e seta de selects.
+
+**Resultado:**
+- ✅ Reserva concluída com sucesso para `100427P4` com todas as booking questions atendidas.
+- ✅ Tipos `DATE_OF_BIRTH`, `PASSPORT_EXPIRY`, `PASSPORT_NATIONALITY`, `PASSPORT_PASSPORT_NO` e `WEIGHT` marcados como funcionais.
+
 ---
 
 ### ✅ Implementação 2: Correção de Duplicação de Formulário de Viajantes
@@ -488,10 +515,10 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 |------|--------|---------------|--------------|------------|
 | `SPECIAL_REQUIREMENTS` | ✅ **FUNCIONAL** | 47668MADAME | 🟢 Baixa | Alta |
 | `PICKUP_POINT` | ✅ **FUNCIONAL** | 100143P7 | 🟡 Média | Alta |
-| `WEIGHT` | ⏳ **PENDENTE** | - | 🟢 Baixa | Média |
+| `WEIGHT` | ✅ **FUNCIONAL** | 100427P4 | 🟢 Baixa | Média |
 | `FULL_NAMES_FIRST` | ✅ **FUNCIONAL** | 100143P7 | 🟡 Média | Alta |
 | `FULL_NAMES_LAST` | ✅ **FUNCIONAL** | 100143P7 | 🟡 Média | Alta |
-| `AGEBAND` | ✅ **FUNCIONAL** | 100143P7 | 🔴 Alta | Média |
+| `AGEBAND` | ✅ **FUNCIONAL** | 100143P7/100427P4 | 🔴 Alta | Média |
 | `DIETARY_REQUIREMENTS` | ⏳ **PENDENTE** | - | 🟢 Baixa | Baixa |
 | `MOBILITY_REQUIREMENTS` | ⏳ **PENDENTE** | - | 🟡 Média | Baixa |
 
@@ -578,6 +605,7 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 | 1.1 | 2025-01-08 | Implementação SPECIAL_REQUIREMENTS | Sistema |
 | 1.2 | 2025-01-08 | Template e estrutura para novas implementações | Sistema |
 | 1.3 | 2025-08-12 | PICKUP obrigatório na Etapa 3; validação Etapa 4 padronizada; mesclagem robusta PER_BOOKING + PER_TRAVELER; remoção do heading em per-booking | Sistema |
+| 1.4 | 2025-08-13 | Caso funcional 100427P4 documentado; PER_TRAVELER (DOB, Passaporte, WEIGHT) funcionais; ajustes de exibição pt-BR (data, moeda) e UI dos selects | Sistema |
 
 ---
 

@@ -251,6 +251,33 @@ body.viator-modal-open {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+/* Ajustes visuais consistentes para selects */
+select.form-control {
+	appearance: none !important;
+	-webkit-appearance: none !important;
+	-moz-appearance: none !important;
+	padding-right: 36px !important; /* espaço para o ícone */
+	text-align: left !important;
+	text-align-last: left !important;
+	background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23495057' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e") !important;
+	background-repeat: no-repeat !important;
+	background-position: calc(100% - 12px) center !important;
+	background-size: 16px !important;
+	line-height: 1.5 !important;
+}
+
+/* Remover setinha padrão do IE/Edge legado */
+select.form-control::-ms-expand {
+	display: none;
+}
+
+/* Estado disabled para selects */
+select.form-control:disabled {
+	background-color: #f8f9fa;
+	color: #6c757d;
+	cursor: not-allowed;
+}
+
 .form-control:focus {
     border-color: #0056b3;
     box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.1);
@@ -287,6 +314,18 @@ body.viator-modal-open {
     transition: all 0.3s ease;
     background: white;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* País (telefone) usa o mesmo ícone padrão do select */
+.country-code-select {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    padding-right: 36px !important;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23495057' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e") !important;
+    background-repeat: no-repeat !important;
+    background-position: calc(100% - 12px) center !important;
+    background-size: 16px !important;
 }
 
 .country-code-select:focus {
@@ -3280,6 +3319,11 @@ body.viator-modal-open {
     .next-steps li {
         font-size: 0.9rem;
     }
+
+    .question-with-unit select,
+    .question-with-unit .form-control[name*="_unit"] {
+    flex: 0 0 45px !important;
+}
 }
 
 /* ===== ESTILOS PARA PERGUNTAS DE RESERVA ===== */
@@ -3726,7 +3770,7 @@ body.viator-modal-open {
 
 .traveler-booking-questions .form-row .col-md-6 {
     flex: 0 0 50% !important;
-    max-width: 50% !important;
+    max-width: 100% !important;
     min-width: 0;
 }
 
@@ -4033,7 +4077,7 @@ body.viator-modal-open {
     .elementor-widget-container .traveler-booking-questions .form-row .col-md-6,
     .elementor-section .traveler-booking-questions .form-row .col-md-6 {
         flex: 0 0 50% !important;
-        max-width: 50% !important;
+        max-width: 100% !important;
     }
 }
 

@@ -88,6 +88,22 @@
     transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
 
+/* Uniformizar aparência dos selects (evitar desformatação) */
+select.question-input,
+select.question-unit,
+select.question-input-custom {
+	appearance: none !important;
+	-webkit-appearance: none !important;
+	-moz-appearance: none !important;
+	padding-right: 34px !important;
+	text-align: left !important;
+	text-align-last: left !important;
+	background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23495057' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e") !important;
+	background-repeat: no-repeat !important;
+	background-position: calc(100% - 10px) center !important;
+	background-size: 16px !important;
+}
+
 .question-input:focus,
 .question-input-custom:focus,
 .question-unit:focus {
