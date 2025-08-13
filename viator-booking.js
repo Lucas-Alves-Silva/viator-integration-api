@@ -4816,7 +4816,13 @@ this.renderLocationOptions();
 
         const inputs = container.querySelectorAll('.question-input');
         const answers = [];
-        const perTravelerIds = ['FULL_NAMES_FIRST', 'FULL_NAMES_LAST', 'AGEBAND', 'HEIGHT'];
+        // Expandir para incluir todos os PER_TRAVELER obrigatórios conforme docs
+        const perTravelerIds = [
+            'FULL_NAMES_FIRST', 'FULL_NAMES_LAST', 'AGEBAND',
+            'HEIGHT', 'WEIGHT',
+            'DATE_OF_BIRTH',
+            'PASSPORT_NATIONALITY', 'PASSPORT_PASSPORT_NO', 'PASSPORT_EXPIRY'
+        ];
 
         inputs.forEach((input) => {
             const questionId = input.getAttribute('data-question-id');
@@ -4842,8 +4848,8 @@ this.renderLocationOptions();
             if (!travelerNum || Number.isNaN(travelerNum) || travelerNum < 1) travelerNum = 1;
             answer.travelerNum = travelerNum;
 
-            // Unidade para HEIGHT
-            if (questionId === 'HEIGHT') {
+            // Unidades para HEIGHT e WEIGHT
+            if (questionId === 'HEIGHT' || questionId === 'WEIGHT') {
                 let unitField = document.getElementById(input.id + '_unit');
                 if (!unitField) {
                     unitField = container.querySelector(`select[name="${input.id}_unit"]`);
@@ -4868,7 +4874,12 @@ this.renderLocationOptions();
             return;
         }
 
-        const perTravelerIds = ['FULL_NAMES_FIRST', 'FULL_NAMES_LAST', 'AGEBAND', 'HEIGHT'];
+        const perTravelerIds = [
+            'FULL_NAMES_FIRST', 'FULL_NAMES_LAST', 'AGEBAND',
+            'HEIGHT', 'WEIGHT',
+            'DATE_OF_BIRTH',
+            'PASSPORT_NATIONALITY', 'PASSPORT_PASSPORT_NO', 'PASSPORT_EXPIRY'
+        ];
         const existing = Array.isArray(this.bookingData.bookingQuestionAnswers) ? this.bookingData.bookingQuestionAnswers : [];
 
         // Remover respostas existentes dessas perguntas para regravar valores atuais
@@ -4888,7 +4899,13 @@ this.renderLocationOptions();
      * CORREÇÃO CRÍTICA: Garantir que perguntas PER_TRAVELER obrigatórias sejam coletadas
      */
     ensureCriticalPerTravelerAnswers(answers) {
-        const criticalQuestions = ['AGEBAND', 'FULL_NAMES_FIRST', 'FULL_NAMES_LAST', 'HEIGHT'];
+        // Incluir todas as perguntas PER_TRAVELER críticas deste produto
+        const criticalQuestions = [
+            'AGEBAND', 'FULL_NAMES_FIRST', 'FULL_NAMES_LAST',
+            'HEIGHT', 'WEIGHT',
+            'DATE_OF_BIRTH',
+            'PASSPORT_NATIONALITY', 'PASSPORT_PASSPORT_NO', 'PASSPORT_EXPIRY'
+        ];
         
         criticalQuestions.forEach(questionId => {
             // Verificar se já temos resposta para esta pergunta
