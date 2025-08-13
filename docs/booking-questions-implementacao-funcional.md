@@ -344,6 +344,36 @@ A função `renderLanguageGuideSection()` estava implementada mas nunca era cham
 
 ---
 
+### ✅ Implementação 6: Conjunto PER_TRAVELER (Produto 101291P1)
+**Data:** Agosto 2025  
+**Produto Testado:** `101291P1`  
+**Status:** ✅ Fluxo completo bem-sucedido (hold, pagamento e confirmação)
+
+**bookingQuestions detectadas (log):**
+```json
+["AGEBAND","DATE_OF_BIRTH","FULL_NAMES_FIRST","FULL_NAMES_LAST","HEIGHT","SPECIAL_REQUIREMENTS","WEIGHT"]
+```
+
+**Evidências do log (resumo):**
+- Availability OK: currency BRL; travelDate 2025-08-15; startTime 16:30; total recomendado 694.53
+- Hold criado: `cartRef` presente; `paymentSessionToken` recebido; totalHeldPrice 694.53
+- Pagamento: cartão Visa test processado via TA Payments; `sessionAccountToken` retornado
+- Confirmação enviada: `bookingRef` BR-597854503; status PENDING; `totalPendingPrice` 694.53
+- `languageGuide` aplicado corretamente nos itens e na raiz (type GUIDE, language "es")
+- `bookingQuestionAnswers` enviados (7): FULL_NAMES_FIRST/LAST, AGEBAND, DATE_OF_BIRTH, HEIGHT (cm), WEIGHT (kg), SPECIAL_REQUIREMENTS
+
+**Validações por etapa:**
+- Etapa 2: coleta de `DATE_OF_BIRTH`, `HEIGHT` (com unidade), `WEIGHT` (com unidade), nomes e `AGEBAND` por viajante
+- Etapa 3: sem `PICKUP_POINT` neste produto; `SPECIAL_REQUIREMENTS` opcional
+- Etapa 4: validação padronizada; botão “Processando...”
+- Etapa 5: data exibida dd/MM/yyyy na UI; preço em pt-BR; payload preserva ISO/numéricos
+
+**Resultado:**
+- ✅ Reserva concluída com sucesso (status PENDING, voucher pendente do operador)
+- ✅ Tipos `HEIGHT` e `WEIGHT` confirmados como funcionais neste produto
+
+---
+
 ### ✅ Implementação 2: Correção de Duplicação de Formulário de Viajantes
 **Data:** Janeiro 2025  
 **Produto Testado:** `100143P7` (Excursão de Ciclismo às Ruínas dos Templos de Beng Mealea)  
@@ -515,10 +545,10 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 |------|--------|---------------|--------------|------------|
 | `SPECIAL_REQUIREMENTS` | ✅ **FUNCIONAL** | 47668MADAME | 🟢 Baixa | Alta |
 | `PICKUP_POINT` | ✅ **FUNCIONAL** | 100143P7 | 🟡 Média | Alta |
-| `WEIGHT` | ✅ **FUNCIONAL** | 100427P4 | 🟢 Baixa | Média |
+| `WEIGHT` | ✅ **FUNCIONAL** | 100427P4/101291P1 | 🟢 Baixa | Média |
 | `FULL_NAMES_FIRST` | ✅ **FUNCIONAL** | 100143P7 | 🟡 Média | Alta |
 | `FULL_NAMES_LAST` | ✅ **FUNCIONAL** | 100143P7 | 🟡 Média | Alta |
-| `AGEBAND` | ✅ **FUNCIONAL** | 100143P7/100427P4 | 🔴 Alta | Média |
+| `AGEBAND` | ✅ **FUNCIONAL** | 100143P7/100427P4/101291P1 | 🔴 Alta | Média |
 | `DIETARY_REQUIREMENTS` | ⏳ **PENDENTE** | - | 🟢 Baixa | Baixa |
 | `MOBILITY_REQUIREMENTS` | ⏳ **PENDENTE** | - | 🟡 Média | Baixa |
 
@@ -606,6 +636,7 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 | 1.2 | 2025-01-08 | Template e estrutura para novas implementações | Sistema |
 | 1.3 | 2025-08-12 | PICKUP obrigatório na Etapa 3; validação Etapa 4 padronizada; mesclagem robusta PER_BOOKING + PER_TRAVELER; remoção do heading em per-booking | Sistema |
 | 1.4 | 2025-08-13 | Caso funcional 100427P4 documentado; PER_TRAVELER (DOB, Passaporte, WEIGHT) funcionais; ajustes de exibição pt-BR (data, moeda) e UI dos selects | Sistema |
+| 1.5 | 2025-08-13 | Caso funcional 101291P1 documentado; HEIGHT/WEIGHT confirmados; fluxo hold→pagamento→confirmação bem-sucedido; languageGuide padronizado | Sistema |
 
 ---
 
