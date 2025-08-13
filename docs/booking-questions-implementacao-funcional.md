@@ -106,6 +106,45 @@ if (empty($item['communication']['email']) || trim($item['communication']['email
 }
 ```
 
+### 6. Mesclagem robusta de Booking Questions (frontend)
+
+- Problema: respostas `PER_BOOKING` (ex.: `PICKUP_POINT`) podiam ser sobrescritas/perdidas quando `collectDetailedTravelersData()` retornava apenas `PER_TRAVELER` na confirmação.
+- Solução: mesclar sempre as respostas persistidas do Step 3 com as retornadas na confirmação, com deduplicação por `(question, travelerNum)` e preservando `PER_BOOKING`.
+
+Trecho (JS, simplificado):
+
+```javascript
+// Em confirmBooking()
+const keyOf = (ans) => {
+  const q = ans.question || ans.questionId || '';
+  const t = (typeof ans.travelerNum === 'undefined' && typeof ans.travelerIndex === 'undefined') ? 'PB' : String(ans.travelerNum ?? ans.travelerIndex);
+  return `${q}::${t}`;
+};
+const mergedMap = new Map();
+(existingAnswers || []).forEach((ans) => mergedMap.set(keyOf(ans), ans));
+(travelerAnswers || []).forEach((ans) => {
+  if ((ans?.answer ?? '') !== '') mergedMap.set(keyOf(ans), ans);
+});
+bookingQuestionAnswers = Array.from(mergedMap.values());
+```
+
+Resultado:
+- ✅ `PICKUP_POINT` nunca é perdido na confirmação
+- ✅ Respostas `PER_TRAVELER` e `PER_BOOKING` coexistem corretamente
+
+### 7. UX e Validação unificadas (Etapas 3 e 4)
+
+- Etapa 3 (Informações):
+  - ✅ Exigência: usuário deve selecionar uma opção de `PICKUP_POINT` ou informar endereço antes de avançar.
+  - ✅ Erros desaparecem dinamicamente ao selecionar um rádio ou digitar o endereço (limpeza automática de `is-invalid` + `hideFieldError` + `hideDateError`).
+  - ✅ Removido o heading `<h4>Informações Gerais da Reserva</h4>` na seção `per-booking-section`.
+  - ✅ Texto padronizado da opção: “📞 Vou decidir depois”.
+
+- Etapa 4 (Pagamento):
+  - ✅ Validação visual padronizada com a Etapa 2 (bordas `is-invalid` e `.error-message`).
+  - ✅ Botão renomeia para “Processando...” durante validação/processamento e volta ao normal em erro/sucesso.
+  - ✅ Mensagem “Problemas encontrados” limpa ao corrigir e tentar novamente; foco no primeiro campo inválido.
+
 ## Como Testar as Correções
 
 ### 1. Teste Manual via Browser
@@ -114,6 +153,13 @@ if (empty($item['communication']['email']) || trim($item['communication']['email
 2. Preencha todos os dados do responsável
 3. Tente finalizar a reserva
 4. Verifique o arquivo de log: `viator-debug.log`
+
+### 1.1 Teste de `PICKUP_POINT` (Etapa 3)
+
+1. Avance à Etapa 3 e tente prosseguir sem selecionar uma opção de `PICKUP_POINT` ou sem digitar endereço
+2. Verifique se a navegação é bloqueada e se o erro aparece no padrão da Etapa 2
+3. Selecione “Vou decidir depois” OU “Escolher de uma lista” e escolha um item OU digite um endereço
+4. Confirme que a mensagem de erro desaparece imediatamente e a navegação é liberada
 
 ### 2. Teste Automatizado
 
@@ -233,23 +279,16 @@ A função `renderLanguageGuideSection()` estava implementada mas nunca era cham
 
 **Contexto:**
 - Booking Question `PICKUP_POINT` (type `LOCATION_REF_OR_FREE_TEXT`, `required: CONDITIONAL`).
-- A validação estava incorreta exigindo o campo quando `arrivalMode = OTHER`, gerando erro mesmo com o fluxo correto.
+- Para robustez do fluxo e evitar erros de confirmação, a UI agora exige a seleção de uma opção (ou endereço) na Etapa 3 antes de avançar. `CONTACT_SUPPLIER_LATER` é válido quando ofertado pelo produto.
 
 **Ajustes aplicados (viator-booking.js):**
-- Regra de obrigatoriedade alinhada à UI e à lógica de negócio:
-  - Agora é obrigatório apenas quando `TRANSFER_ARRIVAL_MODE ∈ {HOTEL_PICKUP, CENTRAL_MEETING_POINT}`.
-  - Não é obrigatório quando `arrivalMode = OTHER`.
-- Preferência por texto livre quando ambos (`LOCATION_REFERENCE` e `FREETEXT`) forem preenchidos.
-- Funções adicionadas para coletar mensagens de erro específicas, evitando mensagem vazia com bullet solitário.
-
-**Trechos principais:**
-- `validatePickupPointConditional()` atualizado para checar obrigatoriedade apenas nos modos que exigem coleta.
-- Nova `validatePickupPointConditionalWithError()` para retornar mensagens agregáveis.
-- `validateAllBookingQuestions()` passou a agregar erros de validações específicas via `validateSpecificQuestionsWithErrors()`.
+- Etapa 3 bloqueia avanço sem seleção de `PICKUP_POINT` (ou endereço)
+- Preferência por texto livre quando ambos (`LOCATION_REFERENCE` e `FREETEXT`) forem preenchidos
+- Limpeza dinâmica de erros ao selecionar rádios/digitar endereço
 
 **Resultado:**
-- Erro falso de `PICKUP_POINT` resolvido quando `arrivalMode = OTHER`.
-- Mensagens de erro apresentam itens específicos em vez de apenas "•".
+- Erros de confirmação por falta de `PICKUP_POINT` eliminados
+- UX consistente e sem mensagens persistentes indevidas
 
 ### ✅ Implementação 4: Correção Crítica PER_TRAVELER
 **Data:** Agosto 2025  
@@ -272,11 +311,7 @@ A função `renderLanguageGuideSection()` estava implementada mas nunca era cham
   ```
 - **Função de recuperação crítica:** `ensureCriticalPerTravelerAnswers()` para buscar especificamente AGEBAND, FULL_NAMES_FIRST, FULL_NAMES_LAST, HEIGHT.
 - **Extração robusta do travelerNum:** Múltiplos padrões (`traveler_(\d+)_`, `data-traveler`).
-- **Redução de logs spam:** Limitados a 5 objetos PICKUP_POINT para evitar poluição do console (502+ → 5 + mensagem resumo).
-
-**Documentação Consultada:**
-- [Implementing Booking Questions - Viator](https://partnerresources.viator.com/travel-commerce/merchant/implementing-booking-questions/)
-- API docs: `group: "PER_TRAVELER"` vs `group: "PER_BOOKING"`
+- **Redução de logs spam:** Limitados a 5 objetos PICKUP_POINT.
 
 **Resultado:** ✅ Perguntas PER_TRAVELER coletadas corretamente com `travelerNum` apropriado
 
@@ -454,9 +489,9 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 | `SPECIAL_REQUIREMENTS` | ✅ **FUNCIONAL** | 47668MADAME | 🟢 Baixa | Alta |
 | `PICKUP_POINT` | ✅ **FUNCIONAL** | 100143P7 | 🟡 Média | Alta |
 | `WEIGHT` | ⏳ **PENDENTE** | - | 🟢 Baixa | Média |
-| `FULL_NAMES_FIRST` | ⏳ **PENDENTE** | - | 🟡 Média | Alta |
-| `FULL_NAMES_LAST` | ⏳ **PENDENTE** | - | 🟡 Média | Alta |
-| `AGEBAND` | ⏳ **PENDENTE** | - | 🔴 Alta | Média |
+| `FULL_NAMES_FIRST` | ✅ **FUNCIONAL** | 100143P7 | 🟡 Média | Alta |
+| `FULL_NAMES_LAST` | ✅ **FUNCIONAL** | 100143P7 | 🟡 Média | Alta |
+| `AGEBAND` | ✅ **FUNCIONAL** | 100143P7 | 🔴 Alta | Média |
 | `DIETARY_REQUIREMENTS` | ⏳ **PENDENTE** | - | 🟢 Baixa | Baixa |
 | `MOBILITY_REQUIREMENTS` | ⏳ **PENDENTE** | - | 🟡 Média | Baixa |
 
@@ -468,8 +503,8 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 3. ⏳ `WEIGHT` - Próximo
 
 #### Fase 2: Tipos com Validação (REQUIRED)
-1. ⏳ `FULL_NAMES_FIRST/LAST` - Validação obrigatória
-2. ⏳ `PICKUP_POINT` - Seleção de opções
+1. ✅ `FULL_NAMES_FIRST/LAST` - Implementado
+2. ✅ `PICKUP_POINT` - Seleção obrigatória na Etapa 3
 
 #### Fase 3: Tipos Complexos (MULTIPLE_CHOICE/CONDITIONAL)
 1. ⏳ `AGEBAND` - Faixas etárias específicas
@@ -498,12 +533,9 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 - **📋 Próximo**: Testar campos opcionais simples
 
 #### Fase 2: Tipos Obrigatórios (Q1-Q2 2025)
-- **🎯 Futuro**: Implementar `FULL_NAMES_FIRST/LAST`
-- **🎯 Futuro**: Implementar `PICKUP_POINT` com seleção
-- **🎯 Futuro**: Validações dinâmicas obrigatórias
+- **🎯 Futuro**: Implementar `DIETARY_REQUIREMENTS`
 
 #### Fase 3: Tipos Complexos (Q2 2025)
-- **🎯 Futuro**: Implementar `AGEBAND` com faixas etárias
 - **🎯 Futuro**: Implementar `MOBILITY_REQUIREMENTS`
 - **🎯 Futuro**: Sistema de validação condicional
 
@@ -545,6 +577,7 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 | 1.0 | 2025-01-08 | Criação da documentação funcional | Sistema |
 | 1.1 | 2025-01-08 | Implementação SPECIAL_REQUIREMENTS | Sistema |
 | 1.2 | 2025-01-08 | Template e estrutura para novas implementações | Sistema |
+| 1.3 | 2025-08-12 | PICKUP obrigatório na Etapa 3; validação Etapa 4 padronizada; mesclagem robusta PER_BOOKING + PER_TRAVELER; remoção do heading em per-booking | Sistema |
 
 ---
 
