@@ -923,12 +923,11 @@ class ViatorBookingSystem {
         ]);
         // Preparar elementos do request para logs e envio
         $__confirm_url = $this->base_url . '/partner/bookings/cart/book';
-        // Se language_guide foi definido, alinhar Accept-Language ao idioma escolhido
-        $accept_language_header = $locale_settings['language'];
-        if (!empty($language_guide)) {
-            // Usar apenas o código ISO informado (ex.: 'en')
-            $accept_language_header = $language_guide;
-        }
+        // Alinhar Accept-Language com os padrões aceitos pela API (BCP-47)
+        // Usar APENAS a configuração global (ou en-US). NÃO derivar do language_guide.
+        $accepted_locales = array('en-US','pt-BR','es-ES','fr-FR','de-DE','it-IT','nl-NL','ja-JP','ko-KR','zh-CN','zh-TW');
+        $configured_lang = isset($locale_settings['accept_language']) && $locale_settings['accept_language'] ? $locale_settings['accept_language'] : '';
+        $accept_language_header = in_array($configured_lang, $accepted_locales, true) ? $configured_lang : 'en-US';
 
         $__confirm_headers = array(
             'Accept' => 'application/json;version=2.0',

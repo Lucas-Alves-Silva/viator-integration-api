@@ -638,6 +638,60 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 | 1.4 | 2025-08-13 | Caso funcional 100427P4 documentado; PER_TRAVELER (DOB, Passaporte, WEIGHT) funcionais; ajustes de exibição pt-BR (data, moeda) e UI dos selects | Sistema |
 | 1.5 | 2025-08-13 | Caso funcional 101291P1 documentado; HEIGHT/WEIGHT confirmados; fluxo hold→pagamento→confirmação bem-sucedido; languageGuide padronizado | Sistema |
 
+### ✅ Implementação 7: Accept-Language (header) – BCP-47 com whitelist
+**Data:** Agosto 2025  
+**Status:** ✅ Aplicado em produção (backend)
+
+**Problema:** respostas 4xx ocasionais por “Invalid value for header: Accept-Language” quando o usuário escolhia um `languageGuide` não compatível (ex.: `yue`).
+
+**Solução:**
+- Header `Accept-Language` agora é derivado apenas da configuração global validada (whitelist) e NUNCA do `languageGuide` escolhido pelo usuário.
+- Whitelist atual: `en-US`, `pt-BR`, `es-ES`, `fr-FR`, `de-DE`, `it-IT`, `nl-NL`, `ja-JP`, `ko-KR`, `zh-CN`, `zh-TW`, `zh-HK`.
+- Fallback seguro: `en-US` quando a configuração não estiver na lista.
+
+**Impacto:** eliminadas rejeições por cabeçalho inválido. `languageGuide` continua sendo enviado apenas no corpo (root e por item), conforme guia oficial (não é booking question).
+
+---
+
+### ✅ Implementação 8: Produto 6613GRANDCELE – fluxo completo com PICKUP_POINT
+**Data:** Agosto 2025  
+**Status:** ✅ Funcional (HOLD → pagamento → CONFIRM OK)
+
+**Contexto do Produto:**
+- `bookingQuestions` detectadas: `PICKUP_POINT (CONDITIONAL)`, `WEIGHT (MANDATORY, PER_TRAVELER)`, `FULL_NAMES_FIRST/LAST (MANDATORY, PER_TRAVELER)`, `SPECIAL_REQUIREMENTS (OPTIONAL)`, `AGEBAND (MANDATORY)`.
+- `logistics.travelerPickup.allowCustomTravelerPickup = false` (quando presente) → endereço customizado oculto.
+
+**Regras aplicadas no frontend:**
+- `PICKUP_POINT`
+  - Exibição de “📞 Vou decidir depois” (CONTACT_SUPPLIER_LATER) quando ofertado pelo produto; enviado como `LOCATION_REFERENCE`.
+  - Campo “Informar endereço específico” (FREETEXT) só aparece e só é enviado quando `allowCustomTravelerPickup === true`.
+  - Referências especiais `MEET_AT_DEPARTURE_POINT`/`CONTACT_SUPPLIER_LATER` tratadas como `LOCATION_REFERENCE`.
+- Modos de chegada (se existirem no produto): labels traduzidos (AIR→Avião, RAIL→Trem, SEA→Navio, OTHER→Outros) sem alterar os values enviados (AIR/RAIL/SEA/OTHER).
+- Chegada OTHER ou produto sem pickup: não renderizar/coletar `TRANSFER_ARRIVAL_TIME`/`TRANSFER_ARRIVAL_DROP_OFF` (evita “Extra answer(s) provided…”).
+- Máscara de hora “HH:MM” no input `booking_question_TRANSFER_ARRIVAL_TIME`.
+
+**Evidências (resumo dos logs):**
+- HOLD 200 com `bookingQuestionAnswers` (5): `FULL_NAMES_FIRST`, `FULL_NAMES_LAST`, `AGEBAND`, `WEIGHT (kg)`, `PICKUP_POINT=CONTACT_SUPPLIER_LATER (LOCATION_REFERENCE)`.
+- Pagamento TA 200, `sessionAccountToken` recebido.
+- CONFIRM 200 → `status=PENDING`, sem erros de booking questions ou headers.
+
+**Resultado:** fluxo estável para 6613GRANDCELE, sem FREETEXT de pickup quando não suportado e sem campos de chegada indevidos.
+
+---
+
+## Diretrizes adicionais consolidadas (aplicadas)
+
+- `Accept-Language` (backend): usar apenas configuração global validada (BCP‑47). Não derivar do `languageGuide`.
+- `languageGuide`: enviar no corpo (root e por item), nunca como booking question. Tipos suportados (ex.: GUIDE/AUDIO) seguindo especificação.
+- `PICKUP_POINT`:
+  - Mostrar `CONTACT_SUPPLIER_LATER` apenas quando presente nas locations do produto.
+  - `FREETEXT` permitido somente se `allowCustomTravelerPickup === true`.
+  - Para “meet at start point” (quando detectável), ocultar UI e enviar `MEET_AT_DEPARTURE_POINT` como `LOCATION_REFERENCE`; exibir card com endereço/descritivo do ponto (opcional, usando `/locations/bulk`).
+- Modos de chegada: traduzir labels (Avião/Trem/Navio/Outros), normalizando para AIR/RAIL/SEA/OTHER antes do envio; quando não suportado, normalizar para `OTHER`.
+- Campos de chegada: quando `arrivalMode === OTHER` ou sem pickup, não coletar `TRANSFER_ARRIVAL_TIME`/`TRANSFER_ARRIVAL_DROP_OFF`.
+- Máscara “HH:MM”: aplicada ao `booking_question_TRANSFER_ARRIVAL_TIME`.
+
+
 ---
 
 **📌 Nota**: Este documento é atualizado automaticamente a cada nova implementação funcional de Booking Questions. Mantenha-o sempre como referência principal para o desenvolvimento e manutenção do sistema.

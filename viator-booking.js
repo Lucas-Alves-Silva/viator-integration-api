@@ -4858,44 +4858,62 @@ this.renderLocationOptions();
 
         let pickupAnswer = null;
 
-        // Preferência: se houver texto livre preenchido, priorizar FREETEXT
-        if (freetextInputEl && freetextInputEl.value && freetextInputEl.value.trim() !== '') {
+        // Preferência: se houver texto livre preenchido, priorizar FREETEXT (somente quando permitido)
+        if (this.isCustomPickupAllowed() && freetextInputEl && freetextInputEl.value && freetextInputEl.value.trim() !== '') {
             pickupAnswer = {
-                question: 'PICKUP_POINT',
+                    question: 'PICKUP_POINT',
                 answer: freetextInputEl.value.trim(),
                 unit: 'FREETEXT'
             };
             console.log('✅ [DYNAMIC DEBUG] PICKUP_POINT via freetext (prioritário):', pickupAnswer);
         } else if (listChoiceSelected && listChoiceSelected.value) {
             const listVal = listChoiceSelected.value.trim();
+            if (listVal === 'CUSTOM_LOCATION' && !this.isCustomPickupAllowed()) {
+                console.warn('❌ [DYNAMIC DEBUG] CUSTOM_LOCATION selecionado, mas não permitido para este produto. Ignorando.');
+            } else {
+            const specialRef = (v) => v === 'CONTACT_SUPPLIER_LATER' || v === 'MEET_AT_DEPARTURE_POINT';
             pickupAnswer = {
                 question: 'PICKUP_POINT',
                 answer: listVal,
-                unit: listVal.startsWith('LOC-') ? 'LOCATION_REFERENCE' : 'FREETEXT'
+                unit: (listVal.startsWith('LOC-') || specialRef(listVal)) ? 'LOCATION_REFERENCE' : 'FREETEXT'
             };
             console.log('✅ [DYNAMIC DEBUG] PICKUP_POINT via lista:', pickupAnswer);
+            }
         } else if (customRadioSelected?.checked && freetextInputEl && freetextInputEl.value.trim()) {
+            if (this.isCustomPickupAllowed()) {
             pickupAnswer = {
                 question: 'PICKUP_POINT',
                 answer: freetextInputEl.value.trim(),
                 unit: 'FREETEXT'
             };
             console.log('✅ [DYNAMIC DEBUG] PICKUP_POINT via freetext:', pickupAnswer);
+            } else {
+                console.warn('❌ [DYNAMIC DEBUG] Fretexto de CUSTOM_LOCATION digitado, mas custom não é permitido. Ignorando.');
+            }
         } else if (hiddenPickupField && hiddenPickupField.value && hiddenPickupField.value !== 'CHOOSE_FROM_LIST') {
             const hiddenVal = hiddenPickupField.value.trim();
+            const specialRef = (v) => v === 'CONTACT_SUPPLIER_LATER' || v === 'MEET_AT_DEPARTURE_POINT';
+            if (hiddenVal === 'CUSTOM_LOCATION' && !this.isCustomPickupAllowed()) {
+                console.warn('❌ [DYNAMIC DEBUG] Hidden CUSTOM_LOCATION detectado, mas não permitido. Ignorando.');
+            } else {
+                const inferredUnit =
+                    (hiddenVal.startsWith('LOC-') || specialRef(hiddenVal))
+                        ? 'LOCATION_REFERENCE'
+                        : (hiddenPickupField.getAttribute('data-unit') || 'FREETEXT');
             pickupAnswer = {
                 question: 'PICKUP_POINT',
                 answer: hiddenVal,
-                unit: hiddenVal.startsWith('LOC-') ? 'LOCATION_REFERENCE' : (hiddenPickupField.getAttribute('data-unit') || 'FREETEXT')
+                    unit: inferredUnit
             };
             console.log('✅ [DYNAMIC DEBUG] PICKUP_POINT via hidden:', pickupAnswer);
+            }
         } else {
             console.log('⚠️ [DYNAMIC DEBUG] Nenhum PICKUP_POINT válido selecionado ainda');
         }
 
         if (pickupAnswer && !answers.find(a => a.question === 'PICKUP_POINT')) {
-            answers.push(pickupAnswer);
-        }
+                answers.push(pickupAnswer);
+            }
 
         // CORREÇÃO: Usar cache do PICKUP_POINT se disponível
         if (this.cachedPickupPoint && this.cachedPickupPoint.answer && !answers.find(a => a.question === 'PICKUP_POINT')) {
@@ -6795,8 +6813,8 @@ this.renderLocationOptions();
                 // Preferir exibir erro no freetext se ele existir
                 const targetField = dropOffFree || dropOffField;
                 if (targetField) this.showFieldError(targetField, 'Endereço final é obrigatório');
-                isValid = false;
-            } else {
+                    isValid = false;
+                } else {
                 if (dropOffField) this.hideFieldError(dropOffField);
                 if (dropOffFree) this.hideFieldError(dropOffFree);
             }
@@ -8425,7 +8443,12 @@ this.renderLocationOptions();
         // Não ocultar "Entrarei em contato depois" por arrival mode.
         // A presença/ausência dessa opção deve seguir os dados do produto (locations).
         
-        // 2. Controlar exibição do campo customizado
+        // 2. Controlar exibição do campo customizado (oculto se não permitido)
+        if (!allowCustomPickup && customRadio) {
+            // Ocultar totalmente a opção quando não suportado pelo produto
+            const wrapper = customRadio.closest('.pickup-option-wrapper');
+            if (wrapper) wrapper.style.display = 'none';
+        }
         if (allowCustomPickup && customRadio && customInput) {
             customRadio.addEventListener('change', function() {
                 if (this.checked) {
@@ -8812,30 +8835,32 @@ this.renderLocationOptions();
      * Verifica múltiplas fontes: logistics e units da pergunta PICKUP_POINT
      */
     isCustomPickupAllowed() {
-        // 1. Verificar via logistics (fonte principal)
+        // 1. Verificar via logistics (fonte principal). Se logistics existir, ele prevalece.
         const pickupData = this.getPickupData();
-        if (pickupData?.allowCustomTravelerPickup === true) {
+        if (pickupData) {
+            if (pickupData.allowCustomTravelerPickup === true) {
             console.log('✅ Pickup customizado permitido via logistics.allowCustomTravelerPickup');
             return true;
+            }
+            console.log('❌ Pickup customizado NÃO permitido (logistics.allowCustomTravelerPickup = false)');
+            return false;
         }
         
-        // 2. Verificar via units da pergunta PICKUP_POINT (fallback)
+        // 2. Fallback apenas quando não há logistics: verificar units da pergunta PICKUP_POINT
         const pickupQuestion = this.bookingQuestions?.find(q => q.id === 'PICKUP_POINT');
         if (pickupQuestion && Array.isArray(pickupQuestion.units)) {
             const hasFreetext = pickupQuestion.units.includes('FREETEXT');
-            console.log('🔍 Verificação de pickup customizado via booking question units:', {
+            console.log('🔍 Verificação de pickup customizado via booking question units (sem logistics):', {
                 units: pickupQuestion.units,
                 hasFreetext: hasFreetext,
                 productCode: window.productData?.productCode || 'N/A'
             });
-            
             if (hasFreetext) {
-                console.log('✅ Pickup customizado permitido via PICKUP_POINT.units (FREETEXT presente)');
+                console.log('✅ Pickup customizado permitido via PICKUP_POINT.units (fallback sem logistics)');
                 return true;
             }
         }
-        
-        console.log('❌ Pickup customizado NÃO permitido - sem logistics.allowCustomTravelerPickup e sem FREETEXT');
+        console.log('❌ Pickup customizado NÃO permitido (sem logistics e sem FREETEXT em units)');
         return false;
     }
 
