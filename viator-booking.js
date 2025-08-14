@@ -4872,12 +4872,62 @@ this.renderLocationOptions();
                 console.warn('❌ [DYNAMIC DEBUG] CUSTOM_LOCATION selecionado, mas não permitido para este produto. Ignorando.');
             } else {
             const specialRef = (v) => v === 'CONTACT_SUPPLIER_LATER' || v === 'MEET_AT_DEPARTURE_POINT';
-            pickupAnswer = {
-                question: 'PICKUP_POINT',
-                answer: listVal,
-                unit: (listVal.startsWith('LOC-') || specialRef(listVal)) ? 'LOCATION_REFERENCE' : 'FREETEXT'
-            };
-            console.log('✅ [DYNAMIC DEBUG] PICKUP_POINT via lista:', pickupAnswer);
+			// Validação adicional: garantir que o LOC selecionado pertence às locations do produto
+			const pickupInfo = (typeof this.getPickupData === 'function') ? this.getPickupData() : (this.productBookingQuestions?.logistics?.travelerPickup || {});
+			const locations = Array.isArray(pickupInfo?.locations) ? pickupInfo.locations : [];
+			const contactSupplierLaterAvailable = locations.some(l => (l?.location?.ref === 'CONTACT_SUPPLIER_LATER'));
+			const locObj = locations.find(l => (l?.location?.ref === listVal));
+			// Descobrir arrival mode atual
+			const currentArrivalMode = (() => {
+				const fromAns = answers.find(a => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
+				if (fromAns && String(fromAns.answer || '')) return String(fromAns.answer).trim();
+				const el = document.querySelector('[data-question-id="TRANSFER_ARRIVAL_MODE"]');
+				return el ? String(el.value || '').trim() : '';
+			})();
+			const allowedByMode = {
+				AIR: ['AIRPORT'],
+				SEA: ['PORT'],
+				RAIL: ['LOCATION'],
+				OTHER: ['LOCATION']
+			};
+
+			let isValidLoc = true;
+			let invalidReason = '';
+			if (listVal.startsWith('LOC-') && !locObj) {
+				isValidLoc = false;
+				invalidReason = 'LOC não pertence à lista do produto';
+			}
+			if (isValidLoc && locObj && currentArrivalMode) {
+				const pType = locObj.pickupType || 'OTHER';
+				const allowedTypes = allowedByMode[currentArrivalMode] || ['AIRPORT','PORT','LOCATION'];
+				if (!allowedTypes.includes(pType)) {
+					isValidLoc = false;
+					invalidReason = `Tipo ${pType} não permitido para modo ${currentArrivalMode}`;
+				}
+			}
+
+			if (!isValidLoc) {
+				console.warn(`❌ [PICKUP VALIDATION] Local inválido para este produto/modo: ${listVal}. Motivo: ${invalidReason}`);
+				// Tentar fallback seguro: CONTACT_SUPPLIER_LATER quando disponível
+				if (contactSupplierLaterAvailable) {
+					pickupAnswer = { question: 'PICKUP_POINT', answer: 'CONTACT_SUPPLIER_LATER', unit: 'LOCATION_REFERENCE' };
+					console.warn('↩️ [PICKUP VALIDATION] Fallback aplicado: CONTACT_SUPPLIER_LATER');
+				} else {
+					// Marcar erro visual e não adicionar resposta inválida
+					const hiddenFieldForError = document.querySelector('input[type="hidden"][data-question-id="PICKUP_POINT"]');
+					if (hiddenFieldForError && typeof this.showFieldError === 'function') {
+						this.showFieldError(hiddenFieldForError, 'Local indisponível para este modo. Selecione outro ou escolha "Vou decidir depois".');
+					}
+					pickupAnswer = null;
+				}
+			} else {
+				pickupAnswer = {
+					question: 'PICKUP_POINT',
+					answer: listVal,
+					unit: (listVal.startsWith('LOC-') || specialRef(listVal)) ? 'LOCATION_REFERENCE' : 'FREETEXT'
+				};
+				console.log('✅ [DYNAMIC DEBUG] PICKUP_POINT via lista:', pickupAnswer);
+			}
             }
         } else if (customRadioSelected?.checked && freetextInputEl && freetextInputEl.value.trim()) {
             if (this.isCustomPickupAllowed()) {
@@ -8359,18 +8409,18 @@ this.renderLocationOptions();
         
         // Filtro por modo de chegada
         const arrivalModeEl = document.querySelector('[data-question-id="TRANSFER_ARRIVAL_MODE"]');
-        const applyModeFilter = (mode) => {
+			const applyModeFilter = (mode) => {
             if (!mode) return;
             console.log(`🚗 [PICKUP FILTER] Aplicando filtro para modo: ${mode}`);
-            
-            const allowedByMode = {
-                AIR: ['AIRPORT','HOTEL','OTHER'],
-                SEA: ['PORT','HOTEL','OTHER'], 
-                RAIL: ['LOCATION','HOTEL','OTHER'],
-                OTHER: ['LOCATION','HOTEL','OTHER']
-            };
-            
-            const allowed = allowedByMode[mode] || ['HOTEL','AIRPORT','PORT','LOCATION','OTHER'];
+				
+				const allowedByMode = {
+					AIR: ['AIRPORT'],
+					SEA: ['PORT'], 
+					RAIL: ['LOCATION'],
+					OTHER: ['LOCATION']
+				};
+				
+				const allowed = allowedByMode[mode] || ['AIRPORT','PORT','LOCATION'];
             let visibleSections = 0;
             
             container.querySelectorAll('.pickup-type-section').forEach(sec => {
@@ -8379,8 +8429,37 @@ this.renderLocationOptions();
                 sec.style.display = shouldShow ? '' : 'none';
                 if (shouldShow) visibleSections++;
             });
-            
-            console.log(`🚗 [PICKUP FILTER] ${visibleSections} seções visíveis para modo ${mode}`);
+				
+				console.log(`🚗 [PICKUP FILTER] ${visibleSections} seções visíveis para modo ${mode}`);
+				
+				// Se nenhuma seção elegível estiver visível, desabilitar "Escolher de uma lista" e aplicar fallback seguro
+				if (visibleSections === 0) {
+					const chooseLabelTitle = container.querySelector(`label[for="${questionId}_choose_location"] .pickup-option-title`);
+					if (chooseLocationRadio) {
+						chooseLocationRadio.disabled = true;
+						if (chooseLabelTitle) {
+							chooseLabelTitle.textContent = 'Nenhum local elegível para o modo selecionado';
+						}
+					}
+					if (locationsContainer) {
+						locationsContainer.style.display = 'none';
+					}
+					if (contactLaterRadio) {
+						contactLaterRadio.checked = true;
+						if (hiddenField) {
+							hiddenField.value = 'CONTACT_SUPPLIER_LATER';
+							hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
+							hiddenField.classList.remove('is-invalid');
+							self.hideFieldError(hiddenField);
+							self.hideDateError();
+						}
+					}
+				} else {
+					// Reabilitar "Escolher de uma lista" quando houver opções elegíveis
+					if (chooseLocationRadio) {
+						chooseLocationRadio.disabled = false;
+					}
+				}
         };
         
         if (arrivalModeEl) {

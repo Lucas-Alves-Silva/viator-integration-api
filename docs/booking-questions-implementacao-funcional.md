@@ -640,10 +640,42 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 
 | 1.6 | 2025-08-14 | Headers padronizados (Accept-Language BCP‑47 com whitelist) e CSP de desenvolvimento para Google Maps; carregamento Maps com v=weekly, async/defer | Sistema |
 | 1.7 | 2025-08-14 | Caso funcional 101124P5 (transfer modes): auto-preenchimento de TRANSFER_DEPARTURE_MODE; CONFIRM 200; regras condicionais implementadas | Sistema |
+| 1.8 | 2025-08-14 | Regras de elegibilidade de PICKUP por modo (AIR/SEA/RAIL/OTHER) e fallback automático para CONTACT_SUPPLIER_LATER quando não houver locais válidos | Sistema |
+| 1.9 | 2025-08-14 | Caso 101124P5 confirmado (CONFIRM 200): ARRIVAL=AIR, DEPARTURE=OTHER, PICKUP_POINT=CONTACT_SUPPLIER_LATER; evidências detalhadas de hold/pagamento/confirm | Sistema |
+| 1.10 | 2025-08-14 | Caso 101124P5: ARRIVAL=AIR + PICKUP_POINT=FREETEXT ("Informar endereço específico"): CONFIRM 200; campos AIR coletados; Accept-Language pt-BR | Sistema |
 
 ---
 
 ### ✅ Implementação 10: Produto 101124P5 – Transfer Modes end-to-end
+### ✅ Implementação 11: PICKUP_POINT — elegibilidade por modo e fallback seguro
+**Data:** Agosto 2025  
+**Status:** ✅ Aplicado (frontend)
+
+**Problema observado:**
+- Ao selecionar um `LOC-...` da lista, a confirmação retornava: “Pickup is not available from this location or it's the wrong type”.
+- A UI exibia opções de hotéis/portos/aeroportos mesmo quando o `ARRIVAL_MODE` não aceitava aquele tipo.
+
+**Ajustes implementados (viator-booking.js):**
+- Filtro estrito por modo de chegada:
+  - AIR → apenas `AIRPORT`
+  - SEA → apenas `PORT`
+  - RAIL → apenas `LOCATION`
+  - OTHER → apenas `LOCATION`
+- Validação na coleta: um `LOC-...` só é aceito se existir em `logistics.travelerPickup.locations` e o `pickupType` for permitido pelo modo atual.
+- Se nenhuma seção elegível existir para o modo selecionado:
+  - Desabilita “Escolher de uma lista”.
+  - Oculta a lista.
+  - Seleciona automaticamente “📞 Vou decidir depois” (`CONTACT_SUPPLIER_LATER`) quando disponível e define `unit=LOCATION_REFERENCE`.
+- Ao detectar `LOC` inválido, aplica fallback para `CONTACT_SUPPLIER_LATER` (se ofertado) ou mostra erro no campo.
+
+**Impacto para o usuário final:**
+- Evita tentativa com locais incompatíveis e reduz erros no final do fluxo.
+- Interface passa a refletir apenas escolhas válidas por modo.
+
+**Evidência (logs):**
+- “🚗 [PICKUP FILTER] 0 seções visíveis” → radio de lista desabilitado e fallback aplicado.
+- “❌ [PICKUP VALIDATION] Local inválido ...” → fallback para CONTACT_SUPPLIER_LATER.
+
 **Data:** Agosto 2025  
 **Status:** ✅ Fluxo completo (HOLD → pagamento → CONFIRM 200)
 
@@ -661,14 +693,63 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
   - `ARRIVAL_MODE = AIR` habilita `TRANSFER_AIR_ARRIVAL_*` e `TRANSFER_ARRIVAL_TIME`; `TRANSFER_ARRIVAL_DROP_OFF` com `unit=FREETEXT`.
 
 **Evidências (logs):**
-- HOLD 200 com `paymentSessionToken`;
-- Pagamento 200 com `sessionAccountToken`;
-- CONFIRM 200 com `status=CONFIRMED` e `voucherInfo.url`.
-- `bookingQuestionAnswers` enviados conforme esperado, incluindo `TRANSFER_DEPARTURE_MODE = OTHER`.
+- HOLD 200 com `paymentSessionToken` (cartRef CR-5778caa75c3ebe84abfdb1aa877f6096; bookingRef BR-597858053)
+- Pagamento 200 (`sessionAccountToken` STK-rtbge6fimbe65iavnq5jl6lil4)
+- CONFIRM 200: `status=CONFIRMED` e `voucherInfo.url` presente
+- `bookingQuestionAnswers` enviados: `TRANSFER_ARRIVAL_MODE=AIR`, `TRANSFER_DEPARTURE_MODE=OTHER`, `PICKUP_POINT=CONTACT_SUPPLIER_LATER (LOCATION_REFERENCE)`, `TRANSFER_ARRIVAL_DROP_OFF (FREETEXT)`, e todos os `PER_TRAVELER` (passaporte, nomes, AGEBAND)
+
+Trechos do log (`viator-debug.log`):
+```json
+"bookingQuestionAnswers": [
+  {"question":"TRANSFER_ARRIVAL_MODE","answer":"AIR"},
+  {"question":"TRANSFER_DEPARTURE_MODE","answer":"OTHER"},
+  {"question":"TRANSFER_ARRIVAL_DROP_OFF","answer":"Brooklyn 123","unit":"FREETEXT"},
+  {"question":"PICKUP_POINT","answer":"CONTACT_SUPPLIER_LATER","unit":"LOCATION_REFERENCE"}
+]
+```
+```json
+"items":[{"status":"CONFIRMED","voucherInfo":{"url":"https://api.sandbox.viator.com/ticket?..."}}]
+```
 
 **Resultado:**
 - ✅ Erro “Missing answer for TRANSFER_DEPARTURE_MODE” eliminado.
 - ✅ Confirmação bem-sucedida com regras de transfer aplicadas.
+
+### ✅ Implementação 12: 101124P5 — ARRIVAL=AIR + PICKUP_POINT (FREETEXT)
+**Data:** Agosto 2025  
+**Status:** ✅ Fluxo completo (HOLD → pagamento → CONFIRM 200)
+
+**Cenário testado:**
+- `TRANSFER_ARRIVAL_MODE = AIR`
+- `TRANSFER_DEPARTURE_MODE = OTHER`
+- `PICKUP_POINT` selecionado como “Informar endereço específico” → enviado como `unit=FREETEXT`
+- Campos de chegada (AIR) preenchidos: `TRANSFER_AIR_ARRIVAL_AIRLINE`, `TRANSFER_AIR_ARRIVAL_FLIGHT_NO`, `TRANSFER_ARRIVAL_TIME`
+- `TRANSFER_ARRIVAL_DROP_OFF` também como `FREETEXT`
+- Header: `Accept-Language: pt-BR`
+
+**Evidências (logs):**
+```json
+"bookingQuestionAnswers": [
+  {"question":"TRANSFER_ARRIVAL_MODE","answer":"AIR"},
+  {"question":"TRANSFER_DEPARTURE_MODE","answer":"OTHER"},
+  {"question":"TRANSFER_AIR_ARRIVAL_AIRLINE","answer":"gol"},
+  {"question":"TRANSFER_AIR_ARRIVAL_FLIGHT_NO","answer":"g3654"},
+  {"question":"TRANSFER_ARRIVAL_TIME","answer":"19:15"},
+  {"question":"TRANSFER_ARRIVAL_DROP_OFF","answer":"Brooklyn 1486","unit":"FREETEXT"},
+  {"question":"PICKUP_POINT","answer":"Brooklyn Agora 2222","unit":"FREETEXT"}
+]
+```
+```json
+"headers": {"Accept":"application/json;version=2.0","Content-Type":"application/json;version=2.0","Accept-Language":"pt-BR"}
+```
+```json
+"items":[{"status":"CONFIRMED","voucherInfo":{"url":"https://api.sandbox.viator.com/ticket?..."}}]
+```
+
+**Diretrizes decorrentes:**
+- Quando o cliente optar por “Informar endereço específico”, enviar `PICKUP_POINT` com `unit=FREETEXT`.
+- Para `ARRIVAL_MODE = AIR`, garantir coleta de airline/flight/time; `TRANSFER_ARRIVAL_DROP_OFF` permanece `FREETEXT`.
+- Se o produto não expuser locais elegíveis ou impedir custom pickup, manter fallback para `CONTACT_SUPPLIER_LATER`.
 
 ### ✅ Implementação 7: Accept-Language (header) – BCP-47 com whitelist
 **Data:** Agosto 2025  
