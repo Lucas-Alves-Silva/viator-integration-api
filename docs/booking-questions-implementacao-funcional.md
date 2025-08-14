@@ -638,6 +638,38 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 | 1.4 | 2025-08-13 | Caso funcional 100427P4 documentado; PER_TRAVELER (DOB, Passaporte, WEIGHT) funcionais; ajustes de exibição pt-BR (data, moeda) e UI dos selects | Sistema |
 | 1.5 | 2025-08-13 | Caso funcional 101291P1 documentado; HEIGHT/WEIGHT confirmados; fluxo hold→pagamento→confirmação bem-sucedido; languageGuide padronizado | Sistema |
 
+| 1.6 | 2025-08-14 | Headers padronizados (Accept-Language BCP‑47 com whitelist) e CSP de desenvolvimento para Google Maps; carregamento Maps com v=weekly, async/defer | Sistema |
+| 1.7 | 2025-08-14 | Caso funcional 101124P5 (transfer modes): auto-preenchimento de TRANSFER_DEPARTURE_MODE; CONFIRM 200; regras condicionais implementadas | Sistema |
+
+---
+
+### ✅ Implementação 10: Produto 101124P5 – Transfer Modes end-to-end
+**Data:** Agosto 2025  
+**Status:** ✅ Fluxo completo (HOLD → pagamento → CONFIRM 200)
+
+**Contexto do Produto:**
+- `bookingQuestions` (20) incluem `TRANSFER_ARRIVAL_MODE`, `TRANSFER_DEPARTURE_MODE` (allowed: AIR, RAIL, SEA, OTHER) e condicionais relacionadas (DEPARTURE_DATE/TIME/PICKUP, AIR/SEA/RAIL específicos).
+- No teste, modes: `ARRIVAL_MODE = AIR`, `DEPARTURE_MODE = OTHER`.
+- `PICKUP_POINT` enviado como `CONTACT_SUPPLIER_LATER (LOCATION_REFERENCE)`.
+
+**Ajustes aplicados (frontend):**
+- Preenchimento automático de modos ausentes quando o produto os exige:
+  - Se `TRANSFER_DEPARTURE_MODE` não estiver presente, preencher com valor permitido (prioriza `OTHER`; fallback para o primeiro de `allowedAnswers`).
+  - Normalização de valores fora de `allowedAnswers` (ajusta para `OTHER` ou primeiro permitido).
+- Condicionais respeitadas:
+  - `DEPARTURE_MODE = OTHER` dispensa condicionais de partida.
+  - `ARRIVAL_MODE = AIR` habilita `TRANSFER_AIR_ARRIVAL_*` e `TRANSFER_ARRIVAL_TIME`; `TRANSFER_ARRIVAL_DROP_OFF` com `unit=FREETEXT`.
+
+**Evidências (logs):**
+- HOLD 200 com `paymentSessionToken`;
+- Pagamento 200 com `sessionAccountToken`;
+- CONFIRM 200 com `status=CONFIRMED` e `voucherInfo.url`.
+- `bookingQuestionAnswers` enviados conforme esperado, incluindo `TRANSFER_DEPARTURE_MODE = OTHER`.
+
+**Resultado:**
+- ✅ Erro “Missing answer for TRANSFER_DEPARTURE_MODE” eliminado.
+- ✅ Confirmação bem-sucedida com regras de transfer aplicadas.
+
 ### ✅ Implementação 7: Accept-Language (header) – BCP-47 com whitelist
 **Data:** Agosto 2025  
 **Status:** ✅ Aplicado em produção (backend)
@@ -650,6 +682,16 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 - Fallback seguro: `en-US` quando a configuração não estiver na lista.
 
 **Impacto:** eliminadas rejeições por cabeçalho inválido. `languageGuide` continua sendo enviado apenas no corpo (root e por item), conforme guia oficial (não é booking question).
+
+### ✅ Implementação 9: CSP e Google Maps (Desenvolvimento)
+**Data:** Agosto 2025  
+**Status:** ✅ Aplicado (frontend/backend)
+
+**Mudanças:**
+- Script do Google Maps atualizado: `v=weekly`, `libraries=places`, `loading=async`, com `async defer` via `script_loader_tag`.
+- CSP leve em desenvolvimento via `send_headers` permitindo `maps.googleapis.com`, `maps.gstatic.com`, `places.googleapis.com` em `script-src`/`connect-src` e imagens.
+
+**Observação:** Em produção, recomenda-se mover a CSP para o servidor/reverse proxy com política estrita.
 
 ---
 

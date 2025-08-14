@@ -66,7 +66,7 @@ class ViatorBookingSystem {
                 'Accept' => 'application/json;version=2.0',
                 'Content-Type' => 'application/json;version=2.0',
                 'exp-api-key' => $this->api_key,
-                'Accept-Language' => $locale_settings['language']
+                'Accept-Language' => $locale_settings['accept_language']
             ),
             'body' => json_encode($request_data),
             'timeout' => 30
@@ -233,7 +233,7 @@ class ViatorBookingSystem {
                     'Accept' => 'application/json;version=2.0',
                     'Content-Type' => 'application/json;version=2.0',
                     'exp-api-key' => $this->api_key,
-                    'Accept-Language' => $locale_settings['language']
+                    'Accept-Language' => $locale_settings['accept_language']
                 ),
                 'body' => json_encode($request_data),
                 'timeout' => 90, // Aumentar timeout para 90 segundos para holds complexos
@@ -925,7 +925,7 @@ class ViatorBookingSystem {
         $__confirm_url = $this->base_url . '/partner/bookings/cart/book';
         // Alinhar Accept-Language com os padrões aceitos pela API (BCP-47)
         // Usar APENAS a configuração global (ou en-US). NÃO derivar do language_guide.
-        $accepted_locales = array('en-US','pt-BR','es-ES','fr-FR','de-DE','it-IT','nl-NL','ja-JP','ko-KR','zh-CN','zh-TW');
+        $accepted_locales = array('en-US','pt-BR','es-ES','fr-FR','de-DE','it-IT','nl-NL','ja-JP','ko-KR','zh-CN','zh-TW','zh-HK');
         $configured_lang = isset($locale_settings['accept_language']) && $locale_settings['accept_language'] ? $locale_settings['accept_language'] : '';
         $accept_language_header = in_array($configured_lang, $accepted_locales, true) ? $configured_lang : 'en-US';
 
@@ -1158,7 +1158,7 @@ class ViatorBookingSystem {
                 'Accept' => 'application/json;version=2.0',
                 'Content-Type' => 'application/json;version=2.0',
                 'exp-api-key' => $this->api_key,
-                'Accept-Language' => $locale_settings['language']
+                'Accept-Language' => $locale_settings['accept_language']
             ],
             'body' => json_encode($request_data),
             'timeout' => 15
@@ -1250,7 +1250,7 @@ class ViatorBookingSystem {
             'headers' => array(
                 'Accept' => 'application/json;version=2.0',
                 'exp-api-key' => $this->api_key,
-                'Accept-Language' => $locale_settings['language']
+                'Accept-Language' => $locale_settings['accept_language']
             ),
             'timeout' => 30
         ));
@@ -1311,7 +1311,7 @@ class ViatorBookingSystem {
         $headers = [
             'exp-api-key' => $this->api_key,
             'Accept' => 'application/json;version=2.0',
-            'Accept-Language' => $locale_settings['language']
+            'Accept-Language' => $locale_settings['accept_language']
         ];
         viator_debug_log('🔍 [GET BOOKING QUESTIONS] Headers enviados: ' . json_encode($headers));
         
@@ -1376,11 +1376,11 @@ class ViatorBookingSystem {
         if (false === $all_questions_data) {
             $questions_api_url = $this->base_url . '/partner/products/booking-questions';
             $questions_response = wp_remote_get($questions_api_url, [
-                'headers' => [
-                    'exp-api-key' => $this->api_key,
-                    'Accept' => 'application/json;version=2.0',
-                    'Accept-Language' => $locale_settings['language']
-                ],
+            'headers' => [
+                'exp-api-key' => $this->api_key,
+                'Accept' => 'application/json;version=2.0',
+                'Accept-Language' => $locale_settings['accept_language']
+            ],
                 'timeout' => 30
             ]);
 

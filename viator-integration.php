@@ -1271,7 +1271,7 @@ function viator_get_search_results($searchTerm) {
             'Accept'           => 'application/json;version=2.0',
             'Content-Type'     => 'application/json;version=2.0',
             'exp-api-key'      => $api_key,
-            'Accept-Language'  => $locale_settings['language'],
+            'Accept-Language'  => $locale_settings['accept_language'],
         ],
         'body'    => $body,
         'timeout' => 120,
@@ -2525,15 +2525,45 @@ function viator_get_currency_symbol($currency_code = null) {
 function viator_get_locale_settings() {
     $language = get_option('viator_language', 'pt-BR');
     
-    // Mapear para formato aceito pela API Viator
-    $accept_language_map = [
-        'pt-BR' => 'pt-BR',
-        'en-US' => 'en-US'
+    // Whitelist e mapeamento para BCP-47 aceito pela API Viator
+    $accepted_locales = [
+        'en-US','pt-BR','es-ES','fr-FR','de-DE','it-IT','nl-NL','ja-JP','ko-KR','zh-CN','zh-TW','zh-HK'
     ];
+    $accept_language_map = [
+        // códigos completos conhecidos
+        'en-US' => 'en-US',
+        'pt-BR' => 'pt-BR',
+        'es-ES' => 'es-ES',
+        'fr-FR' => 'fr-FR',
+        'de-DE' => 'de-DE',
+        'it-IT' => 'it-IT',
+        'nl-NL' => 'nl-NL',
+        'ja-JP' => 'ja-JP',
+        'ko-KR' => 'ko-KR',
+        'zh-CN' => 'zh-CN',
+        'zh-TW' => 'zh-TW',
+        'zh-HK' => 'zh-HK',
+        // abreviações comuns → completos
+        'en' => 'en-US',
+        'pt' => 'pt-BR',
+        'es' => 'es-ES',
+        'fr' => 'fr-FR',
+        'de' => 'de-DE',
+        'it' => 'it-IT',
+        'nl' => 'nl-NL',
+        'ja' => 'ja-JP',
+        'ko' => 'ko-KR',
+        'zh' => 'zh-CN',
+        // especiais
+        'yue' => 'zh-HK'
+    ];
+
+    $configured = isset($accept_language_map[$language]) ? $accept_language_map[$language] : $language;
+    $accept_language = in_array($configured, $accepted_locales, true) ? $configured : 'en-US';
     
     return [
         'language' => $language,
-        'accept_language' => isset($accept_language_map[$language]) ? $accept_language_map[$language] : 'en-US',
+        'accept_language' => $accept_language,
         'currency' => get_option('viator_currency', 'BRL'),
         'currency_symbol' => viator_get_currency_symbol()
     ];
@@ -3752,6 +3782,17 @@ function viator_enqueue_booking_scripts() {
             null,
             true
         );
+
+        // CSP leve para desenvolvimento (permite Google Maps/Static)
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            add_action('send_headers', function() {
+                // Não sobrescreva caso já exista uma CSP mais estrita pelo servidor
+                if (!headers_sent()) {
+                    $csp = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com https://maps.gstatic.com https://checkout-assets.payments.tamg.cloud https://cdn.jsdelivr.net https://unpkg.com; connect-src 'self' https://maps.googleapis.com https://maps.gstatic.com https://places.googleapis.com; img-src 'self' data: https://maps.gstatic.com https://maps.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;";
+                    header("Content-Security-Policy: $csp");
+                }
+            });
+        }
         
         // Adicionar o atributo type="module" ao script da Viator
         add_filter('script_loader_tag', function($tag, $handle, $src) {

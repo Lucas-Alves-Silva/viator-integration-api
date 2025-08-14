@@ -5031,6 +5031,22 @@ this.renderLocationOptions();
 				});
 			} catch(_e) { /* no-op */ }
 
+			// Garantir preenchimento de modos quando esperados pelo produto e ausentes nas respostas
+			try {
+				const expectQuestion = (id) => Array.isArray(this.bookingQuestions) && this.bookingQuestions.some(q => (q?.id || q?.question) === id);
+				['TRANSFER_ARRIVAL_MODE','TRANSFER_DEPARTURE_MODE'].forEach((qid) => {
+					if (expectQuestion(qid) && !filtered.find(a => (a?.question || a?.questionId) === qid)) {
+						const allowed = (this.dynamicBookingQuestions?.allQuestions || []).find(qq => (qq?.id || qq?.question) === qid)?.allowedAnswers;
+						let fallback = 'OTHER';
+						if (Array.isArray(allowed) && allowed.length > 0) {
+							fallback = allowed.includes('OTHER') ? 'OTHER' : allowed[0];
+						}
+						filtered.push({ question: qid, answer: fallback });
+						console.log(`✅ [DYNAMIC DEBUG] ${qid} ausente → preenchido automaticamente com ${fallback}`);
+					}
+				});
+			} catch(__e) { /* no-op */ }
+
 			// Regra adicional: quando não há pickup, apenas AIR/OTHER são aceitos para ARRIVAL_MODE
 			try {
 				if (noPickup) {

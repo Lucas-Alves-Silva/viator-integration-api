@@ -45,7 +45,7 @@ function viator_modify_page_title($title, $sep = '|') {
                             'Accept'           => 'application/json;version=2.0',
                             'Content-Type'     => 'application/json;version=2.0',
                             'exp-api-key'      => $api_key,
-                            'Accept-Language'  => $locale_settings['language'],
+                            'Accept-Language'  => $locale_settings['accept_language'],
                         ],
                         'timeout' => 10, // Timeout reduzido para não atrasar muito o carregamento da página
                     ]);
@@ -143,7 +143,7 @@ function get_product_recommendations($product_code) {
             'Accept'           => 'application/json;version=2.0',
             'Content-Type'     => 'application/json;version=2.0',
             'exp-api-key'      => $api_key,
-            'Accept-Language'  => $locale_settings['language'],
+            'Accept-Language'  => $locale_settings['accept_language'],
         ],
         'body'    => json_encode($body),
         'timeout' => 120,
@@ -189,7 +189,7 @@ function get_product_recommendations($product_code) {
                 'Accept'           => 'application/json;version=2.0',
                 'Content-Type'     => 'application/json;version=2.0',
                 'exp-api-key'      => $api_key,
-                'Accept-Language'  => $locale_settings['language'],
+                'Accept-Language'  => $locale_settings['accept_language'],
             ],
             'timeout' => 30
         ]);
@@ -460,7 +460,7 @@ function viator_update_product_pricing($product_code) {
             'Accept' => 'application/json;version=2.0',
             'Content-Type' => 'application/json;version=2.0',
             'exp-api-key' => $api_key,
-            'Accept-Language' => $locale_settings['language'],
+            'Accept-Language' => $locale_settings['accept_language'],
         ],
         'body' => json_encode($request_data),
         'timeout' => 30
@@ -651,7 +651,7 @@ function viator_get_product_details($product_code) {
             'Accept'           => 'application/json;version=2.0',
             'Content-Type'     => 'application/json;version=2.0',
             'exp-api-key'      => $api_key,
-            'Accept-Language'  => $locale_settings['language'],
+            'Accept-Language'  => $locale_settings['accept_language'],
         ],
         'timeout' => 120,
     ]);
@@ -2049,7 +2049,7 @@ function viator_get_product_details($product_code) {
                         'Accept'           => 'application/json;version=2.0',
                         'Content-Type'     => 'application/json;version=2.0',
                         'exp-api-key'      => $api_key,
-                        'Accept-Language'  => $locale_settings['language'],
+                        'Accept-Language'  => $locale_settings['accept_language'],
                     ],
                     'timeout' => 10,
                 ]);
@@ -2131,7 +2131,7 @@ function viator_get_product_details($product_code) {
                                     'Accept'           => 'application/json;version=2.0',
                                     'Content-Type'     => 'application/json;version=2.0',
                                     'exp-api-key'      => $api_key,
-                                    'Accept-Language'  => $locale_settings['language'],
+                                    'Accept-Language'  => $locale_settings['accept_language'],
                                 ],
                                 'body'    => json_encode($availability_body),
                                 'timeout' => 10,
@@ -2186,7 +2186,7 @@ function viator_get_product_details($product_code) {
                                     'Accept'           => 'application/json;version=2.0',
                                     'Content-Type'     => 'application/json;version=2.0',
                                     'exp-api-key'      => $api_key,
-                                    'Accept-Language'  => $locale_settings['language'],
+                                    'Accept-Language'  => $locale_settings['accept_language'],
                                 ],
                                 'body'    => json_encode($search_body),
                                 'timeout' => 10,
@@ -2383,7 +2383,7 @@ function viator_get_product_data($product_code) {
             'Accept'           => 'application/json;version=2.0',
             'Content-Type'     => 'application/json;version=2.0',
             'exp-api-key'      => $api_key,
-            'Accept-Language'  => $locale_settings['language'],
+            'Accept-Language'  => $locale_settings['accept_language'],
         ],
         'timeout' => 120,
     ]);
@@ -2427,9 +2427,10 @@ function viator_enqueue_product_scripts() {
         $google_places_api_key = function_exists('viator_get_google_places_api_key') ? viator_get_google_places_api_key() : get_option('viator_google_places_api_key');
         $booking_js_deps = ['jquery', 'viator-payment-lib'];
         if (!empty($google_places_api_key)) {
+            // Carregar Maps JS API com melhores práticas (async/defer + v=weekly + loading=async)
             wp_enqueue_script(
                 'google-places-api',
-                'https://maps.googleapis.com/maps/api/js?key=' . urlencode($google_places_api_key) . '&libraries=places&language=pt-BR&region=BR',
+                'https://maps.googleapis.com/maps/api/js?key=' . urlencode($google_places_api_key) . '&v=weekly&libraries=places&language=pt-BR&region=BR&loading=async',
                 [],
                 null,
                 true
@@ -2470,10 +2471,13 @@ function viator_enqueue_product_scripts() {
             '1.0.0'
         );
 
+        // Passar accept_language resolvido (BCP-47) para o frontend, se necessário
+        $locale_settings = function_exists('viator_get_locale_settings') ? viator_get_locale_settings() : ['accept_language' => 'en-US'];
         wp_localize_script('viator-booking-js', 'viatorBookingAjax', [
             'ajaxurl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('viator_booking_nonce'),
-            'environment' => 'sandbox' // Change to 'production' when ready
+            'environment' => 'sandbox', // Change to 'production' when ready
+            'accept_language' => $locale_settings['accept_language']
         ]);
         
         // Informar ao frontend se Google Places está habilitado
@@ -2820,7 +2824,7 @@ function viator_get_reviews_ajax() {
             'Accept' => 'application/json;version=2.0',
             'Content-Type' => 'application/json;version=2.0',
             'exp-api-key' => $api_key,
-            'Accept-Language' => $locale_settings['language']
+            'Accept-Language' => $locale_settings['accept_language']
         ),
         'body' => json_encode($request_data),
         'timeout' => 30
@@ -3505,7 +3509,7 @@ function viator_debug_locations() {
             'Accept' => 'application/json;version=2.0',
             'Content-Type' => 'application/json;version=2.0',
             'exp-api-key' => $api_key,
-            'Accept-Language' => $locale_settings['language'],
+            'Accept-Language' => $locale_settings['accept_language'],
         ],
         'timeout' => 30,
     ]);
@@ -3712,7 +3716,7 @@ function viator_get_bulk_locations($location_references) {
             'Accept' => 'application/json;version=2.0',
             'Content-Type' => 'application/json;version=2.0',
             'exp-api-key' => $api_key,
-            'Accept-Language' => $locale_settings['language']
+            'Accept-Language' => $locale_settings['accept_language']
         ],
         'body' => json_encode($request_data),
         'timeout' => 30
