@@ -3730,6 +3730,13 @@ this.renderLocationOptions();
             return;
         }
 
+        // Limpar container e evitar renderização duplicada
+        formContainer.innerHTML = '';
+        const existingDyn = document.querySelector('.dynamic-booking-questions');
+        if (existingDyn && existingDyn.parentNode === formContainer) {
+            existingDyn.remove();
+        }
+
         // Usar sistema dinâmico se disponível
         if (this.dynamicBookingQuestions.allQuestions && this.productBookingQuestions?.booking_questions) {
             console.log('✅ Usando sistema dinâmico para renderização');
@@ -3845,7 +3852,12 @@ this.renderLocationOptions();
                 return this.renderNumberWithUnitField(question, fieldId, requiredAttr);
 
             case 'LOCATION_REF_OR_FREE_TEXT':
-                return this.renderLocationField(question, fieldId, requiredAttr);
+                // Para PICKUP_POINT usamos o componente completo de pickup
+                if (question.id === 'PICKUP_POINT') {
+                    return this.renderLocationField(question, fieldId, requiredAttr);
+                }
+                // Para outros campos (ex.: TRANSFER_ARRIVAL_DROP_OFF) usar input simples de endereço
+                return this.renderDropOffField(question, fieldId, requiredAttr);
 
             case 'STRING':
                 if (question.allowedAnswers && question.allowedAnswers.length > 0) {
@@ -3874,6 +3886,7 @@ this.renderLocationOptions();
                    name="${fieldId}"
                    class="form-control question-input"
                    ${requiredAttr}
+                   ${question.required === 'CONDITIONAL' ? 'data-original-required="CONDITIONAL"' : ''}
                    data-question-id="${question.id}"
                    data-question-type="${question.type}"
                    data-group="${question.group}">
@@ -3897,6 +3910,7 @@ this.renderLocationOptions();
                    name="${fieldId}"
                    class="form-control question-input"
                    ${requiredAttr}
+                   ${question.required === 'CONDITIONAL' ? 'data-original-required="CONDITIONAL"' : ''}
                    step="0.1"
                    min="0"
                    placeholder="${question.hint || 'Valor'}"
@@ -3912,6 +3926,7 @@ this.renderLocationOptions();
                     <select id="${fieldId}_unit"
                             name="${fieldId}_unit"
                             class="form-control question-unit"
+                            ${question.required === 'CONDITIONAL' ? 'data-original-required="CONDITIONAL"' : ''}
                             data-for="${fieldId}">
             `;
 
@@ -3962,7 +3977,7 @@ this.renderLocationOptions();
 
             Object.keys(groupedLocations).forEach(pickupType => {
                 if (groupedLocations[pickupType].length > 0) {
-                    html += `<optgroup label="${this.getPickupTypeLabel(pickupType)}">`;
+                    html += `<optgroup class="pickup-type-section" data-pickup-type="${pickupType}" label="${this.getPickupTypeLabel(pickupType)}">`;
 
                     groupedLocations[pickupType].forEach(location => {
                         const locationData = this.getLocationData(location.location.ref);
@@ -4015,6 +4030,7 @@ this.renderLocationOptions();
                     name="${fieldId}"
                     class="form-control question-input"
                     ${requiredAttr}
+                    ${question.required === 'CONDITIONAL' ? 'data-original-required="CONDITIONAL"' : ''}
                     data-question-id="${question.id}"
                     data-question-type="${question.type}"
                     data-group="${question.group}">
@@ -4062,6 +4078,7 @@ this.renderLocationOptions();
                    name="${fieldId}"
                    class="form-control question-input"
                    ${requiredAttr}
+                   ${question.required === 'CONDITIONAL' ? 'data-original-required="CONDITIONAL"' : ''}
                    ${maxLengthAttr}
                    placeholder="${placeholder}"
                    data-question-id="${question.id}"
@@ -4079,12 +4096,33 @@ this.renderLocationOptions();
             <input type="time"
                    id="${fieldId}"
                    name="${fieldId}"
-                   class="form-control question-input"
+                   class="form-control question-input time-input"
                    ${requiredAttr}
+                   step="60"
+                   placeholder="HH:MM"
+                   inputmode="numeric"
                    data-question-id="${question.id}"
                    data-question-type="${question.type}"
                    data-group="${question.group}">
             ${question.hint ? `<small class="form-text text-muted">${question.hint}</small>` : ''}
+        `;
+    }
+
+    // Campo simples de endereço para DROP_OFF com hidden sincronizado para unidade
+    renderDropOffField(question, fieldId, requiredAttr) {
+        const placeholder = question.hint || 'Digite um endereço';
+        // Usar um input de texto e um hidden para manter unit conforme a Viator
+        return `
+            <input type="text"
+                   id="${fieldId}_text"
+                   class="form-control question-input"
+                   ${requiredAttr}
+                   placeholder="${placeholder}"
+                   data-question-id="${question.id}"
+                   data-question-type="${question.type}"
+                   data-group="${question.group}">
+            <input type="hidden" id="${fieldId}" name="${fieldId}"
+                   data-question-id="${question.id}" data-group="${question.group}">
         `;
     }
 
@@ -4151,19 +4189,14 @@ this.renderLocationOptions();
                 INFANT: 'Bebê',
                 TRAVELER: 'Viajante'
             },
-            TRANSFER_ARRIVAL_MODE: {
-                AIR: 'Avião',
-                RAIL: 'Trem',
-                SEA: 'Navio/Barco',
-                OTHER: 'Outro'
-            },
-            TRANSFER_DEPARTURE_MODE: {
-                AIR: 'Avião',
-                RAIL: 'Trem',
-                SEA: 'Navio/Barco',
-                OTHER: 'Outro'
-            }
+            TRANSFER_ARRIVAL_MODE: { AIR: 'Avião', RAIL: 'Trem', SEA: 'Navio', OTHER: 'Outros' },
+            TRANSFER_DEPARTURE_MODE: { AIR: 'Avião', RAIL: 'Trem', SEA: 'Navio', OTHER: 'Outros' }
         };
+
+        // Se for modo de chegada/partida, retornar label traduzido quando houver
+        if ((questionId === 'TRANSFER_ARRIVAL_MODE' || questionId === 'TRANSFER_DEPARTURE_MODE') && displayTexts[questionId][answer]) {
+            return displayTexts[questionId][answer];
+        }
 
         return displayTexts[questionId]?.[answer] || answer;
     }
@@ -4205,7 +4238,26 @@ this.renderLocationOptions();
         const requiredLabel = isRequired ? ' *' : '';
 
         // Verificar se é pergunta condicional e se deve ser mostrada
-        if (this.isConditionalQuestion(questionId) && !this.shouldShowConditionalQuestion(questionId)) {
+        // Não forçar exibição de campos de transferência quando o produto não tem pickup
+        const pickupDataForVisibility = this.getPickupData ? this.getPickupData() : undefined;
+        const noPickupMode = pickupDataForVisibility && pickupDataForVisibility.pickupOptionType === 'MEET_EVERYONE_AT_START_POINT';
+
+        // Normalizar valor atual do arrival mode
+        const normalizeMode = (val) => {
+            if (!val) return val;
+            const map = { 'Avião': 'AIR', 'Trem': 'RAIL', 'Navio': 'SEA', 'Outros': 'OTHER' };
+            return map[val] || val;
+        };
+        const arrivalModeEl2 = document.querySelector('[id*="TRANSFER_ARRIVAL_MODE"]');
+        const arrivalModeNow = normalizeMode(arrivalModeEl2 ? arrivalModeEl2.value : '');
+        const arrivalOther = arrivalModeNow === 'OTHER';
+
+        const alwaysVisible = new Set(
+            (noPickupMode || arrivalOther)
+                ? []
+                : ['TRANSFER_AIR_ARRIVAL_AIRLINE','TRANSFER_AIR_ARRIVAL_FLIGHT_NO','TRANSFER_ARRIVAL_TIME','TRANSFER_ARRIVAL_DROP_OFF']
+        );
+        if (this.isConditionalQuestion(questionId) && !this.shouldShowConditionalQuestion(questionId) && !alwaysVisible.has(questionId)) {
             return '';
         }
 
@@ -4351,6 +4403,17 @@ this.renderLocationOptions();
             'TRANSFER_RAIL_DEPARTURE_STATION': () => this.getFieldValue('TRANSFER_DEPARTURE_MODE') === 'RAIL',
             'TRANSFER_RAIL_DEPARTURE_LINE': () => this.getFieldValue('TRANSFER_DEPARTURE_MODE') === 'RAIL'
         };
+        // Garantir que os valores de modo sejam em inglês (AIR/SEA/RAIL/OTHER) mesmo que exibidos traduzidos
+        // Se algum select de modo armazenar o label traduzido, normalizamos de volta
+        const normalizeMode = (val) => {
+            if (!val) return val;
+            const map = { 'Avião': 'AIR', 'Trem': 'RAIL', 'Navio': 'SEA', 'Outros': 'OTHER' };
+            return map[val] || val;
+        };
+        const arrivalModeEl = document.querySelector('[id*="TRANSFER_ARRIVAL_MODE"]');
+        if (arrivalModeEl) arrivalModeEl.value = normalizeMode(arrivalModeEl.value);
+        const departureModeEl = document.querySelector('[id*="TRANSFER_DEPARTURE_MODE"]');
+        if (departureModeEl) departureModeEl.value = normalizeMode(departureModeEl.value);
 
         const condition = conditionalLogic[questionId];
         return condition ? condition() : true;
@@ -4368,6 +4431,8 @@ this.renderLocationOptions();
      * Configurar eventos para campos dinâmicos
      */
     setupDynamicFieldEvents() {
+		if (this._dynamicFieldEventsBound) { return; }
+		this._dynamicFieldEventsBound = true;
         // Event listener para mudanças em campos de transfer mode
         document.addEventListener('change', (e) => {
             if (e.target.matches('[data-question-id="TRANSFER_ARRIVAL_MODE"], [data-question-id="TRANSFER_DEPARTURE_MODE"]')) {
@@ -4378,12 +4443,55 @@ this.renderLocationOptions();
             if (e.target.matches('[data-question-id="PICKUP_POINT"]')) {
                 this.handlePickupPointChange(e.target);
             }
+
+            // Mudanças no campo de hora (aplicar máscara também em change)
+            if (
+                e.target.matches('.time-input') ||
+                e.target.id === 'booking_question_TRANSFER_ARRIVAL_TIME' ||
+                (e.target.dataset && e.target.dataset.questionId === 'TRANSFER_ARRIVAL_TIME')
+            ) {
+                let v = (e.target.value || '').replace(/[^0-9]/g, '').slice(0, 4);
+                if (v.length >= 3) v = v.slice(0, 2) + ':' + v.slice(2);
+                e.target.value = v;
+            }
         });
 
         // Event listener para validação em tempo real
         document.addEventListener('blur', (e) => {
             if (e.target.matches('.question-input')) {
                 this.validateField(e.target);
+            }
+        });
+
+        // Máscara simples para inputs de hora (fallback quando type="time" não mascara)
+        document.addEventListener('input', (e) => {
+            if (
+                e.target.matches('.time-input') ||
+                e.target.id === 'booking_question_TRANSFER_ARRIVAL_TIME' ||
+                (e.target.dataset && e.target.dataset.questionId === 'TRANSFER_ARRIVAL_TIME')
+            ) {
+                let v = (e.target.value || '').replace(/[^0-9]/g, '').slice(0, 4);
+                if (v.length >= 3) v = v.slice(0, 2) + ':' + v.slice(2);
+                e.target.value = v;
+            }
+            // Sincronizar DROP_OFF: copiar valor do _text/_freetext para o hidden e setar unit
+            const id = e.target.id || '';
+            if ((id.includes('TRANSFER_ARRIVAL_DROP_OFF')) && (/_((text)|(freetext))$/.test(id))) {
+                const baseId = id.replace(/_(text|freetext)$/, '');
+                const hidden = document.getElementById(baseId);
+                if (hidden) {
+                    const value = (e.target.value || '').trim();
+                    hidden.value = value;
+                    hidden.setAttribute('data-question-id', 'TRANSFER_ARRIVAL_DROP_OFF');
+                    if (value) hidden.setAttribute('data-unit', 'FREETEXT'); else hidden.removeAttribute('data-unit');
+                }
+                // Opcional: garantir dataset no input de freetext para coleta genérica
+                if (!e.target.dataset || !e.target.dataset.questionId) {
+                    try {
+                        e.target.setAttribute('data-question-id', 'TRANSFER_ARRIVAL_DROP_OFF');
+                        e.target.setAttribute('data-group', 'PER_BOOKING');
+                    } catch (err) { /* no-op */ }
+                }
             }
         });
     }
@@ -4607,11 +4715,16 @@ this.renderLocationOptions();
         const answers = [];
         
         // CORREÇÃO: Buscar tanto por classe quanto por seletores específicos de viajantes
-        const generalInputs = document.querySelectorAll('.question-input');
-        const travelerInputs = document.querySelectorAll('[id*="traveler_"][data-question-id]');
+        // Coletar somente dentro do container da etapa 3 para evitar duplicidade
+        const stepContainer = document.getElementById('booking-questions-content') || document;
+        const generalInputs = stepContainer.querySelectorAll('.question-input');
+        const travelerInputs = stepContainer.querySelectorAll('[id*="traveler_"][data-question-id]');
+        // Filtrar quaisquer inputs aninhados dentro de '.additional-booking-info-section' que não sejam parte do Step 3 principal
+        const filteredGeneral = Array.from(generalInputs).filter(el => !el.closest('#additional-booking-info-section .booking-question-group'));
+        const filteredTraveler = Array.from(travelerInputs).filter(el => !el.closest('#additional-booking-info-section .booking-question-group'));
         
         // Combinar ambos os seletores e remover duplicatas
-        const allInputs = new Set([...generalInputs, ...travelerInputs]);
+        const allInputs = new Set([...filteredGeneral, ...filteredTraveler]);
         const questionInputs = Array.from(allInputs);
 
         console.log('🔍 [DYNAMIC DEBUG] collectDynamicBookingAnswers() iniciado');
@@ -4674,6 +4787,11 @@ this.renderLocationOptions();
                 question: questionId,
                 answer: value
             };
+
+            // Unidade obrigatória para DROP_OFF (sempre FREETEXT quando via texto)
+            if (questionId === 'TRANSFER_ARRIVAL_DROP_OFF') {
+                answer.unit = 'FREETEXT';
+            }
 
             // Adicionar travelerNum se for PER_TRAVELER
             if (group === 'PER_TRAVELER') {
@@ -4740,11 +4858,20 @@ this.renderLocationOptions();
 
         let pickupAnswer = null;
 
-        if (listChoiceSelected && listChoiceSelected.value && listChoiceSelected.value.startsWith('LOC-')) {
+        // Preferência: se houver texto livre preenchido, priorizar FREETEXT
+        if (freetextInputEl && freetextInputEl.value && freetextInputEl.value.trim() !== '') {
             pickupAnswer = {
-                    question: 'PICKUP_POINT',
-                answer: listChoiceSelected.value,
-                unit: 'LOCATION_REFERENCE'
+                question: 'PICKUP_POINT',
+                answer: freetextInputEl.value.trim(),
+                unit: 'FREETEXT'
+            };
+            console.log('✅ [DYNAMIC DEBUG] PICKUP_POINT via freetext (prioritário):', pickupAnswer);
+        } else if (listChoiceSelected && listChoiceSelected.value) {
+            const listVal = listChoiceSelected.value.trim();
+            pickupAnswer = {
+                question: 'PICKUP_POINT',
+                answer: listVal,
+                unit: listVal.startsWith('LOC-') ? 'LOCATION_REFERENCE' : 'FREETEXT'
             };
             console.log('✅ [DYNAMIC DEBUG] PICKUP_POINT via lista:', pickupAnswer);
         } else if (customRadioSelected?.checked && freetextInputEl && freetextInputEl.value.trim()) {
@@ -4767,8 +4894,8 @@ this.renderLocationOptions();
         }
 
         if (pickupAnswer && !answers.find(a => a.question === 'PICKUP_POINT')) {
-                answers.push(pickupAnswer);
-            }
+            answers.push(pickupAnswer);
+        }
 
         // CORREÇÃO: Usar cache do PICKUP_POINT se disponível
         if (this.cachedPickupPoint && this.cachedPickupPoint.answer && !answers.find(a => a.question === 'PICKUP_POINT')) {
@@ -4783,6 +4910,19 @@ this.renderLocationOptions();
 
         console.log('🔍 [DYNAMIC DEBUG] Total final de respostas (incluindo cross-step + cache):', answers.length);
 
+        // Fallback explícito: capturar TRANSFER_ARRIVAL_DROP_OFF de _freetext se ainda não coletado
+        try {
+            if (!answers.find(a => a.question === 'TRANSFER_ARRIVAL_DROP_OFF')) {
+            const dropOffFreetext = document.getElementById('booking_question_TRANSFER_ARRIVAL_DROP_OFF_freetext')
+                    || document.querySelector('input[id*="TRANSFER_ARRIVAL_DROP_OFF"][id$="_freetext"], input[id*="TRANSFER_ARRIVAL_DROP_OFF"][id$="_text"]');
+                if (dropOffFreetext && (dropOffFreetext.value || '').trim() !== '') {
+                    const val = dropOffFreetext.value.trim();
+                    answers.push({ question: 'TRANSFER_ARRIVAL_DROP_OFF', answer: val, unit: 'FREETEXT' });
+                    console.log('✅ [DYNAMIC DEBUG] TRANSFER_ARRIVAL_DROP_OFF via freetext (fallback):', val);
+                }
+            }
+        } catch (e) { /* no-op */ }
+
         // CORREÇÃO: Coletar respostas de language guide
         this.collectLanguageGuideAnswers(answers);
 
@@ -4794,6 +4934,112 @@ this.renderLocationOptions();
         console.log('🔍 [LANGUAGE GUIDE DEBUG] Language guides devem ser enviados como campo separado na requisição');
 
         console.log('🔍 [DYNAMIC DEBUG] Total final após language guide:', answers.length);
+
+        // Se arrival mode for OTHER, não coletar campos de tempo/drop-off de chegada
+        try {
+            const arr = answers.find(a => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
+            const arrIsOther = arr && String(arr.answer || '').trim() === 'OTHER';
+            if (arrIsOther) {
+                const before = answers.length;
+                const filteredArr = answers.filter(a => {
+                    const qid = a && (a.question || a.questionId);
+                    return qid !== 'TRANSFER_ARRIVAL_TIME' && qid !== 'TRANSFER_ARRIVAL_DROP_OFF';
+                });
+                if (filteredArr.length !== before) {
+                    console.log('🔧 [DYNAMIC DEBUG] Removidos campos de chegada (mode OTHER):', { antes: before, depois: filteredArr.length });
+                }
+                answers.length = 0;
+                Array.prototype.push.apply(answers, filteredArr);
+            }
+        } catch(e) { /* no-op */ }
+
+		// Regra oficial: para product option SEM pickup, responder modos como OTHER automaticamente
+		try {
+			const pickupData = this.getPickupData();
+			if (pickupData && pickupData.pickupOptionType === 'MEET_EVERYONE_AT_START_POINT') {
+				['TRANSFER_ARRIVAL_MODE', 'TRANSFER_DEPARTURE_MODE'].forEach((qid) => {
+					if ((this.bookingQuestions || []).some(q => q.id === qid) && !answers.find(a => a.question === qid)) {
+						answers.push({ question: qid, answer: 'OTHER' });
+						console.log(`✅ [DYNAMIC DEBUG] ${qid} definido automaticamente como OTHER (sem pickup)`);
+					}
+				});
+			}
+		} catch (e) { /* no-op */ }
+
+		// FILTRO FINAL DE CONFORMIDADE: manter apenas perguntas suportadas e remover campos de transferência quando não há pickup
+		try {
+			const extractId = (q) => (typeof q === 'string' ? q : (q?.id || q?.question || null));
+			const dyn = Array.isArray(this.dynamicBookingQuestions?.allQuestions) ? this.dynamicBookingQuestions.allQuestions : [];
+			const bkq = Array.isArray(this.bookingQuestions) ? this.bookingQuestions : [];
+			const win = Array.isArray(window.productData?.bookingQuestions) ? window.productData.bookingQuestions : [];
+			const allowedIds = new Set([
+				...dyn.map(extractId).filter(Boolean),
+				...bkq.map(extractId).filter(Boolean),
+				...win.map(extractId).filter(Boolean)
+			]);
+
+			const pickupInfo = this.getPickupData ? this.getPickupData() : undefined;
+			const noPickup = pickupInfo && pickupInfo.pickupOptionType === 'MEET_EVERYONE_AT_START_POINT';
+
+			const before = answers.length;
+			const filtered = answers.filter((ans) => {
+				const qid = ans && (ans.question || ans.questionId);
+				if (!qid) return false;
+				if (noPickup && (qid === 'TRANSFER_ARRIVAL_TIME' || qid === 'TRANSFER_ARRIVAL_DROP_OFF')) return false;
+				return allowedIds.size === 0 || allowedIds.has(qid);
+			});
+			if (filtered.length !== before) {
+				console.log('🔧 [DYNAMIC DEBUG] Respostas filtradas por conformidade:', { antes: before, depois: filtered.length });
+			}
+
+			// Sanitização de valores para modos (usar allowedAnswers do produto)
+			try {
+				const getAllowed = (id) => {
+					const q = (this.dynamicBookingQuestions?.allQuestions || []).find((qq) => (qq?.id || qq?.question) === id);
+					return Array.isArray(q?.allowedAnswers) ? q.allowedAnswers : null;
+				};
+				['TRANSFER_ARRIVAL_MODE', 'TRANSFER_DEPARTURE_MODE'].forEach((qid) => {
+					const allowed = getAllowed(qid);
+					if (!allowed || allowed.length === 0) return;
+					const idx = filtered.findIndex((a) => (a?.question || a?.questionId) === qid);
+					if (idx !== -1) {
+						const cur = filtered[idx].answer;
+						if (!allowed.includes(cur)) {
+							const fallback = allowed.includes('OTHER') ? 'OTHER' : allowed[0];
+							console.warn(`⚠️ [DYNAMIC DEBUG] ${qid} valor inválido "${cur}". Ajustando para "${fallback}" (allowed: ${allowed.join(', ')})`);
+							filtered[idx].answer = fallback;
+						}
+					}
+				});
+			} catch(_e) { /* no-op */ }
+
+			// Regra adicional: quando não há pickup, apenas AIR/OTHER são aceitos para ARRIVAL_MODE
+			try {
+				if (noPickup) {
+					const idx = filtered.findIndex((a) => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
+					if (idx !== -1) {
+						const cur = String(filtered[idx].answer || '').trim();
+						if (cur !== 'AIR' && cur !== 'OTHER') {
+							console.warn(`⚠️ [DYNAMIC DEBUG] TRANSFER_ARRIVAL_MODE inválido no cenário sem pickup: "${cur}" → OTHER`);
+							filtered[idx].answer = 'OTHER';
+						}
+					}
+				}
+			} catch(__e) { /* no-op */ }
+
+			// Substituir conteúdo mantendo a mesma referência
+			answers.length = 0;
+			Array.prototype.push.apply(answers, filtered);
+		} catch (e) { /* no-op */ }
+
+        // Garantir unit para DROP_OFF caso tenha sido coletado sem fallback
+        try {
+            const dropOffAns = answers.find(a => a && a.question === 'TRANSFER_ARRIVAL_DROP_OFF');
+            if (dropOffAns && !dropOffAns.unit) {
+                dropOffAns.unit = 'FREETEXT';
+                console.log('✅ [DYNAMIC DEBUG] Unit adicionada a TRANSFER_ARRIVAL_DROP_OFF (FREETEXT)');
+            }
+        } catch (e) { /* no-op */ }
 
         // CORREÇÃO CRÍTICA: Buscar especificamente por perguntas PER_TRAVELER obrigatórias que podem estar sendo perdidas
         this.ensureCriticalPerTravelerAnswers(answers);
@@ -4963,6 +5209,11 @@ this.renderLocationOptions();
     renderDynamicBookingQuestions(formContainer) {
         console.log('🎨 Renderizando booking questions dinamicamente...');
 
+        // Evitar duplicação: limpar container antes de injetar novo HTML
+        if (formContainer) {
+            formContainer.innerHTML = '';
+        }
+
         const questions = this.productBookingQuestions.booking_questions;
         const travelers = this.bookingData.selectedTravelers || [];
 
@@ -4995,10 +5246,12 @@ this.renderLocationOptions();
         console.log('🔄 [REORGANIZAÇÃO] Perguntas PER_BOOKING na Etapa 3 (incluindo PICKUP_POINT):', perBookingQuestions.length);
         console.log('🔄 Perguntas PER_TRAVELER:', perTravelerQuestions.length);
 
-        // Mover perguntas PER_BOOKING (exceto PICKUP_POINT e LANGUAGE_GUIDE) para a coluna de "Informações Adicionais"
-        const generalPerBookingQuestions = perBookingQuestions.filter(q => 
-            q.id !== 'PICKUP_POINT' && !(q.subType === 'LANGUAGE_GUIDE' || (q.label && typeof q.label === 'string' && (q.label.toLowerCase().includes('idioma') || q.label.toLowerCase().includes('language'))))
-        );
+		// Mover perguntas PER_BOOKING (exceto PICKUP_POINT, TRANSFER_* e LANGUAGE_GUIDE) para a coluna de "Informações Adicionais"
+		const generalPerBookingQuestions = perBookingQuestions.filter(q => 
+			q.id !== 'PICKUP_POINT' &&
+			!String(q.id || '').startsWith('TRANSFER_') &&
+			!(q.subType === 'LANGUAGE_GUIDE' || (q.label && typeof q.label === 'string' && (q.label.toLowerCase().includes('idioma') || q.label.toLowerCase().includes('language'))))
+		);
 
         // Manter apenas PICKUP_POINT no bloco principal (se existir)
         const pickupHtml = this.renderPickupPointSection();
@@ -5009,12 +5262,15 @@ this.renderLocationOptions();
             html += '</div>';
         }
 
+        // As perguntas TRANSFER_* já são renderizadas dentro de renderPickupPointSection();
+        // Evitar duplicação aqui.
+
         // CORREÇÃO: Remover perguntas PER_TRAVELER da etapa 3
-        // As informações dos viajantes (FULL_NAMES_FIRST, FULL_NAMES_LAST, etc.) 
-        // já são coletadas na etapa 2 através do formulário de viajantes
         // A etapa 3 deve conter apenas perguntas PER_BOOKING
         console.log('🔄 [CORREÇÃO] Perguntas PER_TRAVELER removidas da etapa 3 para evitar duplicação');
-        console.log('📝 Perguntas PER_TRAVELER ignoradas:', perTravelerQuestions.map(q => q.id));
+        if (perTravelerQuestions.length > 0) {
+            console.log('📝 Perguntas PER_TRAVELER ignoradas:', perTravelerQuestions.map(q => q.id));
+        }
 
         html += '</div>';
 
@@ -5123,11 +5379,10 @@ this.renderLocationOptions();
             </div>`;
         }
         
-        // Adicionar indicador visual de campo condicional (alinhado à regra atual)
+        // Adicionar ajuda textual leve
         selectHTML += `<div class="pickup-point-info" style="margin-top: 5px;">
             <small class="text-info">
-                <i class="fas fa-info-circle"></i> 
-                Este campo é obrigatório apenas quando o modo de chegada exige coleta (ex.: busca no hotel ou ponto de encontro central)
+                <i class="fas fa-info-circle"></i> Se digitar um endereço específico, ele será usado em vez da lista.
             </small>
         </div>`;
 
@@ -5267,7 +5522,11 @@ this.renderLocationOptions();
         });
 
         // Inicializar coleta inicial
-        this.collectBookingQuestionAnswers();
+        // Debounce para evitar múltiplas coletas em sequência
+        clearTimeout(this._collectBQDebounce);
+        this._collectBQDebounce = setTimeout(() => {
+            this.collectBookingQuestionAnswers();
+        }, 120);
 
         // Adicionar estilos para campos sincronizados
         this.addUnitSyncStyles();
@@ -6252,7 +6511,9 @@ this.renderLocationOptions();
      * Obter total de perguntas obrigatórias
      */
     getTotalRequiredQuestions() {
-        const requiredInputs = document.querySelectorAll('.question-input[required]');
+        // Limitar a validação ao container da etapa 3 para evitar ler campos duplicados fora do escopo
+        const stepContainer = document.getElementById('booking-questions-content') || document;
+        const requiredInputs = stepContainer.querySelectorAll('.question-input[required]');
         return requiredInputs.length;
     }
 
@@ -6262,7 +6523,9 @@ this.renderLocationOptions();
     validateAllBookingQuestions() {
         console.log('🔍 Validando todas as booking questions...');
 
-        const requiredInputs = document.querySelectorAll('.question-input[required]');
+        // Limitar ao container da etapa 3
+        const stepContainer = document.getElementById('booking-questions-content') || document;
+        const requiredInputs = stepContainer.querySelectorAll('.question-input[required]');
         const errors = [];
         let isValid = true;
 
@@ -6492,12 +6755,50 @@ this.renderLocationOptions();
         
         let isValid = true;
         
-        // Validar TRANSFER_ARRIVAL_MODE se presente
-        if (arrivalModeInput && arrivalModeInput.hasAttribute('required')) {
-            const value = arrivalModeInput.value.trim();
+        // Validar TRANSFER_ARRIVAL_MODE se presente (considerar obrigatório na etapa 3)
+        if (arrivalModeInput) {
+            let value = arrivalModeInput.value.trim();
+            // Se a pergunta tem allowedAnswers e o valor atual não é permitido, normalizar para OTHER
+            try {
+                const q = (this.dynamicBookingQuestions?.allQuestions || []).find((qq) => (qq?.id || qq?.question) === 'TRANSFER_ARRIVAL_MODE');
+                const allowed = Array.isArray(q?.allowedAnswers) ? q.allowedAnswers : null;
+                if (allowed && allowed.length > 0 && !allowed.includes(value)) {
+                    const fallback = allowed.includes('OTHER') ? 'OTHER' : allowed[0];
+                    console.warn(`⚠️ [VALIDATION] TRANSFER_ARRIVAL_MODE inválido "${value}". Ajustando para "${fallback}" (allowed: ${allowed.join(', ')})`);
+                    value = fallback;
+                    arrivalModeInput.value = fallback;
+                }
+                // Cenário sem pickup: só AIR/OTHER são válidos segundo o erro da API – normalizar
+                const pickupData = this.getPickupData ? this.getPickupData() : undefined;
+                const noPickup = pickupData && pickupData.pickupOptionType === 'MEET_EVERYONE_AT_START_POINT';
+                if (noPickup && value !== 'AIR' && value !== 'OTHER') {
+                    const fallback = allowed && allowed.includes('OTHER') ? 'OTHER' : 'OTHER';
+                    console.warn(`⚠️ [VALIDATION] TRANSFER_ARRIVAL_MODE ajustado (no-pickup) "${value}" → "${fallback}"`);
+                    value = fallback;
+                    arrivalModeInput.value = fallback;
+                }
+            } catch(_e) { /* no-op */ }
             if (!value) {
                 this.showFieldError(arrivalModeInput, 'Modo de chegada é obrigatório');
                 isValid = false;
+            }
+        }
+        // Se arrival mode exige drop-off, exigir TRANSFER_ARRIVAL_DROP_OFF (não exigir quando OTHER)
+        if (arrivalModeInput && arrivalModeInput.value && arrivalModeInput.value.trim() !== '' && arrivalModeInput.value.trim() !== 'OTHER') {
+            const dropOffField = document.querySelector('[data-question-id="TRANSFER_ARRIVAL_DROP_OFF"]');
+            const dropOffFree = document.getElementById('booking_question_TRANSFER_ARRIVAL_DROP_OFF_freetext')
+                || document.querySelector('input[id*="TRANSFER_ARRIVAL_DROP_OFF"][id$="_freetext"], input[id*="TRANSFER_ARRIVAL_DROP_OFF"][id$="_text"]');
+            const valueFromHidden = dropOffField ? (dropOffField.value || '').trim() : '';
+            const valueFromFree = dropOffFree ? (dropOffFree.value || '').trim() : '';
+            const effectiveValue = valueFromHidden || valueFromFree;
+            if (!effectiveValue) {
+                // Preferir exibir erro no freetext se ele existir
+                const targetField = dropOffFree || dropOffField;
+                if (targetField) this.showFieldError(targetField, 'Endereço final é obrigatório');
+                isValid = false;
+            } else {
+                if (dropOffField) this.hideFieldError(dropOffField);
+                if (dropOffFree) this.hideFieldError(dropOffFree);
             }
         }
         
@@ -6700,6 +7001,19 @@ this.renderLocationOptions();
 
         // Validar se todas as perguntas obrigatórias foram respondidas
         const validation = this.validateAllBookingQuestions();
+        // Regras adicionais críticas do produto para o Step 3
+        if (validation.isValid) {
+            // PICKUP_POINT obrigatório (conforme regra estabelecida)
+            const pickupOk = this.validatePickupPointConditional();
+            if (!pickupOk) {
+                return false;
+            }
+            // TRANSFER_ARRIVAL_DROP_OFF quando aplicável
+            const transferOk = this.validateTransferModes();
+            if (!transferOk) {
+                return false;
+            }
+        }
 
         if (!validation.isValid) {
             console.warn('⚠️ Validação de booking questions falhou:', validation.errors);
@@ -7088,28 +7402,47 @@ this.renderLocationOptions();
         
         let html = '';
         
-        // Renderizar pergunta de ponto de encontro
+        // Renderizar Modo de chegada primeiro, seguido dos dependentes e, em seguida, o Endereço final
+        const arrivalModeQ = transferQuestions.find(q => q.id === 'TRANSFER_ARRIVAL_MODE');
+        const arrivalTimeQ = transferQuestions.find(q => q.id === 'TRANSFER_ARRIVAL_TIME');
+        const dropOffQ = transferQuestions.find(q => q.id === 'TRANSFER_ARRIVAL_DROP_OFF');
+        const airAirlineQ = transferQuestions.find(q => q.id === 'TRANSFER_AIR_ARRIVAL_AIRLINE');
+        const airFlightQ = transferQuestions.find(q => q.id === 'TRANSFER_AIR_ARRIVAL_FLIGHT_NO');
+
+        const renderQ = (question) => {
+            if (!question) return;
+            const questionId = `booking_question_${question.id}`;
+            const isRequired = question.required === 'MANDATORY';
+            const requiredMark = isRequired ? ' *' : '';
+            html += '<div class="booking-question-group">';
+            const safeLabel = this.ensureStringForHTML(question.label, 'Pergunta');
+            html += `<label for="${questionId}">${safeLabel}${requiredMark}</label>`;
+            html += this.renderQuestionField(question, questionId, isRequired, false, null);
+            html += `<div class="error-message" id="error_${questionId}" style="display: none;"></div>`;
+            html += '</div>';
+        };
+
+        // Modo de chegada (sempre visível)
+        renderQ(arrivalModeQ);
+        // Dependentes mais compreensíveis logo abaixo
+        renderQ(airAirlineQ);
+        renderQ(airFlightQ);
+        renderQ(arrivalTimeQ);
+        // Endereço final
+        renderQ(dropOffQ);
+        
+        // Renderizar pergunta de ponto de encontro ao final desse bloco
         if (pickupQuestions.length > 0) {
             const question = pickupQuestions[0];
             const questionId = `booking_question_${question.id}`;
             const isRequired = question.required === 'MANDATORY';
             const requiredMark = isRequired ? ' *' : '';
-            
-            let dataAttrs = `data-question-id="${question.id}" data-group="${question.group}"`;
-            const requiredAttr = isRequired ? 'required' : '';
-            
             html += '<div class="pickup-point-question-group">';
-            // CORREÇÃO: Garantir que label seja string válida
             const safeLabel = this.ensureStringForHTML(question.label, 'Local de Encontro');
             html += `<label for="${questionId}">${safeLabel}${requiredMark}</label>`;
             html += this.renderQuestionField(question, questionId, isRequired, false, null);
             html += `<div class="error-message" id="error_${questionId}" style="display: none;"></div>`;
             html += '</div>';
-        }
-        
-        // Renderizar perguntas de transferência
-        if (transferQuestions.length > 0) {
-            html += this.renderGeneralBookingQuestions(transferQuestions);
         }
         
         return html;
@@ -7127,6 +7460,8 @@ this.renderLocationOptions();
             console.warn('⚠️ [LANGUAGE GUIDE] Container language-guide-container não encontrado');
             return;
         }
+        // Evitar duplicação: sempre limpar antes de escrever
+        languageContainer.innerHTML = '';
         
         const languageQuestions = this.bookingQuestions.filter(q => 
             q.group === 'PER_BOOKING' && 
@@ -7418,12 +7753,27 @@ this.renderLocationOptions();
                         preselectValue = this.bookingData.travelerAgeBandAllocation?.[Number(travelerIndex) - 1] || null;
                     }
 
-                    // Filtro: manter somente faixas etárias disponíveis no produto e selecionadas na Etapa 1
+                    // Filtro base de allowedAnswers
                     let filteredAnswers = question.allowedAnswers;
                     if (isAgeBand) {
                         const availableBands = Array.isArray(this.ageBands) ? new Set(this.ageBands.map(b => b.ageBand)) : new Set();
                         const selectedBands = Array.isArray(this.bookingData.selectedTravelers) ? new Set(this.bookingData.selectedTravelers.map(t => t.ageBand)) : new Set();
                         filteredAnswers = (question.allowedAnswers || []).filter(a => availableBands.has(a) && selectedBands.has(a));
+                    } else if (question.id === 'TRANSFER_ARRIVAL_MODE' || question.id === 'TRANSFER_DEPARTURE_MODE') {
+                        // Filtro de modos: manter somente os modos suportados pelo produto (derivados das perguntas dependentes)
+                        const present = (id) => Array.isArray(this.bookingQuestions) && this.bookingQuestions.some(q => q.id === id);
+                        const hasAir = present('TRANSFER_AIR_ARRIVAL_AIRLINE') || present('TRANSFER_AIR_ARRIVAL_FLIGHT_NO') || present('TRANSFER_AIR_DEPARTURE_AIRLINE') || present('TRANSFER_AIR_DEPARTURE_FLIGHT_NO');
+                        const hasSea = present('TRANSFER_PORT_CRUISE_SHIP') || present('TRANSFER_PORT_ARRIVAL_TIME') || present('TRANSFER_PORT_DEPARTURE_TIME');
+                        const hasRail = present('TRANSFER_RAIL_ARRIVAL_STATION') || present('TRANSFER_RAIL_ARRIVAL_LINE') || present('TRANSFER_RAIL_DEPARTURE_STATION') || present('TRANSFER_RAIL_DEPARTURE_LINE');
+                        filteredAnswers = (question.allowedAnswers || []).filter(a => {
+                            if (a === 'OTHER') return true;
+                            if (a === 'AIR') return hasAir;
+                            if (a === 'SEA') return hasSea;
+                            if (a === 'RAIL') return hasRail;
+                            return false;
+                        });
+                        // Garantir que exista pelo menos OTHER
+                        if (!filteredAnswers.includes('OTHER')) filteredAnswers.push('OTHER');
                     }
 
                     // Se AGE BAND por viajante já foi alocado, travar o campo
@@ -7439,11 +7789,13 @@ this.renderLocationOptions();
                         : filteredAnswers;
 
                     finalAnswers.forEach(answer => {
-                        // Usar label do produto quando disponível
-                        let displayText = answer;
+                        // Usar label traduzido para modos de chegada/partida e outros allowedAnswers
+                        let displayText;
                         if (isAgeBand) {
                             const band = Array.isArray(this.ageBands) ? this.ageBands.find(b => b.ageBand === answer) : null;
                             displayText = band?.label || this.getAgeBandDisplayName?.(answer) || answer;
+                        } else {
+                            displayText = this.getAnswerDisplayText(question.id, answer) || answer;
                         }
                         const selectedAttr = preselectValue && preselectValue === answer ? ' selected' : '';
                         html += `<option value="${answer}"${selectedAttr}>${displayText}</option>`;
@@ -7682,6 +8034,38 @@ this.renderLocationOptions();
         const pickupData = this.getPickupData();
         
         console.log('🎨 [PICKUP RENDER] Dados de pickup:', pickupData);
+        
+        // Caso não haja pickup (todos se encontram no ponto de partida), ocultar UI e responder automaticamente
+        if (pickupData && pickupData.pickupOptionType === 'MEET_EVERYONE_AT_START_POINT') {
+            console.log('ℹ️ [PICKUP RENDER] pickupOptionType = MEET_EVERYONE_AT_START_POINT — ocultando UI e definindo MEET_AT_DEPARTURE_POINT');
+            html += `<input type="hidden" id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr} value="MEET_AT_DEPARTURE_POINT" data-unit="LOCATION_REFERENCE">`;
+
+            // Exibir card informativo com o ponto de encontro (start location)
+            const startInfo = window.productData?.logistics?.start?.[0] || null;
+            const meetingDesc = startInfo?.description ? String(startInfo.description).replace(/\n/g,'<br>') : '';
+            const meetingRef = startInfo?.location?.ref || '';
+            const detailsContainerId = `${questionId}_meeting_details`;
+
+            html += `
+                <div class="meeting-point-card" style="margin-top:10px;padding:12px;border:1px solid #e0e0e0;border-radius:8px;background:#fafafa">
+                    <div class="meeting-radio" style="margin-bottom:6px">
+                        <input type="radio" id="${questionId}_meet_radio" name="${questionId}_meet_radio" checked>
+                        <label for="${questionId}_meet_radio" style="margin-left:6px;cursor:pointer">🚶 Vou por conta própria até o ponto de encontro</label>
+                    </div>
+                    ${meetingDesc ? `<div class="meeting-point-desc" style="margin:6px 0;color:#333">${meetingDesc}</div>` : ''}
+                    <div id="${detailsContainerId}" class="meeting-point-details" style="color:#555"></div>
+                    <div class="meeting-point-note" style="margin-top:8px;color:#555;font-size:0.92em">ℹ️ O fornecedor pode reconfirmar os detalhes do ponto de encontro após a compra.</div>
+                </div>
+            `;
+
+            if (meetingRef) {
+                setTimeout(() => {
+                    try { this.loadMeetingPointDetails(meetingRef, detailsContainerId); } catch (_) {}
+                }, 50);
+            }
+
+            return html;
+        }
         
         // Container principal para pickup point
         html += `<div id="${questionId}_container" class="pickup-point-container">`;
@@ -8233,10 +8617,6 @@ this.renderLocationOptions();
                 if (!target || !target.matches(`input[name="${questionId}"][type="radio"]`)) return;
                 if (target.id === `${questionId}_choose_location`) return; // não limpar ao reabrir a lista
 
-                // Resetar título do label para o texto padrão
-                const chooseLabelTitle = document.querySelector(`label[for="${questionId}_choose_location"] .pickup-option-title`);
-                if (chooseLabelTitle) chooseLabelTitle.textContent = '🏨 Escolher de uma lista';
-
                 // Ocultar lista ao trocar para outras opções
                 if (locationsList) locationsList.style.display = 'none';
             });
@@ -8556,6 +8936,38 @@ this.renderLocationOptions();
                 const container = document.getElementById(`${questionId}_${pickupType}_list`);
                 if(container) container.innerHTML = `<p class="error-message">Erro ao carregar ${this.getPickupTypeLabel(pickupType).toLowerCase()}</p>`;
             });
+        }
+    }
+
+    /**
+     * Carregar detalhes de um único ponto de encontro (para MEET_EVERYONE_AT_START_POINT)
+     */
+    async loadMeetingPointDetails(locationRef, containerId) {
+        try {
+            const response = await fetch(viatorBookingAjax.ajaxurl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    action: 'viator_get_location_details',
+                    nonce: viatorBookingAjax.nonce,
+                    location_refs: JSON.stringify([locationRef])
+                })
+            });
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            const result = await response.json();
+            const target = document.getElementById(containerId);
+            if (!target) return;
+            if (result.success && Array.isArray(result.data) && result.data.length > 0) {
+                const detail = result.data[0];
+                const info = this.getFormattedLocationInfo(detail) || '';
+                const name = detail.name || '';
+                target.innerHTML = [name, info].filter(Boolean).join(' — ');
+            } else {
+                target.textContent = '';
+            }
+        } catch (err) {
+            const target = document.getElementById(containerId);
+            if (target) target.textContent = '';
         }
     }
     
@@ -12122,6 +12534,33 @@ this.renderLocationOptions();
                 this.showDateError('Erro: Dados do responsável incompletos. Por favor, verifique se todos os campos obrigatórios estão preenchidos (Nome, Sobrenome e Email).');
                 return;
             }
+
+            // Regra de segurança adicional: se modo de chegada foi informado, exigir TRANSFER_ARRIVAL_DROP_OFF
+            try {
+                const arrivalModeAns = (bookingQuestionAnswers || []).find(a => (a.question || a.questionId) === 'TRANSFER_ARRIVAL_MODE');
+                const arrivalModeVal = (arrivalModeAns && String(arrivalModeAns.answer || '').trim()) || '';
+                const hasArrivalMode = !!arrivalModeVal;
+                const pickupData = this.getPickupData ? this.getPickupData() : undefined;
+                const noPickup = pickupData && pickupData.pickupOptionType === 'MEET_EVERYONE_AT_START_POINT';
+                const dropOffAnsIndex = (bookingQuestionAnswers || []).findIndex(a => (a.question || a.questionId) === 'TRANSFER_ARRIVAL_DROP_OFF');
+                if (hasArrivalMode && !noPickup && arrivalModeVal !== 'OTHER') {
+                    if (dropOffAnsIndex === -1) {
+                        // Preferir hidden sincronizado
+                        const hidden = document.getElementById('TRANSFER_ARRIVAL_DROP_OFF');
+                        const textInput = document.getElementById('TRANSFER_ARRIVAL_DROP_OFF_text');
+                        const val = hidden?.value?.trim() || textInput?.value?.trim() || '';
+                        if (val) {
+                            const unit = hidden?.getAttribute('data-unit') || 'FREETEXT';
+                            bookingQuestionAnswers.push({ question: 'TRANSFER_ARRIVAL_DROP_OFF', answer: val, unit: unit });
+                        } else {
+                            this.showDateError('Informe o endereço final da chegada (Endereço final).');
+                            const fg = (textInput || hidden)?.closest?.('.booking-question-group');
+                            if (fg && fg.scrollIntoView) fg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            return false;
+                        }
+                    }
+                }
+            } catch (_e) {}
             
             console.log('✅ [CONFIRM] Validação final aprovada - bookerInfo completo:', bookerInfo);
 
@@ -12195,6 +12634,52 @@ this.renderLocationOptions();
                         unit: answer.unit
                     });
                 });
+
+                // FILTRO FINAL ANTES DO ENVIO: remover campos de transferência quando não há pickup
+                try {
+                    const pickupData = this.getPickupData ? this.getPickupData() : undefined;
+                    const noPickup = pickupData && pickupData.pickupOptionType === 'MEET_EVERYONE_AT_START_POINT';
+                    if (noPickup) {
+                        const before = bookingQuestionAnswers.length;
+                        bookingQuestionAnswers = bookingQuestionAnswers.filter((a) => {
+                            const qid = a && (a.question || a.questionId);
+                            return qid !== 'TRANSFER_ARRIVAL_TIME' && qid !== 'TRANSFER_ARRIVAL_DROP_OFF';
+                        });
+                        const after = bookingQuestionAnswers.length;
+                        if (after !== before) {
+                            console.log('🔧 [CONFIRM] Removidos campos de transferência (no-pickup):', { antes: before, depois: after });
+                        }
+                        // Normalizar arrival mode para OTHER quando não for aceito
+                        const idx = bookingQuestionAnswers.findIndex((a) => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
+                        if (idx !== -1) {
+                            const cur = String(bookingQuestionAnswers[idx].answer || '').trim();
+                            if (cur !== 'AIR' && cur !== 'OTHER') {
+                                console.warn(`⚠️ [CONFIRM] TRANSFER_ARRIVAL_MODE inválido no cenário sem pickup: "${cur}" → OTHER`);
+                                bookingQuestionAnswers[idx].answer = 'OTHER';
+                            }
+                        }
+                    }
+                } catch (e) { /* no-op */ }
+
+                // Remoção final de quaisquer campos de transferência indevidos para produtos sem pickup ou arrivalMode=OTHER
+                try {
+                    const pickupData2 = this.getPickupData ? this.getPickupData() : undefined;
+                    const noPickup2 = pickupData2 && pickupData2.pickupOptionType === 'MEET_EVERYONE_AT_START_POINT';
+                    // Verificar arrival mode atual nas respostas
+                    const arrIdx = bookingQuestionAnswers.findIndex((a) => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
+                    const arrivalIsOther = arrIdx !== -1 && String(bookingQuestionAnswers[arrIdx].answer || '').trim() === 'OTHER';
+                    if (noPickup2 || arrivalIsOther) {
+                        const before2 = bookingQuestionAnswers.length;
+                        bookingQuestionAnswers = bookingQuestionAnswers.filter((a) => {
+                            const qid = a && (a.question || a.questionId);
+                            return qid !== 'TRANSFER_ARRIVAL_TIME' && qid !== 'TRANSFER_ARRIVAL_DROP_OFF';
+                        });
+                        const after2 = bookingQuestionAnswers.length;
+                        if (after2 !== before2) {
+                            console.log('🔧 [CONFIRM] Purga final de campos de transferência (no-pickup):', { antes: before2, depois: after2 });
+                        }
+                    }
+                } catch (e) { /* no-op */ }
 
                 requestParams.bookingQuestionAnswers = JSON.stringify(bookingQuestionAnswers);
             } else {
