@@ -644,6 +644,7 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 | 1.9 | 2025-08-14 | Caso 101124P5 confirmado (CONFIRM 200): ARRIVAL=AIR, DEPARTURE=OTHER, PICKUP_POINT=CONTACT_SUPPLIER_LATER; evidências detalhadas de hold/pagamento/confirm | Sistema |
 | 1.10 | 2025-08-14 | Caso 101124P5: ARRIVAL=AIR + PICKUP_POINT=FREETEXT ("Informar endereço específico"): CONFIRM 200; campos AIR coletados; Accept-Language pt-BR | Sistema |
 | 1.11 | 2025-08-15 | Caso 101124P5: ARRIVAL=SEA + DEPARTURE=OTHER; campos SEA (TRANSFER_PORT_CRUISE_SHIP, TRANSFER_PORT_ARRIVAL_TIME); PICKUP_POINT=CONTACT_SUPPLIER_LATER; CONFIRM 200 | Sistema |
+| 1.12 | 2025-08-15 | Casos 101124P5: ARRIVAL=OTHER + PICKUP_POINT (CONTACT_SUPPLIER_LATER, "Gostaria que me buscassem", "Informar endereço específico"); CONFIRM 200 | Sistema |
 
 ---
 
@@ -789,6 +790,51 @@ Trechos do log (`viator-debug.log`):
 - Não enviar `TRANSFER_ARRIVAL_TIME` quando o modo é SEA (evita “Extra answer(s) provided: TRANSFER_ARRIVAL_TIME”).
 - `TRANSFER_ARRIVAL_DROP_OFF` permanece `FREETEXT` quando informado manualmente.
 - `PICKUP_POINT` pode ser `CONTACT_SUPPLIER_LATER` como `LOCATION_REFERENCE` quando disponível no produto.
+
+### ✅ Implementação 14: 101124P5 — ARRIVAL=OTHER + PICKUP_POINT (3 variações)
+**Data:** Agosto 2025  
+**Status:** ✅ Fluxos completos (HOLD → pagamento → CONFIRM 200) para 3 cenários
+
+**Cenários testados (ARRIVAL_MODE = OTHER):**
+1) `PICKUP_POINT = CONTACT_SUPPLIER_LATER` → enviado como `unit=LOCATION_REFERENCE`.
+2) `PICKUP_POINT = "Gostaria que me buscassem"` → quando o produto permite endereço livre, enviado como `unit=FREETEXT` com o endereço digitado.
+3) `PICKUP_POINT = "Informar endereço específico"` → `unit=FREETEXT` com o endereço digitado (Google Places opcional na UI).
+
+**Comportamentos e regras para OTHER:**
+- Não exibir/coletar `TRANSFER_ARRIVAL_TIME` e não exigir campos específicos de AIR/SEA/RAIL.
+- `TRANSFER_ARRIVAL_DROP_OFF` permanece disponível como `FREETEXT` quando o produto solicitar endereço final.
+- Elegibilidade da lista de locais segue a regra geral (para OTHER, `LOCATION` quando aplicável), mas cenários 2 e 3 preferem `FREETEXT`.
+
+**Exemplos de answers (resumo):**
+```json
+// Cenário 1: OTHER + CONTACT_SUPPLIER_LATER
+[
+  {"question":"TRANSFER_ARRIVAL_MODE","answer":"OTHER"},
+  {"question":"TRANSFER_DEPARTURE_MODE","answer":"OTHER"},
+  {"question":"PICKUP_POINT","answer":"CONTACT_SUPPLIER_LATER","unit":"LOCATION_REFERENCE"}
+]
+```
+```json
+// Cenário 2: OTHER + "Gostaria que me buscassem" (FREETEXT)
+[
+  {"question":"TRANSFER_ARRIVAL_MODE","answer":"OTHER"},
+  {"question":"TRANSFER_DEPARTURE_MODE","answer":"OTHER"},
+  {"question":"PICKUP_POINT","answer":"Rua Exemplo 123, Centro","unit":"FREETEXT"}
+]
+```
+```json
+// Cenário 3: OTHER + "Informar endereço específico" (FREETEXT)
+[
+  {"question":"TRANSFER_ARRIVAL_MODE","answer":"OTHER"},
+  {"question":"TRANSFER_DEPARTURE_MODE","answer":"OTHER"},
+  {"question":"PICKUP_POINT","answer":"Av. Modelo 999, Bairro","unit":"FREETEXT"}
+]
+```
+
+**Observações de compatibilidade:**
+- Headers intactos e válidos (`Accept-Language` vindo da configuração global, ex.: `pt-BR`).
+- Sem campos extras quando `ARRIVAL_MODE = OTHER`.
+- UI traduzida (Avião/Trem/Navio/Outros) mantendo values de API (AIR/RAIL/SEA/OTHER).
 
 ### ✅ Implementação 7: Accept-Language (header) – BCP-47 com whitelist
 **Data:** Agosto 2025  
