@@ -643,6 +643,7 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 | 1.8 | 2025-08-14 | Regras de elegibilidade de PICKUP por modo (AIR/SEA/RAIL/OTHER) e fallback automático para CONTACT_SUPPLIER_LATER quando não houver locais válidos | Sistema |
 | 1.9 | 2025-08-14 | Caso 101124P5 confirmado (CONFIRM 200): ARRIVAL=AIR, DEPARTURE=OTHER, PICKUP_POINT=CONTACT_SUPPLIER_LATER; evidências detalhadas de hold/pagamento/confirm | Sistema |
 | 1.10 | 2025-08-14 | Caso 101124P5: ARRIVAL=AIR + PICKUP_POINT=FREETEXT ("Informar endereço específico"): CONFIRM 200; campos AIR coletados; Accept-Language pt-BR | Sistema |
+| 1.11 | 2025-08-15 | Caso 101124P5: ARRIVAL=SEA + DEPARTURE=OTHER; campos SEA (TRANSFER_PORT_CRUISE_SHIP, TRANSFER_PORT_ARRIVAL_TIME); PICKUP_POINT=CONTACT_SUPPLIER_LATER; CONFIRM 200 | Sistema |
 
 ---
 
@@ -750,6 +751,44 @@ Trechos do log (`viator-debug.log`):
 - Quando o cliente optar por “Informar endereço específico”, enviar `PICKUP_POINT` com `unit=FREETEXT`.
 - Para `ARRIVAL_MODE = AIR`, garantir coleta de airline/flight/time; `TRANSFER_ARRIVAL_DROP_OFF` permanece `FREETEXT`.
 - Se o produto não expuser locais elegíveis ou impedir custom pickup, manter fallback para `CONTACT_SUPPLIER_LATER`.
+
+### ✅ Implementação 13: 101124P5 — ARRIVAL=SEA + PICKUP_POINT (CONTACT_SUPPLIER_LATER)
+**Data:** Agosto 2025  
+**Status:** ✅ Fluxo completo (HOLD → pagamento → CONFIRM 200)
+
+**Cenário testado:**
+- `TRANSFER_ARRIVAL_MODE = SEA`
+- `TRANSFER_DEPARTURE_MODE = OTHER`
+- `TRANSFER_PORT_CRUISE_SHIP` preenchido (ex.: "Cruzeiro do Saara")
+- `TRANSFER_PORT_ARRIVAL_TIME` preenchido (ex.: "09:00")
+- `TRANSFER_ARRIVAL_DROP_OFF` como `FREETEXT` (ex.: "Brooklyn 123")
+- `PICKUP_POINT = CONTACT_SUPPLIER_LATER` com `unit=LOCATION_REFERENCE`
+
+**Evidências (logs do viator-debug.log):**
+```json
+"bookingQuestionAnswers": [
+  {"question":"TRANSFER_ARRIVAL_MODE","answer":"SEA"},
+  {"question":"TRANSFER_DEPARTURE_MODE","answer":"OTHER"},
+  {"question":"TRANSFER_PORT_CRUISE_SHIP","answer":"Cruzeiro do Saara"},
+  {"question":"TRANSFER_PORT_ARRIVAL_TIME","answer":"09:00"},
+  {"question":"TRANSFER_ARRIVAL_DROP_OFF","answer":"Brooklyn 123","unit":"FREETEXT"},
+  {"question":"PICKUP_POINT","answer":"CONTACT_SUPPLIER_LATER","unit":"LOCATION_REFERENCE"}
+]
+```
+```json
+"headers": {"Accept":"application/json;version=2.0","Content-Type":"application/json;version=2.0","Accept-Language":"pt-BR"}
+```
+```json
+"items":[{"status":"CONFIRMED","voucherInfo":{"url":"https://api.sandbox.viator.com/ticket?..."}}]
+```
+
+**Diretrizes decorrentes:**
+- Para `ARRIVAL_MODE = SEA`, coletar obrigatoriamente:
+  - `TRANSFER_PORT_CRUISE_SHIP` (nome do navio)
+  - `TRANSFER_PORT_ARRIVAL_TIME` (hora do desembarque)
+- Não enviar `TRANSFER_ARRIVAL_TIME` quando o modo é SEA (evita “Extra answer(s) provided: TRANSFER_ARRIVAL_TIME”).
+- `TRANSFER_ARRIVAL_DROP_OFF` permanece `FREETEXT` quando informado manualmente.
+- `PICKUP_POINT` pode ser `CONTACT_SUPPLIER_LATER` como `LOCATION_REFERENCE` quando disponível no produto.
 
 ### ✅ Implementação 7: Accept-Language (header) – BCP-47 com whitelist
 **Data:** Agosto 2025  

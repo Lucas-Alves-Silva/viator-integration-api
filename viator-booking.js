@@ -7742,19 +7742,29 @@ this.renderLocationOptions();
         
         let html = '<div class="traveler-booking-questions"><h5>📋 Informações Específicas do Viajante</h5>';
         
-        // Separar perguntas por tipo para reorganização
-        const nameQuestions = perTravelerQuestions.filter(q => 
-            q.id === 'FULL_NAMES_FIRST' || q.id === 'FIRST_NAME' || q.label.toLowerCase().includes('nome') || q.label.toLowerCase().includes('first name')
+        // Separar perguntas por tipo para reorganização (ordem UX solicitada)
+        const safeLower = (s) => (s || '').toLowerCase();
+        const nameQuestions = perTravelerQuestions.filter(q =>
+            q.id === 'FULL_NAMES_FIRST' || q.id === 'FIRST_NAME'
         );
-        const surnameQuestions = perTravelerQuestions.filter(q => 
-            q.id === 'FULL_NAMES_LAST' || q.id === 'LAST_NAME' || q.label.toLowerCase().includes('sobrenome') || q.label.toLowerCase().includes('last name')
+        const surnameQuestions = perTravelerQuestions.filter(q =>
+            q.id === 'FULL_NAMES_LAST' || q.id === 'LAST_NAME'
         );
-        const ageBandQuestions = perTravelerQuestions.filter(q => 
-            q.id === 'AGEBAND' || q.label.toLowerCase().includes('idade') || q.label.toLowerCase().includes('faixa')
-        );
-        const otherQuestions = perTravelerQuestions.filter(q => 
-            !nameQuestions.includes(q) && !surnameQuestions.includes(q) && !ageBandQuestions.includes(q)
-        );
+        const dobQuestions = perTravelerQuestions.filter(q => q.id === 'DATE_OF_BIRTH');
+        const ageBandQuestions = perTravelerQuestions.filter(q => q.id === 'AGEBAND');
+        const passportNationalityQuestions = perTravelerQuestions.filter(q => q.id === 'PASSPORT_NATIONALITY');
+        const passportNumberQuestions = perTravelerQuestions.filter(q => q.id === 'PASSPORT_PASSPORT_NO');
+        const passportExpiryQuestions = perTravelerQuestions.filter(q => q.id === 'PASSPORT_EXPIRY');
+        const excluded = new Set([
+            ...nameQuestions,
+            ...surnameQuestions,
+            ...dobQuestions,
+            ...ageBandQuestions,
+            ...passportNationalityQuestions,
+            ...passportNumberQuestions,
+            ...passportExpiryQuestions
+        ]);
+        const otherQuestions = perTravelerQuestions.filter(q => !excluded.has(q));
         
         // 1. Nome e Sobrenome lado a lado
         if (nameQuestions.length > 0 || surnameQuestions.length > 0) {
@@ -7803,7 +7813,27 @@ this.renderLocationOptions();
             html += '</div>';
         }
         
-        // 2. Faixa Etária
+        // 2. Data de nascimento
+        const renderSingleTravelerQuestion = (question) => {
+            if (!question) return;
+            const questionId = `traveler_${travelerIndex}_question_${question.id}`;
+            const isRequired = question.required === 'MANDATORY';
+            const requiredMark = isRequired ? ' *' : '';
+            const isConditional = question.required === 'CONDITIONAL';
+            const shouldHideInitially = isConditional && !ViatorConditionalQuestions.shouldShowQuestion(question.id);
+            const displayStyle = shouldHideInitially ? 'style="display: none;"' : '';
+            html += `<div class="booking-question-group" ${displayStyle}>`;
+            html += `<label for="${questionId}">${question.label}${requiredMark}</label>`;
+            html += this.renderQuestionField(question, questionId, isRequired, true, travelerIndex);
+            html += `<div class="error-message" id="error_${questionId}" style="display: none;"></div>`;
+            html += '</div>';
+        };
+
+        if (dobQuestions.length > 0) {
+            renderSingleTravelerQuestion(dobQuestions[0]);
+        }
+
+        // 3. Faixa Etária
         ageBandQuestions.forEach(question => {
             const questionId = `traveler_${travelerIndex}_question_${question.id}`;
             const isRequired = question.required === 'MANDATORY';
@@ -7821,7 +7851,22 @@ this.renderLocationOptions();
             html += '</div>';
         });
         
-        // 3. Demais campos (peso, etc.)
+        // 4. País de emissão do passaporte
+        if (passportNationalityQuestions.length > 0) {
+            renderSingleTravelerQuestion(passportNationalityQuestions[0]);
+        }
+
+        // 5. Número do passaporte
+        if (passportNumberQuestions.length > 0) {
+            renderSingleTravelerQuestion(passportNumberQuestions[0]);
+        }
+
+        // 6. Data de validade do passaporte
+        if (passportExpiryQuestions.length > 0) {
+            renderSingleTravelerQuestion(passportExpiryQuestions[0]);
+        }
+
+        // 7. Demais campos (peso, etc.)
         otherQuestions.forEach(question => {
             const questionId = `traveler_${travelerIndex}_question_${question.id}`;
             const isRequired = question.required === 'MANDATORY';
