@@ -4255,7 +4255,7 @@ this.renderLocationOptions();
         const alwaysVisible = new Set(
             (noPickupMode || arrivalOther)
                 ? []
-                : ['TRANSFER_AIR_ARRIVAL_AIRLINE','TRANSFER_AIR_ARRIVAL_FLIGHT_NO','TRANSFER_ARRIVAL_TIME','TRANSFER_ARRIVAL_DROP_OFF']
+                : ['TRANSFER_ARRIVAL_DROP_OFF']
         );
         if (this.isConditionalQuestion(questionId) && !this.shouldShowConditionalQuestion(questionId) && !alwaysVisible.has(questionId)) {
             return '';
@@ -4401,7 +4401,12 @@ this.renderLocationOptions();
             'TRANSFER_RAIL_ARRIVAL_STATION': () => this.getFieldValue('TRANSFER_ARRIVAL_MODE') === 'RAIL',
             'TRANSFER_RAIL_ARRIVAL_LINE': () => this.getFieldValue('TRANSFER_ARRIVAL_MODE') === 'RAIL',
             'TRANSFER_RAIL_DEPARTURE_STATION': () => this.getFieldValue('TRANSFER_DEPARTURE_MODE') === 'RAIL',
-            'TRANSFER_RAIL_DEPARTURE_LINE': () => this.getFieldValue('TRANSFER_DEPARTURE_MODE') === 'RAIL'
+            'TRANSFER_RAIL_DEPARTURE_LINE': () => this.getFieldValue('TRANSFER_DEPARTURE_MODE') === 'RAIL',
+            // Mostrar TRANSFER_ARRIVAL_TIME apenas para AIR e RAIL (não para SEA/OTHER)
+            'TRANSFER_ARRIVAL_TIME': () => {
+                const m = this.getFieldValue('TRANSFER_ARRIVAL_MODE');
+                return m === 'AIR' || m === 'RAIL';
+            }
         };
         // Garantir que os valores de modo sejam em inglês (AIR/SEA/RAIL/OTHER) mesmo que exibidos traduzidos
         // Se algum select de modo armazenar o label traduzido, normalizamos de volta
@@ -4448,7 +4453,9 @@ this.renderLocationOptions();
             if (
                 e.target.matches('.time-input') ||
                 e.target.id === 'booking_question_TRANSFER_ARRIVAL_TIME' ||
-                (e.target.dataset && e.target.dataset.questionId === 'TRANSFER_ARRIVAL_TIME')
+                (e.target.dataset && e.target.dataset.questionId === 'TRANSFER_ARRIVAL_TIME') ||
+                e.target.id === 'booking_question_TRANSFER_PORT_ARRIVAL_TIME' ||
+                (e.target.dataset && e.target.dataset.questionId === 'TRANSFER_PORT_ARRIVAL_TIME')
             ) {
                 let v = (e.target.value || '').replace(/[^0-9]/g, '').slice(0, 4);
                 if (v.length >= 3) v = v.slice(0, 2) + ':' + v.slice(2);
@@ -4468,7 +4475,9 @@ this.renderLocationOptions();
             if (
                 e.target.matches('.time-input') ||
                 e.target.id === 'booking_question_TRANSFER_ARRIVAL_TIME' ||
-                (e.target.dataset && e.target.dataset.questionId === 'TRANSFER_ARRIVAL_TIME')
+                (e.target.dataset && e.target.dataset.questionId === 'TRANSFER_ARRIVAL_TIME') ||
+                e.target.id === 'booking_question_TRANSFER_PORT_ARRIVAL_TIME' ||
+                (e.target.dataset && e.target.dataset.questionId === 'TRANSFER_PORT_ARRIVAL_TIME')
             ) {
                 let v = (e.target.value || '').replace(/[^0-9]/g, '').slice(0, 4);
                 if (v.length >= 3) v = v.slice(0, 2) + ':' + v.slice(2);
@@ -5019,6 +5028,23 @@ this.renderLocationOptions();
                 answers.length = 0;
                 Array.prototype.push.apply(answers, filteredArr);
             }
+            // Se ARRIVAL_MODE = SEA, exigir campos de SEA e não exigir campos de AIR
+            const arrIsSea = arr && String(arr.answer || '').trim() === 'SEA';
+            if (arrIsSea) {
+                // Remover campos de AIR se porventura coletados vazios ou indevidos
+                const before2 = answers.length;
+                let filteredSea = answers.filter(a => {
+                    const qid = a && (a.question || a.questionId);
+                    return qid !== 'TRANSFER_AIR_ARRIVAL_AIRLINE' && qid !== 'TRANSFER_AIR_ARRIVAL_FLIGHT_NO';
+                });
+                if (filteredSea.length !== before2) {
+                    console.log('🔧 [DYNAMIC DEBUG] Removidos campos AIR (SEA selecionado):', { antes: before2, depois: filteredSea.length });
+                }
+                answers.length = 0;
+                Array.prototype.push.apply(answers, filteredSea);
+                // Garantir placeholders para validação de SEA (serão validados na UI)
+                // A coleta real já acontece via inputs, então aqui apenas não removemos os campos de SEA se existirem
+            }
         } catch(e) { /* no-op */ }
 
 		// Regra oficial: para product option SEM pickup, responder modos como OTHER automaticamente
@@ -5054,6 +5080,12 @@ this.renderLocationOptions();
 				const qid = ans && (ans.question || ans.questionId);
 				if (!qid) return false;
 				if (noPickup && (qid === 'TRANSFER_ARRIVAL_TIME' || qid === 'TRANSFER_ARRIVAL_DROP_OFF')) return false;
+				// Se chegada for SEA, não enviar TRANSFER_ARRIVAL_TIME
+				try {
+					const arr = answers.find(a => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
+					const arrIsSea = arr && String(arr.answer || '').trim() === 'SEA';
+					if (arrIsSea && qid === 'TRANSFER_ARRIVAL_TIME') return false;
+				} catch(_e) { /* no-op */ }
 				return allowedIds.size === 0 || allowedIds.has(qid);
 			});
 			if (filtered.length !== before) {
@@ -6726,6 +6758,25 @@ this.renderLocationOptions();
             }
         }
 
+        // Campos obrigatórios para SEA (ARRIVAL)
+        try {
+            const arrivalModeValue = arrivalModeInput ? arrivalModeInput.value.trim() : '';
+            if (arrivalModeValue === 'SEA') {
+                const cruiseShipInput = document.querySelector('[id*="TRANSFER_PORT_CRUISE_SHIP"]');
+                const portArrivalTimeInput = document.querySelector('[id*="TRANSFER_PORT_ARRIVAL_TIME"]');
+                if (cruiseShipInput && (!cruiseShipInput.value || cruiseShipInput.value.trim() === '')) {
+                    isValid = false;
+                    this.showFieldError(cruiseShipInput, 'Nome do navio é obrigatório');
+                    errors.push('Nome do navio');
+                }
+                if (portArrivalTimeInput && (!portArrivalTimeInput.value || portArrivalTimeInput.value.trim() === '')) {
+                    isValid = false;
+                    this.showFieldError(portArrivalTimeInput, 'Horário de chegada no porto é obrigatório');
+                    errors.push('Horário de chegada no porto');
+                }
+            }
+        } catch(_e) { /* no-op */ }
+
         // Peso (WEIGHT)
         const weightInputs = document.querySelectorAll('[id*="WEIGHT"]:not([id*="_unit"])');
         weightInputs.forEach(input => {
@@ -7492,6 +7543,8 @@ this.renderLocationOptions();
         const dropOffQ = transferQuestions.find(q => q.id === 'TRANSFER_ARRIVAL_DROP_OFF');
         const airAirlineQ = transferQuestions.find(q => q.id === 'TRANSFER_AIR_ARRIVAL_AIRLINE');
         const airFlightQ = transferQuestions.find(q => q.id === 'TRANSFER_AIR_ARRIVAL_FLIGHT_NO');
+        const portArrivalQ = transferQuestions.find(q => q.id === 'TRANSFER_PORT_ARRIVAL_TIME');
+        const portCruiseQ = transferQuestions.find(q => q.id === 'TRANSFER_PORT_CRUISE_SHIP');
 
         const renderQ = (question) => {
             if (!question) return;
@@ -7508,10 +7561,15 @@ this.renderLocationOptions();
 
         // Modo de chegada (sempre visível)
         renderQ(arrivalModeQ);
-        // Dependentes mais compreensíveis logo abaixo
+        // Dependentes (AIR primeiro, depois SEA). TRANSFER_ARRIVAL_TIME só é relevante para AIR/RAIL.
         renderQ(airAirlineQ);
         renderQ(airFlightQ);
+        // SEA — ordem UX: Nome do navio → Hora da chegada (porto) → Hora do desembarque
+        renderQ(portCruiseQ);
+        // TIME genérico de chegada (apenas AIR/RAIL via shouldShowConditionalQuestion). Em SEA ficará oculto
         renderQ(arrivalTimeQ);
+        // Hora do desembarque no contexto marítimo (TRANSFER_PORT_ARRIVAL_TIME)
+        renderQ(portArrivalQ);
         // Endereço final
         renderQ(dropOffQ);
         
