@@ -30,6 +30,26 @@ Este documento serve como referência completa para a implementação e funciona
 
 **Produtos Testados:**
 - `101650P10` (Santorini) - ✅ Fluxo completo: HOLD → pagamento → CONFIRM 200
+- `101036P42` (Transfer Barcelona) - ✅ Fluxo completo: HOLD → pagamento → CONFIRM 200 com PICKUP_POINT FREETEXT
+
+### ✅ Novo Caso Funcional: Produto 101036P42
+**Status**: ✅ **IMPLEMENTADO E FUNCIONAL**
+
+**Contexto:**
+- **Tipo**: Transfer privado de Barcelona do centro da cidade para o terminal de cruzeiros
+- **PICKUP_POINT**: Funcionando perfeitamente com `unit=FREETEXT` para endereços customizados
+- **TRANSFER_DEPARTURE_MODE**: Campo obrigatório aceitando AIR/RAIL/SEA/OTHER
+
+**Evidências dos Logs:**
+- **HOLD**: ✅ 200 - Cart criado com sucesso
+- **Pagamento**: ✅ 200 - Processado via TA Payments
+- **Confirmação**: ✅ 200 - Status CONFIRMED com voucher gerado
+- **Booking Questions**: Enviadas corretamente com estrutura válida
+
+**Resultado:**
+- ✅ Sistema robusto para transfer privado com pickup customizado
+- ✅ PICKUP_POINT FREETEXT funcionando perfeitamente
+- ✅ Fluxo completo validado e documentado
 
 ## Objetivo
 
@@ -165,12 +185,12 @@ Resultado:
   - ✅ Exigência: usuário deve selecionar uma opção de `PICKUP_POINT` ou informar endereço antes de avançar.
   - ✅ Erros desaparecem dinamicamente ao selecionar um rádio ou digitar o endereço (limpeza automática de `is-invalid` + `hideFieldError` + `hideDateError`).
   - ✅ Removido o heading `<h4>Informações Gerais da Reserva</h4>` na seção `per-booking-section`.
-  - ✅ Texto padronizado da opção: “📞 Vou decidir depois”.
+  - ✅ Texto padronizado da opção: "📞 Vou decidir depois".
 
 - Etapa 4 (Pagamento):
   - ✅ Validação visual padronizada com a Etapa 2 (bordas `is-invalid` e `.error-message`).
-  - ✅ Botão renomeia para “Processando...” durante validação/processamento e volta ao normal em erro/sucesso.
-  - ✅ Mensagem “Problemas encontrados” limpa ao corrigir e tentar novamente; foco no primeiro campo inválido.
+  - ✅ Botão renomeia para "Processando..." durante validação/processamento e volta ao normal em erro/sucesso.
+  - ✅ Mensagem "Problemas encontrados" limpa ao corrigir e tentar novamente; foco no primeiro campo inválido.
 
 ## Como Testar as Correções
 
@@ -185,7 +205,7 @@ Resultado:
 
 1. Avance à Etapa 3 e tente prosseguir sem selecionar uma opção de `PICKUP_POINT` ou sem digitar endereço
 2. Verifique se a navegação é bloqueada e se o erro aparece no padrão da Etapa 2
-3. Selecione “Vou decidir depois” OU “Escolher de uma lista” e escolha um item OU digite um endereço
+3. Selecione "Vou decidir depois" OU "Escolher de uma lista" e escolha um item OU digite um endereço
 4. Confirme que a mensagem de erro desaparece imediatamente e a navegação é liberada
 
 ### 2. Teste Automatizado
@@ -433,7 +453,7 @@ A função `renderLanguageGuideSection()` estava implementada mas nunca era cham
 **Validações aplicadas:**
 - Etapa 2: coleta e persistência de todos os PER_TRAVELER acima, com máscara/unidade (WEIGHT) e validação de formato.
 - Etapa 3: bloqueio de avanço sem `PICKUP_POINT`; limpeza dinâmica de erro ao selecionar/digitar.
-- Etapa 4: validação padronizada; botão “Processando...” durante verificação/pagamento.
+- Etapa 4: validação padronizada; botão "Processando..." durante verificação/pagamento.
 - Etapa 5: exibição da data no padrão pt-BR (dd/MM/yyyy) apenas na UI; sem impacto no payload (continua ISO YYYY-MM-DD). Correção de formatação do preço (pt-BR) e seta de selects.
 
 **Resultado:**
@@ -463,7 +483,7 @@ A função `renderLanguageGuideSection()` estava implementada mas nunca era cham
 **Validações por etapa:**
 - Etapa 2: coleta de `DATE_OF_BIRTH`, `HEIGHT` (com unidade), `WEIGHT` (com unidade), nomes e `AGEBAND` por viajante
 - Etapa 3: sem `PICKUP_POINT` neste produto; `SPECIAL_REQUIREMENTS` opcional
-- Etapa 4: validação padronizada; botão “Processando...”
+- Etapa 4: validação padronizada; botão "Processando..."
 - Etapa 5: data exibida dd/MM/yyyy na UI; preço em pt-BR; payload preserva ISO/numéricos
 
 **Resultado:**
@@ -744,6 +764,7 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 | 1.12 | 2025-08-15 | Casos 101124P5: ARRIVAL=OTHER + PICKUP_POINT (CONTACT_SUPPLIER_LATER, "Gostaria que me buscassem", "Informar endereço específico"); CONFIRM 200 | Sistema |
 | 1.13 | 2025-08-15 | Correção: filtragem de ARRIVAL/DEPARTURE por allowedAnswers do produto; sanitização automática (evita AIR quando apenas OTHER/SEA são válidos) | Sistema |
 | 1.14 | 2025-08-16 | **Implementação 16**: Melhorias no PICKUP_POINT - exibição de endereços reais, Google Places API v1, pré-visualização do local escolhido e UI aprimorada | Sistema |
+| 1.15 | 2025-08-16 | **Implementação 17**: Produto 101036P42 (Transfer Barcelona) - PICKUP_POINT FREETEXT funcionando; fluxo completo HOLD→pagamento→CONFIRM 200; voucher gerado | Sistema |
 
 ---
 
@@ -753,7 +774,7 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 **Status:** ✅ Aplicado (frontend)
 
 **Problema observado:**
-- Ao selecionar um `LOC-...` da lista, a confirmação retornava: “Pickup is not available from this location or it's the wrong type”.
+- Ao selecionar um `LOC-...` da lista, a confirmação retornava: "Pickup is not available from this location or it's the wrong type".
 - A UI exibia opções de hotéis/portos/aeroportos mesmo quando o `ARRIVAL_MODE` não aceitava aquele tipo.
 
 **Ajustes implementados (viator-booking.js):**
@@ -764,9 +785,9 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
   - OTHER → apenas `LOCATION`
 - Validação na coleta: um `LOC-...` só é aceito se existir em `logistics.travelerPickup.locations` e o `pickupType` for permitido pelo modo atual.
 - Se nenhuma seção elegível existir para o modo selecionado:
-  - Desabilita “Escolher de uma lista”.
+  - Desabilita "Escolher de uma lista".
   - Oculta a lista.
-  - Seleciona automaticamente “📞 Vou decidir depois” (`CONTACT_SUPPLIER_LATER`) quando disponível e define `unit=LOCATION_REFERENCE`.
+  - Seleciona automaticamente "📞 Vou decidir depois" (`CONTACT_SUPPLIER_LATER`) quando disponível e define `unit=LOCATION_REFERENCE`.
 - Ao detectar `LOC` inválido, aplica fallback para `CONTACT_SUPPLIER_LATER` (se ofertado) ou mostra erro no campo.
 
 **Impacto para o usuário final:**
@@ -774,8 +795,8 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 - Interface passa a refletir apenas escolhas válidas por modo.
 
 **Evidência (logs):**
-- “🚗 [PICKUP FILTER] 0 seções visíveis” → radio de lista desabilitado e fallback aplicado.
-- “❌ [PICKUP VALIDATION] Local inválido ...” → fallback para CONTACT_SUPPLIER_LATER.
+- "🚗 [PICKUP FILTER] 0 seções visíveis" → radio de lista desabilitado e fallback aplicado.
+- "❌ [PICKUP VALIDATION] Local inválido ..." → fallback para CONTACT_SUPPLIER_LATER.
 
 **Data:** Agosto 2025  
 **Status:** ✅ Fluxo completo (HOLD → pagamento → CONFIRM 200)
@@ -813,7 +834,7 @@ Trechos do log (`viator-debug.log`):
 ```
 
 **Resultado:**
-- ✅ Erro “Missing answer for TRANSFER_DEPARTURE_MODE” eliminado.
+- ✅ Erro "Missing answer for TRANSFER_DEPARTURE_MODE" eliminado.
 - ✅ Confirmação bem-sucedida com regras de transfer aplicadas.
 
 ### ✅ Implementação 12: 101124P5 — ARRIVAL=AIR + PICKUP_POINT (FREETEXT)
@@ -823,7 +844,7 @@ Trechos do log (`viator-debug.log`):
 **Cenário testado:**
 - `TRANSFER_ARRIVAL_MODE = AIR`
 - `TRANSFER_DEPARTURE_MODE = OTHER`
-- `PICKUP_POINT` selecionado como “Informar endereço específico” → enviado como `unit=FREETEXT`
+- `PICKUP_POINT` selecionado como "Informar endereço específico" → enviado como `unit=FREETEXT`
 - Campos de chegada (AIR) preenchidos: `TRANSFER_AIR_ARRIVAL_AIRLINE`, `TRANSFER_AIR_ARRIVAL_FLIGHT_NO`, `TRANSFER_ARRIVAL_TIME`
 - `TRANSFER_ARRIVAL_DROP_OFF` também como `FREETEXT`
 - Header: `Accept-Language: pt-BR`
@@ -848,7 +869,7 @@ Trechos do log (`viator-debug.log`):
 ```
 
 **Diretrizes decorrentes:**
-- Quando o cliente optar por “Informar endereço específico”, enviar `PICKUP_POINT` com `unit=FREETEXT`.
+- Quando o cliente optar por "Informar endereço específico", enviar `PICKUP_POINT` com `unit=FREETEXT`.
 - Para `ARRIVAL_MODE = AIR`, garantir coleta de airline/flight/time; `TRANSFER_ARRIVAL_DROP_OFF` permanece `FREETEXT`.
 - Se o produto não expuser locais elegíveis ou impedir custom pickup, manter fallback para `CONTACT_SUPPLIER_LATER`.
 
@@ -886,7 +907,7 @@ Trechos do log (`viator-debug.log`):
 - Para `ARRIVAL_MODE = SEA`, coletar obrigatoriamente:
   - `TRANSFER_PORT_CRUISE_SHIP` (nome do navio)
   - `TRANSFER_PORT_ARRIVAL_TIME` (hora do desembarque)
-- Não enviar `TRANSFER_ARRIVAL_TIME` quando o modo é SEA (evita “Extra answer(s) provided: TRANSFER_ARRIVAL_TIME”).
+- Não enviar `TRANSFER_ARRIVAL_TIME` quando o modo é SEA (evita "Extra answer(s) provided: TRANSFER_ARRIVAL_TIME").
 - `TRANSFER_ARRIVAL_DROP_OFF` permanece `FREETEXT` quando informado manualmente.
 - `PICKUP_POINT` pode ser `CONTACT_SUPPLIER_LATER` como `LOCATION_REFERENCE` quando disponível no produto.
 
@@ -960,7 +981,7 @@ Trechos do log (`viator-debug.log`):
 **Data:** Agosto 2025  
 **Status:** ✅ Aplicado em produção (backend)
 
-**Problema:** respostas 4xx ocasionais por “Invalid value for header: Accept-Language” quando o usuário escolhia um `languageGuide` não compatível (ex.: `yue`).
+**Problema:** respostas 4xx ocasionais por "Invalid value for header: Accept-Language" quando o usuário escolhia um `languageGuide` não compatível (ex.: `yue`).
 
 **Solução:**
 - Header `Accept-Language` agora é derivado apenas da configuração global validada (whitelist) e NUNCA do `languageGuide` escolhido pelo usuário.
@@ -991,12 +1012,12 @@ Trechos do log (`viator-debug.log`):
 
 **Regras aplicadas no frontend:**
 - `PICKUP_POINT`
-  - Exibição de “📞 Vou decidir depois” (CONTACT_SUPPLIER_LATER) quando ofertado pelo produto; enviado como `LOCATION_REFERENCE`.
-  - Campo “Informar endereço específico” (FREETEXT) só aparece e só é enviado quando `allowCustomTravelerPickup === true`.
+  - Exibição de "📞 Vou decidir depois" (CONTACT_SUPPLIER_LATER) quando ofertado pelo produto; enviado como `LOCATION_REFERENCE`.
+  - Campo "Informar endereço específico" (FREETEXT) só aparece e só é enviado quando `allowCustomTravelerPickup === true`.
   - Referências especiais `MEET_AT_DEPARTURE_POINT`/`CONTACT_SUPPLIER_LATER` tratadas como `LOCATION_REFERENCE`.
 - Modos de chegada (se existirem no produto): labels traduzidos (AIR→Avião, RAIL→Trem, SEA→Navio, OTHER→Outros) sem alterar os values enviados (AIR/RAIL/SEA/OTHER).
-- Chegada OTHER ou produto sem pickup: não renderizar/coletar `TRANSFER_ARRIVAL_TIME`/`TRANSFER_ARRIVAL_DROP_OFF` (evita “Extra answer(s) provided…”).
-- Máscara de hora “HH:MM” no input `booking_question_TRANSFER_ARRIVAL_TIME`.
+- Chegada OTHER ou produto sem pickup: não renderizar/coletar `TRANSFER_ARRIVAL_TIME`/`TRANSFER_ARRIVAL_DROP_OFF` (evita "Extra answer(s) provided…").
+- Máscara de hora "HH:MM" no input `booking_question_TRANSFER_ARRIVAL_TIME`.
 
 **Evidências (resumo dos logs):**
 - HOLD 200 com `bookingQuestionAnswers` (5): `FULL_NAMES_FIRST`, `FULL_NAMES_LAST`, `AGEBAND`, `WEIGHT (kg)`, `PICKUP_POINT=CONTACT_SUPPLIER_LATER (LOCATION_REFERENCE)`.

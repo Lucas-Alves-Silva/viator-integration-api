@@ -7717,9 +7717,9 @@ this.renderLocationOptions();
                 
                 html = '';
                 html += '<div class="booking-question-group">';
-                html += '<label for="' + questionId + '">Selecione o idioma preferido para a excursão</label>';
+                html += '<label for="' + questionId + '">Selecione o idioma preferido para a excursão *</label>';
                 html += '<select id="' + questionId + '" name="' + questionId + '" class="form-control question-input" data-question-id="LANGUAGE_GUIDE" data-group="PER_BOOKING">';
-                html += '<option value="">Selecione o idioma da excursão</option>';
+                html += '<option value="">Selecione o idioma da excursão *</option>';
                 
                 languageGuides.forEach(guide => {
                     const languageName = this.getLanguageName(guide.language);
@@ -13031,7 +13031,8 @@ this.renderLocationOptions();
                     const noPickup2 = pickupData2 && pickupData2.pickupOptionType === 'MEET_EVERYONE_AT_START_POINT';
                     // Verificar arrival mode atual nas respostas
                     const arrIdx = bookingQuestionAnswers.findIndex((a) => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
-                    const arrivalIsOther = arrIdx !== -1 && String(bookingQuestionAnswers[arrIdx].answer || '').trim() === 'OTHER';
+                    const arrivalModeVal = arrIdx !== -1 ? String(bookingQuestionAnswers[arrIdx].answer || '').trim() : '';
+                    const arrivalIsOther = arrivalModeVal === 'OTHER';
                     if (noPickup2 || arrivalIsOther) {
                         const before2 = bookingQuestionAnswers.length;
                         bookingQuestionAnswers = bookingQuestionAnswers.filter((a) => {
@@ -13040,7 +13041,41 @@ this.renderLocationOptions();
                         });
                         const after2 = bookingQuestionAnswers.length;
                         if (after2 !== before2) {
-                            console.log('🔧 [CONFIRM] Purga final de campos de transferência (no-pickup):', { antes: before2, depois: after2 });
+                            console.log('🔧 [CONFIRM] Purga final de campos de transferência (no-pickup/OTHER):', { antes: before2, depois: after2 });
+                        }
+                    }
+                    // Sanitização por modo: remover campos de SEA quando não SEA; remover campos de AIR quando não AIR
+                    const seaFields = ['TRANSFER_PORT_CRUISE_SHIP', 'TRANSFER_PORT_ARRIVAL_TIME'];
+                    const airFields = ['TRANSFER_AIR_ARRIVAL_AIRLINE', 'TRANSFER_AIR_ARRIVAL_FLIGHT_NO', 'TRANSFER_ARRIVAL_TIME'];
+                    if (arrivalModeVal === 'SEA') {
+                        const beforeSea = bookingQuestionAnswers.length;
+                        bookingQuestionAnswers = bookingQuestionAnswers.filter(a => {
+                            const qid = a && (a.question || a.questionId);
+                            return airFields.indexOf(qid) === -1; // remove AIR-only
+                        });
+                        const afterSea = bookingQuestionAnswers.length;
+                        if (afterSea !== beforeSea) {
+                            console.log('🔧 [CONFIRM] Campos AIR removidos para arrivalMode=SEA:', { antes: beforeSea, depois: afterSea });
+                        }
+                    } else if (arrivalModeVal === 'AIR') {
+                        const beforeAir = bookingQuestionAnswers.length;
+                        bookingQuestionAnswers = bookingQuestionAnswers.filter(a => {
+                            const qid = a && (a.question || a.questionId);
+                            return seaFields.indexOf(qid) === -1; // remove SEA-only
+                        });
+                        const afterAir = bookingQuestionAnswers.length;
+                        if (afterAir !== beforeAir) {
+                            console.log('🔧 [CONFIRM] Campos SEA removidos para arrivalMode=AIR:', { antes: beforeAir, depois: afterAir });
+                        }
+                    } else {
+                        const beforeOther = bookingQuestionAnswers.length;
+                        bookingQuestionAnswers = bookingQuestionAnswers.filter(a => {
+                            const qid = a && (a.question || a.questionId);
+                            return seaFields.indexOf(qid) === -1 && airFields.indexOf(qid) === -1; // remove ambos
+                        });
+                        const afterOther = bookingQuestionAnswers.length;
+                        if (afterOther !== beforeOther) {
+                            console.log('🔧 [CONFIRM] Campos AIR/SEA removidos para arrivalMode=OTHER/indefinido:', { antes: beforeOther, depois: afterOther });
                         }
                     }
                 } catch (e) { /* no-op */ }
