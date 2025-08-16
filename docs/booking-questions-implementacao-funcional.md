@@ -31,24 +31,28 @@ Este documento serve como referência completa para a implementação e funciona
 **Produtos Testados:**
 - `101650P10` (Santorini) - ✅ Fluxo completo: HOLD → pagamento → CONFIRM 200
 - `101036P42` (Transfer Barcelona) - ✅ Fluxo completo: HOLD → pagamento → CONFIRM 200 com PICKUP_POINT FREETEXT
+- `100006P8` (Transfer Egito) - ✅ Fluxo completo: HOLD → pagamento → CONFIRM 200 com PICKUP_POINT FREETEXT + PER_TRAVELER
 
-### ✅ Novo Caso Funcional: Produto 101036P42
+### ✅ Novo Caso Funcional: Produto 100006P8
 **Status**: ✅ **IMPLEMENTADO E FUNCIONAL**
 
 **Contexto:**
-- **Tipo**: Transfer privado de Barcelona do centro da cidade para o terminal de cruzeiros
+- **Tipo**: Transfer privado no Egito (supplierId: 100006, supplierLocation: EG)
 - **PICKUP_POINT**: Funcionando perfeitamente com `unit=FREETEXT` para endereços customizados
-- **TRANSFER_DEPARTURE_MODE**: Campo obrigatório aceitando AIR/RAIL/SEA/OTHER
+- **PER_TRAVELER**: FULL_NAMES_FIRST/LAST e AGEBAND coletados corretamente com travelerNum
+- **languageGuide**: Aplicado corretamente nos itens e na raiz (type=GUIDE, language=en)
 
 **Evidências dos Logs:**
 - **HOLD**: ✅ 200 - Cart criado com sucesso
 - **Pagamento**: ✅ 200 - Processado via TA Payments
 - **Confirmação**: ✅ 200 - Status CONFIRMED com voucher gerado
-- **Booking Questions**: Enviadas corretamente com estrutura válida
+- **Booking Questions**: Enviadas corretamente com estrutura válida (5 campos)
+- **Preço**: BRL 88.58 (recomendado) / BRL 81.49 (parceiro)
 
 **Resultado:**
-- ✅ Sistema robusto para transfer privado com pickup customizado
+- ✅ Sistema robusto para transfer privado com pickup customizado no Egito
 - ✅ PICKUP_POINT FREETEXT funcionando perfeitamente
+- ✅ PER_TRAVELER coletado corretamente com travelerNum
 - ✅ Fluxo completo validado e documentado
 
 ## Objetivo
@@ -765,6 +769,7 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 | 1.13 | 2025-08-15 | Correção: filtragem de ARRIVAL/DEPARTURE por allowedAnswers do produto; sanitização automática (evita AIR quando apenas OTHER/SEA são válidos) | Sistema |
 | 1.14 | 2025-08-16 | **Implementação 16**: Melhorias no PICKUP_POINT - exibição de endereços reais, Google Places API v1, pré-visualização do local escolhido e UI aprimorada | Sistema |
 | 1.15 | 2025-08-16 | **Implementação 17**: Produto 101036P42 (Transfer Barcelona) - PICKUP_POINT FREETEXT funcionando; fluxo completo HOLD→pagamento→CONFIRM 200; voucher gerado | Sistema |
+| 1.16 | 2025-08-16 | **Implementação 18**: Produto 100006P8 (Transfer Egito) - PICKUP_POINT FREETEXT + PER_TRAVELER funcionando; fluxo completo HOLD→pagamento→CONFIRM 200; voucher gerado | Sistema |
 
 ---
 
@@ -1052,6 +1057,134 @@ Trechos do log (`viator-debug.log`):
   - **Validação dinâmica**: Erros desaparecem automaticamente ao fazer seleções válidas.
   - **Feedback visual**: Container `pickup-chosen-preview` sempre atualizado com informações do local escolhido.
 
+---
+
+### ✅ Implementação 18: Produto 100006P8 – Transfer privado Egito com PICKUP_POINT FREETEXT
+**Data:** Agosto 2025  
+**Status:** ✅ Fluxo completo bem-sucedido (HOLD → pagamento → CONFIRM 200)
+
+**Contexto do Produto:**
+- **Tipo**: Transfer privado no Egito (supplierId: 100006, supplierLocation: EG)
+- **bookingQuestions** detectadas (5): 
+  - `FULL_NAMES_FIRST` (PER_TRAVELER, STRING)
+  - `FULL_NAMES_LAST` (PER_TRAVELER, STRING)
+  - `AGEBAND` (PER_TRAVELER, STRING)
+  - `TRANSFER_DEPARTURE_MODE` (PER_BOOKING, STRING)
+  - `PICKUP_POINT` (PER_BOOKING, LOCATION_REF_OR_FREE_TEXT)
+
+**Cenário Testado:**
+- `TRANSFER_DEPARTURE_MODE = OTHER` (modo de partida)
+- `PICKUP_POINT = "Vamos ir"` com `unit=FREETEXT` (endereço customizado)
+- Viajante: 1 adulto (Shiny Inox)
+- Preço: BRL 88.58 (recomendado) / BRL 81.49 (parceiro)
+- `languageGuide`: type=GUIDE, language=en
+
+**Evidências dos Logs (`viator-debug.log`):**
+
+**1. Booking Questions Coletadas:**
+```json
+"bookingQuestionAnswers": [
+  {"question":"FULL_NAMES_FIRST","answer":"Shiny","travelerNum":1},
+  {"question":"FULL_NAMES_LAST","answer":"Inox","travelerNum":1},
+  {"question":"AGEBAND","answer":"ADULT","travelerNum":1},
+  {"question":"TRANSFER_DEPARTURE_MODE","answer":"OTHER"},
+  {"question":"PICKUP_POINT","answer":"Vamos ir","unit":"FREETEXT"}
+]
+```
+
+**2. Fluxo de Reserva:**
+- **HOLD**: ✅ 200 - Cart criado com sucesso
+  - `cartRef`: CR-285519c2b4288cc3531db16ea58bd6ee
+  - `bookingRef`: BR-597861245
+  - `paymentSessionToken` recebido
+  - Status: BOOKABLE
+  - Preço: BRL 88.58 (recomendado) / BRL 81.49 (parceiro)
+- **Pagamento**: ✅ 200 - Processado via TA Payments
+  - `sessionAccountToken`: STK-qpev2bgrsjdnpdwvhgcr23x2a4
+- **Confirmação**: ✅ 200 - Reserva confirmada
+  - Status: CONFIRMED
+  - Voucher gerado com sucesso
+
+**3. Estrutura Final da Requisição:**
+```json
+{
+  "cartRef": "CR-285519c2b4288cc3531db16ea58bd6ee",
+  "paymentToken": "STK-qpev2bgrsjdnpdwvhgcr23x2a4",
+  "bookerInfo": {
+    "firstName": "Shiny",
+    "lastName": "Inox"
+  },
+  "communication": {
+    "email": "jucaflarj@gmail.com",
+    "phone": "(21) 98081-3881"
+  },
+  "items": [{
+    "bookingRef": "BR-597861245",
+    "partnerBookingRef": "BOOK_eabfebb7e53248c3b05673d6408e6466",
+    "bookingQuestionAnswers": [
+      {"question":"FULL_NAMES_FIRST","answer":"Shiny","travelerNum":1},
+      {"question":"FULL_NAMES_LAST","answer":"Inox","travelerNum":1},
+      {"question":"AGEBAND","answer":"ADULT","travelerNum":1},
+      {"question":"TRANSFER_DEPARTURE_MODE","answer":"OTHER"},
+      {"question":"PICKUP_POINT","answer":"Vamos ir","unit":"FREETEXT"}
+    ],
+    "communication": {
+      "email": "jucaflarj@gmail.com",
+      "phone": "(21) 98081-3881"
+    },
+    "travelers": [{
+      "isLead": true,
+      "firstName": "Shiny",
+      "lastName": "Inox"
+    }],
+    "languageGuide": {
+      "type": "GUIDE",
+      "language": "en"
+    }
+  }],
+  "languageGuide": {
+    "type": "GUIDE",
+    "language": "en"
+  },
+  "bookingQuestionAnswers": [
+    {"question":"FULL_NAMES_FIRST","answer":"Shiny","travelerNum":1},
+    {"question":"FULL_NAMES_LAST","answer":"Inox","travelerNum":1},
+    {"question":"AGEBAND","answer":"ADULT","travelerNum":1},
+    {"question":"TRANSFER_DEPARTURE_MODE","answer":"OTHER"},
+    {"question":"PICKUP_POINT","answer":"Vamos ir","unit":"FREETEXT"}
+  ]
+}
+```
+
+**4. Voucher e Política de Cancelamento:**
+- **Voucher**: URL gerada com código único
+- **Política**: Cancelamento com reembolso total até 24h antes da partida
+- **Preço confirmado**: BRL 88.58 (recomendado) / BRL 81.49 (parceiro)
+- **Comissão**: BRL 7.09
+
+**Validações Aplicadas:**
+- ✅ **PER_TRAVELER**: FULL_NAMES_FIRST/LAST, AGEBAND coletados corretamente com travelerNum
+- ✅ **PER_BOOKING**: TRANSFER_DEPARTURE_MODE e PICKUP_POINT funcionando
+- ✅ **PICKUP_POINT**: Aceita FREETEXT para endereços customizados
+- ✅ **languageGuide**: Aplicado corretamente nos itens e na raiz
+- ✅ **Estrutura de dados**: Todos os campos obrigatórios preenchidos
+- ✅ **Integração**: Sistema de pagamento TA Payments funcionando
+- ✅ **Confirmação**: API retorna status CONFIRMED com voucher
+
+**Resultado:**
+- ✅ Reserva concluída com sucesso para produto 100006P8
+- ✅ PICKUP_POINT com FREETEXT funcionando perfeitamente
+- ✅ Fluxo completo: HOLD → pagamento → CONFIRM 200
+- ✅ Voucher gerado e disponível para download
+- ✅ Sistema robusto para transfer privado com pickup customizado no Egito
+
+**Diretrizes Técnicas:**
+- **PICKUP_POINT FREETEXT**: Funcional para endereços customizados quando permitido
+- **PER_TRAVELER**: Campos obrigatórios coletados com travelerNum correto
+- **languageGuide**: Aplicado tanto nos itens quanto na raiz da requisição
+- **Estrutura de dados**: Comunicação e viajantes presentes em todos os itens
+- **Validação**: Sistema valida campos obrigatórios antes do envio
+- **Logs**: Rastreamento completo de todas as etapas do fluxo
 
 ---
 
