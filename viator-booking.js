@@ -4037,7 +4037,16 @@ this.renderLocationOptions();
                 <option value="">Selecione uma opção</option>
         `;
 
-        question.allowedAnswers.forEach(answer => {
+        // Determinar opções efetivas respeitando allowedAnswers do produto (evita exibir AIR quando só OTHER/SEA são válidos)
+        let effectiveAnswers = Array.isArray(question.allowedAnswers) ? question.allowedAnswers.slice() : [];
+        if (question.id === 'TRANSFER_ARRIVAL_MODE' || question.id === 'TRANSFER_DEPARTURE_MODE') {
+            const productAllowed = this.getProductAllowedAnswers(question.id);
+            if (Array.isArray(productAllowed) && productAllowed.length > 0) {
+                effectiveAnswers = productAllowed.slice();
+            }
+        }
+
+        effectiveAnswers.forEach(answer => {
             const displayText = this.getAnswerDisplayText(question.id, answer);
             html += `<option value="${answer}">${displayText}</option>`;
         });
@@ -4199,6 +4208,46 @@ this.renderLocationOptions();
         }
 
         return displayTexts[questionId]?.[answer] || answer;
+    }
+
+    /**
+     * Obter allowedAnswers por produto para uma booking question específica.
+     * Usa as perguntas do produto quando disponíveis; caso contrário, infere por presença de dependentes.
+     */
+    getProductAllowedAnswers(questionId) {
+        try {
+            // Para ARRIVAL/DEPARTURE, derivar allowed por presença de dependentes do produto (não confiar no allowedAnswers genérico da pergunta)
+            if (questionId === 'TRANSFER_ARRIVAL_MODE' || questionId === 'TRANSFER_DEPARTURE_MODE') {
+                const list = Array.isArray(this.bookingQuestions)
+                    ? this.bookingQuestions
+                    : (Array.isArray(this.productBookingQuestions?.booking_questions) ? this.productBookingQuestions.booking_questions : []);
+                const isArrival = questionId === 'TRANSFER_ARRIVAL_MODE';
+                const getId = (q) => (q?.id || q?.question || '');
+                const hasAir = list.some(q => String(getId(q)).startsWith(isArrival ? 'TRANSFER_AIR_ARRIVAL' : 'TRANSFER_AIR_DEPARTURE'));
+                const hasSea = list.some(q => String(getId(q)).startsWith(isArrival ? 'TRANSFER_PORT_ARRIVAL' : 'TRANSFER_PORT_DEPARTURE'));
+                const hasRail = list.some(q => String(getId(q)).startsWith(isArrival ? 'TRANSFER_RAIL_ARRIVAL' : 'TRANSFER_RAIL_DEPARTURE'));
+                const inferred = [];
+                if (hasAir) inferred.push('AIR');
+                if (hasSea) inferred.push('SEA');
+                if (hasRail) inferred.push('RAIL');
+                inferred.push('OTHER');
+                return inferred;
+            }
+
+            // Para demais perguntas, se houver allowedAnswers específicos do produto, retornar
+            const candidates = [];
+            if (Array.isArray(this.productBookingQuestions?.booking_questions)) candidates.push(this.productBookingQuestions.booking_questions);
+            if (Array.isArray(this.bookingQuestions)) candidates.push(this.bookingQuestions);
+            if (Array.isArray(this.dynamicBookingQuestions?.productQuestions)) candidates.push(this.dynamicBookingQuestions.productQuestions);
+
+            for (const arr of candidates) {
+                const found = arr.find(q => (q?.id || q?.question) === questionId);
+                if (found && Array.isArray(found.allowedAnswers) && found.allowedAnswers.length > 0) {
+                    return found.allowedAnswers.slice();
+                }
+            }
+        } catch (_e) { /* no-op */ }
+        return null;
     }
 
     /**
@@ -5095,6 +5144,8 @@ this.renderLocationOptions();
 			// Sanitização de valores para modos (usar allowedAnswers do produto)
 			try {
 				const getAllowed = (id) => {
+					const fromProduct = this.getProductAllowedAnswers(id);
+					if (Array.isArray(fromProduct) && fromProduct.length > 0) return fromProduct;
 					const q = (this.dynamicBookingQuestions?.allQuestions || []).find((qq) => (qq?.id || qq?.question) === id);
 					return Array.isArray(q?.allowedAnswers) ? q.allowedAnswers : null;
 				};
@@ -5423,7 +5474,48 @@ this.renderLocationOptions();
         // Configurar eventos dinâmicos
         this.setupDynamicFieldEvents();
 
+        // Após injetar o HTML e bindar eventos, garantir que os modos selecionados são válidos para o produto
+        try {
+            this.sanitizeTransferModes();
+        } catch (_e) { /* best effort */ }
+
         console.log('✅ Booking questions dinâmicas renderizadas');
+    }
+
+    /**
+     * Garantir que valores atuais de ARRIVAL/DEPARTURE estejam entre as opções permitidas no select.
+     * Se não, aplicar fallback seguro (OTHER quando disponível ou primeira opção válida).
+     */
+    sanitizeTransferModes() {
+        const fixSelect = (selector) => {
+            const el = document.querySelector(selector);
+            if (!el) return;
+            // Preferir allowedAnswers do produto
+            const qid = el.getAttribute('data-question-id') || (selector.includes('ARRIVAL') ? 'TRANSFER_ARRIVAL_MODE' : 'TRANSFER_DEPARTURE_MODE');
+            const productAllowed = (this.getProductAllowedAnswers && this.getProductAllowedAnswers(qid)) || [];
+            // Se houver restrição do produto, sincronizar opções do select
+            if (Array.isArray(productAllowed) && productAllowed.length > 0) {
+                const optValues = new Set(productAllowed);
+                Array.from(el.options).forEach((opt) => {
+                    if (opt.value && !optValues.has(opt.value)) {
+                        opt.remove();
+                    }
+                });
+            }
+            const allowed = Array.from(el.options).map(o => o.value).filter(v => v);
+            const current = (el.value || '').trim();
+            if (!allowed.includes(current)) {
+                const fallback = allowed.includes('OTHER') ? 'OTHER' : (allowed[0] || '');
+                if (fallback && fallback !== current) {
+                    el.value = fallback;
+                    // Disparar change para atualizar condicionais
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                    console.log(`🔧 [TRANSFER MODE] Valor inválido (${current}) ajustado para ${fallback}`);
+                }
+            }
+        };
+        fixSelect('[data-question-id="TRANSFER_ARRIVAL_MODE"]');
+        fixSelect('[data-question-id="TRANSFER_DEPARTURE_MODE"]');
     }
 
     /**
@@ -6895,8 +6987,9 @@ this.renderLocationOptions();
             let value = arrivalModeInput.value.trim();
             // Se a pergunta tem allowedAnswers e o valor atual não é permitido, normalizar para OTHER
             try {
-                const q = (this.dynamicBookingQuestions?.allQuestions || []).find((qq) => (qq?.id || qq?.question) === 'TRANSFER_ARRIVAL_MODE');
-                const allowed = Array.isArray(q?.allowedAnswers) ? q.allowedAnswers : null;
+                // Preferir allowedAnswers do produto; fallback para allQuestions
+                const allowed = (this.getProductAllowedAnswers && this.getProductAllowedAnswers('TRANSFER_ARRIVAL_MODE')) ||
+                                ((this.dynamicBookingQuestions?.allQuestions || []).find((qq) => (qq?.id || qq?.question) === 'TRANSFER_ARRIVAL_MODE')?.allowedAnswers);
                 if (allowed && allowed.length > 0 && !allowed.includes(value)) {
                     const fallback = allowed.includes('OTHER') ? 'OTHER' : allowed[0];
                     console.warn(`⚠️ [VALIDATION] TRANSFER_ARRIVAL_MODE inválido "${value}". Ajustando para "${fallback}" (allowed: ${allowed.join(', ')})`);
@@ -7561,15 +7654,15 @@ this.renderLocationOptions();
 
         // Modo de chegada (sempre visível)
         renderQ(arrivalModeQ);
-        // Dependentes (AIR primeiro, depois SEA). TRANSFER_ARRIVAL_TIME só é relevante para AIR/RAIL.
+        // Dependentes (AIR e SEA). A visibilidade real é controlada por shouldShowConditionalQuestion()
+        // AIR
         renderQ(airAirlineQ);
         renderQ(airFlightQ);
-        // SEA — ordem UX: Nome do navio → Hora da chegada (porto) → Hora do desembarque
+        // SEA
         renderQ(portCruiseQ);
-        // TIME genérico de chegada (apenas AIR/RAIL via shouldShowConditionalQuestion). Em SEA ficará oculto
-        renderQ(arrivalTimeQ);
-        // Hora do desembarque no contexto marítimo (TRANSFER_PORT_ARRIVAL_TIME)
         renderQ(portArrivalQ);
+        // TIME genérico de chegada (apenas AIR/RAIL; SEA/OTHER ficam ocultos pela condicional)
+        renderQ(arrivalTimeQ);
         // Endereço final
         renderQ(dropOffQ);
         
@@ -9289,6 +9382,28 @@ this.renderLocationOptions();
         mainContainer.innerHTML = allHTML || '<p>Nenhum local disponível</p>';
         console.log(`✅ ${locationDetails.length} locais renderizados no container principal`);
 
+        // Elementos de pré-visualização sob a opção "Gostaria que me buscassem"
+        const chosenPreviewEl = document.getElementById(`${questionId}_chosen_preview`);
+        const renderChosenPreview = (ref) => {
+            if (!chosenPreviewEl) return;
+            const d = detailsMap[ref];
+            if (!d) {
+                chosenPreviewEl.textContent = '';
+                chosenPreviewEl.style.display = 'none';
+                return;
+            }
+            const info = this.getFormattedLocationInfo(d) || '';
+            const name = d.name || '';
+            const text = [name, info].filter(Boolean).join(' — ');
+            if (text) {
+                chosenPreviewEl.textContent = text;
+                chosenPreviewEl.style.display = 'block';
+            } else {
+                chosenPreviewEl.textContent = '';
+                chosenPreviewEl.style.display = 'none';
+            }
+        };
+
         // Adicionar event listeners para sincronizar radio buttons com campo hidden
         setTimeout(() => {
             const hiddenField = document.getElementById(questionId);
@@ -9311,10 +9426,12 @@ this.renderLocationOptions();
                             hiddenField.value = listSelected.value;
                             hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
                             console.log('📍 [PICKUP SYNC] Valor inicial (lista selecionada):', listSelected.value);
+                            renderChosenPreview(listSelected.value);
                         } else if (isMandatory) {
                             hiddenField.value = '';
                             hiddenField.removeAttribute('data-unit');
                             console.log('📍 [PICKUP SYNC] Campo obrigatório: aguardando escolha da lista');
+                            if (chosenPreviewEl) { chosenPreviewEl.textContent = ''; chosenPreviewEl.style.display = 'none'; }
                         } else {
                             hiddenField.value = 'CHOOSE_FROM_LIST';
                             hiddenField.removeAttribute('data-unit');
@@ -9323,10 +9440,12 @@ this.renderLocationOptions();
                         hiddenField.value = '';
                         hiddenField.removeAttribute('data-unit');
                         console.log('📍 [PICKUP SYNC] Campo obrigatório: ignorando CONTACT_SUPPLIER_LATER');
+                        if (chosenPreviewEl) { chosenPreviewEl.textContent = ''; chosenPreviewEl.style.display = 'none'; }
                     } else {
                     hiddenField.value = checkedRadio.value;
                         hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
                         console.log('📍 [PICKUP SYNC] Valor inicial definido:', checkedRadio.value);
+                        if (chosenPreviewEl) { chosenPreviewEl.textContent = ''; chosenPreviewEl.style.display = 'none'; }
                     }
                 }
 
@@ -9340,15 +9459,18 @@ this.renderLocationOptions();
                                     hiddenField.value = listSelected.value;
                                     hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
                                     console.log('📍 [PICKUP SYNC] Valor atualizado (lista selecionada):', listSelected.value);
+                                    renderChosenPreview(listSelected.value);
                                 } else {
                                     hiddenField.value = 'CHOOSE_FROM_LIST';
                                     hiddenField.removeAttribute('data-unit');
                                     console.log('📍 [PICKUP SYNC] Aguardando escolha da lista');
+                                    if (chosenPreviewEl) { chosenPreviewEl.textContent = ''; chosenPreviewEl.style.display = 'none'; }
                                 }
                             } else {
                             hiddenField.value = this.value;
                                 hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
                                 console.log('📍 [PICKUP SYNC] Valor atualizado:', this.value);
+                                if (chosenPreviewEl) { chosenPreviewEl.textContent = ''; chosenPreviewEl.style.display = 'none'; }
                             }
 
                             // Remover classe de erro se existir
@@ -9369,6 +9491,19 @@ this.renderLocationOptions();
                     });
                 });
                 
+                // Sincronizar seleção da lista diretamente e atualizar pré-visualização
+                const listChoiceRadios = document.querySelectorAll(`input[name="${questionId}_list_choice"]`);
+                listChoiceRadios.forEach(r => {
+                    r.addEventListener('change', function() {
+                        if (!this.checked) return;
+                        if (hiddenField) {
+                            hiddenField.value = this.value;
+                            hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
+                        }
+                        renderChosenPreview(this.value);
+                    });
+                });
+
                 console.log('✅ [PICKUP SYNC] Listeners configurados para', radioButtons.length, 'radio buttons');
             } else {
                 console.warn('⚠️ [PICKUP SYNC] Falha na configuração:', {
@@ -9442,12 +9577,7 @@ this.renderLocationOptions();
      * Obter informações formatadas da localização
      */
     getFormattedLocationInfo(detail) {
-        // Se temos informações contextuais, usar elas
-        if (detail.contextInfo) {
-            return detail.contextInfo;
-        }
-        
-        // Se temos endereço completo, formatar de forma resumida
+        // Se temos endereço completo, priorizar exibir endereço
         if (detail.address && typeof detail.address === 'object') {
             const parts = [];
             if (detail.address.street && detail.address.street.trim() !== '' && detail.address.street !== ', ') {
@@ -9456,10 +9586,21 @@ this.renderLocationOptions();
             if (detail.address.city && detail.address.city.trim() !== '') {
                 parts.push(detail.address.city.trim());
             }
+            if (detail.address.state && detail.address.state.trim() !== '') {
+                parts.push(detail.address.state.trim());
+            }
+            if (detail.address.country && detail.address.country.trim() !== '') {
+                parts.push(detail.address.country.trim());
+            }
             
             if (parts.length > 0) {
                 return parts.join(', ');
             }
+        }
+        
+        // Se temos informações contextuais, usar somente se não houver endereço
+        if (detail.contextInfo) {
+            return detail.contextInfo;
         }
         
         // Para casos especiais

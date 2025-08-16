@@ -4,6 +4,33 @@
 
 Este documento serve como referência completa para a implementação e funcionamento das **Booking Questions** da API Viator no sistema de reservas. Aqui documentamos todas as estruturas de Booking Questions identificadas, testadas e implementadas funcionalmente, fornecendo um controle detalhado das implementações e servindo como guia para correções e adequações futuras.
 
+## 🆕 Melhorias Recentes Implementadas (Agosto 2025)
+
+### ✅ Problema do PICKUP_POINT Resolvido
+**Status**: ✅ **IMPLEMENTADO E FUNCIONAL**
+
+**Problema Original:**
+- Usuários viam apenas "Local específico identificado via Google Maps" ao invés do endereço real
+- Falta de feedback visual sobre a seleção feita
+- UI confusa e pouco informativa
+
+**Soluções Aplicadas:**
+1. **Google Places API v1**: Migração para versão mais moderna com Field Masks
+2. **Priorização de Endereços**: UI agora mostra endereços reais (rua, cidade, UF, país)
+3. **Pré-visualização Inteligente**: Preview "Nome — Endereço" quando "Gostaria que me buscassem" é selecionado
+4. **Sincronização em Tempo Real**: Seleções são refletidas imediatamente na interface
+5. **Logs Detalhados**: Melhor debugging para problemas de API
+
+**Resultado:**
+- ✅ Endereços reais são exibidos corretamente
+- ✅ Usuários têm feedback visual claro sobre suas escolhas
+- ✅ Interface mais informativa e profissional
+- ✅ Sistema robusto com fallback para API v3
+- ✅ Logs detalhados para manutenção
+
+**Produtos Testados:**
+- `101650P10` (Santorini) - ✅ Fluxo completo: HOLD → pagamento → CONFIRM 200
+
 ## Objetivo
 
 Manter um registro organizado e atualizado de:
@@ -218,6 +245,77 @@ As mensagens de erro agora são mais específicas:
 - "Erro ao processar dados do responsável"
 
 ## 📋 Histórico de Implementações
+
+### ✅ Implementação 16: Melhorias no PICKUP_POINT - Exibição de Endereços e Google Places API v1
+**Data:** Agosto 2025  
+**Status:** ✅ Implementado e Funcional
+
+**Problema Identificado:**
+- Na seção "Ponto de Encontro", quando o usuário selecionava "Gostaria que me buscassem", a UI exibia apenas o texto genérico "Local específico identificado via Google Maps" ao invés do endereço real identificado.
+- O sistema não estava priorizando a exibição do endereço formatado sobre informações contextuais genéricas.
+- Falta de pré-visualização do local escolhido na opção "Gostaria que me buscassem".
+
+**Soluções Implementadas:**
+
+#### 1. Atualização da Google Places API (unique-product.php)
+- **Migração para API v1**: Atualizada função `viator_get_google_place_details()` para usar a Google Places API v1:
+  - Endpoint: `GET https://places.googleapis.com/v1/places/{place_id}?languageCode=pt-BR`
+  - Headers: `X-Goog-Api-Key` (chave do usuário), `X-Goog-FieldMask: displayName,formattedAddress,addressComponents`
+  - Fallback para API v3: Mantida compatibilidade com versão anterior
+- **Parse de endereços**: Implementado parsing robusto de `addressComponents` para montar endereço estruturado
+- **Logs detalhados**: Adicionado logging para capturar códigos de resposta e mensagens da API Google
+
+#### 2. Melhorias na UI do Frontend (viator-booking.js)
+- **Priorização de endereços**: Função `getFormattedLocationInfo()` modificada para:
+  - Priorizar exibição do endereço real (rua, cidade, UF, país) sobre `contextInfo`
+  - Usar `contextInfo` apenas como fallback quando não houver dados de endereço úteis
+  - Formatação inteligente: "Rua, Cidade - UF, País" quando disponível
+- **Pré-visualização do local escolhido**: Implementada funcionalidade para:
+  - Exibir preview "Nome — Endereço" quando "Gostaria que me buscassem" é selecionado
+  - Atualizar dinamicamente conforme o usuário muda a seleção na lista
+  - Preencher o container `pickup-chosen-preview` com informações detalhadas
+
+#### 3. Sincronização de Seleção
+- **Event listeners robustos**: Configurados listeners para sincronizar:
+  - Radio buttons da opção "Gostaria que me buscassem"
+  - Seleção na lista de locais disponíveis
+  - Campo hidden com a referência escolhida
+- **Validação em tempo real**: Erros desaparecem dinamicamente ao fazer seleções válidas
+
+**Evidências de Funcionamento (Logs):**
+- **Produto testado**: `101650P10` (excursão em Santorini)
+- **Fluxo completo**: HOLD → pagamento → CONFIRM 200
+- **PICKUP_POINT**: Enviado como `CONTACT_SUPPLIER_LATER` com `unit=LOCATION_REFERENCE`
+- **Status final**: `CONFIRMED` com voucher gerado
+
+**Trechos dos logs (`viator-debug.log`):**
+```json
+"bookingQuestionAnswers": [
+  {"question":"PICKUP_POINT","answer":"CONTACT_SUPPLIER_LATER","unit":"LOCATION_REFERENCE"}
+]
+```
+```json
+"items":[{"status":"CONFIRMED","voucherInfo":{"url":"https://api.sandbox.viator.com/ticket?..."}}]
+```
+
+**Resultado:**
+- ✅ Endereços reais agora são exibidos ao invés de texto genérico
+- ✅ UI mais informativa e útil para o usuário final
+- ✅ Pré-visualização clara do local escolhido
+- ✅ Integração robusta com Google Places API v1
+- ✅ Fallback seguro para API v3 quando necessário
+- ✅ Logs detalhados para debugging de problemas de API
+
+**Arquivos Modificados:**
+- `unique-product.php` - Função `viator_get_google_place_details()` atualizada para API v1
+- `viator-booking.js` - Função `getFormattedLocationInfo()` e sistema de pré-visualização
+- `viator-booking.js` - Event listeners para sincronização de seleção
+
+**Diretrizes Técnicas:**
+- **Google Places API**: Usar v1 com Field Masks para performance e custos otimizados
+- **Fallback**: Manter compatibilidade com v3 para robustez
+- **Endereços**: Priorizar sempre dados estruturados sobre texto genérico
+- **UI/UX**: Fornecer feedback visual claro sobre seleções do usuário
 
 ### ✅ Implementação 3: Sistema Dinâmico de Booking Questions
 **Data:** Dezembro 2024  
@@ -637,7 +735,6 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 | 1.3 | 2025-08-12 | PICKUP obrigatório na Etapa 3; validação Etapa 4 padronizada; mesclagem robusta PER_BOOKING + PER_TRAVELER; remoção do heading em per-booking | Sistema |
 | 1.4 | 2025-08-13 | Caso funcional 100427P4 documentado; PER_TRAVELER (DOB, Passaporte, WEIGHT) funcionais; ajustes de exibição pt-BR (data, moeda) e UI dos selects | Sistema |
 | 1.5 | 2025-08-13 | Caso funcional 101291P1 documentado; HEIGHT/WEIGHT confirmados; fluxo hold→pagamento→confirmação bem-sucedido; languageGuide padronizado | Sistema |
-
 | 1.6 | 2025-08-14 | Headers padronizados (Accept-Language BCP‑47 com whitelist) e CSP de desenvolvimento para Google Maps; carregamento Maps com v=weekly, async/defer | Sistema |
 | 1.7 | 2025-08-14 | Caso funcional 101124P5 (transfer modes): auto-preenchimento de TRANSFER_DEPARTURE_MODE; CONFIRM 200; regras condicionais implementadas | Sistema |
 | 1.8 | 2025-08-14 | Regras de elegibilidade de PICKUP por modo (AIR/SEA/RAIL/OTHER) e fallback automático para CONTACT_SUPPLIER_LATER quando não houver locais válidos | Sistema |
@@ -645,6 +742,8 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 | 1.10 | 2025-08-14 | Caso 101124P5: ARRIVAL=AIR + PICKUP_POINT=FREETEXT ("Informar endereço específico"): CONFIRM 200; campos AIR coletados; Accept-Language pt-BR | Sistema |
 | 1.11 | 2025-08-15 | Caso 101124P5: ARRIVAL=SEA + DEPARTURE=OTHER; campos SEA (TRANSFER_PORT_CRUISE_SHIP, TRANSFER_PORT_ARRIVAL_TIME); PICKUP_POINT=CONTACT_SUPPLIER_LATER; CONFIRM 200 | Sistema |
 | 1.12 | 2025-08-15 | Casos 101124P5: ARRIVAL=OTHER + PICKUP_POINT (CONTACT_SUPPLIER_LATER, "Gostaria que me buscassem", "Informar endereço específico"); CONFIRM 200 | Sistema |
+| 1.13 | 2025-08-15 | Correção: filtragem de ARRIVAL/DEPARTURE por allowedAnswers do produto; sanitização automática (evita AIR quando apenas OTHER/SEA são válidos) | Sistema |
+| 1.14 | 2025-08-16 | **Implementação 16**: Melhorias no PICKUP_POINT - exibição de endereços reais, Google Places API v1, pré-visualização do local escolhido e UI aprimorada | Sistema |
 
 ---
 
@@ -832,6 +931,27 @@ Trechos do log (`viator-debug.log`):
 ```
 
 **Observações de compatibilidade:**
+
+### ✅ Implementação 15: Bloqueio de modos de chegada não suportados (erro "Invalid value provided for TRANSFER_ARRIVAL_MODE")
+**Data:** Agosto 2025  
+**Status:** ✅ Aplicado (frontend)
+
+**Problema observado (ex.: produto 101650P10):**
+- O select exibia `AIR` mesmo quando o produto aceitava apenas `OTHER` e `SEA`.
+- Na confirmação, a API retornava: `Invalid value provided for TRANSFER_ARRIVAL_MODE, should be one of: OTHER, SEA`.
+
+**Correção aplicada (viator-booking.js):**
+- Renderização dos selects de `TRANSFER_ARRIVAL_MODE`/`TRANSFER_DEPARTURE_MODE` agora utiliza `allowedAnswers` do produto quando disponíveis (via `getProductAllowedAnswers`).
+- Pós-render (`sanitizeTransferModes`): remove opções não permitidas e normaliza o valor atual para um permitido (prioriza `OTHER`).
+- Coleta/validação final: ao montar `bookingQuestionAnswers`, sanitiza os valores dos modos conforme `allowedAnswers` do produto antes do envio.
+
+**Impacto:**
+- Evita selecionar e enviar `AIR` quando o produto aceita somente `OTHER`/`SEA`.
+- Elimina o erro de confirmação mostrado nos logs.
+
+**Evidência (logs):**
+- Antes: tentativa com `AIR` terminava em `BAD_REQUEST` com a mensagem acima.
+- Depois: `TRANSFER_ARRIVAL_MODE` normalizado para `OTHER`/`SEA` conforme permitido; confirmação segue sem esse erro.
 - Headers intactos e válidos (`Accept-Language` vindo da configuração global, ex.: `pt-BR`).
 - Sem campos extras quando `ARRIVAL_MODE = OTHER`.
 - UI traduzida (Avião/Trem/Navio/Outros) mantendo values de API (AIR/RAIL/SEA/OTHER).
@@ -894,10 +1014,22 @@ Trechos do log (`viator-debug.log`):
 - `PICKUP_POINT`:
   - Mostrar `CONTACT_SUPPLIER_LATER` apenas quando presente nas locations do produto.
   - `FREETEXT` permitido somente se `allowCustomTravelerPickup === true`.
-  - Para “meet at start point” (quando detectável), ocultar UI e enviar `MEET_AT_DEPARTURE_POINT` como `LOCATION_REFERENCE`; exibir card com endereço/descritivo do ponto (opcional, usando `/locations/bulk`).
+  - Para "meet at start point" (quando detectável), ocultar UI e enviar `MEET_AT_DEPARTURE_POINT` como `LOCATION_REFERENCE`; exibir card com endereço/descritivo do ponto (opcional, usando `/locations/bulk`).
+  - **Priorizar exibição de endereços reais**: Sempre mostrar endereço formatado (rua, cidade, UF, país) ao invés de texto genérico "Local específico identificado via Google Maps".
+  - **Pré-visualização obrigatória**: Exibir preview "Nome — Endereço" quando "Gostaria que me buscassem" for selecionado.
+- **Google Places API**:
+  - **Versão preferida**: Usar Google Places API v1 com Field Masks para performance e custos otimizados.
+  - **Endpoint**: `GET https://places.googleapis.com/v1/places/{place_id}?languageCode=pt-BR`
+  - **Headers obrigatórios**: `X-Goog-Api-Key`, `X-Goog-FieldMask: displayName,formattedAddress,addressComponents`
+  - **Fallback**: Manter compatibilidade com API v3 para robustez.
+  - **Logs detalhados**: Capturar códigos de resposta e mensagens para debugging.
 - Modos de chegada: traduzir labels (Avião/Trem/Navio/Outros), normalizando para AIR/RAIL/SEA/OTHER antes do envio; quando não suportado, normalizar para `OTHER`.
 - Campos de chegada: quando `arrivalMode === OTHER` ou sem pickup, não coletar `TRANSFER_ARRIVAL_TIME`/`TRANSFER_ARRIVAL_DROP_OFF`.
-- Máscara “HH:MM”: aplicada ao `booking_question_TRANSFER_ARRIVAL_TIME`.
+- Máscara "HH:MM": aplicada ao `booking_question_TRANSFER_ARRIVAL_TIME`.
+- **UI/UX aprimorada**:
+  - **Sincronização em tempo real**: Event listeners robustos para sincronizar seleções de pickup.
+  - **Validação dinâmica**: Erros desaparecem automaticamente ao fazer seleções válidas.
+  - **Feedback visual**: Container `pickup-chosen-preview` sempre atualizado com informações do local escolhido.
 
 
 ---

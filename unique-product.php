@@ -3840,79 +3840,126 @@ function viator_get_google_place_details($place_id) {
     if (empty($google_api_key)) {
         return null;
     }
-    
+
     // Cache key baseado no place_id
     $cache_key = 'google_place_' . md5($place_id);
     $cached_data = get_transient($cache_key);
-    
     if (false !== $cached_data) {
         return $cached_data;
     }
-    
-    // URL da API Google Places Details
+
+    // 1) Tentar API Google Places v1 (recomendada): GET https://places.googleapis.com/v1/places/{place_id}
+    //    Headers: X-Goog-Api-Key, X-Goog-FieldMask
+    $v1_url = 'https://places.googleapis.com/v1/places/' . rawurlencode($place_id) . '?languageCode=pt-BR';
+    $v1_response = wp_remote_get($v1_url, [
+        'timeout' => 10,
+        'headers' => [
+            'X-Goog-Api-Key' => $google_api_key,
+            'X-Goog-FieldMask' => 'displayName,formattedAddress,addressComponents'
+        ]
+    ]);
+
+    if (!is_wp_error($v1_response) && wp_remote_retrieve_response_code($v1_response) === 200) {
+        $v1_body = wp_remote_retrieve_body($v1_response);
+        $v1_data = json_decode($v1_body, true);
+        if (is_array($v1_data) && (!empty($v1_data['formattedAddress']) || !empty($v1_data['addressComponents']) || !empty($v1_data['displayName']))) {
+            $place_details = [
+                'name' => isset($v1_data['displayName']['text']) ? $v1_data['displayName']['text'] : ($v1_data['displayName'] ?? ''),
+                'formatted_address' => $v1_data['formattedAddress'] ?? '',
+                'address' => []
+            ];
+
+            // Processar addressComponents v1 (longText/shortText + types)
+            $address_components = [];
+            if (!empty($v1_data['addressComponents']) && is_array($v1_data['addressComponents'])) {
+                foreach ($v1_data['addressComponents'] as $component) {
+                    $types = isset($component['types']) && is_array($component['types']) ? $component['types'] : [];
+                    $text = $component['longText'] ?? ($component['text'] ?? ($component['shortText'] ?? ''));
+                    if (in_array('street_number', $types, true)) {
+                        $address_components['street_number'] = $text;
+                    } elseif (in_array('route', $types, true)) {
+                        $address_components['route'] = $text;
+                    } elseif (in_array('locality', $types, true) || in_array('administrative_area_level_2', $types, true)) {
+                        $address_components['city'] = $text;
+                    } elseif (in_array('administrative_area_level_1', $types, true)) {
+                        $address_components['state'] = $text;
+                    } elseif (in_array('country', $types, true)) {
+                        $address_components['country'] = $text;
+                    } elseif (in_array('postal_code', $types, true)) {
+                        $address_components['postcode'] = $text;
+                    }
+                }
+            }
+
+            $street_parts = [];
+            if (!empty($address_components['street_number'])) {
+                $street_parts[] = $address_components['street_number'];
+            }
+            if (!empty($address_components['route'])) {
+                $street_parts[] = $address_components['route'];
+            }
+
+            $place_details['address'] = [
+                'street' => implode(' ', $street_parts),
+                'city' => $address_components['city'] ?? '',
+                'state' => $address_components['state'] ?? '',
+                'country' => $address_components['country'] ?? '',
+                'postcode' => $address_components['postcode'] ?? ''
+            ];
+
+            if (empty($place_details['address']['street']) && empty($place_details['address']['city']) && !empty($place_details['formatted_address'])) {
+                $place_details['address']['street'] = $place_details['formatted_address'];
+            }
+
+            set_transient($cache_key, $place_details, 7 * (defined('DAY_IN_SECONDS') ? DAY_IN_SECONDS : 86400));
+            return $place_details;
+        }
+    }
+
+    // 2) Fallback: API antiga (Place Details JSON)
     $url = 'https://maps.googleapis.com/maps/api/place/details/json';
     $params = [
         'place_id' => $place_id,
         'key' => $google_api_key,
         'fields' => 'name,formatted_address,address_components,geometry',
-        'language' => 'pt-BR' // Português brasileiro
+        'language' => 'pt-BR'
     ];
-    
     $request_url = $url . '?' . http_build_query($params);
-    
-    $response = wp_remote_get($request_url, [
-        'timeout' => 10
-    ]);
-    
-    if (is_wp_error($response)) {
+    $response = wp_remote_get($request_url, [ 'timeout' => 10 ]);
+    if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
         return null;
     }
-    
-    $response_code = wp_remote_retrieve_response_code($response);
-    if ($response_code !== 200) {
-        return null;
-    }
-    
     $body = wp_remote_retrieve_body($response);
     $data = json_decode($body, true);
-    
-    if (!isset($data['result']) || $data['status'] !== 'OK') {
+    if (!isset($data['result']) || ($data['status'] ?? '') !== 'OK') {
         return null;
     }
-    
+
     $result = $data['result'];
-    
-    // Processar os dados do local
     $place_details = [
         'name' => $result['name'] ?? '',
         'formatted_address' => $result['formatted_address'] ?? '',
         'address' => []
     ];
-    
-    // Processar componentes do endereço para formato compatível com Viator
     if (isset($result['address_components'])) {
         $address_components = [];
-        
         foreach ($result['address_components'] as $component) {
             $types = $component['types'];
             $long_name = $component['long_name'];
-            
-            if (in_array('street_number', $types)) {
+            if (in_array('street_number', $types, true)) {
                 $address_components['street_number'] = $long_name;
-            } elseif (in_array('route', $types)) {
+            } elseif (in_array('route', $types, true)) {
                 $address_components['route'] = $long_name;
-            } elseif (in_array('locality', $types) || in_array('administrative_area_level_2', $types)) {
+            } elseif (in_array('locality', $types, true) || in_array('administrative_area_level_2', $types, true)) {
                 $address_components['city'] = $long_name;
-            } elseif (in_array('administrative_area_level_1', $types)) {
+            } elseif (in_array('administrative_area_level_1', $types, true)) {
                 $address_components['state'] = $long_name;
-            } elseif (in_array('country', $types)) {
+            } elseif (in_array('country', $types, true)) {
                 $address_components['country'] = $long_name;
-            } elseif (in_array('postal_code', $types)) {
+            } elseif (in_array('postal_code', $types, true)) {
                 $address_components['postcode'] = $long_name;
             }
         }
-        
-        // Montar endereço no formato esperado pelo sistema
         $street_parts = [];
         if (!empty($address_components['street_number'])) {
             $street_parts[] = $address_components['street_number'];
@@ -3920,7 +3967,6 @@ function viator_get_google_place_details($place_id) {
         if (!empty($address_components['route'])) {
             $street_parts[] = $address_components['route'];
         }
-        
         $place_details['address'] = [
             'street' => implode(' ', $street_parts),
             'city' => $address_components['city'] ?? '',
@@ -3929,15 +3975,10 @@ function viator_get_google_place_details($place_id) {
             'postcode' => $address_components['postcode'] ?? ''
         ];
     }
-    
-    // Se não conseguimos processar os componentes, usar o endereço formatado
-    if (empty($place_details['address']['street']) && empty($place_details['address']['city'])) {
+    if (empty($place_details['address']['street']) && empty($place_details['address']['city']) && !empty($place_details['formatted_address'])) {
         $place_details['address']['street'] = $place_details['formatted_address'];
     }
-    
-    // Cache por 7 dias
     set_transient($cache_key, $place_details, 7 * (defined('DAY_IN_SECONDS') ? DAY_IN_SECONDS : 86400));
-    
     return $place_details;
 }
 
