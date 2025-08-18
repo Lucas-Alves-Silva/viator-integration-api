@@ -13316,8 +13316,11 @@ this.renderLocationOptions();
                         const isContactLater = genVal === 'CONTACT_SUPPLIER_LATER';
                         const isLocRef = genVal.startsWith('LOC-');
 
-                        // NOVA REGRA: se o produto expõe PICKUP_POINT, nunca remover (independe do arrivalMode)
-                        if (hasGenericPickup) {
+                        // REGRA RAIL: remover PICKUP_POINT quando arrivalMode=RAIL para evitar "Extra answer(s) provided"
+                        if (arrivalModeVal2 === 'RAIL') {
+                            bookingQuestionAnswers.splice(idxGeneric, 1);
+                            console.log('🔧 [CONFIRM] Removido PICKUP_POINT (arrivalMode=RAIL)');
+                        } else if (hasGenericPickup) {
                             // Se não permite freetext, coerir para CONTACT_SUPPLIER_LATER quando necessário
                             if (allowCustomPickup === false && !isContactLater && !isLocRef) {
                                 bookingQuestionAnswers[idxGeneric].answer = 'CONTACT_SUPPLIER_LATER';
