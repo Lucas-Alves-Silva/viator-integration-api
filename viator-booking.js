@@ -4226,12 +4226,22 @@ this.renderLocationOptions();
                 const hasAir = list.some(q => String(getId(q)).startsWith(isArrival ? 'TRANSFER_AIR_ARRIVAL' : 'TRANSFER_AIR_DEPARTURE'));
                 const hasSea = list.some(q => String(getId(q)).startsWith(isArrival ? 'TRANSFER_PORT_ARRIVAL' : 'TRANSFER_PORT_DEPARTURE'));
                 const hasRail = list.some(q => String(getId(q)).startsWith(isArrival ? 'TRANSFER_RAIL_ARRIVAL' : 'TRANSFER_RAIL_DEPARTURE'));
-                const inferred = [];
-                if (hasAir) inferred.push('AIR');
-                if (hasSea) inferred.push('SEA');
-                if (hasRail) inferred.push('RAIL');
-                inferred.push('OTHER');
-                return inferred;
+                const inferredModes = [];
+                if (hasAir) inferredModes.push('AIR');
+                if (hasSea) inferredModes.push('SEA');
+                if (hasRail) inferredModes.push('RAIL');
+                // Se detectamos modos específicos, retornar somente estes (NÃO adicionar OTHER por padrão)
+                if (inferredModes.length > 0) {
+                    return inferredModes;
+                }
+                // Fallback: usar allowedAnswers do próprio campo quando disponíveis
+                const modeQuestion = list.find(q => (q?.id || q?.question) === questionId);
+                const allowed = Array.isArray(modeQuestion?.allowedAnswers)
+                    ? modeQuestion.allowedAnswers.filter(v => ['AIR','RAIL','SEA','OTHER'].includes(v))
+                    : [];
+                if (allowed.length > 0) return allowed;
+                // Último recurso
+                return ['OTHER'];
             }
 
             // Para demais perguntas, se houver allowedAnswers específicos do produto, retornar
@@ -13308,6 +13318,20 @@ this.renderLocationOptions();
                         });
                     }
                 } catch (e) { /* no-op */ }
+
+                // Normalização FINAL de TRANSFER_ARRIVAL_MODE contra modos permitidos do produto
+                try {
+                    const arrIdxFinal = bookingQuestionAnswers.findIndex(a => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
+                    if (arrIdxFinal !== -1) {
+                        const currentVal = String(bookingQuestionAnswers[arrIdxFinal].answer || '').trim();
+                        const allowedFinal = (this.getProductAllowedAnswers && this.getProductAllowedAnswers('TRANSFER_ARRIVAL_MODE')) || [];
+                        if (Array.isArray(allowedFinal) && allowedFinal.length > 0 && !allowedFinal.includes(currentVal)) {
+                            // Fallback: escolher o primeiro permitido
+                            bookingQuestionAnswers[arrIdxFinal].answer = allowedFinal[0];
+                            console.warn(`⚠️ [CONFIRM] TRANSFER_ARRIVAL_MODE normalizado de "${currentVal}" para "${allowedFinal[0]}" (conforme produto)`);
+                        }
+                    }
+                } catch (_e) { /* no-op */ }
 
                 requestParams.bookingQuestionAnswers = JSON.stringify(bookingQuestionAnswers);
             } else {
