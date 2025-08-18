@@ -5049,6 +5049,33 @@ this.renderLocationOptions();
             }
         } catch (e) { /* no-op */ }
 
+        // Fallback explícito: capturar TRANSFER_ARRIVAL_TIME se ainda não coletado
+        try {
+            if (!answers.find(a => a.question === 'TRANSFER_ARRIVAL_TIME')) {
+                let timeValue = '';
+                const timeEl = document.getElementById('booking_question_TRANSFER_ARRIVAL_TIME_time')
+                    || document.querySelector('input[id*="TRANSFER_ARRIVAL_TIME"][type="time"]')
+                    || document.querySelector('input[id*="TRANSFER_ARRIVAL_TIME"][type="text"]')
+                    || document.querySelector('[data-question-id="TRANSFER_ARRIVAL_TIME"]');
+                timeValue = (timeEl && (timeEl.value || '').trim()) || '';
+
+                if (!timeValue) {
+                    const hourEl = document.querySelector('select[id*="TRANSFER_ARRIVAL_TIME"][id*="hour"], select[name*="TRANSFER_ARRIVAL_TIME"][name*="hour"]');
+                    const minuteEl = document.querySelector('select[id*="TRANSFER_ARRIVAL_TIME"][id*="minute"], select[name*="TRANSFER_ARRIVAL_TIME"][name*="minute"]');
+                    const hour = (hourEl && hourEl.value) ? String(hourEl.value).padStart(2, '0') : '';
+                    const minute = (minuteEl && minuteEl.value) ? String(minuteEl.value).padStart(2, '0') : '';
+                    if (hour && minute) {
+                        timeValue = `${hour}:${minute}`;
+                    }
+                }
+
+                if (timeValue) {
+                    answers.push({ question: 'TRANSFER_ARRIVAL_TIME', answer: timeValue });
+                    console.log('✅ [DYNAMIC DEBUG] TRANSFER_ARRIVAL_TIME coletado (fallback):', timeValue);
+                }
+            }
+        } catch (e) { /* no-op */ }
+
         // CORREÇÃO: Coletar respostas de language guide
         this.collectLanguageGuideAnswers(answers);
 
@@ -5128,7 +5155,8 @@ this.renderLocationOptions();
 			const filtered = answers.filter((ans) => {
 				const qid = ans && (ans.question || ans.questionId);
 				if (!qid) return false;
-				if (noPickup && (qid === 'TRANSFER_ARRIVAL_TIME' || qid === 'TRANSFER_ARRIVAL_DROP_OFF')) return false;
+				// No-pickup: manter TRANSFER_ARRIVAL_TIME (Viator ainda exige para AIR); remover apenas DROP_OFF
+				if (noPickup && (qid === 'TRANSFER_ARRIVAL_DROP_OFF')) return false;
 				// Se chegada for SEA, não enviar TRANSFER_ARRIVAL_TIME
 				try {
 					const arr = answers.find(a => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
@@ -12933,6 +12961,41 @@ this.renderLocationOptions();
                     }
                 }
             } catch (_e) {}
+
+            // Garantir TRANSFER_ARRIVAL_TIME quando arrivalMode=AIR
+            try {
+                const arrIdx = bookingQuestionAnswers.findIndex(a => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
+                const arrVal = arrIdx !== -1 ? String(bookingQuestionAnswers[arrIdx].answer || '').trim() : '';
+                const hasArrivalTime = bookingQuestionAnswers.some(a => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_TIME');
+                if (arrVal === 'AIR' && !hasArrivalTime) {
+                    let timeValue = '';
+                    const timeEl = document.getElementById('booking_question_TRANSFER_ARRIVAL_TIME_time')
+                        || document.querySelector('input[id*="TRANSFER_ARRIVAL_TIME"][type="time"]')
+                        || document.querySelector('input[id*="TRANSFER_ARRIVAL_TIME"][type="text"]')
+                        || document.querySelector('[data-question-id="TRANSFER_ARRIVAL_TIME"]');
+                    timeValue = (timeEl && (timeEl.value || '').trim()) || '';
+
+                    if (!timeValue) {
+                        const hourEl = document.querySelector('select[id*="TRANSFER_ARRIVAL_TIME"][id*="hour"], select[name*="TRANSFER_ARRIVAL_TIME"][name*="hour"]');
+                        const minuteEl = document.querySelector('select[id*="TRANSFER_ARRIVAL_TIME"][id*="minute"], select[name*="TRANSFER_ARRIVAL_TIME"][name*="minute"]');
+                        const hour = (hourEl && hourEl.value) ? String(hourEl.value).padStart(2, '0') : '';
+                        const minute = (minuteEl && minuteEl.value) ? String(minuteEl.value).padStart(2, '0') : '';
+                        if (hour && minute) {
+                            timeValue = `${hour}:${minute}`;
+                        }
+                    }
+
+                    if (timeValue) {
+                        bookingQuestionAnswers.push({ question: 'TRANSFER_ARRIVAL_TIME', answer: timeValue });
+                        console.log('✅ [CONFIRM] TRANSFER_ARRIVAL_TIME incluído (AIR):', timeValue);
+                    } else {
+                        this.showDateError('Informe a hora de chegada do voo (Hora da chegada).');
+                        const fg = (timeEl)?.closest?.('.booking-question-group');
+                        if (fg && fg.scrollIntoView) fg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        return false;
+                    }
+                }
+            } catch (_e) {}
             
             console.log('✅ [CONFIRM] Validação final aprovada - bookerInfo completo:', bookerInfo);
 
@@ -13015,7 +13078,8 @@ this.renderLocationOptions();
                         const before = bookingQuestionAnswers.length;
                         bookingQuestionAnswers = bookingQuestionAnswers.filter((a) => {
                             const qid = a && (a.question || a.questionId);
-                            return qid !== 'TRANSFER_ARRIVAL_TIME' && qid !== 'TRANSFER_ARRIVAL_DROP_OFF';
+                            // No-pickup: manter TRANSFER_ARRIVAL_TIME (AIR exige); remover apenas DROP_OFF
+                            return qid !== 'TRANSFER_ARRIVAL_DROP_OFF';
                         });
                         const after = bookingQuestionAnswers.length;
                         if (after !== before) {
@@ -13045,7 +13109,8 @@ this.renderLocationOptions();
                         const before2 = bookingQuestionAnswers.length;
                         bookingQuestionAnswers = bookingQuestionAnswers.filter((a) => {
                             const qid = a && (a.question || a.questionId);
-                            return qid !== 'TRANSFER_ARRIVAL_TIME' && qid !== 'TRANSFER_ARRIVAL_DROP_OFF';
+                            // No-pickup ou OTHER: manter TRANSFER_ARRIVAL_TIME (não é exclusivo de SEA); remover apenas DROP_OFF
+                            return qid !== 'TRANSFER_ARRIVAL_DROP_OFF';
                         });
                         const after2 = bookingQuestionAnswers.length;
                         if (after2 !== before2) {
