@@ -13202,22 +13202,66 @@ this.renderLocationOptions();
                             console.log('🔧 [CONFIRM] Campos SEA removidos para arrivalMode=AIR:', { antes: beforeAir, depois: afterAir });
                         }
 
-                        // Regra adicional: alguns produtos AIR não aceitam endereço final (DROP_OFF)
-                        // quando não permitem custom pickup/endereço. Remover para evitar "Extra answer(s) provided".
+                        // Regra revisada: quando o produto não permite custom pickup, só removemos DROP_OFF
+                        // se o produto NÃO exigir essa pergunta. Caso o produto EXIJA (está na lista),
+                        // garantimos que haja um valor padrão coerente.
                         try {
+                            const productQuestionsRaw = Array.isArray(this.bookingQuestions) && this.bookingQuestions.length > 0
+                                ? this.bookingQuestions
+                                : (Array.isArray(window.productData?.bookingQuestions) ? window.productData.bookingQuestions : []);
+                            const productIds = new Set(productQuestionsRaw.map(function(q){ return q && (q.questionId || q.id || q); }));
                             const allowCustomPickupAir = !!(window.productData && window.productData.logistics && window.productData.logistics.allowCustomTravelerPickup);
+                            const productHasDropOff = productIds.has('TRANSFER_ARRIVAL_DROP_OFF');
+
                             if (allowCustomPickupAir === false) {
-                                const beforeDrop = bookingQuestionAnswers.length;
-                                const removed = [];
-                                bookingQuestionAnswers = bookingQuestionAnswers.filter(function(a){
+                                const idxDrop = bookingQuestionAnswers.findIndex(function(a){
                                     const qid = a && (a.question || a.questionId);
-                                    const isDrop = qid === 'TRANSFER_ARRIVAL_DROP_OFF';
-                                    if (isDrop) removed.push(qid);
-                                    return !isDrop;
+                                    return qid === 'TRANSFER_ARRIVAL_DROP_OFF';
                                 });
-                                const afterDrop = bookingQuestionAnswers.length;
-                                if (afterDrop !== beforeDrop) {
-                                    console.log('🔧 [CONFIRM] Removido TRANSFER_ARRIVAL_DROP_OFF para arrivalMode=AIR em produto sem custom pickup:', { removidas: removed });
+
+                                if (productHasDropOff) {
+                                    // Produto exige DROP_OFF → garantir resposta, adicionando fallback se ausente
+                                    if (idxDrop === -1) {
+                                        // Tentar derivar fallback do PICKUP_POINT selecionado
+                                        let fallbackAnswer = 'CONTACT_SUPPLIER_LATER';
+                                        let fallbackUnit = 'LOCATION_REFERENCE';
+                                        try {
+                                            const pickupAns = bookingQuestionAnswers.find(a => (a?.question || a?.questionId) === 'PICKUP_POINT');
+                                            const val = String(pickupAns?.answer || '').trim();
+                                            if (val && val.startsWith('LOC-')) {
+                                                fallbackAnswer = val;
+                                                fallbackUnit = 'LOCATION_REFERENCE';
+                                            } else if (val === 'CONTACT_SUPPLIER_LATER') {
+                                                fallbackAnswer = 'CONTACT_SUPPLIER_LATER';
+                                                fallbackUnit = 'LOCATION_REFERENCE';
+                                            } else if (!val) {
+                                                // Sem referência de pickup: usar freetext neutro
+                                                fallbackAnswer = 'To be decided';
+                                                fallbackUnit = 'FREETEXT';
+                                            }
+                                        } catch (_e) { /* no-op */ }
+
+                                        bookingQuestionAnswers.push({
+                                            question: 'TRANSFER_ARRIVAL_DROP_OFF',
+                                            answer: fallbackAnswer,
+                                            unit: fallbackUnit
+                                        });
+                                        console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF obrigatório no produto → preenchido automaticamente:', { answer: fallbackAnswer, unit: fallbackUnit });
+                                    }
+                                } else {
+                                    // Produto não exige DROP_OFF → remover para evitar "Extra answer(s) provided)"
+                                    const beforeDrop = bookingQuestionAnswers.length;
+                                    const removed = [];
+                                    bookingQuestionAnswers = bookingQuestionAnswers.filter(function(a){
+                                        const qid = a && (a.question || a.questionId);
+                                        const isDrop = qid === 'TRANSFER_ARRIVAL_DROP_OFF';
+                                        if (isDrop) removed.push(qid);
+                                        return !isDrop;
+                                    });
+                                    const afterDrop = bookingQuestionAnswers.length;
+                                    if (afterDrop !== beforeDrop) {
+                                        console.log('🔧 [CONFIRM] Removido TRANSFER_ARRIVAL_DROP_OFF (produto não exige e sem custom pickup):', { removidas: removed });
+                                    }
                                 }
                             }
                         } catch (e) { /* no-op */ }
