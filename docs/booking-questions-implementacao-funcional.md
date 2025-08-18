@@ -32,40 +32,31 @@ Este documento serve como referência completa para a implementação e funciona
 - `101650P10` (Santorini) - ✅ Fluxo completo: HOLD → pagamento → CONFIRM 200
 - `101036P42` (Transfer Barcelona) - ✅ Fluxo completo: HOLD → pagamento → CONFIRM 200 com PICKUP_POINT FREETEXT
 - `100006P8` (Transfer Egito) - ✅ Fluxo completo: HOLD → pagamento → CONFIRM 200 com PICKUP_POINT FREETEXT + PER_TRAVELER
+- `100143P7` (Múltiplos viajantes) - ✅ Fluxo completo: HOLD → pagamento → CONFIRM 200 com status PENDING + PER_TRAVELER + HEIGHT
 
-### ✅ Novo Caso Funcional: Produto 100006P8
+### ✅ Novo Caso Funcional: Produto 100143P7
 **Status**: ✅ **IMPLEMENTADO E FUNCIONAL**
 
 **Contexto:**
-- **Tipo**: Transfer privado no Egito (supplierId: 100006, supplierLocation: EG)
-- **PICKUP_POINT**: Funcionando perfeitamente com `unit=FREETEXT` para endereços customizados
-- **PER_TRAVELER**: FULL_NAMES_FIRST/LAST e AGEBAND coletados corretamente com travelerNum
-- **languageGuide**: Aplicado corretamente nos itens e na raiz (type=GUIDE, language=en)
+- **Tipo**: Produto com múltiplos viajantes (supplierId: 100143, supplierLocation: KH)
+- **PER_TRAVELER**: FULL_NAMES_FIRST/LAST, AGEBAND e HEIGHT coletados corretamente com travelerNum
+- **PICKUP_POINT**: CONTACT_SUPPLIER_LATER funcionando perfeitamente
+- **Múltiplos viajantes**: INFANT (68cm) + ADULT (172cm) com dados completos
+- **Status PENDING**: Reserva processada com sucesso, aguardando confirmação do fornecedor
+
+**Principais Conquistas:**
+1. **Sistema robusto para múltiplos viajantes**: PER_TRAVELER funcionando com travelerNum correto
+2. **HEIGHT com unit**: Coletado corretamente em centímetros para cada viajante
+3. **PICKUP_POINT normalizado**: CONTACT_SUPPLIER_LATER com unit=LOCATION_REFERENCE
+4. **Fluxo completo validado**: HOLD → pagamento → CONFIRM 200
+5. **Status PENDING**: Compreendido e documentado como comportamento normal da API
 
 **Evidências dos Logs:**
-- **HOLD**: ✅ 200 - Cart criado com sucesso
-- **Pagamento**: ✅ 200 - Processado via TA Payments
-- **Confirmação**: ✅ 200 - Status CONFIRMED com voucher gerado
-- **Booking Questions**: Enviadas corretamente com estrutura válida (5 campos)
-- **Preço**: BRL 88.58 (recomendado) / BRL 81.49 (parceiro)
-
-**Resultado:**
-- ✅ Sistema robusto para transfer privado com pickup customizado no Egito
-- ✅ PICKUP_POINT FREETEXT funcionando perfeitamente
-- ✅ PER_TRAVELER coletado corretamente com travelerNum
-- ✅ Fluxo completo validado e documentado
-
-### ✅ Correção adicional: PICKUP_POINT com arrivalMode=OTHER e múltiplos viajantes (Agosto 2025)
-
-- **Sintoma (logs):** Ao confirmar com `arrivalMode = OTHER` e 2 viajantes, a API retornava `Arrival mode OTHER requires answers: PICKUP_POINT` após uma sanitização que removia o campo.
-- **Causa:** Filtro final removia `PICKUP_POINT` quando havia campos especializados de pickup ou quando `allowCustomTravelerPickup=false`, mesmo no modo OTHER (onde a API exige `PICKUP_POINT`).
-- **Correção (frontend, confirmBooking):**
-  - Manter `PICKUP_POINT` quando `arrivalMode === OTHER` e o produto expõe `PICKUP_POINT`.
-  - Remover `PICKUP_POINT` apenas quando: (a) há campos especializados E `arrivalMode !== OTHER`, ou (b) `allowCustomTravelerPickup === false` e o valor é freetext inválido (nem `CONTACT_SUPPLIER_LATER` nem `LOC-`).
-  - Normalizar `unit='LOCATION_REFERENCE'` para `CONTACT_SUPPLIER_LATER` e valores `LOC-`.
-- **Resultado esperado:**
-  - OTHER: `PICKUP_POINT` sempre presente (conforme exigência da API), evitando 400/500.
-  - SEA/AIR com campos especializados: sem duplicar `PICKUP_POINT` (somente os campos específicos são enviados).
+- **Booking Questions**: 9 campos coletados corretamente (4 PER_TRAVELER + 1 PER_BOOKING)
+- **HOLD**: ✅ 200 com line items separados por age band
+- **Pagamento**: ✅ 200 via TA Payments
+- **Confirmação**: ✅ 200 com status PENDING e política de cancelamento detalhada
+- **Preço**: BRL 857.82 (recomendado) / BRL 789.19 (parceiro)
 
 ### ✅ Correção Crítica: Erro "Missing answer(s) for: PICKUP_POINT" (Agosto 2025)
 
@@ -824,6 +815,7 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 | 1.7 | 2025-08-13 | Caso funcional 101036P42 documentado; PICKUP_POINT FREETEXT funcionando; fluxo completo validado | Sistema |
 | 1.8 | 2025-08-13 | Caso funcional 100006P8 documentado; PER_TRAVELER + PICKUP_POINT FREETEXT; fluxo completo validado | Sistema |
 | 1.9 | 2025-08-18 | **CORREÇÃO CRÍTICA**: Erro "Missing answer(s) for: PICKUP_POINT" resolvido; nova regra de sanitização implementada; PICKUP_POINT sempre mantido quando produto o expõe | Sistema |
+| 1.10 | 2025-08-18 | **Implementação 19**: Produto 100143P7 - Múltiplos viajantes (INFANT+ADULT) com PER_TRAVELER + HEIGHT; fluxo completo HOLD→pagamento→CONFIRM 200 com status PENDING | Sistema |
 
 ---
 
@@ -1243,3 +1235,110 @@ Trechos do log (`viator-debug.log`):
 ---
 
 **📌 Nota**: Este documento é atualizado automaticamente a cada nova implementação funcional de Booking Questions. Mantenha-o sempre como referência principal para o desenvolvimento e manutenção do sistema.
+
+### ✅ Implementação 19: Produto 100143P7 – Múltiplos viajantes com PER_TRAVELER + PICKUP_POINT
+**Data:** Agosto 2025  
+**Status:** ✅ Fluxo completo bem-sucedido (HOLD → pagamento → CONFIRM 200 com status PENDING)
+
+**Contexto do Produto:**
+- **Tipo**: Produto com múltiplos viajantes (supplierId: 100143, supplierLocation: KH)
+- **bookingQuestions** detectadas (9): 
+  - `FULL_NAMES_FIRST` (PER_TRAVELER, STRING)
+  - `FULL_NAMES_LAST` (PER_TRAVELER, STRING)
+  - `AGEBAND` (PER_TRAVELER, STRING)
+  - `HEIGHT` (PER_TRAVELER, STRING)
+  - `PICKUP_POINT` (PER_BOOKING, LOCATION_REF_OR_FREE_TEXT)
+
+**Cenário Testado:**
+- **Viajante 1**: Samara Gerônimo (INFANT, altura: 68cm)
+- **Viajante 2**: Jéssika Alves (ADULT, altura: 172cm)
+- `PICKUP_POINT = "CONTACT_SUPPLIER_LATER"` com `unit=LOCATION_REFERENCE`
+- Preço: BRL 857.82 (recomendado) / BRL 789.19 (parceiro)
+- `languageGuide`: type=GUIDE, language=en
+
+**Evidências dos Logs (`viator-debug.log`):**
+
+**1. Booking Questions Coletadas:**
+```json
+"bookingQuestionAnswers": [
+  {"question":"FULL_NAMES_FIRST","answer":"Samara","travelerNum":1},
+  {"question":"FULL_NAMES_LAST","answer":"Gerônimo","travelerNum":1},
+  {"question":"AGEBAND","answer":"INFANT","travelerNum":1},
+  {"question":"HEIGHT","answer":"68","travelerNum":1,"unit":"cm"},
+  {"question":"FULL_NAMES_FIRST","answer":"Jéssika","travelerNum":2},
+  {"question":"FULL_NAMES_LAST","answer":"Alves","travelerNum":2},
+  {"question":"AGEBAND","answer":"ADULT","travelerNum":2},
+  {"question":"HEIGHT","answer":"172","travelerNum":2,"unit":"cm"},
+  {"question":"PICKUP_POINT","answer":"CONTACT_SUPPLIER_LATER","unit":"LOCATION_REFERENCE"}
+]
+```
+
+**2. Fluxo de Reserva:**
+- **HOLD**: ✅ 200 - Cart criado com sucesso
+  - `cartRef`: CR-2dbb198651e256a3b2a291baf8ae5ae8
+  - `bookingRef`: BR-597865083
+  - `paymentSessionToken` recebido
+  - Status: BOOKABLE
+  - Preço: BRL 857.82 (recomendado) / BRL 789.19 (parceiro)
+  - **Line Items**: INFANT (BRL 359.73) + ADULT (BRL 498.09)
+- **Pagamento**: ✅ 200 - Processado via TA Payments
+  - `sessionToken` recebido
+- **Confirmação**: ✅ 200 - Reserva processada
+  - Status: **PENDING** (aguardando confirmação do fornecedor)
+  - Política de cancelamento: STANDARD (24h para reembolso total)
+  - Preço pendente: BRL 857.82 (recomendado) / BRL 789.19 (parceiro)
+
+**3. Estrutura Final da Requisição:**
+```json
+{
+  "cartRef": "CR-2dbb198651e256a3b2a291baf8ae5ae8",
+  "paymentToken": "STK-ysub4i...",
+  "bookerInfo": {
+    "firstName": "Shiny",
+    "lastName": "inox",
+    "email": "jucaflarj@gmail.com",
+    "phone": "(21) 98971-2606",
+    "countryCode": "BR"
+  },
+  "bookingQuestionAnswers": [
+    {"question":"FULL_NAMES_FIRST","answer":"Samara","travelerNum":1},
+    {"question":"FULL_NAMES_LAST","answer":"Gerônimo","travelerNum":1},
+    {"question":"AGEBAND","answer":"INFANT","travelerNum":1},
+    {"question":"HEIGHT","answer":"68","travelerNum":1,"unit":"cm"},
+    {"question":"FULL_NAMES_FIRST","answer":"Jéssika","travelerNum":2},
+    {"question":"FULL_NAMES_LAST","answer":"Alves","travelerNum":2},
+    {"question":"AGEBAND","answer":"ADULT","travelerNum":2},
+    {"question":"HEIGHT","answer":"172","travelerNum":2,"unit":"cm"},
+    {"question":"PICKUP_POINT","answer":"CONTACT_SUPPLIER_LATER","unit":"LOCATION_REFERENCE"}
+  ],
+  "languageGuide": {
+    "type": "GUIDE",
+    "language": "en"
+  }
+}
+```
+
+**4. Política de Cancelamento:**
+- **Tipo**: STANDARD
+- **Reembolso total**: Cancelar até 24h antes da partida
+- **Cancelamento por mau tempo**: Permitido
+- **Cancelamento por viajantes insuficientes**: Não permitido
+- **Elegibilidade de reembolso**:
+  - 1+ dias antes: 100% reembolsável
+  - 0-1 dia antes: 0% reembolsável
+
+**Resultado:**
+- ✅ Sistema robusto para múltiplos viajantes com PER_TRAVELER
+- ✅ HEIGHT coletado corretamente com travelerNum e unit=cm
+- ✅ PICKUP_POINT com CONTACT_SUPPLIER_LATER funcionando
+- ✅ Fluxo completo validado: HOLD → pagamento → CONFIRM 200
+- ✅ Status PENDING (normal para produtos que exigem confirmação do fornecedor)
+- ✅ Política de cancelamento detalhada retornada pela API
+
+**Observações Importantes:**
+- **Status PENDING**: Indica que a reserva foi processada com sucesso, mas aguarda confirmação do fornecedor
+- **Preço pendente**: BRL 857.82 (não cobrado ainda, apenas pré-autorizado)
+- **Viajantes**: INFANT + ADULT com dados completos coletados corretamente
+- **PICKUP_POINT**: CONTACT_SUPPLIER_LATER normalizado com unit=LOCATION_REFERENCE
+
+### ✅ Implementação 18: Produto 100006P8 – Transfer privado Egito com PICKUP_POINT FREETEXT
