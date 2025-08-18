@@ -5155,8 +5155,14 @@ this.renderLocationOptions();
 			const filtered = answers.filter((ans) => {
 				const qid = ans && (ans.question || ans.questionId);
 				if (!qid) return false;
-				// No-pickup: manter TRANSFER_ARRIVAL_TIME (Viator ainda exige para AIR); remover apenas DROP_OFF
-				if (noPickup && (qid === 'TRANSFER_ARRIVAL_DROP_OFF')) return false;
+				// No-pickup: manter DROP_OFF para AIR/RAIL; remover apenas para OTHER/SEA
+				if (noPickup && qid === 'TRANSFER_ARRIVAL_DROP_OFF') {
+					try {
+						const arr = answers.find(a => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
+						const val = arr ? String(arr.answer || '').trim() : '';
+						if (val !== 'AIR' && val !== 'RAIL') return false;
+					} catch(_e) { /* no-op */ }
+				}
 				// Se chegada for SEA, não enviar TRANSFER_ARRIVAL_TIME
 				try {
 					const arr = answers.find(a => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
@@ -5208,14 +5214,15 @@ this.renderLocationOptions();
 				});
 			} catch(__e) { /* no-op */ }
 
-			// Regra adicional: quando não há pickup, apenas AIR/OTHER são aceitos para ARRIVAL_MODE
+			// Regra adicional: quando não há pickup, preservar modos válidos (AIR/RAIL/OTHER)
 			try {
 				if (noPickup) {
 					const idx = filtered.findIndex((a) => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
 					if (idx !== -1) {
 						const cur = String(filtered[idx].answer || '').trim();
-						if (cur !== 'AIR' && cur !== 'OTHER') {
-							console.warn(`⚠️ [DYNAMIC DEBUG] TRANSFER_ARRIVAL_MODE inválido no cenário sem pickup: "${cur}" → OTHER`);
+						// Apenas ajustar valores claramente incompatíveis (ex.: SEA)
+						if (cur !== 'AIR' && cur !== 'RAIL' && cur !== 'OTHER') {
+							console.warn(`⚠️ [DYNAMIC DEBUG] TRANSFER_ARRIVAL_MODE incompatível no cenário sem pickup: "${cur}" → OTHER`);
 							filtered[idx].answer = 'OTHER';
 						}
 					}
@@ -7024,14 +7031,18 @@ this.renderLocationOptions();
                     value = fallback;
                     arrivalModeInput.value = fallback;
                 }
-                // Cenário sem pickup: só AIR/OTHER são válidos segundo o erro da API – normalizar
+                // Cenário sem pickup: preservar RAIL quando permitido; ajustar apenas valores inválidos
                 const pickupData = this.getPickupData ? this.getPickupData() : undefined;
                 const noPickup = pickupData && pickupData.pickupOptionType === 'MEET_EVERYONE_AT_START_POINT';
-                if (noPickup && value !== 'AIR' && value !== 'OTHER') {
-                    const fallback = allowed && allowed.includes('OTHER') ? 'OTHER' : 'OTHER';
-                    console.warn(`⚠️ [VALIDATION] TRANSFER_ARRIVAL_MODE ajustado (no-pickup) "${value}" → "${fallback}"`);
-                    value = fallback;
-                    arrivalModeInput.value = fallback;
+                if (noPickup) {
+                    const isAllowed = !allowed || allowed.includes(value);
+                    // Somente se o valor atual não for permitido pelo produto, normalizar
+                    if (!isAllowed) {
+                        const fallback = allowed && allowed.length > 0 ? (allowed.includes('OTHER') ? 'OTHER' : allowed[0]) : 'OTHER';
+                        console.warn(`⚠️ [VALIDATION] TRANSFER_ARRIVAL_MODE inválido no cenário sem pickup: "${value}" → "${fallback}" (allowed: ${Array.isArray(allowed)?allowed.join(', '):'desconhecido'})`);
+                        value = fallback;
+                        arrivalModeInput.value = fallback;
+                    }
                 }
             } catch(_e) { /* no-op */ }
             if (!value) {
@@ -7674,6 +7685,8 @@ this.renderLocationOptions();
         const airFlightQ = transferQuestions.find(q => q.id === 'TRANSFER_AIR_ARRIVAL_FLIGHT_NO');
         const portArrivalQ = transferQuestions.find(q => q.id === 'TRANSFER_PORT_ARRIVAL_TIME');
         const portCruiseQ = transferQuestions.find(q => q.id === 'TRANSFER_PORT_CRUISE_SHIP');
+        const railLineQ = transferQuestions.find(q => q.id === 'TRANSFER_RAIL_ARRIVAL_LINE');
+        const railStationQ = transferQuestions.find(q => q.id === 'TRANSFER_RAIL_ARRIVAL_STATION');
 
         const renderQ = (question) => {
             if (!question) return;
@@ -7697,6 +7710,9 @@ this.renderLocationOptions();
         // SEA
         renderQ(portCruiseQ);
         renderQ(portArrivalQ);
+        // RAIL
+        renderQ(railLineQ);
+        renderQ(railStationQ);
         // TIME genérico de chegada (apenas AIR/RAIL; SEA/OTHER ficam ocultos pela condicional)
         renderQ(arrivalTimeQ);
         // Endereço final
@@ -12962,12 +12978,12 @@ this.renderLocationOptions();
                 }
             } catch (_e) {}
 
-            // Garantir TRANSFER_ARRIVAL_TIME quando arrivalMode=AIR
+            // Garantir TRANSFER_ARRIVAL_TIME quando arrivalMode=AIR/RAIL
             try {
                 const arrIdx = bookingQuestionAnswers.findIndex(a => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
                 const arrVal = arrIdx !== -1 ? String(bookingQuestionAnswers[arrIdx].answer || '').trim() : '';
                 const hasArrivalTime = bookingQuestionAnswers.some(a => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_TIME');
-                if (arrVal === 'AIR' && !hasArrivalTime) {
+                if ((arrVal === 'AIR' || arrVal === 'RAIL') && !hasArrivalTime) {
                     let timeValue = '';
                     const timeEl = document.getElementById('booking_question_TRANSFER_ARRIVAL_TIME_time')
                         || document.querySelector('input[id*="TRANSFER_ARRIVAL_TIME"][type="time"]')
@@ -12987,13 +13003,40 @@ this.renderLocationOptions();
 
                     if (timeValue) {
                         bookingQuestionAnswers.push({ question: 'TRANSFER_ARRIVAL_TIME', answer: timeValue });
-                        console.log('✅ [CONFIRM] TRANSFER_ARRIVAL_TIME incluído (AIR):', timeValue);
+                        console.log('✅ [CONFIRM] TRANSFER_ARRIVAL_TIME incluído (', arrVal, '):', timeValue);
                     } else {
-                        this.showDateError('Informe a hora de chegada do voo (Hora da chegada).');
+                        const msg = arrVal === 'AIR' ? 'Informe a hora de chegada do voo (Hora da chegada).' : 'Informe a hora de chegada do trem (Hora da chegada).';
+                        this.showDateError(msg);
                         const fg = (timeEl)?.closest?.('.booking-question-group');
                         if (fg && fg.scrollIntoView) fg.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         return false;
                     }
+                }
+            } catch (_e) {}
+
+            // Garantir campos de RAIL (LINE/STATION) quando arrivalMode=RAIL
+            try {
+                const arrIdx2 = bookingQuestionAnswers.findIndex(a => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
+                const arrVal2 = arrIdx2 !== -1 ? String(bookingQuestionAnswers[arrIdx2].answer || '').trim() : '';
+                if (arrVal2 === 'RAIL') {
+                    const ensureRail = (qid, label) => {
+                        const exists = bookingQuestionAnswers.some(a => (a?.question || a?.questionId) === qid);
+                        if (exists) return true;
+                        const el = document.getElementById(`booking_question_${qid}`) || document.querySelector(`[data-question-id="${qid}"]`);
+                        const val = (el && (el.value || '').trim()) || '';
+                        if (val) {
+                            bookingQuestionAnswers.push({ question: qid, answer: val });
+                            console.log(`✅ [CONFIRM] ${qid} incluído (RAIL):`, val);
+                            return true;
+                        }
+                        if (el) this.showFieldError(el, `${label} é obrigatório`);
+                        this.showDateError(`${label} é obrigatório para Trem.`);
+                        const fg = el?.closest?.('.booking-question-group');
+                        if (fg && fg.scrollIntoView) fg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        return false;
+                    };
+                    if (!ensureRail('TRANSFER_RAIL_ARRIVAL_LINE', 'Linha do Trem (Chegada)')) return false;
+                    if (!ensureRail('TRANSFER_RAIL_ARRIVAL_STATION', 'Estação de Chegada')) return false;
                 }
             } catch (_e) {}
             
@@ -13074,11 +13117,18 @@ this.renderLocationOptions();
                 try {
                     const pickupData = this.getPickupData ? this.getPickupData() : undefined;
                     const noPickup = pickupData && pickupData.pickupOptionType === 'MEET_EVERYONE_AT_START_POINT';
+                    // Ler o arrival mode atual
+                    const arrIdxNoPickup = bookingQuestionAnswers.findIndex((a) => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
+                    const arrValNoPickup = arrIdxNoPickup !== -1 ? String(bookingQuestionAnswers[arrIdxNoPickup].answer || '').trim() : '';
                     if (noPickup) {
                         const before = bookingQuestionAnswers.length;
                         bookingQuestionAnswers = bookingQuestionAnswers.filter((a) => {
                             const qid = a && (a.question || a.questionId);
-                            // No-pickup: manter TRANSFER_ARRIVAL_TIME (AIR exige); remover apenas DROP_OFF
+                            // No-pickup: NÃO remover DROP_OFF quando arrivalMode for AIR/RAIL (Viator exige)
+                            if ((arrValNoPickup === 'AIR' || arrValNoPickup === 'RAIL') && qid === 'TRANSFER_ARRIVAL_DROP_OFF') {
+                                return true;
+                            }
+                            // Caso contrário (OTHER/SEA/indefinido), remover DROP_OFF
                             return qid !== 'TRANSFER_ARRIVAL_DROP_OFF';
                         });
                         const after = bookingQuestionAnswers.length;
@@ -13089,7 +13139,8 @@ this.renderLocationOptions();
                         const idx = bookingQuestionAnswers.findIndex((a) => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
                         if (idx !== -1) {
                             const cur = String(bookingQuestionAnswers[idx].answer || '').trim();
-                            if (cur !== 'AIR' && cur !== 'OTHER') {
+                            // Preservar RAIL no cenário sem pickup; ajustar apenas valores claramente inválidos (ex.: SEA)
+                            if (cur !== 'AIR' && cur !== 'RAIL' && cur !== 'OTHER') {
                                 console.warn(`⚠️ [CONFIRM] TRANSFER_ARRIVAL_MODE inválido no cenário sem pickup: "${cur}" → OTHER`);
                                 bookingQuestionAnswers[idx].answer = 'OTHER';
                             }
@@ -13105,11 +13156,11 @@ this.renderLocationOptions();
                     const arrIdx = bookingQuestionAnswers.findIndex((a) => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
                     const arrivalModeVal = arrIdx !== -1 ? String(bookingQuestionAnswers[arrIdx].answer || '').trim() : '';
                     const arrivalIsOther = arrivalModeVal === 'OTHER';
-                    if (noPickup2 || arrivalIsOther) {
+                    if (arrivalIsOther || (noPickup2 && arrivalModeVal !== 'AIR' && arrivalModeVal !== 'RAIL')) {
                         const before2 = bookingQuestionAnswers.length;
                         bookingQuestionAnswers = bookingQuestionAnswers.filter((a) => {
                             const qid = a && (a.question || a.questionId);
-                            // No-pickup ou OTHER: manter TRANSFER_ARRIVAL_TIME (não é exclusivo de SEA); remover apenas DROP_OFF
+                            // OTHER ou no-pickup sem AIR/RAIL: remover apenas DROP_OFF
                             return qid !== 'TRANSFER_ARRIVAL_DROP_OFF';
                         });
                         const after2 = bookingQuestionAnswers.length;
@@ -13136,9 +13187,43 @@ this.renderLocationOptions();
                             const qid = a && (a.question || a.questionId);
                             return seaFields.indexOf(qid) === -1; // remove SEA-only
                         });
-                        const afterAir = bookingQuestionAnswers.length;
+                        let afterAir = bookingQuestionAnswers.length;
                         if (afterAir !== beforeAir) {
                             console.log('🔧 [CONFIRM] Campos SEA removidos para arrivalMode=AIR:', { antes: beforeAir, depois: afterAir });
+                        }
+
+                        // Regra adicional: alguns produtos AIR não aceitam endereço final (DROP_OFF)
+                        // quando não permitem custom pickup/endereço. Remover para evitar "Extra answer(s) provided".
+                        try {
+                            const allowCustomPickupAir = !!(window.productData && window.productData.logistics && window.productData.logistics.allowCustomTravelerPickup);
+                            if (allowCustomPickupAir === false) {
+                                const beforeDrop = bookingQuestionAnswers.length;
+                                const removed = [];
+                                bookingQuestionAnswers = bookingQuestionAnswers.filter(function(a){
+                                    const qid = a && (a.question || a.questionId);
+                                    const isDrop = qid === 'TRANSFER_ARRIVAL_DROP_OFF';
+                                    if (isDrop) removed.push(qid);
+                                    return !isDrop;
+                                });
+                                const afterDrop = bookingQuestionAnswers.length;
+                                if (afterDrop !== beforeDrop) {
+                                    console.log('🔧 [CONFIRM] Removido TRANSFER_ARRIVAL_DROP_OFF para arrivalMode=AIR em produto sem custom pickup:', { removidas: removed });
+                                }
+                            }
+                        } catch (e) { /* no-op */ }
+                    } else if (arrivalModeVal === 'RAIL') {
+                        // Para RAIL: remover campos exclusivos de SEA e os exclusivos de AIR (airline/flight),
+                        // preservando TRANSFER_ARRIVAL_TIME que é compartilhado
+                        const beforeRail = bookingQuestionAnswers.length;
+                        bookingQuestionAnswers = bookingQuestionAnswers.filter(a => {
+                            const qid = a && (a.question || a.questionId);
+                            return seaFields.indexOf(qid) === -1
+                                && qid !== 'TRANSFER_AIR_ARRIVAL_AIRLINE'
+                                && qid !== 'TRANSFER_AIR_ARRIVAL_FLIGHT_NO';
+                        });
+                        const afterRail = bookingQuestionAnswers.length;
+                        if (afterRail !== beforeRail) {
+                            console.log('🔧 [CONFIRM] Campos AIR/SEA removidos para arrivalMode=RAIL (preservando TRANSFER_ARRIVAL_TIME):', { antes: beforeRail, depois: afterRail });
                         }
                     } else {
                         const beforeOther = bookingQuestionAnswers.length;
@@ -13196,6 +13281,31 @@ this.renderLocationOptions();
                                 console.log('🔧 [CONFIRM] Removido PICKUP_POINT com FREETEXT em produto sem custom pickup');
                             }
                         }
+                    }
+                } catch (e) { /* no-op */ }
+
+                // SANITIZAÇÃO GERAL: remover respostas que não existem nas bookingQuestions do produto
+                // Evita erros do tipo: "Extra answer(s) provided: <QUESTION_ID>"
+                try {
+                    const productQuestionsRaw2 = Array.isArray(this.bookingQuestions) && this.bookingQuestions.length > 0
+                        ? this.bookingQuestions
+                        : (Array.isArray(window.productData?.bookingQuestions) ? window.productData.bookingQuestions : []);
+                    const validIds = new Set(productQuestionsRaw2.map(function(q){ return q && (q.questionId || q.id || q); }));
+                    const beforeLen = bookingQuestionAnswers.length;
+                    const removedList = [];
+                    bookingQuestionAnswers = bookingQuestionAnswers.filter(function(a){
+                        const qid = a && (a.question || a.questionId);
+                        const keep = validIds.has(qid);
+                        if (!keep && qid) removedList.push(qid);
+                        return keep;
+                    });
+                    const afterLen = bookingQuestionAnswers.length;
+                    if (afterLen !== beforeLen) {
+                        console.log('🔧 [CONFIRM] Removidas respostas não pertencentes às bookingQuestions do produto:', {
+                            antes: beforeLen,
+                            depois: afterLen,
+                            removidas: removedList
+                        });
                     }
                 } catch (e) { /* no-op */ }
 
