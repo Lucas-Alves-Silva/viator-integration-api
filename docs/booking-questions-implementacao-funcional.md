@@ -34,6 +34,31 @@ Este documento serve como referência completa para a implementação e funciona
 - `100006P8` (Transfer Egito) - ✅ Fluxo completo: HOLD → pagamento → CONFIRM 200 com PICKUP_POINT FREETEXT + PER_TRAVELER
 - `100143P7` (Múltiplos viajantes) - ✅ Fluxo completo: HOLD → pagamento → CONFIRM 200 com status PENDING + PER_TRAVELER + HEIGHT
 - **Novo**: Produto de alto valor - ✅ Fluxo completo: HOLD → pagamento → CONFIRM 200 com status CONFIRMED + voucher gerado
+- **Novo**: Produto com múltiplas faixas etárias - ✅ Fluxo completo: HOLD → pagamento → CONFIRM 200 com status CONFIRMED + preços diferenciados
+
+### ✅ Novo Caso Funcional: Produto com múltiplas faixas etárias (ADULT + SENIOR)
+**Status**: ✅ **IMPLEMENTADO E FUNCIONAL**
+
+**Contexto:**
+- **Tipo**: Produto com múltiplas faixas etárias (ADULT + SENIOR)
+- **Preço total**: BRL 968,51 (recomendado) / BRL 891,03 (parceiro)
+- **Status final**: CONFIRMED (reserva confirmada com voucher disponível)
+- **Faixas etárias**: 1 ADULT + 1 SENIOR com preços diferenciados
+- **Voucher**: Gerado com sucesso e disponível para download imediato
+
+**Principais Conquistas:**
+1. **Sistema robusto para múltiplas faixas etárias**: Preços diferenciados processados com sucesso
+2. **Status CONFIRMED**: Reserva confirmada com voucher disponível para download
+3. **Preços por faixa etária**: ADULT (BRL 525,76) + SENIOR (BRL 442,75) calculados corretamente
+4. **Fluxo completo validado**: HOLD → pagamento → CONFIRM 200
+5. **Política de cancelamento**: Detalhada com elegibilidade de reembolso
+
+**Evidências dos Logs:**
+- **HOLD**: ✅ 200 com line items separados por faixa etária
+- **Pagamento**: ✅ 200 via TA Payments
+- **Confirmação**: ✅ 200 com status CONFIRMED e voucher gerado
+- **Preço total**: BRL 968,51 (recomendado) / BRL 891,03 (parceiro)
+- **Comissão**: BRL 77,48 calculada corretamente
 
 ### ✅ Novo Caso Funcional: Produto com status CONFIRMED e voucher
 **Status**: ✅ **IMPLEMENTADO E FUNCIONAL**
@@ -841,6 +866,7 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 | 1.9 | 2025-08-18 | **CORREÇÃO CRÍTICA**: Erro "Missing answer(s) for: PICKUP_POINT" resolvido; nova regra de sanitização implementada; PICKUP_POINT sempre mantido quando produto o expõe | Sistema |
 | 1.10 | 2025-08-18 | **Implementação 19**: Produto 100143P7 - Múltiplos viajantes (INFANT+ADULT) com PER_TRAVELER + HEIGHT; fluxo completo HOLD→pagamento→CONFIRM 200 com status PENDING | Sistema |
 | 1.11 | 2025-08-18 | **Implementação 20**: Produto de alto valor (BRL 17.709,84) com status CONFIRMED e voucher gerado; fluxo completo HOLD→pagamento→CONFIRM 200 com voucher disponível | Sistema |
+| 1.12 | 2025-08-18 | **Implementação 21**: Produto com múltiplas faixas etárias (ADULT+SENIOR) e status CONFIRMED; preços diferenciados por faixa etária; voucher sem restrição de segurança | Sistema |
 
 ---
 
@@ -1507,4 +1533,163 @@ Trechos do log (`viator-debug.log`):
 - **Viajantes**: 2 adultos com reserva confirmada
 - **Comissão**: BRL 1.416,78 calculada corretamente
 
-### ✅ Implementação 19: Produto 100143P7 – Múltiplos viajantes com PER_TRAVELER + PICKUP_POINT
+### ✅ Implementação 21: Produto com diferentes faixas etárias (ADULT + SENIOR) e status CONFIRMED
+**Data:** Agosto 2025  
+**Status:** ✅ Fluxo completo bem-sucedido (HOLD → pagamento → CONFIRM 200 com status CONFIRMED)
+
+**Contexto do Produto:**
+- **Tipo**: Produto com múltiplas faixas etárias (ADULT + SENIOR)
+- **Preço total**: BRL 968,51 (recomendado) / BRL 891,03 (parceiro)
+- **Status final**: CONFIRMED (reserva confirmada com voucher disponível)
+- **Faixas etárias**: 1 ADULT + 1 SENIOR
+
+**Cenário Testado:**
+- **Viajante 1**: ADULT - BRL 525,76 (recomendado) / BRL 483,70 (parceiro)
+- **Viajante 2**: SENIOR - BRL 442,75 (recomendado) / BRL 407,33 (parceiro)
+- **Preço total**: BRL 968,51 (recomendado) / BRL 891,03 (parceiro)
+- **Comissão**: BRL 77,48
+- **Status**: CONFIRMED (reserva confirmada com sucesso)
+
+**Evidências dos Logs (`viator-debug.log`):**
+
+**1. Fluxo de Reserva:**
+- **HOLD**: ✅ 200 - Cart criado com sucesso
+  - `cartRef`: CR-2dbb198651e256a3b2a291baf8ae5ae8
+  - `bookingRef`: BR-597865153
+  - `paymentSessionToken` recebido
+  - Status: BOOKABLE
+  - Preço: BRL 968,51 (recomendado) / BRL 891,03 (parceiro)
+  - **Line Items**: 
+    - ADULT x1 (BRL 525,76 recomendado / BRL 483,70 parceiro)
+    - SENIOR x1 (BRL 442,75 recomendado / BRL 407,33 parceiro)
+- **Pagamento**: ✅ 200 - Processado via TA Payments
+  - `sessionToken` recebido
+- **Confirmação**: ✅ 200 - Reserva confirmada
+  - Status: **CONFIRMED** (reserva confirmada com voucher disponível)
+  - Política de cancelamento: STANDARD (24h para reembolso total)
+  - Preço confirmado: BRL 968,51 (recomendado) / BRL 891,03 (parceiro)
+
+**2. Estrutura da Resposta de Confirmação:**
+```json
+{
+  "cartRef": "CR-2dbb198651e256a3b2a291baf8ae5ae8",
+  "partnerCartRef": "CART_5dc0b945e83444849a4360b08d53057b",
+  "currency": "BRL",
+  "items": [{
+    "partnerBookingRef": "BOOK_2679428b9d44541e163a409b",
+    "bookingRef": "BR-597865153",
+    "status": "CONFIRMED",
+    "lineItems": [
+      {
+        "ageBand": "ADULT",
+        "numberOfTravelers": 1,
+        "subtotalPrice": {
+          "price": {
+            "recommendedRetailPrice": 525.76,
+            "partnerNetPrice": 483.70
+          }
+        }
+      },
+      {
+        "ageBand": "SENIOR",
+        "numberOfTravelers": 1,
+        "subtotalPrice": {
+          "price": {
+            "recommendedRetailPrice": 442.75,
+            "partnerNetPrice": 407.33
+          }
+        }
+      }
+    ],
+    "itemTotalPrice": {
+      "price": {
+        "recommendedRetailPrice": 968.51,
+        "partnerNetPrice": 891.03,
+        "bookingFee": 0,
+        "commission": 77.48,
+        "partnerTotalPrice": 891.03
+      }
+    },
+    "cancellationPolicy": {
+      "type": "STANDARD",
+      "description": "For a full refund, cancel at least 24 hours before the scheduled departure time.",
+      "cancelIfBadWeather": false,
+      "cancelIfInsufficientTravelers": false,
+      "refundEligibility": [
+        {
+          "dayRangeMin": 1,
+          "percentageRefundable": 100,
+          "startTimestamp": "2025-08-18T17:51:16Z",
+          "endTimestamp": "2025-08-21T10:29:59Z"
+        },
+        {
+          "dayRangeMin": 0,
+          "dayRangeMax": 1,
+          "percentageRefundable": 0,
+          "startTimestamp": "2025-08-21T10:30:00Z",
+          "endTimestamp": "2025-08-22T10:30:00Z"
+        }
+      ]
+    },
+    "voucherInfo": {
+      "url": "https://api.sandbox.viator.com/ticket?code=1022769791:9c4309332648becf05ffdd618f75d7a612c8e1e0dc2a3e46d4fd02971ce7c3b4:597865153",
+      "format": "HTML",
+      "type": "STANDARD",
+      "isVoucherRestrictionRequired": false
+    }
+  }],
+  "totalConfirmedPrice": {
+    "price": {
+      "recommendedRetailPrice": 968.51,
+      "partnerNetPrice": 891.03,
+      "bookingFee": 0,
+      "commission": 77.48,
+      "partnerTotalPrice": 891.03
+    }
+  },
+  "totalPendingPrice": {
+    "price": {
+      "recommendedRetailPrice": 0,
+      "partnerNetPrice": 0,
+      "bookingFee": 0,
+      "commission": 0,
+      "partnerTotalPrice": 0
+    }
+  }
+}
+```
+
+**3. Política de Cancelamento:**
+- **Tipo**: STANDARD
+- **Reembolso total**: Cancelar até 24h antes da partida
+- **Cancelamento por mau tempo**: Não permitido
+- **Cancelamento por viajantes insuficientes**: Não permitido
+- **Elegibilidade de reembolso**:
+  - 1+ dias antes: 100% reembolsável
+  - 0-1 dia antes: 0% reembolsável
+
+**4. Voucher Gerado:**
+- **Status**: CONFIRMED com voucher disponível
+- **URL do voucher**: https://api.sandbox.viator.com/ticket?code=1022769791:9c4309332648becf05ffdd618f75d7a612c8e1e0dc2a3e46d4fd02971ce7c3b4:597865153
+- **Formato**: HTML
+- **Tipo**: STANDARD
+- **Restrição de segurança**: Não (isVoucherRestrictionRequired: false)
+
+**Resultado:**
+- ✅ Sistema robusto para produtos com múltiplas faixas etárias
+- ✅ Status CONFIRMED com voucher gerado com sucesso
+- ✅ Preços diferenciados por faixa etária processados corretamente
+- ✅ Política de cancelamento detalhada retornada pela API
+- ✅ Fluxo completo validado: HOLD → pagamento → CONFIRM 200
+- ✅ Preço confirmado e comissão calculada corretamente
+- ✅ Voucher disponível para download imediato
+
+**Observações Importantes:**
+- **Status CONFIRMED**: Reserva confirmada com voucher disponível para download
+- **Preço confirmado**: BRL 968,51 (cobrado e confirmado)
+- **Voucher sem restrição**: Disponível para download imediato
+- **Faixas etárias**: ADULT + SENIOR com preços diferenciados
+- **Comissão**: BRL 77,48 calculada corretamente
+- **Política de cancelamento**: Mais restritiva (sem cancelamento por mau tempo ou viajantes insuficientes)
+
+### ✅ Implementação 20: Produto com status CONFIRMED e voucher gerado
