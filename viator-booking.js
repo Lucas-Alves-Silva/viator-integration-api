@@ -9511,7 +9511,7 @@ this.renderLocationOptions();
                         renderChosenPreview(this.value);
                     });
                 });
-
+                
                 console.log('✅ [PICKUP SYNC] Listeners configurados para', radioButtons.length, 'radio buttons');
             } else {
                 console.warn('⚠️ [PICKUP SYNC] Falha na configuração:', {
@@ -13112,13 +13112,18 @@ this.renderLocationOptions();
                         const isContactLater = genVal === 'CONTACT_SUPPLIER_LATER';
                         const isLocRef = genVal.startsWith('LOC-');
 
-                        // Manter quando OTHER exige PICKUP_POINT
-                        if (arrivalModeVal2 === 'OTHER' && hasGenericPickup) {
-                            // manter
+                        // NOVA REGRA: se o produto expõe PICKUP_POINT, nunca remover (independe do arrivalMode)
+                        if (hasGenericPickup) {
+                            // Se não permite freetext, coerir para CONTACT_SUPPLIER_LATER quando necessário
+                            if (allowCustomPickup === false && !isContactLater && !isLocRef) {
+                                bookingQuestionAnswers[idxGeneric].answer = 'CONTACT_SUPPLIER_LATER';
+                                bookingQuestionAnswers[idxGeneric].unit = 'LOCATION_REFERENCE';
+                                console.log('🔧 [CONFIRM] FREETEXT não permitido → coerido para CONTACT_SUPPLIER_LATER em PICKUP_POINT');
+                            }
                         } else if (hasSpecializedPickup && arrivalModeVal2 !== 'OTHER') {
-                            // Especializado presente e modo ≠ OTHER → remover genérico para evitar resposta extra
+                            // Produto não define PICKUP_POINT e há campos especializados → remover para evitar extra answer
                             bookingQuestionAnswers.splice(idxGeneric, 1);
-                            console.log('🔧 [CONFIRM] Removido PICKUP_POINT (campos especializados presentes e arrivalMode≠OTHER)');
+                            console.log('🔧 [CONFIRM] Removido PICKUP_POINT (produto sem PICKUP_POINT e campos especializados presentes)');
                         } else if (allowCustomPickup === false) {
                             // Sem custom pickup: só aceitar CONTACT_SUPPLIER_LATER ou LOC-
                             if (!isContactLater && !isLocRef) {

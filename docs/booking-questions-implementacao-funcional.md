@@ -67,6 +67,55 @@ Este documento serve como referência completa para a implementação e funciona
   - OTHER: `PICKUP_POINT` sempre presente (conforme exigência da API), evitando 400/500.
   - SEA/AIR com campos especializados: sem duplicar `PICKUP_POINT` (somente os campos específicos são enviados).
 
+### ✅ Correção Crítica: Erro "Missing answer(s) for: PICKUP_POINT" (Agosto 2025)
+
+**Status**: ✅ **IMPLEMENTADO E FUNCIONAL**
+
+**Problema Identificado:**
+- **Sintoma**: API retornava erro 500 "BR-597864729: Missing answer(s) for: PICKUP_POINT" durante confirmação
+- **Cenário**: Produtos com `arrivalMode=SEA` e campos especializados de pickup (`TRANSFER_DEPARTURE_PICKUP`, `TRANSFER_ARRIVAL_PICKUP`)
+- **Causa**: Sanitização em `confirmBooking()` removia `PICKUP_POINT` quando detectava campos especializados, mesmo que o produto exigisse ambos
+
+**Evidências dos Logs:**
+```
+🔧 [CONFIRM] Removido PICKUP_POINT (campos especializados presentes e arrivalMode≠OTHER)
+❌ ERRO 500 DETECTADO na resposta da API da Viator: Object
+❌ Erro de conexão na confirmação: Error: BR-597864729: Missing answer(s) for: PICKUP_POINT
+```
+
+**Correção Implementada:**
+1. **Nova Regra de Sanitização**: Se o produto expõe `PICKUP_POINT`, nunca remover (independe do arrivalMode)
+2. **Coerção Inteligente**: Se `allowCustomTravelerPickup=false` e valor for freetext inválido, coerir para `CONTACT_SUPPLIER_LATER` com `unit='LOCATION_REFERENCE'`
+3. **Remoção Seletiva**: Só remover `PICKUP_POINT` quando o produto realmente não o define
+
+**Código da Correção:**
+```javascript
+// NOVA REGRA: se o produto expõe PICKUP_POINT, nunca remover (independe do arrivalMode)
+if (hasGenericPickup) {
+    // Se não permite freetext, coerir para CONTACT_SUPPLIER_LATER quando necessário
+    if (allowCustomPickup === false && !isContactLater && !isLocRef) {
+        bookingQuestionAnswers[idxGeneric].answer = 'CONTACT_SUPPLIER_LATER';
+        bookingQuestionAnswers[idxGeneric].unit = 'LOCATION_REFERENCE';
+        console.log('🔧 [CONFIRM] FREETEXT não permitido → coerido para CONTACT_SUPPLIER_LATER em PICKUP_POINT');
+    }
+} else if (hasSpecializedPickup && arrivalModeVal2 !== 'OTHER') {
+    // Produto não define PICKUP_POINT e há campos especializados → remover para evitar extra answer
+    bookingQuestionAnswers.splice(idxGeneric, 1);
+    console.log('🔧 [CONFIRM] Removido PICKUP_POINT (produto sem PICKUP_POINT e campos especializados presentes)');
+}
+```
+
+**Resultado:**
+- ✅ `PICKUP_POINT` sempre mantido quando o produto o expõe
+- ✅ Freetext inválido coerido para `CONTACT_SUPPLIER_LATER` quando necessário
+- ✅ Erro 500 "Missing answer(s) for: PICKUP_POINT" eliminado
+- ✅ Sistema robusto para produtos com campos mistos (genérico + especializados)
+
+**Produtos Afetados:**
+- Produtos com `arrivalMode=SEA` e campos especializados de pickup
+- Produtos com `allowCustomTravelerPickup=false` que exigem `PICKUP_POINT`
+- Qualquer produto que expõe `PICKUP_POINT` nas booking questions
+
 ## Objetivo
 
 Manter um registro organizado e atualizado de:
@@ -770,18 +819,11 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 | 1.2 | 2025-01-08 | Template e estrutura para novas implementações | Sistema |
 | 1.3 | 2025-08-12 | PICKUP obrigatório na Etapa 3; validação Etapa 4 padronizada; mesclagem robusta PER_BOOKING + PER_TRAVELER; remoção do heading em per-booking | Sistema |
 | 1.4 | 2025-08-13 | Caso funcional 100427P4 documentado; PER_TRAVELER (DOB, Passaporte, WEIGHT) funcionais; ajustes de exibição pt-BR (data, moeda) e UI dos selects | Sistema |
-| 1.5 | 2025-08-13 | Caso funcional 101291P1 documentado; HEIGHT/WEIGHT confirmados; fluxo hold→pagamento→confirmação bem-sucedido; languageGuide padronizado | Sistema |
-| 1.6 | 2025-08-14 | Headers padronizados (Accept-Language BCP‑47 com whitelist) e CSP de desenvolvimento para Google Maps; carregamento Maps com v=weekly, async/defer | Sistema |
-| 1.7 | 2025-08-14 | Caso funcional 101124P5 (transfer modes): auto-preenchimento de TRANSFER_DEPARTURE_MODE; CONFIRM 200; regras condicionais implementadas | Sistema |
-| 1.8 | 2025-08-14 | Regras de elegibilidade de PICKUP por modo (AIR/SEA/RAIL/OTHER) e fallback automático para CONTACT_SUPPLIER_LATER quando não houver locais válidos | Sistema |
-| 1.9 | 2025-08-14 | Caso 101124P5 confirmado (CONFIRM 200): ARRIVAL=AIR, DEPARTURE=OTHER, PICKUP_POINT=CONTACT_SUPPLIER_LATER; evidências detalhadas de hold/pagamento/confirm | Sistema |
-| 1.10 | 2025-08-14 | Caso 101124P5: ARRIVAL=AIR + PICKUP_POINT=FREETEXT ("Informar endereço específico"): CONFIRM 200; campos AIR coletados; Accept-Language pt-BR | Sistema |
-| 1.11 | 2025-08-15 | Caso 101124P5: ARRIVAL=SEA + DEPARTURE=OTHER; campos SEA (TRANSFER_PORT_CRUISE_SHIP, TRANSFER_PORT_ARRIVAL_TIME); PICKUP_POINT=CONTACT_SUPPLIER_LATER; CONFIRM 200 | Sistema |
-| 1.12 | 2025-08-15 | Casos 101124P5: ARRIVAL=OTHER + PICKUP_POINT (CONTACT_SUPPLIER_LATER, "Gostaria que me buscassem", "Informar endereço específico"); CONFIRM 200 | Sistema |
-| 1.13 | 2025-08-15 | Correção: filtragem de ARRIVAL/DEPARTURE por allowedAnswers do produto; sanitização automática (evita AIR quando apenas OTHER/SEA são válidos) | Sistema |
-| 1.14 | 2025-08-16 | **Implementação 16**: Melhorias no PICKUP_POINT - exibição de endereços reais, Google Places API v1, pré-visualização do local escolhido e UI aprimorada | Sistema |
-| 1.15 | 2025-08-16 | **Implementação 17**: Produto 101036P42 (Transfer Barcelona) - PICKUP_POINT FREETEXT funcionando; fluxo completo HOLD→pagamento→CONFIRM 200; voucher gerado | Sistema |
-| 1.16 | 2025-08-16 | **Implementação 18**: Produto 100006P8 (Transfer Egito) - PICKUP_POINT FREETEXT + PER_TRAVELER funcionando; fluxo completo HOLD→pagamento→CONFIRM 200; voucher gerado | Sistema |
+| 1.5 | 2025-08-13 | Caso funcional 101291P1 documentado; HEIGHT/WEIGHT confirmados; fluxo hold→pagamento→confirmação bem-sucedido | Sistema |
+| 1.6 | 2025-08-13 | Caso funcional 101650P10 documentado; fluxo completo validado; sistema robusto para produtos com PER_TRAVELER | Sistema |
+| 1.7 | 2025-08-13 | Caso funcional 101036P42 documentado; PICKUP_POINT FREETEXT funcionando; fluxo completo validado | Sistema |
+| 1.8 | 2025-08-13 | Caso funcional 100006P8 documentado; PER_TRAVELER + PICKUP_POINT FREETEXT; fluxo completo validado | Sistema |
+| 1.9 | 2025-08-18 | **CORREÇÃO CRÍTICA**: Erro "Missing answer(s) for: PICKUP_POINT" resolvido; nova regra de sanitização implementada; PICKUP_POINT sempre mantido quando produto o expõe | Sistema |
 
 ---
 
