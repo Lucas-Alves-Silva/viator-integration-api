@@ -7011,8 +7011,16 @@ this.renderLocationOptions();
                 isValid = false;
             }
         }
-        // Se arrival mode exige drop-off, exigir TRANSFER_ARRIVAL_DROP_OFF (não exigir quando OTHER)
-        if (arrivalModeInput && arrivalModeInput.value && arrivalModeInput.value.trim() !== '' && arrivalModeInput.value.trim() !== 'OTHER') {
+        // Se e somente se o produto expõe o campo e o arrival mode exige (AIR/RAIL), exigir TRANSFER_ARRIVAL_DROP_OFF. Nunca exigir para SEA/OTHER.
+        if (
+            arrivalModeInput && arrivalModeInput.value && arrivalModeInput.value.trim() !== '' &&
+            arrivalModeInput.value.trim() !== 'OTHER' && arrivalModeInput.value.trim() !== 'SEA' &&
+            (
+                document.querySelector('[data-question-id="TRANSFER_ARRIVAL_DROP_OFF"]') ||
+                document.getElementById('booking_question_TRANSFER_ARRIVAL_DROP_OFF_freetext') ||
+                document.querySelector('input[id*="TRANSFER_ARRIVAL_DROP_OFF"][id$="_freetext"], input[id*="TRANSFER_ARRIVAL_DROP_OFF"][id$="_text"]')
+            )
+        ) {
             const dropOffField = document.querySelector('[data-question-id="TRANSFER_ARRIVAL_DROP_OFF"]');
             const dropOffFree = document.getElementById('booking_question_TRANSFER_ARRIVAL_DROP_OFF_freetext')
                 || document.querySelector('input[id*="TRANSFER_ARRIVAL_DROP_OFF"][id$="_freetext"], input[id*="TRANSFER_ARRIVAL_DROP_OFF"][id$="_text"]');
@@ -8779,7 +8787,7 @@ this.renderLocationOptions();
                 if (hiddenField && this.name === `${questionId}`) {
                     if (this.id === `${questionId}_contact_later`) {
                         hiddenField.value = 'CONTACT_SUPPLIER_LATER';
-                        hiddenField.removeAttribute('data-unit');
+                        hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
                         console.log('✅ [PICKUP SIMPLIFIED] Valor atualizado: CONTACT_SUPPLIER_LATER');
                         hiddenField.classList.remove('is-invalid');
                         self.hideFieldError(hiddenField);
@@ -9416,7 +9424,7 @@ this.renderLocationOptions();
             });
 
             if (hiddenField && radioButtons.length > 0) {
-                // NUNCA definir automaticamente CONTACT_SUPPLIER_LATER quando a pergunta for MANDATORY
+                // CONTACT_SUPPLIER_LATER é válido quando ofertado pelo produto, mesmo em perguntas MANDATORY
                 const checkedRadio = document.querySelector(`input[name="${questionId}"][type="radio"]:checked`);
                 const isMandatory = !!document.querySelector(`#${questionId}[required]`);
                 if (checkedRadio) {
@@ -9436,10 +9444,10 @@ this.renderLocationOptions();
                             hiddenField.value = 'CHOOSE_FROM_LIST';
                             hiddenField.removeAttribute('data-unit');
                         }
-                    } else if (isMandatory && checkedRadio.value === 'CONTACT_SUPPLIER_LATER') {
-                        hiddenField.value = '';
-                        hiddenField.removeAttribute('data-unit');
-                        console.log('📍 [PICKUP SYNC] Campo obrigatório: ignorando CONTACT_SUPPLIER_LATER');
+                    } else if (checkedRadio.value === 'CONTACT_SUPPLIER_LATER') {
+                        hiddenField.value = 'CONTACT_SUPPLIER_LATER';
+                        hiddenField.setAttribute('data-unit', 'LOCATION_REFERENCE');
+                        console.log('📍 [PICKUP SYNC] Valor inicial (CONTACT_SUPPLIER_LATER) definido');
                         if (chosenPreviewEl) { chosenPreviewEl.textContent = ''; chosenPreviewEl.style.display = 'none'; }
                     } else {
                     hiddenField.value = checkedRadio.value;
@@ -12907,7 +12915,7 @@ this.renderLocationOptions();
                 const pickupData = this.getPickupData ? this.getPickupData() : undefined;
                 const noPickup = pickupData && pickupData.pickupOptionType === 'MEET_EVERYONE_AT_START_POINT';
                 const dropOffAnsIndex = (bookingQuestionAnswers || []).findIndex(a => (a.question || a.questionId) === 'TRANSFER_ARRIVAL_DROP_OFF');
-                if (hasArrivalMode && !noPickup && arrivalModeVal !== 'OTHER') {
+                if (hasArrivalMode && !noPickup && (arrivalModeVal === 'AIR' || arrivalModeVal === 'RAIL')) {
                     if (dropOffAnsIndex === -1) {
                         // Preferir hidden sincronizado
                         const hidden = document.getElementById('TRANSFER_ARRIVAL_DROP_OFF');
@@ -13076,6 +13084,47 @@ this.renderLocationOptions();
                         const afterOther = bookingQuestionAnswers.length;
                         if (afterOther !== beforeOther) {
                             console.log('🔧 [CONFIRM] Campos AIR/SEA removidos para arrivalMode=OTHER/indefinido:', { antes: beforeOther, depois: afterOther });
+                        }
+                    }
+                } catch (e) { /* no-op */ }
+
+                // NOVO: Sanitização de PICKUP_POINT para evitar resposta extra quando o produto usa campos especializados
+                try {
+                    const productQuestionsRaw = Array.isArray(this.bookingQuestions) && this.bookingQuestions.length > 0
+                        ? this.bookingQuestions
+                        : (Array.isArray(window.productData?.bookingQuestions) ? window.productData.bookingQuestions : []);
+                    const productIds = new Set(productQuestionsRaw.map(function(q){ return q && (q.questionId || q.id || q); }));
+                    const allowCustomPickup = !!(window.productData && window.productData.logistics && window.productData.logistics.allowCustomTravelerPickup);
+                    const hasSpecializedPickup = productIds.has('TRANSFER_DEPARTURE_PICKUP') || productIds.has('TRANSFER_ARRIVAL_PICKUP');
+                    const idxGeneric = bookingQuestionAnswers.findIndex(function(a){ const q = a && (a.question || a.questionId); return q === 'PICKUP_POINT'; });
+                    if (idxGeneric !== -1) {
+                        // Normalizar CONTACT_SUPPLIER_LATER/LOC-
+                        const genVal = String(bookingQuestionAnswers[idxGeneric].answer || '');
+                        if (genVal === 'CONTACT_SUPPLIER_LATER') {
+                            bookingQuestionAnswers[idxGeneric].unit = 'LOCATION_REFERENCE';
+                        } else if (genVal.startsWith('LOC-') && !bookingQuestionAnswers[idxGeneric].unit) {
+                            bookingQuestionAnswers[idxGeneric].unit = 'LOCATION_REFERENCE';
+                        }
+
+                        const arrIdx2 = bookingQuestionAnswers.findIndex(a => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
+                        const arrivalModeVal2 = arrIdx2 !== -1 ? String(bookingQuestionAnswers[arrIdx2].answer || '').trim() : '';
+                        const hasGenericPickup = productIds.has('PICKUP_POINT');
+                        const isContactLater = genVal === 'CONTACT_SUPPLIER_LATER';
+                        const isLocRef = genVal.startsWith('LOC-');
+
+                        // Manter quando OTHER exige PICKUP_POINT
+                        if (arrivalModeVal2 === 'OTHER' && hasGenericPickup) {
+                            // manter
+                        } else if (hasSpecializedPickup && arrivalModeVal2 !== 'OTHER') {
+                            // Especializado presente e modo ≠ OTHER → remover genérico para evitar resposta extra
+                            bookingQuestionAnswers.splice(idxGeneric, 1);
+                            console.log('🔧 [CONFIRM] Removido PICKUP_POINT (campos especializados presentes e arrivalMode≠OTHER)');
+                        } else if (allowCustomPickup === false) {
+                            // Sem custom pickup: só aceitar CONTACT_SUPPLIER_LATER ou LOC-
+                            if (!isContactLater && !isLocRef) {
+                                bookingQuestionAnswers.splice(idxGeneric, 1);
+                                console.log('🔧 [CONFIRM] Removido PICKUP_POINT com FREETEXT em produto sem custom pickup');
+                            }
                         }
                     }
                 } catch (e) { /* no-op */ }

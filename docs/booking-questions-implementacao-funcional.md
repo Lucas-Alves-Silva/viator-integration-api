@@ -55,6 +55,18 @@ Este documento serve como referência completa para a implementação e funciona
 - ✅ PER_TRAVELER coletado corretamente com travelerNum
 - ✅ Fluxo completo validado e documentado
 
+### ✅ Correção adicional: PICKUP_POINT com arrivalMode=OTHER e múltiplos viajantes (Agosto 2025)
+
+- **Sintoma (logs):** Ao confirmar com `arrivalMode = OTHER` e 2 viajantes, a API retornava `Arrival mode OTHER requires answers: PICKUP_POINT` após uma sanitização que removia o campo.
+- **Causa:** Filtro final removia `PICKUP_POINT` quando havia campos especializados de pickup ou quando `allowCustomTravelerPickup=false`, mesmo no modo OTHER (onde a API exige `PICKUP_POINT`).
+- **Correção (frontend, confirmBooking):**
+  - Manter `PICKUP_POINT` quando `arrivalMode === OTHER` e o produto expõe `PICKUP_POINT`.
+  - Remover `PICKUP_POINT` apenas quando: (a) há campos especializados E `arrivalMode !== OTHER`, ou (b) `allowCustomTravelerPickup === false` e o valor é freetext inválido (nem `CONTACT_SUPPLIER_LATER` nem `LOC-`).
+  - Normalizar `unit='LOCATION_REFERENCE'` para `CONTACT_SUPPLIER_LATER` e valores `LOC-`.
+- **Resultado esperado:**
+  - OTHER: `PICKUP_POINT` sempre presente (conforme exigência da API), evitando 400/500.
+  - SEA/AIR com campos especializados: sem duplicar `PICKUP_POINT` (somente os campos específicos são enviados).
+
 ## Objetivo
 
 Manter um registro organizado e atualizado de:
