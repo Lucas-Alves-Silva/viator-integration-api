@@ -7719,12 +7719,12 @@ this.renderLocationOptions();
         renderQ(airFlightQ);
         // SEA
         renderQ(portCruiseQ);
+        // Ajuste de ordem para melhor UX em SEA: mostrar "Hora da chegada" antes de "Hora do desembarque"
+        renderQ(arrivalTimeQ);
         renderQ(portArrivalQ);
         // RAIL
         renderQ(railLineQ);
         renderQ(railStationQ);
-        // TIME genérico de chegada (apenas AIR/RAIL; SEA/OTHER ficam ocultos pela condicional)
-        renderQ(arrivalTimeQ);
         // Endereço final
         renderQ(dropOffQ);
         
@@ -13191,6 +13191,43 @@ this.renderLocationOptions();
                         if (afterSea !== beforeSea) {
                             console.log('🔧 [CONFIRM] Campos AIR removidos para arrivalMode=SEA:', { antes: beforeSea, depois: afterSea });
                         }
+
+                        // Regras adicionais para SEA: remover PICKUP_POINT e/ou DROP_OFF quando não aplicáveis
+                        try {
+                            const productQuestionsRawSea = Array.isArray(this.bookingQuestions) && this.bookingQuestions.length > 0
+                                ? this.bookingQuestions
+                                : (Array.isArray(window.productData?.bookingQuestions) ? window.productData.bookingQuestions : []);
+                            const productIdsSea = new Set(productQuestionsRawSea.map(function(q){ return q && (q.questionId || q.id || q); }));
+                            const allowCustomPickupSea = !!(window.productData && window.productData.logistics && window.productData.logistics.allowCustomTravelerPickup);
+                            const hasSeaSpecific = productIdsSea.has('TRANSFER_PORT_CRUISE_SHIP') || productIdsSea.has('TRANSFER_PORT_ARRIVAL_TIME') || productIdsSea.has('TRANSFER_PORT_DEPARTURE_TIME');
+
+                            // 1) PICKUP_POINT costuma ser rejeitado em SEA quando há campos específicos de porto
+                            if (hasSeaSpecific) {
+                                const beforeSeaPickup = bookingQuestionAnswers.length;
+                                bookingQuestionAnswers = bookingQuestionAnswers.filter(function(a){
+                                    const qid = a && (a.question || a.questionId);
+                                    return qid !== 'PICKUP_POINT';
+                                });
+                                const afterSeaPickup = bookingQuestionAnswers.length;
+                                if (afterSeaPickup !== beforeSeaPickup) {
+                                    console.log('🔧 [CONFIRM] Removido PICKUP_POINT para arrivalMode=SEA (campos específicos de porto presentes)');
+                                }
+                            }
+
+                            // 2) TRANSFER_ARRIVAL_DROP_OFF: quando o produto não admite freetext (allowCustom=false), evitar enviar
+                            const hasDropOffSea = productIdsSea.has('TRANSFER_ARRIVAL_DROP_OFF');
+                            if (!hasDropOffSea || allowCustomPickupSea === false) {
+                                const beforeSeaDrop = bookingQuestionAnswers.length;
+                                bookingQuestionAnswers = bookingQuestionAnswers.filter(function(a){
+                                    const qid = a && (a.question || a.questionId);
+                                    return qid !== 'TRANSFER_ARRIVAL_DROP_OFF';
+                                });
+                                const afterSeaDrop = bookingQuestionAnswers.length;
+                                if (afterSeaDrop !== beforeSeaDrop) {
+                                    console.log('🔧 [CONFIRM] Removido TRANSFER_ARRIVAL_DROP_OFF para arrivalMode=SEA (não aplicável)');
+                                }
+                            }
+                        } catch (_e) { /* no-op */ }
                     } else if (arrivalModeVal === 'AIR') {
                         const beforeAir = bookingQuestionAnswers.length;
                         bookingQuestionAnswers = bookingQuestionAnswers.filter(a => {
