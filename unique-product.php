@@ -2442,7 +2442,7 @@ function viator_enqueue_product_scripts() {
             'viator-booking-js',
             plugin_dir_url(__FILE__) . 'viator-booking.js',
             $booking_js_deps,
-            '1.0.1',
+            '1.0.3',
             true
         );
 

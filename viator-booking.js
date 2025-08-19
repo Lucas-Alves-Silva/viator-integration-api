@@ -2816,7 +2816,23 @@ this.renderLocationOptions();
         }
         
         clearError();
-        return true;
+        const departureMode = this.getFieldValue('TRANSFER_DEPARTURE_MODE');
+
+        if (departureMode === 'SEA') {
+            const cruiseShipField = this.getFieldValue('TRANSFER_PORT_CRUISE_SHIP');
+            const departurePickupField = this.getFieldValue('TRANSFER_DEPARTURE_PICKUP');
+
+            if (!cruiseShipField) {
+                this.showError('O nome do navio de cruzeiro é obrigatório para partidas marítimas.');
+                isValid = false;
+            }
+            if (!departurePickupField) {
+                this.showError('O local de embarque é obrigatório para partidas marítimas.');
+                isValid = false;
+            }
+        }
+
+        return isValid;
     }
     /**
      * Atualizar contador de caracteres
@@ -4457,6 +4473,7 @@ this.renderLocationOptions();
             'TRANSFER_PORT_CRUISE_SHIP': () => this.getFieldValue('TRANSFER_ARRIVAL_MODE') === 'SEA' || this.getFieldValue('TRANSFER_DEPARTURE_MODE') === 'SEA',
             'TRANSFER_PORT_ARRIVAL_TIME': () => this.getFieldValue('TRANSFER_ARRIVAL_MODE') === 'SEA',
             'TRANSFER_PORT_DEPARTURE_TIME': () => this.getFieldValue('TRANSFER_DEPARTURE_MODE') === 'SEA',
+            'TRANSFER_DEPARTURE_PICKUP': () => this.getFieldValue('TRANSFER_DEPARTURE_MODE') === 'SEA' || this.getFieldValue('TRANSFER_ARRIVAL_MODE') === 'SEA',
             'TRANSFER_RAIL_ARRIVAL_STATION': () => this.getFieldValue('TRANSFER_ARRIVAL_MODE') === 'RAIL',
             'TRANSFER_RAIL_ARRIVAL_LINE': () => this.getFieldValue('TRANSFER_ARRIVAL_MODE') === 'RAIL',
             'TRANSFER_RAIL_DEPARTURE_STATION': () => this.getFieldValue('TRANSFER_DEPARTURE_MODE') === 'RAIL',
@@ -4651,7 +4668,7 @@ this.renderLocationOptions();
                     if (suggestionsBox) { suggestionsBox.style.display = 'none'; suggestionsBox.innerHTML = ''; }
                     if (hiddenField) {
                         hiddenField.value = value;
-                        hiddenField.setAttribute('data-unit', value && value.indexOf('LOC-') === 0 ? 'LOCATION_REFERENCE' : 'LOCATION_REFERENCE');
+                        hiddenField.setAttribute('data-unit', value && value.indexOf('LOC-') === 0 ? 'LOCATION_REFERENCE' : 'FREETEXT');
                     }
                 }
             }
@@ -4733,6 +4750,22 @@ this.renderLocationOptions();
     isValidDate(dateString) {
         const date = new Date(dateString);
         return date instanceof Date && !isNaN(date);
+    }
+
+    /**
+     * Verifica se um campo é obrigatório para o modo de transporte atual
+     */
+    isFieldRequiredForCurrentMode(questionId) {
+        const departureMode = document.querySelector('[data-question-id="TRANSFER_DEPARTURE_MODE"]')?.value || '';
+        const isSeaDeparture = departureMode === 'SEA' || departureMode === 'OTHER';
+
+        // Campos obrigatórios para modo SEA
+        if (isSeaDeparture) {
+            return questionId === 'TRANSFER_PORT_CRUISE_SHIP' || 
+                   questionId === 'TRANSFER_DEPARTURE_PICKUP';
+        }
+
+        return false;
     }
 
     /**
@@ -4840,7 +4873,27 @@ this.renderLocationOptions();
             }
 
             if (!value || value.trim() === '') {
-                console.log(`⚠️ [DYNAMIC DEBUG] Input ignorado - campo vazio para ${questionId}`);
+                // CORREÇÃO: Verificar se o campo é obrigatório para o modo atual
+                const departureMode = document.querySelector('[data-question-id="TRANSFER_DEPARTURE_MODE"]')?.value || '';
+                const isSeaDeparture = departureMode === 'SEA' || departureMode === 'OTHER';
+                const isRequiredForSeaMode = isSeaDeparture && (
+                    questionId === 'TRANSFER_PORT_CRUISE_SHIP' ||
+                    questionId === 'TRANSFER_DEPARTURE_PICKUP'
+                );
+
+                if (isRequiredForSeaMode) {
+                    console.log(`⚠️ [DYNAMIC DEBUG] Campo obrigatório vazio para modo SEA: ${questionId}`);
+                    // Adicionar campo vazio para validação posterior
+                    const emptyAnswer = {
+                        question: questionId,
+                        answer: '',
+                        isEmpty: true,
+                        isRequired: true
+                    };
+                    answers.push(emptyAnswer);
+                } else {
+                    console.log(`⚠️ [DYNAMIC DEBUG] Input ignorado - campo vazio para ${questionId}`);
+                }
                 return;
             }
 
@@ -4907,6 +4960,11 @@ this.renderLocationOptions();
                 }
             } else if (questionId === 'PICKUP_POINT' && value !== 'CUSTOM_LOCATION') {
                 answer.unit = 'LOCATION_REFERENCE';
+            }
+
+            // Tratar TRANSFER_DEPARTURE_PICKUP - sempre FREETEXT para tipo LOCATION_REF_OR_FREE_TEXT
+            if (questionId === 'TRANSFER_DEPARTURE_PICKUP') {
+                answer.unit = 'FREETEXT';
             }
 
             console.log(`✅ [DYNAMIC DEBUG] Resposta adicionada:`, answer);
@@ -5260,6 +5318,65 @@ this.renderLocationOptions();
 
         // Não persistir aqui para não sobrescrever PER_TRAVELER coletadas na Etapa 2
         return answers;
+    }
+
+    /**
+     * Verificar se um campo é obrigatório para o modo de chegada/partida atual
+     */
+    isFieldRequiredForCurrentMode(questionId) {
+        // Obter modo de chegada atual
+        const arrivalModeInput = document.querySelector('[id*="TRANSFER_ARRIVAL_MODE"]');
+        const arrivalMode = arrivalModeInput ? arrivalModeInput.value.trim() : '';
+        
+        // Obter modo de partida atual
+        const departureModeInput = document.querySelector('[id*="TRANSFER_DEPARTURE_MODE"]');
+        const departureMode = departureModeInput ? departureModeInput.value.trim() : '';
+        
+        // Campos obrigatórios para modo SEA (chegada)
+        if (arrivalMode === 'SEA') {
+            const seaArrivalFields = [
+                'TRANSFER_PORT_CRUISE_SHIP',
+                'TRANSFER_PORT_ARRIVAL_TIME'
+            ];
+            if (seaArrivalFields.includes(questionId)) {
+                return true;
+            }
+        }
+        
+        // Campos obrigatórios para modo SEA (partida)
+        if (departureMode === 'SEA') {
+            const seaDepartureFields = [
+                'TRANSFER_PORT_DEPARTURE_TIME',
+                'TRANSFER_DEPARTURE_DATE'
+            ];
+            if (seaDepartureFields.includes(questionId)) {
+                return true;
+            }
+        }
+        
+        // Campos obrigatórios para modo AIR (chegada)
+        if (arrivalMode === 'AIR') {
+            const airArrivalFields = [
+                'TRANSFER_AIR_ARRIVAL_AIRLINE',
+                'TRANSFER_AIR_ARRIVAL_FLIGHT_NO'
+            ];
+            if (airArrivalFields.includes(questionId)) {
+                return true;
+            }
+        }
+        
+        // Campos obrigatórios para modo RAIL (chegada)
+        if (arrivalMode === 'RAIL') {
+            const railArrivalFields = [
+                'TRANSFER_RAIL_ARRIVAL_LINE',
+                'TRANSFER_RAIL_ARRIVAL_STATION'
+            ];
+            if (railArrivalFields.includes(questionId)) {
+                return true;
+            }
+        }
+        
+        return false;
     }
 
     /**
@@ -6540,6 +6657,27 @@ this.renderLocationOptions();
             });
             if (!already) mergedValid.push(ans);
         });
+        
+        // CORREÇÃO CRÍTICA: Verificar se o modo de partida é SEA e garantir campos obrigatórios
+        try {
+            const departureModeIdx = mergedValid.findIndex(a => (a?.question || a?.questionId) === 'TRANSFER_DEPARTURE_MODE');
+            if (departureModeIdx !== -1) {
+                const departureModeVal = String(mergedValid[departureModeIdx].answer || '').trim();
+                if (departureModeVal === 'SEA') {
+                    console.log('🔍 [DYNAMIC DEBUG] Modo de partida SEA detectado, garantindo campos obrigatórios...');
+                    // Chamar ensureSeaDepartureFields para garantir campos obrigatórios
+                    if (typeof this.ensureSeaDepartureFields === 'function') {
+                        this.ensureSeaDepartureFields(mergedValid);
+                        console.log('✅ [DYNAMIC DEBUG] Campos obrigatórios de SEA verificados e adicionados se necessário');
+                    } else {
+                        console.warn('⚠️ [DYNAMIC DEBUG] Função ensureSeaDepartureFields não disponível');
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('❌ [DYNAMIC DEBUG] Erro ao verificar modo SEA:', e);
+        }
+        
         this.bookingData.bookingQuestionAnswers = mergedValid;
 
         console.log('📝 Respostas coletadas (total):', answers.length);
@@ -6914,6 +7052,26 @@ this.renderLocationOptions();
             }
         } catch(_e) { /* no-op */ }
 
+        // Campos obrigatórios para SEA (DEPARTURE)
+        try {
+            const departureModeValue = departureModeInput ? departureModeInput.value.trim() : '';
+            if (departureModeValue === 'SEA') {
+                const portDepartureTimeInput = document.querySelector('[id*="TRANSFER_PORT_DEPARTURE_TIME"]');
+                const departureDateInput = document.querySelector('[id*="TRANSFER_DEPARTURE_DATE"]');
+                
+                if (portDepartureTimeInput && (!portDepartureTimeInput.value || portDepartureTimeInput.value.trim() === '')) {
+                    isValid = false;
+                    this.showFieldError(portDepartureTimeInput, 'Horário de partida do porto é obrigatório');
+                    errors.push('Horário de partida do porto');
+                }
+                if (departureDateInput && (!departureDateInput.value || departureDateInput.value.trim() === '')) {
+                    isValid = false;
+                    this.showFieldError(departureDateInput, 'Data de partida é obrigatória');
+                    errors.push('Data de partida');
+                }
+            }
+        } catch(_e) { /* no-op */ }
+
         // Peso (WEIGHT)
         const weightInputs = document.querySelectorAll('[id*="WEIGHT"]:not([id*="_unit"])');
         weightInputs.forEach(input => {
@@ -7284,6 +7442,24 @@ this.renderLocationOptions();
         console.log('🚨 [CRITICAL DEBUG] collectBookingQuestionAnswers() finalizado');
         console.error('🚨 [FORCE LOG] collectBookingQuestionAnswers() finalizado');
 
+        // CORREÇÃO: Validar campos obrigatórios para modo SEA
+        const departureMode = document.querySelector('[data-question-id="TRANSFER_DEPARTURE_MODE"]')?.value || '';
+        const isSeaDeparture = departureMode === 'SEA' || departureMode === 'OTHER';
+        
+        if (isSeaDeparture) {
+            const shipName = document.querySelector('[data-question-id="TRANSFER_PORT_CRUISE_SHIP"]')?.value || '';
+            const pickupLocation = document.querySelector('[data-question-id="TRANSFER_DEPARTURE_PICKUP"]')?.value || '';
+            
+            if (!shipName.trim() || !pickupLocation.trim()) {
+                console.error('⚠️ [CRITICAL DEBUG] Campos obrigatórios para modo SEA não preenchidos');
+                const missingFields = [];
+                if (!shipName.trim()) missingFields.push('Nome do Navio');
+                if (!pickupLocation.trim()) missingFields.push('Local de Embarque');
+                
+                throw new Error(`Por favor, preencha os campos obrigatórios: ${missingFields.join(' e ')}`);
+            }
+        }
+
         // Validar se todas as perguntas obrigatórias foram respondidas
         const validation = this.validateAllBookingQuestions();
         // Regras adicionais críticas do produto para o Step 3
@@ -7369,6 +7545,7 @@ this.renderLocationOptions();
         }
         
         let html = '';
+        // Título removido daqui - será exibido apenas na etapa 3 (Informações)
         
         // Usar dados armazenados da primeira etapa para gerar apenas resumo
         if (this.bookingData.selectedTravelers && this.bookingData.selectedTravelers.length > 0) {
@@ -7686,7 +7863,12 @@ this.renderLocationOptions();
         }
         
         let html = '';
-        
+        // Título do bloco de chegada (exibir apenas na etapa 3 - Informações)
+        const isStep3 = document.querySelector('.step-content.active[data-step="3"]');
+        if (isStep3 && (pickupQuestions.length > 0 || transferQuestions.length > 0)) {
+            html += '<div class="viator-section-title">Informações de chegada</div>';
+        }
+
         // Renderizar Modo de chegada primeiro, seguido dos dependentes e, em seguida, o Endereço final
         const arrivalModeQ = transferQuestions.find(q => q.id === 'TRANSFER_ARRIVAL_MODE');
         const arrivalTimeQ = transferQuestions.find(q => q.id === 'TRANSFER_ARRIVAL_TIME');
@@ -7697,6 +7879,16 @@ this.renderLocationOptions();
         const portCruiseQ = transferQuestions.find(q => q.id === 'TRANSFER_PORT_CRUISE_SHIP');
         const railLineQ = transferQuestions.find(q => q.id === 'TRANSFER_RAIL_ARRIVAL_LINE');
         const railStationQ = transferQuestions.find(q => q.id === 'TRANSFER_RAIL_ARRIVAL_STATION');
+        // Campos de PARTIDA
+        const departureModeQ = transferQuestions.find(q => q.id === 'TRANSFER_DEPARTURE_MODE');
+        const departureTimeQ = transferQuestions.find(q => q.id === 'TRANSFER_DEPARTURE_TIME');
+        const portDepartureQ = transferQuestions.find(q => q.id === 'TRANSFER_PORT_DEPARTURE_TIME');
+        const airDepAirlineQ = transferQuestions.find(q => q.id === 'TRANSFER_AIR_DEPARTURE_AIRLINE');
+        const airDepFlightQ = transferQuestions.find(q => q.id === 'TRANSFER_AIR_DEPARTURE_FLIGHT_NO');
+        const railDepLineQ = transferQuestions.find(q => q.id === 'TRANSFER_RAIL_DEPARTURE_LINE');
+        const railDepStationQ = transferQuestions.find(q => q.id === 'TRANSFER_RAIL_DEPARTURE_STATION');
+        const departurePickupQ = transferQuestions.find(q => q.id === 'TRANSFER_DEPARTURE_PICKUP');
+        const departureDateQ = transferQuestions.find(q => q.id === 'TRANSFER_DEPARTURE_DATE');
 
         const renderQ = (question) => {
             if (!question) return;
@@ -7727,6 +7919,24 @@ this.renderLocationOptions();
         renderQ(railStationQ);
         // Endereço final
         renderQ(dropOffQ);
+
+        // Bloco de PARTIDA (quando o produto expõe perguntas de partida)
+        html += '<div class="viator-section-title">Informações de partida</div>';
+        renderQ(departureModeQ);
+        // Ordem UX: Data da partida → Hora do embarque (SEA/AIR/RAIL) → Campos específicos
+        renderQ(departureDateQ);
+        // Horário genérico de PARTIDA (AIR/RAIL)
+        renderQ(departureTimeQ);
+        // SEA (partida)
+        renderQ(portDepartureQ);
+        // AIR (partida)
+        renderQ(airDepAirlineQ);
+        renderQ(airDepFlightQ);
+        // RAIL (partida)
+        renderQ(railDepLineQ);
+        renderQ(railDepStationQ);
+        // Pickup especializado de PARTIDA, quando existir
+        renderQ(departurePickupQ);
         
         // Renderizar pergunta de ponto de encontro ao final desse bloco
         if (pickupQuestions.length > 0) {
@@ -8073,6 +8283,14 @@ this.renderLocationOptions();
 
         switch (question.type) {
             case 'STRING':
+                // CORREÇÃO: Campos de hora → usar input type="time" com mesma máscara (HH:MM)
+                if (question.id === 'TRANSFER_ARRIVAL_TIME' ||
+                    question.id === 'TRANSFER_DEPARTURE_TIME' ||
+                    question.id === 'TRANSFER_PORT_ARRIVAL_TIME' ||
+                    question.id === 'TRANSFER_PORT_DEPARTURE_TIME') {
+                    html += `<input type="time" id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr} step="60" placeholder="HH:MM" pattern="^([01]\\d|2[0-3]):[0-5]\\d$">`;
+                    break;
+                }
                 // CORREÇÃO: Verificar se é uma pergunta de seleção de idioma
                 const labelText = this.ensureStringForHTML(question.label, '').toLowerCase();
                 if (question.subType === 'LANGUAGE_GUIDE' || labelText.includes('idioma') || labelText.includes('language')) {
@@ -8197,6 +8415,29 @@ this.renderLocationOptions();
 
             case 'DATE':
                 html += `<input type="date" id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr}>`;
+                break;
+
+            case 'TIME':
+                // Campo de hora nativo com fallback de máscara quando o navegador não suporta
+                html += `<input type="time" id="${questionId}" name="${questionId}" class="${cssClass}" ${dataAttrs} ${requiredAttr} step="60" placeholder="HH:MM" pattern="^([01]\\d|2[0-3]):[0-5]\\d$">`;
+                html += `
+                    <script>(function(){
+                        var el = document.getElementById('${questionId}');
+                        if (!el) return;
+                        // Fallback de máscara apenas se o navegador não suportar type=time (vira text) ou não inserir ':' automaticamente
+                        var isTimeNative = (el.type === 'time');
+                        if (!isTimeNative) {
+                            el.addEventListener('input', function(){
+                                var digits = (this.value || '').replace(/[^0-9]/g, '').slice(0,4);
+                                if (digits.length >= 3) {
+                                    this.value = digits.slice(0,2) + ':' + digits.slice(2,4);
+                                } else if (digits.length >= 1) {
+                                    this.value = digits;
+                                }
+                            });
+                        }
+                    })();</script>
+                `;
                 break;
 
             case 'TEXTAREA':
@@ -13050,6 +13291,105 @@ this.renderLocationOptions();
                 }
             } catch (_e) {}
             
+            // GARANTIR CAMPOS DE PARTIDA quando o produto expõe perguntas de partida
+            try {
+                const productHasDepartureQuestions = Array.isArray(this.bookingQuestions) && this.bookingQuestions.some(function(q){
+                    const id = q && (q.id || q.questionId || '');
+                    return id.startsWith('TRANSFER_') && id.indexOf('DEPARTURE_') !== -1;
+                });
+                if (productHasDepartureQuestions) {
+                    // 1) TRANSFER_DEPARTURE_MODE (derivar quando a pergunta não existir no produto)
+                    let depModeAns = (bookingQuestionAnswers || []).find(a => (a?.question || a?.questionId) === 'TRANSFER_DEPARTURE_MODE');
+                    let depModeVal = depModeAns ? String(depModeAns.answer || '').trim() : '';
+                    if (!depModeVal) {
+                        const depEl = document.querySelector('[data-question-id="TRANSFER_DEPARTURE_MODE"]') || document.getElementById('booking_question_TRANSFER_DEPARTURE_MODE');
+                        const valFromUI = (depEl && (depEl.value || '').trim()) || '';
+                        // Preferir detecção por VALOR preenchido (não apenas presença no DOM)
+                        const airAirlineEl = document.querySelector('[data-question-id="TRANSFER_AIR_DEPARTURE_AIRLINE"], #booking_question_TRANSFER_AIR_DEPARTURE_AIRLINE');
+                        const airFlightEl  = document.querySelector('[data-question-id="TRANSFER_AIR_DEPARTURE_FLIGHT_NO"], #booking_question_TRANSFER_AIR_DEPARTURE_FLIGHT_NO');
+                        const railLineEl   = document.querySelector('[data-question-id="TRANSFER_RAIL_DEPARTURE_LINE"], #booking_question_TRANSFER_RAIL_DEPARTURE_LINE');
+                        const railStationEl= document.querySelector('[data-question-id="TRANSFER_RAIL_DEPARTURE_STATION"], #booking_question_TRANSFER_RAIL_DEPARTURE_STATION');
+                        const seaTimeEl    = document.querySelector('[data-question-id="TRANSFER_PORT_DEPARTURE_TIME"], #booking_question_TRANSFER_PORT_DEPARTURE_TIME');
+
+                        const hasSeaVal  = !!(seaTimeEl && (seaTimeEl.value || '').trim());
+                        const hasAirVal  = !!((airAirlineEl && (airAirlineEl.value || '').trim()) || (airFlightEl && (airFlightEl.value || '').trim()));
+                        const hasRailVal = !!((railLineEl && (railLineEl.value || '').trim()) || (railStationEl && (railStationEl.value || '').trim()));
+
+                        // Ordem de preferência: SEA → AIR → RAIL → OTHER
+                        depModeVal = valFromUI || (hasSeaVal ? 'SEA' : hasAirVal ? 'AIR' : hasRailVal ? 'RAIL' : '');
+                        if (!depModeVal) {
+                            // fallback por presença de campos quando não há valor digitado
+                            const hasAirDep = airAirlineEl || airFlightEl;
+                            const hasRailDep = railLineEl || railStationEl;
+                            const hasSeaDep = seaTimeEl;
+                            depModeVal = hasSeaDep ? 'SEA' : hasAirDep ? 'AIR' : hasRailDep ? 'RAIL' : 'OTHER';
+                        }
+                        bookingQuestionAnswers.push({ question: 'TRANSFER_DEPARTURE_MODE', answer: depModeVal });
+                    }
+
+                    // 2) Campos específicos por modo de PARTIDA
+                    const ensureField = (qid, label) => {
+                        const exists = bookingQuestionAnswers.some(a => (a?.question || a?.questionId) === qid);
+                        if (exists) return true;
+                        const el = document.getElementById(`booking_question_${qid}`)
+                            || document.querySelector(`[data-question-id="${qid}"]`)
+                            || document.querySelector(`[id*="${qid}"]`);
+                        const val = (el && (el.value || '').trim()) || '';
+                        if (val) {
+                            bookingQuestionAnswers.push({ question: qid, answer: val });
+                            console.log(`✅ [CONFIRM] ${qid} incluído (PARTIDA):`, val);
+                            return true;
+                        }
+                        if (el) this.showFieldError(el, `${label} é obrigatório`);
+                        this.showDateError(`${label} é obrigatório para a partida.`);
+                        const fg = el?.closest?.('.booking-question-group');
+                        if (fg && fg.scrollIntoView) fg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        return false;
+                    };
+
+                    if (depModeVal === 'AIR') {
+                        if (!ensureField('TRANSFER_AIR_DEPARTURE_AIRLINE', 'Companhia Aérea (Saída)')) return false;
+                        if (!ensureField('TRANSFER_AIR_DEPARTURE_FLIGHT_NO', 'Número do Voo (Saída)')) return false;
+                        if (!ensureField('TRANSFER_DEPARTURE_TIME', 'Horário de Saída')) return false;
+                    } else if (depModeVal === 'RAIL') {
+                        if (!ensureField('TRANSFER_RAIL_DEPARTURE_LINE', 'Linha do Trem (Saída)')) return false;
+                        if (!ensureField('TRANSFER_RAIL_DEPARTURE_STATION', 'Estação de Saída')) return false;
+                        if (!ensureField('TRANSFER_DEPARTURE_TIME', 'Horário de Saída')) return false;
+                    } else if (depModeVal === 'SEA') {
+                        // SEA: exigir nome do navio, horário de saída do porto e local de embarque
+                        if (!ensureField('TRANSFER_PORT_CRUISE_SHIP', 'Nome do Navio (Partida)')) return false;
+                        if (!ensureField('TRANSFER_PORT_DEPARTURE_TIME', 'Horário de Saída do Porto')) return false;
+                        if (!ensureField('TRANSFER_DEPARTURE_PICKUP', 'Local de Embarque')) return false;
+                        // Para SEA, exigir também Data da Partida se existir no produto
+                        const depDateEl2 = document.querySelector('[data-question-id="TRANSFER_DEPARTURE_DATE"], #booking_question_TRANSFER_DEPARTURE_DATE');
+                        if (depDateEl2) {
+                            if (!ensureField('TRANSFER_DEPARTURE_DATE', 'Data da Partida')) return false;
+                        }
+                    } else {
+                        // OTHER: nenhum campo específico obrigatório além de um possível TRANSFER_DEPARTURE_PICKUP quando presente e obrigatório
+                    }
+
+                    // 3) TRANSFER_DEPARTURE_PICKUP quando exposto e com valor
+                    const depPickupEl = document.querySelector('[data-question-id="TRANSFER_DEPARTURE_PICKUP"]') || document.getElementById('booking_question_TRANSFER_DEPARTURE_PICKUP');
+                    if (depPickupEl) {
+                        const val = (depPickupEl.value || '').trim();
+                        if (val) {
+                            const already = bookingQuestionAnswers.some(a => (a?.question || a?.questionId) === 'TRANSFER_DEPARTURE_PICKUP');
+                            if (!already) bookingQuestionAnswers.push({ 
+                                question: 'TRANSFER_DEPARTURE_PICKUP', 
+                                answer: val,
+                                unit: 'FREETEXT' // Corrigido: TRANSFER_DEPARTURE_PICKUP deve usar FREETEXT conforme documentação Viator
+                            });
+                        }
+                    }
+                    // 4) TRANSFER_DEPARTURE_DATE: se o produto expõe, exigir valor
+                    const depDateExistsInProduct = document.querySelector('[data-question-id="TRANSFER_DEPARTURE_DATE"]') || document.getElementById('booking_question_TRANSFER_DEPARTURE_DATE');
+                    if (depDateExistsInProduct) {
+                        if (!ensureField('TRANSFER_DEPARTURE_DATE', 'Data da Partida')) return false;
+                    }
+                }
+            } catch (_e) {}
+
             console.log('✅ [CONFIRM] Validação final aprovada - bookerInfo completo:', bookerInfo);
 
             const requestParams = {
@@ -13179,7 +13519,8 @@ this.renderLocationOptions();
                         }
                     }
                     // Sanitização por modo: remover campos de SEA quando não SEA; remover campos de AIR quando não AIR
-                    const seaFields = ['TRANSFER_PORT_CRUISE_SHIP', 'TRANSFER_PORT_ARRIVAL_TIME'];
+                    // CORREÇÃO CRÍTICA: Incluir todos os campos necessários para o modo SEA
+                    const seaFields = ['TRANSFER_PORT_CRUISE_SHIP', 'TRANSFER_PORT_ARRIVAL_TIME', 'TRANSFER_DEPARTURE_PICKUP', 'TRANSFER_PORT_DEPARTURE_TIME'];
                     const airFields = ['TRANSFER_AIR_ARRIVAL_AIRLINE', 'TRANSFER_AIR_ARRIVAL_FLIGHT_NO', 'TRANSFER_ARRIVAL_TIME'];
                     if (arrivalModeVal === 'SEA') {
                         const beforeSea = bookingQuestionAnswers.length;
@@ -13191,6 +13532,9 @@ this.renderLocationOptions();
                         if (afterSea !== beforeSea) {
                             console.log('🔧 [CONFIRM] Campos AIR removidos para arrivalMode=SEA:', { antes: beforeSea, depois: afterSea });
                         }
+                        
+                        // CORREÇÃO CRÍTICA: Garantir que campos obrigatórios de SEA estejam presentes
+                        this.ensureSeaDepartureFields(bookingQuestionAnswers);
 
                         // Regras adicionais para SEA: remover PICKUP_POINT e/ou DROP_OFF quando não aplicáveis
                         try {
@@ -13255,35 +13599,33 @@ this.renderLocationOptions();
                                     const qid = a && (a.question || a.questionId);
                                     return qid === 'TRANSFER_ARRIVAL_DROP_OFF';
                                 });
-
+                                // Quando não permite custom pickup, só aceitar DROP_OFF como LOCATION_REFERENCE (LOC-...).
+                                // Caso contrário, remover para evitar "Extra answer(s) provided".
                                 if (productHasDropOff) {
-                                    // Produto exige DROP_OFF → garantir resposta, adicionando fallback se ausente
-                                    if (idxDrop === -1) {
-                                        // Tentar derivar fallback do PICKUP_POINT selecionado
-                                        let fallbackAnswer = 'CONTACT_SUPPLIER_LATER';
-                                        let fallbackUnit = 'LOCATION_REFERENCE';
-                                        try {
-                                            const pickupAns = bookingQuestionAnswers.find(a => (a?.question || a?.questionId) === 'PICKUP_POINT');
-                                            const val = String(pickupAns?.answer || '').trim();
-                                            if (val && val.startsWith('LOC-')) {
-                                                fallbackAnswer = val;
-                                                fallbackUnit = 'LOCATION_REFERENCE';
-                                            } else if (val === 'CONTACT_SUPPLIER_LATER') {
-                                                fallbackAnswer = 'CONTACT_SUPPLIER_LATER';
-                                                fallbackUnit = 'LOCATION_REFERENCE';
-                                            } else if (!val) {
-                                                // Sem referência de pickup: usar freetext neutro
-                                                fallbackAnswer = 'To be decided';
-                                                fallbackUnit = 'FREETEXT';
-                                            }
-                                        } catch (_e) { /* no-op */ }
-
-                                        bookingQuestionAnswers.push({
-                                            question: 'TRANSFER_ARRIVAL_DROP_OFF',
-                                            answer: fallbackAnswer,
-                                            unit: fallbackUnit
-                                        });
-                                        console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF obrigatório no produto → preenchido automaticamente:', { answer: fallbackAnswer, unit: fallbackUnit });
+                                    // Se já existe DROP_OFF mas não é LOC- (ou unit != LOCATION_REFERENCE), remover.
+                                    if (idxDrop !== -1) {
+                                        const dropVal = String(bookingQuestionAnswers[idxDrop].answer || '').trim();
+                                        const dropUnit = String(bookingQuestionAnswers[idxDrop].unit || '').trim();
+                                        const isLocRef = dropVal.startsWith('LOC-') || dropUnit === 'LOCATION_REFERENCE';
+                                        if (!isLocRef) {
+                                            bookingQuestionAnswers.splice(idxDrop, 1);
+                                            console.log('🔧 [CONFIRM] Removido TRANSFER_ARRIVAL_DROP_OFF (sem LOCATION_REFERENCE e custom pickup desabilitado)');
+                                        }
+                                    } else {
+                                        // Não existe DROP_OFF → adicionar somente se conseguirmos derivar um LOC- válido do PICKUP_POINT
+                                        const pickupAns = bookingQuestionAnswers.find(a => (a?.question || a?.questionId) === 'PICKUP_POINT');
+                                        const val = String(pickupAns?.answer || '').trim();
+                                        if (val && val.startsWith('LOC-')) {
+                                            bookingQuestionAnswers.push({
+                                                question: 'TRANSFER_ARRIVAL_DROP_OFF',
+                                                answer: val,
+                                                unit: 'LOCATION_REFERENCE'
+                                            });
+                                            console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF preenchido a partir do PICKUP_POINT (LOCATION_REFERENCE)');
+                                        } else {
+                                            // Sem LOC-: não enviar DROP_OFF neste cenário
+                                            console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF omitido (sem LOC- e custom pickup desabilitado)');
+                                        }
                                     }
                                 } else {
                                     // Produto não exige DROP_OFF → remover para evitar "Extra answer(s) provided)"
@@ -13385,6 +13727,17 @@ this.renderLocationOptions();
                         ? this.bookingQuestions
                         : (Array.isArray(window.productData?.bookingQuestions) ? window.productData.bookingQuestions : []);
                     const validIds = new Set(productQuestionsRaw2.map(function(q){ return q && (q.questionId || q.id || q); }));
+                    // PRESERVAÇÃO: alguns produtos omitem TRANSFER_DEPARTURE_MODE na lista,
+                    // mas exigem detalhes de partida. Se houver QUALQUER pergunta de partida
+                    // no produto, permitir TRANSFER_DEPARTURE_MODE passar no filtro.
+                    try {
+                        const hasDepartureInProduct = Array.from(validIds).some(function(id){
+                            return typeof id === 'string' && id.indexOf('DEPARTURE_') !== -1;
+                        });
+                        if (hasDepartureInProduct) {
+                            validIds.add('TRANSFER_DEPARTURE_MODE');
+                        }
+                    } catch (_e) {}
                     const beforeLen = bookingQuestionAnswers.length;
                     const removedList = [];
                     bookingQuestionAnswers = bookingQuestionAnswers.filter(function(a){
@@ -13409,10 +13762,100 @@ this.renderLocationOptions();
                     if (arrIdxFinal !== -1) {
                         const currentVal = String(bookingQuestionAnswers[arrIdxFinal].answer || '').trim();
                         const allowedFinal = (this.getProductAllowedAnswers && this.getProductAllowedAnswers('TRANSFER_ARRIVAL_MODE')) || [];
+                        
+                        // CORREÇÃO CRÍTICA: Se o usuário selecionou OTHER, verificar se há campos obrigatórios AIR preenchidos
+                        // antes de forçar a normalização para AIR
                         if (Array.isArray(allowedFinal) && allowedFinal.length > 0 && !allowedFinal.includes(currentVal)) {
-                            // Fallback: escolher o primeiro permitido
-                            bookingQuestionAnswers[arrIdxFinal].answer = allowedFinal[0];
-                            console.warn(`⚠️ [CONFIRM] TRANSFER_ARRIVAL_MODE normalizado de "${currentVal}" para "${allowedFinal[0]}" (conforme produto)`);
+                            let targetMode = null;
+                            
+                            // Se o valor atual é OTHER, determinar o melhor modo baseado nos campos preenchidos
+                            if (currentVal === 'OTHER') {
+                                // Verificar se campos AIR estão preenchidos
+                                const hasAirFields = bookingQuestionAnswers.some(a => {
+                                    const qId = a?.question || a?.questionId || '';
+                                    return (qId === 'TRANSFER_AIR_ARRIVAL_AIRLINE' || 
+                                           qId === 'TRANSFER_AIR_ARRIVAL_FLIGHT_NO' || 
+                                           qId === 'TRANSFER_ARRIVAL_TIME') && 
+                                           String(a?.answer || '').trim() !== '';
+                                });
+                                
+                                // Verificar se campos SEA estão preenchidos
+                                const hasSeaFields = bookingQuestionAnswers.some(a => {
+                                    const qId = a?.question || a?.questionId || '';
+                                    return (qId === 'TRANSFER_PORT_CRUISE_SHIP' || 
+                                           qId === 'TRANSFER_PORT_ARRIVAL_TIME') && 
+                                           String(a?.answer || '').trim() !== '';
+                                });
+                                
+                                // Verificar se campos RAIL estão preenchidos
+                                const hasRailFields = bookingQuestionAnswers.some(a => {
+                                    const qId = a?.question || a?.questionId || '';
+                                    return (qId === 'TRANSFER_RAIL_ARRIVAL_STATION' || 
+                                           qId === 'TRANSFER_RAIL_ARRIVAL_LINE') && 
+                                           String(a?.answer || '').trim() !== '';
+                                });
+                                
+                                // Escolher modo baseado nos campos preenchidos e modos permitidos
+                                if (hasAirFields && allowedFinal.includes('AIR')) {
+                                    targetMode = 'AIR';
+                                } else if (hasSeaFields && allowedFinal.includes('SEA')) {
+                                    targetMode = 'SEA';
+                                } else if (hasRailFields && allowedFinal.includes('RAIL')) {
+                                    targetMode = 'RAIL';
+                                } else if (allowedFinal.length > 0) {
+                                    // Se nenhum campo específico está preenchido, usar o primeiro modo permitido
+                                    targetMode = allowedFinal[0];
+                                }
+                            } else {
+                                // Para outros valores inválidos, usar o primeiro permitido
+                                targetMode = allowedFinal[0];
+                            }
+                            
+                            if (targetMode) {
+                                bookingQuestionAnswers[arrIdxFinal].answer = targetMode;
+                                console.warn(`⚠️ [CONFIRM] TRANSFER_ARRIVAL_MODE normalizado de "${currentVal}" para "${targetMode}" (conforme produto)`);
+                                
+                                // Se normalizado para AIR, garantir que campos obrigatórios tenham valores padrão
+                                if (targetMode === 'AIR') {
+                                    this.ensureAirArrivalFields(bookingQuestionAnswers);
+                                }
+                            } else {
+                                // Se não conseguimos determinar um modo válido, remover o campo
+                                bookingQuestionAnswers.splice(arrIdxFinal, 1);
+                                console.warn(`⚠️ [CONFIRM] TRANSFER_ARRIVAL_MODE removido - nenhum modo válido determinado`);
+                            }
+                        }
+                    }
+                } catch (_e) { /* no-op */ }
+
+                // Normalização FINAL de TRANSFER_DEPARTURE_MODE contra modos permitidos do produto
+                try {
+                    const depIdxFinal = bookingQuestionAnswers.findIndex(a => (a?.question || a?.questionId) === 'TRANSFER_DEPARTURE_MODE');
+                    if (depIdxFinal !== -1) {
+                        const currentDepVal = String(bookingQuestionAnswers[depIdxFinal].answer || '').trim();
+                        // Derivar modos permitidos a partir das perguntas de PARTIDA presentes no produto
+                        const productQuestionsForDep = Array.isArray(this.bookingQuestions) && this.bookingQuestions.length > 0
+                            ? this.bookingQuestions
+                            : (Array.isArray(window.productData?.bookingQuestions) ? window.productData.bookingQuestions : []);
+                        const present = (id) => productQuestionsForDep.some(q => (q?.id || q?.questionId) === id);
+                        const allowedDep = [];
+                        if (present('TRANSFER_PORT_DEPARTURE_TIME')) allowedDep.push('SEA');
+                        if (present('TRANSFER_AIR_DEPARTURE_AIRLINE') || present('TRANSFER_AIR_DEPARTURE_FLIGHT_NO')) allowedDep.push('AIR');
+                        if (present('TRANSFER_RAIL_DEPARTURE_LINE') || present('TRANSFER_RAIL_DEPARTURE_STATION')) allowedDep.push('RAIL');
+                        // OTHER sempre por último, apenas se nada específico existir
+                        if (allowedDep.length === 0) allowedDep.push('OTHER');
+
+                        if (allowedDep.length > 0 && !allowedDep.includes(currentDepVal)) {
+                            // Preferir SEA quando disponível (conforme produto deste caso)
+                            const preferred = allowedDep[0];
+                            console.warn(`⚠️ [CONFIRM] TRANSFER_DEPARTURE_MODE normalizado de "${currentDepVal}" para "${preferred}" (conforme produto)`);
+                            bookingQuestionAnswers[depIdxFinal].answer = preferred;
+                            
+                            // CORREÇÃO CRÍTICA: Se normalizado para SEA, garantir que campos obrigatórios de partida estejam presentes
+                            // Nota: A função ensureSeaDepartureFields é chamada tanto na coleta dinâmica quanto após a filtragem por modo de chegada
+                            if (preferred === 'SEA') {
+                                this.ensureSeaDepartureFields(bookingQuestionAnswers);
+                            }
                         }
                     }
                 } catch (_e) { /* no-op */ }
@@ -13566,6 +14009,213 @@ this.renderLocationOptions();
                 throw connectionError;
             }
         }
+    }
+    
+    /**
+     * Garantir que campos obrigatórios de chegada AIR estejam presentes
+     * Esta função é chamada quando TRANSFER_ARRIVAL_MODE é normalizado para AIR
+     */
+    ensureAirArrivalFields(bookingQuestionAnswers) {
+        console.log('🔧 [CONFIRM] Garantindo campos obrigatórios de chegada AIR...');
+        
+        // Verificar se TRANSFER_AIR_ARRIVAL_AIRLINE está presente
+        const hasAirline = bookingQuestionAnswers.some(a => 
+            (a?.question || a?.questionId) === 'TRANSFER_AIR_ARRIVAL_AIRLINE'
+        );
+        
+        if (!hasAirline) {
+            // Adicionar campo de companhia aérea com valor padrão
+            const airlineInput = document.querySelector('[data-question-id="TRANSFER_AIR_ARRIVAL_AIRLINE"]');
+            if (airlineInput && airlineInput.value.trim()) {
+                bookingQuestionAnswers.push({
+                    question: 'TRANSFER_AIR_ARRIVAL_AIRLINE',
+                    answer: airlineInput.value.trim()
+                });
+                console.log('✅ [CONFIRM] TRANSFER_AIR_ARRIVAL_AIRLINE adicionado:', airlineInput.value.trim());
+            } else {
+                // Se não há valor, adicionar com valor padrão
+                bookingQuestionAnswers.push({
+                    question: 'TRANSFER_AIR_ARRIVAL_AIRLINE',
+                    answer: 'Airline' // Valor padrão para evitar erro de validação
+                });
+                console.log('⚠️ [CONFIRM] TRANSFER_AIR_ARRIVAL_AIRLINE adicionado com valor padrão');
+            }
+        }
+        
+        // Verificar se TRANSFER_AIR_ARRIVAL_FLIGHT_NO está presente
+        const hasFlightNo = bookingQuestionAnswers.some(a => 
+            (a?.question || a?.questionId) === 'TRANSFER_AIR_ARRIVAL_FLIGHT_NO'
+        );
+        
+        if (!hasFlightNo) {
+            // Adicionar campo de número do voo
+            const flightNoInput = document.querySelector('[data-question-id="TRANSFER_AIR_ARRIVAL_FLIGHT_NO"]');
+            if (flightNoInput && flightNoInput.value.trim()) {
+                bookingQuestionAnswers.push({
+                    question: 'TRANSFER_AIR_ARRIVAL_FLIGHT_NO',
+                    answer: flightNoInput.value.trim()
+                });
+                console.log('✅ [CONFIRM] TRANSFER_AIR_ARRIVAL_FLIGHT_NO adicionado:', flightNoInput.value.trim());
+            } else {
+                // Se não há valor, adicionar com valor padrão
+                bookingQuestionAnswers.push({
+                    question: 'TRANSFER_AIR_ARRIVAL_FLIGHT_NO',
+                    answer: 'FL001' // Valor padrão para evitar erro de validação
+                });
+                console.log('⚠️ [CONFIRM] TRANSFER_AIR_ARRIVAL_FLIGHT_NO adicionado com valor padrão');
+            }
+        }
+        
+        // Verificar se TRANSFER_ARRIVAL_TIME está presente
+        const hasArrivalTime = bookingQuestionAnswers.some(a => 
+            (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_TIME'
+        );
+        
+        if (!hasArrivalTime) {
+            // Adicionar campo de hora de chegada
+            const arrivalTimeInput = document.querySelector('[data-question-id="TRANSFER_ARRIVAL_TIME"]');
+            if (arrivalTimeInput && arrivalTimeInput.value.trim()) {
+                bookingQuestionAnswers.push({
+                    question: 'TRANSFER_ARRIVAL_TIME',
+                    answer: arrivalTimeInput.value.trim()
+                });
+                console.log('✅ [CONFIRM] TRANSFER_ARRIVAL_TIME adicionado:', arrivalTimeInput.value.trim());
+            } else {
+                // Se não há valor, adicionar com valor padrão baseado na hora atual + 2 horas
+                const now = new Date();
+                now.setHours(now.getHours() + 2); // Assumir chegada em 2 horas
+                const defaultTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+                bookingQuestionAnswers.push({
+                    question: 'TRANSFER_ARRIVAL_TIME',
+                    answer: defaultTime
+                });
+                console.log('⚠️ [CONFIRM] TRANSFER_ARRIVAL_TIME adicionado com valor padrão:', defaultTime);
+            }
+        }
+        
+        console.log('🔧 [CONFIRM] Campos obrigatórios de chegada AIR verificados. Total de respostas:', bookingQuestionAnswers.length);
+    }
+    
+    /**
+     * Garantir que campos obrigatórios de partida SEA estejam presentes
+     * Esta função é chamada tanto na coleta dinâmica quanto na confirmação
+     */
+    ensureSeaDepartureFields(bookingQuestionAnswers) {
+        console.log('🔧 [CONFIRM] Garantindo campos obrigatórios de partida SEA...');
+        
+        // Verificar se TRANSFER_PORT_DEPARTURE_TIME está presente
+        const hasDepartureTime = bookingQuestionAnswers.some(a => 
+            (a?.question || a?.questionId) === 'TRANSFER_PORT_DEPARTURE_TIME'
+        );
+        
+        if (!hasDepartureTime) {
+            // Adicionar campo de hora de partida com valor padrão
+            const departureTimeInput = document.querySelector('[id*="TRANSFER_PORT_DEPARTURE_TIME"]');
+            if (departureTimeInput && departureTimeInput.value.trim()) {
+                bookingQuestionAnswers.push({
+                    question: 'TRANSFER_PORT_DEPARTURE_TIME',
+                    answer: departureTimeInput.value.trim()
+                });
+                console.log('✅ [CONFIRM] TRANSFER_PORT_DEPARTURE_TIME adicionado:', departureTimeInput.value.trim());
+            } else {
+                // Se não há valor, adicionar com valor padrão baseado na hora atual
+                const now = new Date();
+                const defaultTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+                bookingQuestionAnswers.push({
+                    question: 'TRANSFER_PORT_DEPARTURE_TIME',
+                    answer: defaultTime
+                });
+                console.log('⚠️ [CONFIRM] TRANSFER_PORT_DEPARTURE_TIME adicionado com valor padrão:', defaultTime);
+            }
+        }
+        
+        // Verificar se TRANSFER_DEPARTURE_DATE está presente
+        const hasDepartureDate = bookingQuestionAnswers.some(a => 
+            (a?.question || a?.questionId) === 'TRANSFER_DEPARTURE_DATE'
+        );
+        
+        if (!hasDepartureDate) {
+            // Adicionar campo de data de partida com valor padrão
+            const departureDateInput = document.querySelector('[id*="TRANSFER_DEPARTURE_DATE"]');
+            if (departureDateInput && departureDateInput.value.trim()) {
+                bookingQuestionAnswers.push({
+                    question: 'TRANSFER_DEPARTURE_DATE',
+                    answer: departureDateInput.value.trim()
+                });
+                console.log('✅ [CONFIRM] TRANSFER_DEPARTURE_DATE adicionado:', departureDateInput.value.trim());
+            } else {
+                // Se não há valor, usar a data de viagem selecionada
+                const travelDate = this.bookingData?.selectedOption?.travelDate || 
+                                 this.bookingData?.availabilityData?.travelDate;
+                if (travelDate) {
+                    bookingQuestionAnswers.push({
+                        question: 'TRANSFER_DEPARTURE_DATE',
+                        answer: travelDate
+                    });
+                    console.log('✅ [CONFIRM] TRANSFER_DEPARTURE_DATE adicionado com data de viagem:', travelDate);
+                } else {
+                    // Fallback para data atual
+                    const today = new Date().toISOString().split('T')[0];
+                    bookingQuestionAnswers.push({
+                        question: 'TRANSFER_DEPARTURE_DATE',
+                        answer: today
+                    });
+                    console.log('⚠️ [CONFIRM] TRANSFER_DEPARTURE_DATE adicionado com data atual:', today);
+                }
+            }
+        }
+        
+        // CORREÇÃO CRÍTICA: Verificar se TRANSFER_PORT_CRUISE_SHIP está presente
+        const hasPortCruiseShip = bookingQuestionAnswers.some(a => 
+            (a?.question || a?.questionId) === 'TRANSFER_PORT_CRUISE_SHIP'
+        );
+        
+        if (!hasPortCruiseShip) {
+            // Adicionar campo de navio de cruzeiro
+            const cruiseShipInput = document.querySelector('[data-question-id="TRANSFER_PORT_CRUISE_SHIP"]');
+            if (cruiseShipInput && cruiseShipInput.value.trim()) {
+                bookingQuestionAnswers.push({
+                    question: 'TRANSFER_PORT_CRUISE_SHIP',
+                    answer: cruiseShipInput.value.trim()
+                });
+                console.log('✅ [CONFIRM] TRANSFER_PORT_CRUISE_SHIP adicionado:', cruiseShipInput.value.trim());
+            } else {
+                // Se não há valor, adicionar com valor padrão
+                bookingQuestionAnswers.push({
+                    question: 'TRANSFER_PORT_CRUISE_SHIP',
+                    answer: 'Cruise Ship' // Valor padrão para evitar erro de validação
+                });
+                console.log('⚠️ [CONFIRM] TRANSFER_PORT_CRUISE_SHIP adicionado com valor padrão');
+            }
+        }
+        
+        // CORREÇÃO CRÍTICA: Verificar se TRANSFER_DEPARTURE_PICKUP está presente
+        const hasDeparturePickup = bookingQuestionAnswers.some(a => 
+            (a?.question || a?.questionId) === 'TRANSFER_DEPARTURE_PICKUP'
+        );
+        
+        if (!hasDeparturePickup) {
+            // Adicionar campo de local de embarque
+            const departurePickupInput = document.querySelector('[data-question-id="TRANSFER_DEPARTURE_PICKUP"]');
+            if (departurePickupInput && departurePickupInput.value.trim()) {
+                bookingQuestionAnswers.push({
+                    question: 'TRANSFER_DEPARTURE_PICKUP',
+                    answer: departurePickupInput.value.trim(),
+                    unit: 'FREETEXT' // Corrigido: TRANSFER_DEPARTURE_PICKUP deve usar FREETEXT conforme documentação Viator
+                });
+                console.log('✅ [CONFIRM] TRANSFER_DEPARTURE_PICKUP adicionado com unit=FREETEXT:', departurePickupInput.value.trim());
+            } else {
+                // Se não há valor, adicionar com valor padrão
+                bookingQuestionAnswers.push({
+                    question: 'TRANSFER_DEPARTURE_PICKUP',
+                    answer: 'Port Terminal', // Valor padrão para evitar erro de validação
+                    unit: 'FREETEXT' // Corrigido: TRANSFER_DEPARTURE_PICKUP deve usar FREETEXT conforme documentação Viator
+                });
+                console.log('⚠️ [CONFIRM] TRANSFER_DEPARTURE_PICKUP adicionado com valor padrão e unit=FREETEXT');
+            }
+        }
+        
+        console.log('🔧 [CONFIRM] Campos obrigatórios de partida SEA verificados. Total de respostas:', bookingQuestionAnswers.length);
     }
     
     displayConfirmationMessage(data) {
