@@ -14600,8 +14600,8 @@ class ViatorBookingManager {
                         }
                     } catch(_e) { /* no-op */ }
 
-                // CORREÇÃO ESPECÍFICA: Remover PICKUP_POINT para produtos SEA com campos especializados
-                // Resolve erro "Extra answer(s) provided: PICKUP_POINT" para produtos como 9966P46
+                // CORREÇÃO ESPECÍFICA: Gerenciar PICKUP_POINT para produtos SEA com campos especializados
+                // Resolve tanto "Extra answer(s) provided" quanto "Missing answer(s) for" PICKUP_POINT
                 try {
                     const arrivalModeIdx = bookingQuestionAnswers.findIndex(a => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
                     const departureModeIdx = bookingQuestionAnswers.findIndex(a => (a?.question || a?.questionId) === 'TRANSFER_DEPARTURE_MODE');
@@ -14622,13 +14622,33 @@ class ViatorBookingManager {
                         return qid === 'TRANSFER_DEPARTURE_PICKUP';
                     });
 
-                    // Se modo SEA + campos especializados + PICKUP_POINT presente, remover PICKUP_POINT
-                    if (pickupPointIdx !== -1 && (arrivalMode === 'SEA' || departureMode === 'SEA') && (hasPortFields || hasSpecializedPickup)) {
-                        const pickupAnswer = String(bookingQuestionAnswers[pickupPointIdx].answer || '').trim();
-                        // Só remover se for CONTACT_SUPPLIER_LATER (adicionado automaticamente)
-                        if (pickupAnswer === 'CONTACT_SUPPLIER_LATER') {
-                            bookingQuestionAnswers.splice(pickupPointIdx, 1);
-                            console.log('🔧 [CONFIRM] PICKUP_POINT removido para produto SEA com campos especializados (evita extra answer)');
+                    // Verificar se há TRANSFER_ARRIVAL_DROP_OFF (indica que PICKUP_POINT pode ser necessário)
+                    const hasArrivalDropOff = bookingQuestionAnswers.some(a => {
+                        const qid = a?.question || a?.questionId || '';
+                        return qid === 'TRANSFER_ARRIVAL_DROP_OFF';
+                    });
+
+                    // Se modo SEA + campos especializados
+                    if ((arrivalMode === 'SEA' || departureMode === 'SEA') && (hasPortFields || hasSpecializedPickup)) {
+
+                        // CASO 1: SEM TRANSFER_ARRIVAL_DROP_OFF - remover PICKUP_POINT (correção 29.5)
+                        if (!hasArrivalDropOff && pickupPointIdx !== -1) {
+                            const pickupAnswer = String(bookingQuestionAnswers[pickupPointIdx].answer || '').trim();
+                            // Só remover se for CONTACT_SUPPLIER_LATER (adicionado automaticamente)
+                            if (pickupAnswer === 'CONTACT_SUPPLIER_LATER') {
+                                bookingQuestionAnswers.splice(pickupPointIdx, 1);
+                                console.log('🔧 [CONFIRM] PICKUP_POINT removido para produto SEA sem ARRIVAL_DROP_OFF (evita extra answer)');
+                            }
+                        }
+
+                        // CASO 2: COM TRANSFER_ARRIVAL_DROP_OFF - garantir PICKUP_POINT (correção 29.6)
+                        else if (hasArrivalDropOff && pickupPointIdx === -1) {
+                            bookingQuestionAnswers.push({
+                                question: 'PICKUP_POINT',
+                                answer: 'CONTACT_SUPPLIER_LATER',
+                                unit: 'LOCATION_REFERENCE'
+                            });
+                            console.log('🔧 [CONFIRM] PICKUP_POINT adicionado para produto SEA com ARRIVAL_DROP_OFF (evita missing answer)');
                         }
                     }
                 } catch(_e) { /* no-op */ }
