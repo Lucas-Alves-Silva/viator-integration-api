@@ -14600,6 +14600,38 @@ class ViatorBookingManager {
                         }
                     } catch(_e) { /* no-op */ }
 
+                // CORREÇÃO ESPECÍFICA: Remover PICKUP_POINT para produtos SEA com campos especializados
+                // Resolve erro "Extra answer(s) provided: PICKUP_POINT" para produtos como 9966P46
+                try {
+                    const arrivalModeIdx = bookingQuestionAnswers.findIndex(a => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
+                    const departureModeIdx = bookingQuestionAnswers.findIndex(a => (a?.question || a?.questionId) === 'TRANSFER_DEPARTURE_MODE');
+                    const pickupPointIdx = bookingQuestionAnswers.findIndex(a => (a?.question || a?.questionId) === 'PICKUP_POINT');
+
+                    const arrivalMode = arrivalModeIdx !== -1 ? String(bookingQuestionAnswers[arrivalModeIdx].answer || '').trim() : '';
+                    const departureMode = departureModeIdx !== -1 ? String(bookingQuestionAnswers[departureModeIdx].answer || '').trim() : '';
+
+                    // Verificar se há campos especializados de porto/cruzeiro
+                    const hasPortFields = bookingQuestionAnswers.some(a => {
+                        const qid = a?.question || a?.questionId || '';
+                        return typeof qid === 'string' && qid.indexOf('TRANSFER_PORT_') === 0;
+                    });
+
+                    // Verificar se há TRANSFER_DEPARTURE_PICKUP (campo especializado)
+                    const hasSpecializedPickup = bookingQuestionAnswers.some(a => {
+                        const qid = a?.question || a?.questionId || '';
+                        return qid === 'TRANSFER_DEPARTURE_PICKUP';
+                    });
+
+                    // Se modo SEA + campos especializados + PICKUP_POINT presente, remover PICKUP_POINT
+                    if (pickupPointIdx !== -1 && (arrivalMode === 'SEA' || departureMode === 'SEA') && (hasPortFields || hasSpecializedPickup)) {
+                        const pickupAnswer = String(bookingQuestionAnswers[pickupPointIdx].answer || '').trim();
+                        // Só remover se for CONTACT_SUPPLIER_LATER (adicionado automaticamente)
+                        if (pickupAnswer === 'CONTACT_SUPPLIER_LATER') {
+                            bookingQuestionAnswers.splice(pickupPointIdx, 1);
+                            console.log('🔧 [CONFIRM] PICKUP_POINT removido para produto SEA com campos especializados (evita extra answer)');
+                        }
+                    }
+                } catch(_e) { /* no-op */ }
 
                 // SANITIZAÇÃO GERAL: remover respostas que não existem nas bookingQuestions do produto
                 // Evita erros do tipo: "Extra answer(s) provided: <QUESTION_ID>"
