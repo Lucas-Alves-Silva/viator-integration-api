@@ -14629,6 +14629,12 @@ class ViatorBookingManager {
                         return typeof qid === 'string' && qid.indexOf('TRANSFER_AIR_') === 0;
                     });
 
+                    // Verificar se há campos especializados de RAIL
+                    const hasRailFields = bookingQuestionAnswers.some(a => {
+                        const qid = a?.question || a?.questionId || '';
+                        return typeof qid === 'string' && qid.indexOf('TRANSFER_RAIL_') === 0;
+                    });
+
                     // CASO 1: Produtos AIR com TRANSFER_ARRIVAL_DROP_OFF - remover ambos (correção 29.7)
                     if (arrivalMode === 'AIR' && hasAirFields && arrivalDropOffIdx !== -1) {
                         const dropOffAnswer = String(bookingQuestionAnswers[arrivalDropOffIdx].answer || '').trim();
@@ -14671,6 +14677,16 @@ class ViatorBookingManager {
                                 unit: 'LOCATION_REFERENCE'
                             });
                             console.log('🔧 [CONFIRM] PICKUP_POINT adicionado para produto SEA com ARRIVAL_DROP_OFF (evita missing answer)');
+                        }
+                    }
+
+                    // CASO 3: Produtos RAIL com TRANSFER_ARRIVAL_DROP_OFF - remover apenas PICKUP_POINT (correção 29.8)
+                    else if (arrivalMode === 'RAIL' && hasRailFields && arrivalDropOffIdx !== -1 && pickupPointIdx !== -1) {
+                        const pickupAnswer = String(bookingQuestionAnswers[pickupPointIdx].answer || '').trim();
+                        // Só remover se for CONTACT_SUPPLIER_LATER (adicionado automaticamente)
+                        if (pickupAnswer === 'CONTACT_SUPPLIER_LATER') {
+                            bookingQuestionAnswers.splice(pickupPointIdx, 1);
+                            console.log('🔧 [CONFIRM] PICKUP_POINT removido para produto RAIL (evita extra answer)');
                         }
                     }
                 } catch(_e) { /* no-op */ }
