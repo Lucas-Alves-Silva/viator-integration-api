@@ -1025,6 +1025,7 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 
 | 1.19 | 2025-08-22 | Caso funcional 101124P5 (arrival=AIR, departure=SEA); correção ReferenceError em confirm; separação chegada vs partida; fallbacks de pickup aplicados | Sistema |
 | 1.20 | 2025-08-22 | Teste bem-sucedido 101124P5 (AIR→SEA + "Gostaria que me buscassem"); PICKUP_POINT=CONTACT_SUPPLIER_LATER; status CONFIRMED; voucher gerado | Sistema |
+| 1.21 | 2025-08-22 | Teste bem-sucedido 101124P5 (AIR→SEA + endereço manual FREETEXT); PICKUP_POINT=CONTACT_SUPPLIER_LATER; status CONFIRMED; voucher gerado | Sistema |
 
 ---
 
@@ -1205,6 +1206,91 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 - Recomendado: BRL 1.089,24
 - Parceiro: BRL 1.002,10
 - Comissão: BRL 87,14
+
+### ✅ Teste Bem-Sucedido Adicional: Produto 101124P5 (AIR→SEA + Endereço Manual FREETEXT)
+
+**Data:** 2025-08-22 às 11:47-11:48
+**Status:** ✅ Implementado e Funcional
+
+**Configuração específica do teste:**
+- **Modo de chegada**: Avião (AIR) - Malasya MA674 às 04:00
+- **Modo de partida**: Navio (SEA) - Titanic em 30/08/2025 às 10:00
+- **Ponto de Encontro**: "Informar endereço específico" → CONTACT_SUPPLIER_LATER (LOCATION_REFERENCE) - fallback aplicado
+- **Endereço final**: CONTACT_SUPPLIER_LATER (LOCATION_REFERENCE) - fallback aplicado
+- **Pickup de partida**: Port Terminal (FREETEXT) - entrada manual
+
+**Diferenças do teste anterior:**
+- **Teste anterior (11:30)**: "Gostaria que me buscassem" → CONTACT_SUPPLIER_LATER
+- **Teste atual (11:47)**: "Informar endereço específico" → CONTACT_SUPPLIER_LATER (mesmo fallback)
+- **Observação**: Ambos os cenários resultaram no mesmo fallback CONTACT_SUPPLIER_LATER com unit=LOCATION_REFERENCE, indicando que o sistema aplica consistentemente o fallback quando allowCustomTravelerPickup=false, independentemente da opção selecionada pelo usuário
+
+**Evidências do Backend (viator-debug.log):**
+- **HOLD** (11:47:49): 200 OK
+  - cartRef: `CR-efb228da1114a1fbe8c3516b79588de1`
+  - status: `BOOKABLE`
+  - paymentSessionToken: válido (JWT)
+  - totalHeldPrice: BRL 1089.24 (recomendado) / BRL 1002.10 (parceiro)
+- **Pagamento** (11:48:19): 200 OK
+  - paymentToken: `STK-apjctaq7lngdvpz4oghpfvpubu`
+  - Via TA Payments
+- **Confirmação** (11:48:31): 200 OK
+  - status: `CONFIRMED`
+  - bookingRef: `BR-597877759`
+  - 25 booking questions enviadas corretamente
+  - voucher gerado: `https://api.sandbox.viator.com/ticket?code=1022782337:b365e3d6ff297906f71b557c1ac4a5858cb4f293673715a10f0866b234d0dafe:597877759`
+
+**Estrutura do payload final (trechos relevantes):**
+```json
+{
+  "question": "PICKUP_POINT",
+  "answer": "CONTACT_SUPPLIER_LATER",
+  "unit": "LOCATION_REFERENCE"
+},
+{
+  "question": "TRANSFER_DEPARTURE_PICKUP",
+  "answer": "Port Terminal",
+  "unit": "FREETEXT"
+},
+{
+  "question": "TRANSFER_ARRIVAL_DROP_OFF",
+  "answer": "CONTACT_SUPPLIER_LATER",
+  "unit": "LOCATION_REFERENCE"
+},
+{
+  "question": "TRANSFER_ARRIVAL_MODE",
+  "answer": "AIR"
+},
+{
+  "question": "TRANSFER_DEPARTURE_MODE",
+  "answer": "SEA"
+}
+```
+
+**Campos de transporte preservados:**
+- **AIR (chegada)**: TRANSFER_AIR_ARRIVAL_AIRLINE=Malasya, TRANSFER_AIR_ARRIVAL_FLIGHT_NO=MA674, TRANSFER_ARRIVAL_TIME=04:00
+- **SEA (partida)**: TRANSFER_PORT_CRUISE_SHIP=Titanic, TRANSFER_DEPARTURE_DATE=2025-08-30, TRANSFER_PORT_DEPARTURE_TIME=10:00
+
+**Resultado:**
+- ✅ Fluxo completo bem-sucedido: HOLD → pagamento → CONFIRM 200
+- ✅ Status CONFIRMED com voucher disponível para download
+- ✅ Fallback CONTACT_SUPPLIER_LATER aplicado consistentemente para PICKUP_POINT e TRANSFER_ARRIVAL_DROP_OFF
+- ✅ Entrada manual FREETEXT funcionando corretamente para TRANSFER_DEPARTURE_PICKUP
+- ✅ Campos de partida SEA preservados quando arrival=AIR
+- ✅ Sem erros "Missing answer(s)" ou "Extra answer(s)"
+
+**Comparação com teste anterior:**
+| Aspecto | Teste 11:30 ("Gostaria que me buscassem") | Teste 11:47 ("Endereço específico") |
+|---------|-------------------------------------------|-------------------------------------|
+| PICKUP_POINT | CONTACT_SUPPLIER_LATER (LOCATION_REFERENCE) | CONTACT_SUPPLIER_LATER (LOCATION_REFERENCE) |
+| TRANSFER_DEPARTURE_PICKUP | Port Terminal (FREETEXT) | Port Terminal (FREETEXT) |
+| TRANSFER_ARRIVAL_DROP_OFF | Test 123 (FREETEXT) | CONTACT_SUPPLIER_LATER (LOCATION_REFERENCE) |
+| Resultado | ✅ CONFIRMED | ✅ CONFIRMED |
+
+**Observações técnicas:**
+- O sistema aplica fallback CONTACT_SUPPLIER_LATER consistentemente quando allowCustomTravelerPickup=false
+- A diferenciação entre "Gostaria que me buscassem" e "Informar endereço específico" não impacta o payload final quando o produto não permite pickup customizado
+- Entrada manual via FREETEXT funciona corretamente para campos que permitem essa opção
+- A normalização por modo de transporte preserva corretamente os campos de partida SEA quando arrival=AIR
 
 
 **Data:** Agosto 2025
