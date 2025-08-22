@@ -1027,6 +1027,7 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 | 1.20 | 2025-08-22 | Teste bem-sucedido 101124P5 (AIR→SEA + "Gostaria que me buscassem"); PICKUP_POINT=CONTACT_SUPPLIER_LATER; status CONFIRMED; voucher gerado | Sistema |
 | 1.21 | 2025-08-22 | Teste bem-sucedido 101124P5 (AIR→SEA + endereço manual FREETEXT); PICKUP_POINT=CONTACT_SUPPLIER_LATER; status CONFIRMED; voucher gerado | Sistema |
 | 1.22 | 2025-08-22 | Teste bem-sucedido 101124P5 (SEA→SEA + "Vou decidir depois"); correção aplicada para TRANSFER_ARRIVAL_DROP_OFF; status CONFIRMED; voucher gerado | Sistema |
+| 1.23 | 2025-08-22 | Teste bem-sucedido 101124P5 (SEA→SEA + "Gostaria que me buscassem"); confirmação de que correção TRANSFER_ARRIVAL_DROP_OFF funciona para ambas opções de pickup; status CONFIRMED; voucher gerado | Sistema |
 
 ---
 
@@ -1380,6 +1381,89 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 - ✅ Cenário SEA→SEA agora funciona corretamente após correção do bug
 - ✅ Primeira implementação bem-sucedida de transporte marítimo bidirecional
 - ✅ Correção aplicada no código viator-booking.js (linhas 14057-14080)
+
+### ✅ Teste Bem-Sucedido Adicional: Produto 101124P5 (SEA→SEA + "Gostaria que me buscassem")
+
+**Data:** 2025-08-22 às 12:54-12:55
+**Status:** ✅ Implementado e Funcional
+
+**Configuração específica do teste:**
+- **Modo de chegada**: Navio (SEA) - Titanic às 18:50
+- **Modo de partida**: Navio (SEA) - em 28/08/2025 às 14:30
+- **Ponto de Encontro**: "Gostaria que me buscassem" → CONTACT_SUPPLIER_LATER (LOCATION_REFERENCE) - fallback aplicado
+- **Endereço final**: "Test Way 123" (FREETEXT) - entrada manual preservada
+- **Pickup de partida**: "Port Terminal" (FREETEXT) - entrada manual
+
+**Evidências do Backend (viator-debug.log):**
+- **HOLD** (12:54:51): 200 OK
+  - cartRef: `CR-d128869da16363fd0ce2ed39ae1efe23`
+  - status: `BOOKABLE`
+  - paymentSessionToken: válido (JWT)
+  - totalHeldPrice: BRL 1089.24 (recomendado) / BRL 1002.10 (parceiro)
+- **Pagamento** (12:55:06): 200 OK
+  - paymentToken: `STK-6njf4dq2qjauhh7omwz3wu6sri`
+  - Via TA Payments
+- **Confirmação** (12:55:17): 200 OK
+  - status: `CONFIRMED`
+  - bookingRef: `BR-597877873`
+  - 23 booking questions enviadas corretamente
+  - voucher gerado: `https://api.sandbox.viator.com/ticket?code=1022782451:92069a944d938d4f7602b0ff78617dedce76a4e6711215a0f3b299373d314ed5:597877873`
+
+**Estrutura do payload final (trechos relevantes):**
+```json
+{
+  "question": "PICKUP_POINT",
+  "answer": "CONTACT_SUPPLIER_LATER",
+  "unit": "LOCATION_REFERENCE"
+},
+{
+  "question": "TRANSFER_DEPARTURE_PICKUP",
+  "answer": "Port Terminal",
+  "unit": "FREETEXT"
+},
+{
+  "question": "TRANSFER_ARRIVAL_DROP_OFF",
+  "answer": "Test Way 123",
+  "unit": "FREETEXT"
+},
+{
+  "question": "TRANSFER_ARRIVAL_MODE",
+  "answer": "SEA"
+},
+{
+  "question": "TRANSFER_DEPARTURE_MODE",
+  "answer": "SEA"
+}
+```
+
+**Campos de transporte SEA preservados:**
+- **SEA (chegada)**: TRANSFER_PORT_CRUISE_SHIP=Titanic, TRANSFER_PORT_ARRIVAL_TIME=18:50
+- **SEA (partida)**: TRANSFER_DEPARTURE_DATE=2025-08-28, TRANSFER_PORT_DEPARTURE_TIME=14:30
+
+**Comparação com testes anteriores SEA→SEA:**
+
+| Aspecto | "Vou decidir depois" (12:06) | "Gostaria que me buscassem" (12:54) |
+|---------|------------------------------|-------------------------------------|
+| PICKUP_POINT | ✅ CONTACT_SUPPLIER_LATER (LOCATION_REFERENCE) | ✅ CONTACT_SUPPLIER_LATER (LOCATION_REFERENCE) |
+| TRANSFER_ARRIVAL_DROP_OFF | ✅ "Test 123" (FREETEXT) | ✅ "Test Way 123" (FREETEXT) |
+| TRANSFER_DEPARTURE_PICKUP | ✅ "Port Terminal" (FREETEXT) | ✅ "Port Terminal" (FREETEXT) |
+| Resultado API | ✅ 200 OK (CONFIRMED) | ✅ 200 OK (CONFIRMED) |
+| Voucher | ✅ Gerado (1022782377) | ✅ Gerado (1022782451) |
+| BookingRef | BR-597877799 | BR-597877873 |
+
+**Validação da correção aplicada:**
+- ✅ **Correção funciona para ambas opções**: "Vou decidir depois" e "Gostaria que me buscassem" resultam no mesmo comportamento
+- ✅ **TRANSFER_ARRIVAL_DROP_OFF preservado**: Campo nunca é removido para `arrivalMode=SEA`, independente da opção de pickup
+- ✅ **Cenário SEA→SEA robusto**: Múltiplos testes bem-sucedidos demonstram estabilidade da implementação
+- ✅ **Sem erros "Missing answer(s)"**: Correção eliminou completamente o erro que ocorria anteriormente
+- ✅ **Fallbacks consistentes**: Sistema aplica CONTACT_SUPPLIER_LATER de forma consistente quando `allowCustomTravelerPickup=false`
+
+**Resultado:**
+- ✅ Fluxo completo bem-sucedido: HOLD → pagamento → CONFIRM 200
+- ✅ Status CONFIRMED com voucher disponível para download
+- ✅ Confirmação de que a correção no viator-booking.js funciona para diferentes opções de pickup
+- ✅ Demonstração da robustez e estabilidade do cenário SEA→SEA
+- ✅ Validação completa de que não há mais erros relacionados a TRANSFER_ARRIVAL_DROP_OFF
 
 
 **Data:** Agosto 2025
