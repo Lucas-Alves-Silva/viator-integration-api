@@ -1024,6 +1024,7 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 | 1.18 | 2025-08-20 | **Implementação 28**: Três opções de Ponto de Encontro funcionando corretamente - "Vou decidir depois", "Gostaria que me buscassem" e "Informar endereço específico" | Sistema |
 
 | 1.19 | 2025-08-22 | Caso funcional 101124P5 (arrival=AIR, departure=SEA); correção ReferenceError em confirm; separação chegada vs partida; fallbacks de pickup aplicados | Sistema |
+| 1.20 | 2025-08-22 | Teste bem-sucedido 101124P5 (AIR→SEA + "Gostaria que me buscassem"); PICKUP_POINT=CONTACT_SUPPLIER_LATER; status CONFIRMED; voucher gerado | Sistema |
 
 ---
 
@@ -1119,6 +1120,91 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 **Observações para futuras manutenções:**
 - Se a Viator exigir `LOCATION_REFERENCE` específico, preferir uma `LOC-...` válida do `logistics.travelerPickup.locations` (primeira elegível) em vez de `CONTACT_SUPPLIER_LATER`.
 - Manter os logs `[PAYLOAD CHECK]` para facilitar diagnóstico e rastreabilidade.
+
+### ✅ Teste Bem-Sucedido Atualizado: Produto 101124P5 (AIR→SEA + "Gostaria que me buscassem")
+
+**Data:** 2025-08-22 às 11:30
+**Status:** ✅ Implementado e Funcional
+
+**Configuração específica do teste:**
+- **Modo de chegada**: Avião (AIR) - TAM TA741 às 10:00
+- **Modo de partida**: Navio (SEA) - Titanic em 28/08/2025 às 16:00
+- **Ponto de Encontro**: "Gostaria que me buscassem" → CONTACT_SUPPLIER_LATER (LOCATION_REFERENCE)
+- **Endereço final**: Test 123 (FREETEXT)
+- **Pickup de partida**: Port Terminal (FREETEXT)
+
+**Evidências do Frontend (Anotações.txt):**
+- Pré-envio do payload (11:30:36):
+  - `🔎 [PAYLOAD CHECK] allowCustomTravelerPickup: false`
+  - `🔎 [PAYLOAD CHECK] PICKUP_POINT: Object` → CONTACT_SUPPLIER_LATER com unit=LOCATION_REFERENCE
+  - `🔎 [PAYLOAD CHECK] TRANSFER_DEPARTURE_PICKUP: Object` → "Port Terminal" com unit=FREETEXT
+- Garantias aplicadas:
+  - `🔧 [PRE-FLIGHT] ensureSeaDepartureFields aplicado (dep=SEA)`
+  - `🔧 [PRE-FLIGHT] PICKUP_POINT adicionado (faltante) como CONTACT_SUPPLIER_LATER`
+  - `🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF corrigido para CONTACT_SUPPLIER_LATER`
+- Confirmação bem-sucedida:
+  - `✅ Sucesso na tentativa 1`
+  - `✅ Pagamento e reserva processados com sucesso, pronto para step 5`
+
+**Evidências do Backend (viator-debug.log):**
+- **HOLD** (11:30:10-13): 200 OK
+  - cartRef: `CR-f1b9909aea7858195aab45bce32b9d20`
+  - status: `BOOKABLE`
+  - paymentSessionToken: válido (JWT)
+  - totalHeldPrice: BRL 1089.24 (recomendado) / BRL 1002.10 (parceiro)
+- **Pagamento** (11:30:36): 200 OK
+  - paymentToken: `STK-7prluik2mfcv3h6kitdhsddlbm`
+  - Via TA Payments
+- **Confirmação** (11:30:39-48): 200 OK
+  - status: `CONFIRMED`
+  - bookingRef: `BR-597877713`
+  - 25 booking questions enviadas corretamente
+  - voucher gerado: `https://api.sandbox.viator.com/ticket?code=1022782291:b3ee9d5978fc75d117dfdbbe885ebe0da99b807d02f435c3e97453ff6d096cfd:597877713`
+
+**Estrutura do payload final (trechos relevantes):**
+```json
+{
+  "question": "PICKUP_POINT",
+  "answer": "CONTACT_SUPPLIER_LATER",
+  "unit": "LOCATION_REFERENCE"
+},
+{
+  "question": "TRANSFER_DEPARTURE_PICKUP",
+  "answer": "Port Terminal",
+  "unit": "FREETEXT"
+},
+{
+  "question": "TRANSFER_ARRIVAL_MODE",
+  "answer": "AIR"
+},
+{
+  "question": "TRANSFER_DEPARTURE_MODE",
+  "answer": "SEA"
+}
+```
+
+**Campos de transporte preservados:**
+- **AIR (chegada)**: TRANSFER_AIR_ARRIVAL_AIRLINE=TAM, TRANSFER_AIR_ARRIVAL_FLIGHT_NO=TA741, TRANSFER_ARRIVAL_TIME=10:00
+- **SEA (partida)**: TRANSFER_PORT_CRUISE_SHIP=Titanic, TRANSFER_DEPARTURE_DATE=2025-08-28, TRANSFER_PORT_DEPARTURE_TIME=16:00
+
+**Resultado:**
+- ✅ Fluxo completo bem-sucedido: HOLD → pagamento → CONFIRM 200
+- ✅ Status CONFIRMED com voucher disponível para download
+- ✅ Separação correta entre campos de chegada e partida
+- ✅ Fallback CONTACT_SUPPLIER_LATER aplicado corretamente para PICKUP_POINT
+- ✅ Campos de partida SEA preservados quando arrival=AIR
+- ✅ Sem erros "Missing answer(s)" ou "Extra answer(s)"
+
+**Política de cancelamento:**
+- Tipo: STANDARD
+- Reembolso total: até 24h antes (100%)
+- Cancelamento por mau tempo: permitido
+- Cancelamento por viajantes insuficientes: permitido
+
+**Preços finais:**
+- Recomendado: BRL 1.089,24
+- Parceiro: BRL 1.002,10
+- Comissão: BRL 87,14
 
 
 **Data:** Agosto 2025
