@@ -6,6 +6,60 @@ Este documento serve como referência completa para a implementação e funciona
 
 ## 🆕 Melhorias Recentes Implementadas (Agosto 2025)
 
+### ✅ Correções de Sincronização Frontend-Backend (Janeiro 2025)
+**Status**: ✅ **IMPLEMENTADO E FUNCIONAL**
+
+**Problema Identificado:**
+- Erro "Sessão de reserva não encontrada" ocorrendo devido a problemas de sincronização
+- Validação de pagamento tentando acessar `holdData` antes do hold ser completamente estabelecido
+- Falta de tratamento robusto para timeouts e falhas de rede
+- Ausência de validação adequada do `paymentSessionToken` JWT
+
+**Soluções Implementadas:**
+
+#### 1. **Lógica de Retry para Validação de Hold**
+- ✅ Implementada função `validateHoldValidity` assíncrona com retry automático
+- ✅ Máximo de 3 tentativas com delay de 1 segundo entre tentativas
+- ✅ Logs de depuração para rastreamento das tentativas
+- ✅ Validação robusta de `holdData` e `paymentSessionToken`
+
+#### 2. **Estado de Carregamento Durante Criação do Hold**
+- ✅ Funções `showHoldLoadingState()` e `hideHoldLoadingState()` implementadas
+- ✅ Overlay visual com spinner e mensagens informativas
+- ✅ Feedback em tempo real para o usuário durante o processo
+- ✅ Tratamento de erro com mensagens específicas
+
+#### 3. **Melhorias no Tratamento de Timeout e Sincronização**
+- ✅ Sistema de heartbeat para monitoramento do progresso do hold
+- ✅ Retry automático para erros de rede/timeout (máximo 2 tentativas)
+- ✅ Timeout configurado para 90 segundos com logs detalhados
+- ✅ Limpeza adequada de timers e intervalos
+
+#### 4. **Validação Robusta do PaymentSessionToken**
+- ✅ Função `validatePaymentSessionToken()` para validação JWT
+- ✅ Verificação da estrutura JWT (3 partes separadas por pontos)
+- ✅ Validação de campos obrigatórios: `tokenId`, `checkoutSessionId`, `merchantId`, `clientId`
+- ✅ Verificação de URLs essenciais: `paymentDataSubmissionUrl`, `creditCardEntryUrl`
+- ✅ Tratamento de erros com mensagens específicas
+
+**Arquivos Modificados:**
+- `viator-booking.js`: Implementação de todas as melhorias de sincronização
+- `docs/booking-questions-implementacao-funcional.md`: Documentação atualizada
+
+**Benefícios Alcançados:**
+- ✅ Eliminação do erro "Sessão de reserva não encontrada"
+- ✅ Melhor experiência do usuário com feedback visual
+- ✅ Maior robustez contra falhas de rede e timeouts
+- ✅ Validação adequada de tokens de pagamento
+- ✅ Logs detalhados para debugging e monitoramento
+
+**Evidências de Funcionamento:**
+- Hold criado com sucesso: `paymentSessionToken` validado
+- Retry automático funcionando em casos de timeout
+- Estado de carregamento exibido corretamente
+- Heartbeat detectando progresso do hold
+- Validação JWT identificando tokens corrompidos
+
 ### ✅ Novo Caso Funcional: Produto 100014P4 com Modo de Chegada SEA
 **Status**: ✅ **IMPLEMENTADO E FUNCIONAL**
 
@@ -26,7 +80,7 @@ Este documento serve como referência completa para a implementação e funciona
 
 **Melhoria de UX Implementada:**
 - **Reordenação das perguntas**: Sequência otimizada para melhor experiência do usuário
-- **Ordem implementada**: 
+- **Ordem implementada**:
   1. Modo de chegada
   2. Nome do navio de cruzeiro
   3. Hora da chegada
@@ -322,7 +376,7 @@ foreach ($request_data['items'] as $index => &$item) {
     $email = $item['communication']['email'] ?? '';
     $firstName = $item['travelers'][0]['firstName'] ?? '';
     $lastName = $item['travelers'][0]['lastName'] ?? '';
-    
+
     if (empty($email) || empty($firstName) || empty($lastName)) {
         // Aplicar dados do responsável como fallback
         $item['communication']['email'] = $booker_info['email'] ?? '';
@@ -467,7 +521,7 @@ As mensagens de erro agora são mais específicas:
 ## 📋 Histórico de Implementações
 
 ### ✅ Implementação 16: Melhorias no PICKUP_POINT - Exibição de Endereços e Google Places API v1
-**Data:** Agosto 2025  
+**Data:** Agosto 2025
 **Status:** ✅ Implementado e Funcional
 
 **Problema Identificado:**
@@ -538,7 +592,7 @@ As mensagens de erro agora são mais específicas:
 - **UI/UX**: Fornecer feedback visual claro sobre seleções do usuário
 
 ### ✅ Implementação 3: Sistema Dinâmico de Booking Questions
-**Data:** Dezembro 2024  
+**Data:** Dezembro 2024
 **Status:** ✅ Funcional e Compatível com API Viator
 
 **Descrição:**
@@ -565,7 +619,7 @@ Implementação completa do sistema dinâmico de booking questions seguindo a es
 - ✅ Tratamento correto de perguntas obrigatórias vs opcionais
 
 ### ✅ Correção 1: Renderização da Seção de Idioma
-**Data:** Dezembro 2024  
+**Data:** Dezembro 2024
 **Status:** ✅ Corrigido e Funcional
 
 **Problema Identificado:**
@@ -591,8 +645,8 @@ A função `renderLanguageGuideSection()` estava implementada mas nunca era cham
 ✅ A seção `additional-booking-info-section` é exibida corretamente na etapa 3 das perguntas de reserva.
 
 ### ✅ Implementação 3: PICKUP_POINT (validação condicional)
-**Data:** Agosto 2025  
-**Produto Testado:** `100143P7`  
+**Data:** Agosto 2025
+**Produto Testado:** `100143P7`
 **Status:** ✅ Implementado e validado
 
 **Contexto:**
@@ -609,8 +663,8 @@ A função `renderLanguageGuideSection()` estava implementada mas nunca era cham
 - UX consistente e sem mensagens persistentes indevidas
 
 ### ✅ Implementação 4: Correção Crítica PER_TRAVELER
-**Data:** Agosto 2025  
-**Produto Testado:** `100143P7`  
+**Data:** Agosto 2025
+**Produto Testado:** `100143P7`
 **Status:** ✅ Implementado e validado
 
 **Contexto:**
@@ -623,7 +677,7 @@ A função `renderLanguageGuideSection()` estava implementada mas nunca era cham
   ```json
   {
     "question": "AGEBAND",
-    "answer": "ADULT", 
+    "answer": "ADULT",
     "travelerNum": 1
   }
   ```
@@ -634,8 +688,8 @@ A função `renderLanguageGuideSection()` estava implementada mas nunca era cham
 **Resultado:** ✅ Perguntas PER_TRAVELER coletadas corretamente com `travelerNum` apropriado
 
 ### ✅ Implementação 5: Conjunto PER_TRAVELER + PER_BOOKING (Produto 100427P4)
-**Data:** Agosto 2025  
-**Produto Testado:** `100427P4`  
+**Data:** Agosto 2025
+**Produto Testado:** `100427P4`
 **Status:** ✅ Funcional e Reserva concluída com sucesso
 
 **Resumo do caso:**
@@ -663,8 +717,8 @@ A função `renderLanguageGuideSection()` estava implementada mas nunca era cham
 ---
 
 ### ✅ Implementação 6: Conjunto PER_TRAVELER (Produto 101291P1)
-**Data:** Agosto 2025  
-**Produto Testado:** `101291P1`  
+**Data:** Agosto 2025
+**Produto Testado:** `101291P1`
 **Status:** ✅ Fluxo completo bem-sucedido (hold, pagamento e confirmação)
 
 **bookingQuestions detectadas (log):**
@@ -693,9 +747,9 @@ A função `renderLanguageGuideSection()` estava implementada mas nunca era cham
 ---
 
 ### ✅ Implementação 2: Correção de Duplicação de Formulário de Viajantes
-**Data:** Janeiro 2025  
-**Produto Testado:** `100143P7` (Excursão de Ciclismo às Ruínas dos Templos de Beng Mealea)  
-**Booking Questions:** `FULL_NAMES_FIRST`, `FULL_NAMES_LAST`, `HEIGHT`, `PICKUP_POINT`, `SPECIAL_REQUIREMENTS`, `AGEBAND`  
+**Data:** Janeiro 2025
+**Produto Testado:** `100143P7` (Excursão de Ciclismo às Ruínas dos Templos de Beng Mealea)
+**Booking Questions:** `FULL_NAMES_FIRST`, `FULL_NAMES_LAST`, `HEIGHT`, `PICKUP_POINT`, `SPECIAL_REQUIREMENTS`, `AGEBAND`
 **Status:** ✅ **RESOLVIDO**
 
 **Problema Identificado:**
@@ -724,9 +778,9 @@ A função `renderDynamicBookingQuestions` tentava acessar propriedades `firstNa
 - ✅ Processo de reserva funcionando sem erros de renderização
 
 ### ✅ Implementação 1: Correção de Validação de Campos Obrigatórios
-**Data:** Janeiro 2025  
-**Produto Testado:** `100143P7` (Excursão de Ciclismo às Ruínas dos Templos de Beng Mealea)  
-**Booking Questions:** `FULL_NAMES_FIRST`, `FULL_NAMES_LAST`  
+**Data:** Janeiro 2025
+**Produto Testado:** `100143P7` (Excursão de Ciclismo às Ruínas dos Templos de Beng Mealea)
+**Booking Questions:** `FULL_NAMES_FIRST`, `FULL_NAMES_LAST`
 **Status:** ✅ **RESOLVIDO**
 
 **Problema Identificado:**
@@ -967,12 +1021,15 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 | 1.15 | 2025-08-18 | **Implementação 24**: Produto 100273P23 com modo AIR funcionando; sanitização inteligente implementada para remover campos não suportados pelo produto | Sistema |
 | 1.16 | 2025-08-18 | **Implementação 25**: Produto com modo AIR e "Vou decidir depois" funcionando; fallback automático para TRANSFER_ARRIVAL_DROP_OFF implementado | Sistema |
 | 1.17 | 2025-08-18 | **Implementação 26**: Produto com modo RAIL e "Vou decidir depois" funcionando; sanitização específica para PICKUP_POINT implementada | Sistema |
+| 1.18 | 2025-08-20 | **Implementação 28**: Três opções de Ponto de Encontro funcionando corretamente - "Vou decidir depois", "Gostaria que me buscassem" e "Informar endereço específico" | Sistema |
+
+| 1.19 | 2025-08-22 | Caso funcional 101124P5 (arrival=AIR, departure=SEA); correção ReferenceError em confirm; separação chegada vs partida; fallbacks de pickup aplicados | Sistema |
 
 ---
 
 ### ✅ Implementação 10: Produto 101124P5 – Transfer Modes end-to-end
 ### ✅ Implementação 11: PICKUP_POINT — elegibilidade por modo e fallback seguro
-**Data:** Agosto 2025  
+**Data:** Agosto 2025
 **Status:** ✅ Aplicado (frontend)
 
 **Problema observado:**
@@ -1000,7 +1057,71 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 - "🚗 [PICKUP FILTER] 0 seções visíveis" → radio de lista desabilitado e fallback aplicado.
 - "❌ [PICKUP VALIDATION] Local inválido ..." → fallback para CONTACT_SUPPLIER_LATER.
 
-**Data:** Agosto 2025  
+### ✅ Novo Caso Funcional Atualizado: Produto 101124P5 (arrival=AIR, departure=SEA)
+
+**Data:** 2025-08-22
+**Status:** ✅ Implementado e Funcional
+
+**Decisão de documentação:** Atualização incremental neste documento (em vez de criar um novo), mantendo o histórico anterior do mesmo produto (101124P5) e acrescentando as novas evidências para rastreabilidade.
+
+**Contexto do teste (Anotações.txt):**
+- Tentativas de confirmação: 3 (com retry automático)
+- Antes das correções: exceção no front impedia chamada estável de confirmação
+- Após as correções: payload validado por logs e exceção removida
+
+**Evidências do Front (Anotações.txt):**
+- Pré-envio do payload:
+  - `🔎 [PAYLOAD CHECK] allowCustomTravelerPickup: false`
+  - `🔎 [PAYLOAD CHECK] PICKUP_POINT: Object` → CONTACT_SUPPLIER_LATER com unit=LOCATION_REFERENCE
+  - `🔎 [PAYLOAD CHECK] TRANSFER_DEPARTURE_PICKUP: Object` → fallback aplicado (LOCATION_REFERENCE ou FREETEXT quando aplicável)
+- Garantias de partida SEA aplicadas:
+  - `🔧 [PRE-FLIGHT] ensureSeaDepartureFields aplicado (dep=SEA)`
+  - `🔧 [PRE-FLIGHT] PICKUP_POINT adicionado (faltante) como CONTACT_SUPPLIER_LATER`
+- Normalização por chegada corrigida:
+  - `🔧 [CONFIRM] Campos SEA (chegada) removidos para arrivalMode=AIR` (sem remover campos de partida)
+
+**Evidências do Backend (viator-debug.log):**
+- HOLD: 200 com `status: BOOKABLE`; `paymentSessionToken` presente
+- Pagamento: 200, `paymentAccounts` retornado (TA Payments)
+- Sem erros de `Missing answer(s)` ou `Extra answer(s)` na confirmação nesta rodada
+
+**Problema identificado e corrigido:**
+- ReferenceError no front: `idxGeneric is not defined` durante `confirmBooking()`
+  - Causa: manipulação por índice em `PICKUP_POINT` após mutações, levando a referência inválida
+  - Correção: uso de `push` com checagens, reavaliação local do índice e fallback final robusto (sem depender de `idxGeneric` existente)
+
+**Ajustes funcionais aplicados (viator-booking.js):**
+1) Separação de campos por contexto (chegada vs partida)
+   - arrival=AIR → remover apenas `SEA (chegada)`; preservar `SEA (partida)`
+2) Garantias de pickup
+   - `PICKUP_POINT`: se produto/logistics expõe e estiver ausente → CONTACT_SUPPLIER_LATER + LOCATION_REFERENCE
+   - `TRANSFER_DEPARTURE_PICKUP` em `departure=SEA`: CONTACT_SUPPLIER_LATER/LOCATION_REFERENCE quando `allowCustom=false`; FREETEXT padrão quando permitido e sem valor
+3) Logs de diagnóstico
+   - `[PAYLOAD CHECK]` para `allowCustom`, `PICKUP_POINT`, `TRANSFER_DEPARTURE_PICKUP`
+4) Correção do ReferenceError
+   - Substituição de atribuições por índice por `push` seguro e fallbacks finais
+
+**Resultado:**
+- Payload final consistente para 101124P5 (arrival=AIR, departure=SEA)
+- Erro “Missing answer(s) for: PICKUP_POINT” eliminado neste fluxo
+- Exceção JavaScript removida; confirmação pode prosseguir
+
+**Trechos de log (resumo):**
+```
+🔧 [PRE-FLIGHT] ensureSeaDepartureFields aplicado (dep=SEA)
+🔧 [PRE-FLIGHT] PICKUP_POINT adicionado (faltante) como CONTACT_SUPPLIER_LATER
+🔎 [PAYLOAD CHECK] allowCustomTravelerPickup: false
+🔎 [PAYLOAD CHECK] PICKUP_POINT: { unit: 'LOCATION_REFERENCE', answer: 'CONTACT_SUPPLIER_LATER' }
+🔎 [PAYLOAD CHECK] TRANSFER_DEPARTURE_PICKUP: { ... }
+🔧 [CONFIRM] Campos SEA (chegada) removidos para arrivalMode=AIR
+```
+
+**Observações para futuras manutenções:**
+- Se a Viator exigir `LOCATION_REFERENCE` específico, preferir uma `LOC-...` válida do `logistics.travelerPickup.locations` (primeira elegível) em vez de `CONTACT_SUPPLIER_LATER`.
+- Manter os logs `[PAYLOAD CHECK]` para facilitar diagnóstico e rastreabilidade.
+
+
+**Data:** Agosto 2025
 **Status:** ✅ Fluxo completo (HOLD → pagamento → CONFIRM 200)
 
 **Contexto do Produto:**
@@ -1040,7 +1161,7 @@ Trechos do log (`viator-debug.log`):
 - ✅ Confirmação bem-sucedida com regras de transfer aplicadas.
 
 ### ✅ Implementação 12: 101124P5 — ARRIVAL=AIR + PICKUP_POINT (FREETEXT)
-**Data:** Agosto 2025  
+**Data:** Agosto 2025
 **Status:** ✅ Fluxo completo (HOLD → pagamento → CONFIRM 200)
 
 **Cenário testado:**
@@ -1076,7 +1197,7 @@ Trechos do log (`viator-debug.log`):
 - Se o produto não expuser locais elegíveis ou impedir custom pickup, manter fallback para `CONTACT_SUPPLIER_LATER`.
 
 ### ✅ Implementação 13: 101124P5 — ARRIVAL=SEA + PICKUP_POINT (CONTACT_SUPPLIER_LATER)
-**Data:** Agosto 2025  
+**Data:** Agosto 2025
 **Status:** ✅ Fluxo completo (HOLD → pagamento → CONFIRM 200)
 
 **Cenário testado:**
@@ -1114,7 +1235,7 @@ Trechos do log (`viator-debug.log`):
 - `PICKUP_POINT` pode ser `CONTACT_SUPPLIER_LATER` como `LOCATION_REFERENCE` quando disponível no produto.
 
 ### ✅ Implementação 14: 101124P5 — ARRIVAL=OTHER + PICKUP_POINT (3 variações)
-**Data:** Agosto 2025  
+**Data:** Agosto 2025
 **Status:** ✅ Fluxos completos (HOLD → pagamento → CONFIRM 200) para 3 cenários
 
 **Cenários testados (ARRIVAL_MODE = OTHER):**
@@ -1156,7 +1277,7 @@ Trechos do log (`viator-debug.log`):
 **Observações de compatibilidade:**
 
 ### ✅ Implementação 15: Bloqueio de modos de chegada não suportados (erro "Invalid value provided for TRANSFER_ARRIVAL_MODE")
-**Data:** Agosto 2025  
+**Data:** Agosto 2025
 **Status:** ✅ Aplicado (frontend)
 
 **Problema observado (ex.: produto 101650P10):**
@@ -1180,7 +1301,7 @@ Trechos do log (`viator-debug.log`):
 - UI traduzida (Avião/Trem/Navio/Outros) mantendo values de API (AIR/RAIL/SEA/OTHER).
 
 ### ✅ Implementação 7: Accept-Language (header) – BCP-47 com whitelist
-**Data:** Agosto 2025  
+**Data:** Agosto 2025
 **Status:** ✅ Aplicado em produção (backend)
 
 **Problema:** respostas 4xx ocasionais por "Invalid value for header: Accept-Language" quando o usuário escolhia um `languageGuide` não compatível (ex.: `yue`).
@@ -1193,7 +1314,7 @@ Trechos do log (`viator-debug.log`):
 **Impacto:** eliminadas rejeições por cabeçalho inválido. `languageGuide` continua sendo enviado apenas no corpo (root e por item), conforme guia oficial (não é booking question).
 
 ### ✅ Implementação 9: CSP e Google Maps (Desenvolvimento)
-**Data:** Agosto 2025  
+**Data:** Agosto 2025
 **Status:** ✅ Aplicado (frontend/backend)
 
 **Mudanças:**
@@ -1205,7 +1326,7 @@ Trechos do log (`viator-debug.log`):
 ---
 
 ### ✅ Implementação 8: Produto 6613GRANDCELE – fluxo completo com PICKUP_POINT
-**Data:** Agosto 2025  
+**Data:** Agosto 2025
 **Status:** ✅ Funcional (HOLD → pagamento → CONFIRM OK)
 
 **Contexto do Produto:**
@@ -1257,12 +1378,12 @@ Trechos do log (`viator-debug.log`):
 ---
 
 ### ✅ Implementação 18: Produto 100006P8 – Transfer privado Egito com PICKUP_POINT FREETEXT
-**Data:** Agosto 2025  
+**Data:** Agosto 2025
 **Status:** ✅ Fluxo completo bem-sucedido (HOLD → pagamento → CONFIRM 200)
 
 **Contexto do Produto:**
 - **Tipo**: Transfer privado no Egito (supplierId: 100006, supplierLocation: EG)
-- **bookingQuestions** detectadas (5): 
+- **bookingQuestions** detectadas (5):
   - `FULL_NAMES_FIRST` (PER_TRAVELER, STRING)
   - `FULL_NAMES_LAST` (PER_TRAVELER, STRING)
   - `AGEBAND` (PER_TRAVELER, STRING)
@@ -1388,12 +1509,12 @@ Trechos do log (`viator-debug.log`):
 **📌 Nota**: Este documento é atualizado automaticamente a cada nova implementação funcional de Booking Questions. Mantenha-o sempre como referência principal para o desenvolvimento e manutenção do sistema.
 
 ### ✅ Implementação 19: Produto 100143P7 – Múltiplos viajantes com PER_TRAVELER + PICKUP_POINT
-**Data:** Agosto 2025  
+**Data:** Agosto 2025
 **Status:** ✅ Fluxo completo bem-sucedido (HOLD → pagamento → CONFIRM 200 com status PENDING)
 
 **Contexto do Produto:**
 - **Tipo**: Produto com múltiplos viajantes (supplierId: 100143, supplierLocation: KH)
-- **bookingQuestions** detectadas (9): 
+- **bookingQuestions** detectadas (9):
   - `FULL_NAMES_FIRST` (PER_TRAVELER, STRING)
   - `FULL_NAMES_LAST` (PER_TRAVELER, STRING)
   - `AGEBAND` (PER_TRAVELER, STRING)
@@ -1493,7 +1614,7 @@ Trechos do log (`viator-debug.log`):
 - **PICKUP_POINT**: CONTACT_SUPPLIER_LATER normalizado com unit=LOCATION_REFERENCE
 
 ### ✅ Implementação 20: Produto com status CONFIRMED e voucher gerado
-**Data:** Agosto 2025  
+**Data:** Agosto 2025
 **Status:** ✅ Fluxo completo bem-sucedido (HOLD → pagamento → CONFIRM 200 com status CONFIRMED)
 
 **Contexto do Produto:**
@@ -1634,7 +1755,7 @@ Trechos do log (`viator-debug.log`):
 - **Comissão**: BRL 1.416,78 calculada corretamente
 
 ### ✅ Implementação 21: Produto com diferentes faixas etárias (ADULT + SENIOR) e status CONFIRMED
-**Data:** Agosto 2025  
+**Data:** Agosto 2025
 **Status:** ✅ Fluxo completo bem-sucedido (HOLD → pagamento → CONFIRM 200 com status CONFIRMED)
 
 **Contexto do Produto:**
@@ -1659,7 +1780,7 @@ Trechos do log (`viator-debug.log`):
   - `paymentSessionToken` recebido
   - Status: BOOKABLE
   - Preço: BRL 968,51 (recomendado) / BRL 891,03 (parceiro)
-  - **Line Items**: 
+  - **Line Items**:
     - ADULT x1 (BRL 525,76 recomendado / BRL 483,70 parceiro)
     - SENIOR x1 (BRL 442,75 recomendado / BRL 407,33 parceiro)
 - **Pagamento**: ✅ 200 - Processado via TA Payments
@@ -1802,7 +1923,7 @@ Trechos do log (`viator-debug.log`):
 ```
 
 ### ✅ Implementação 23: Produto 100273P23 – Modo RAIL com campos obrigatórios funcionando
-**Data:** Agosto 2025  
+**Data:** Agosto 2025
 **Status:** ✅ Fluxo completo bem-sucedido (HOLD → pagamento → CONFIRM 200 com status CONFIRMED)
 
 **Contexto do Produto:**
@@ -2024,7 +2145,7 @@ O sistema está agora completamente funcional para produtos com modo de chegada 
 ---
 
 ### ✅ Implementação 24: Produto 100273P23 – Modo AIR com correção TRANSFER_ARRIVAL_DROP_OFF
-**Data:** Agosto 2025  
+**Data:** Agosto 2025
 **Status:** ✅ Fluxo completo bem-sucedido (HOLD → pagamento → CONFIRM 200 com status CONFIRMED)
 
 **Contexto do Produto:**
@@ -2176,7 +2297,7 @@ O sistema está agora completamente funcional para produtos com modo de chegada 
 ---
 
 ### ✅ Implementação 25: Produto com Modo AIR e "Vou decidir depois" – Correção TRANSFER_ARRIVAL_DROP_OFF
-**Data:** Agosto 2025  
+**Data:** Agosto 2025
 **Status:** ✅ Fluxo completo bem-sucedido (HOLD → pagamento → CONFIRM 200 com status CONFIRMED)
 
 **Contexto do Produto:**
@@ -2331,7 +2452,7 @@ O sistema está agora completamente funcional para produtos com modo de chegada 
 ---
 
 ### ✅ Implementação 26: Produto com Modo RAIL e "Vou decidir depois" – Correção PICKUP_POINT
-**Data:** Agosto 2025  
+**Data:** Agosto 2025
 **Status:** ✅ Fluxo completo bem-sucedido (HOLD → pagamento → CONFIRM 200 com status CONFIRMED)
 
 **Contexto do Produto:**
@@ -2614,9 +2735,9 @@ As melhorias recentes, incluindo a reordenação das perguntas para modo SEA e o
 
 ### **✅ Teste 1: Produto 100014P4 - Modo de Chegada SEA (Confirmado pela API)**
 
-**Data:** 18/08/2025 às 21:25:01  
-**Status:** ✅ **CONFIRMADO** pela API Viator  
-**Booking Reference:** BR-597865573  
+**Data:** 18/08/2025 às 21:25:01
+**Status:** ✅ **CONFIRMADO** pela API Viator
+**Booking Reference:** BR-597865573
 
 #### **Configuração do Teste:**
 - **Produto:** 100014P4 (Transfer com múltiplos modos de chegada)
@@ -2687,7 +2808,7 @@ if (arrivalMode === 'SEA' && hasPortSpecificFields) {
 
 #### **Taxa de Sucesso por Modo:**
 - **AIR:** 100% (2/2 testes)
-- **RAIL:** 100% (2/2 testes)  
+- **RAIL:** 100% (2/2 testes)
 - **OTHER:** 100% (2/2 testes)
 - **SEA:** 100% (1/1 teste)
 
@@ -2741,12 +2862,12 @@ if (Array.isArray(allowedFinal) && allowedFinal.length > 0 && !allowedFinal.incl
 if (currentVal === 'OTHER' && allowedFinal.includes('AIR')) {
     const hasAirFields = bookingQuestionAnswers.some(a => {
         const qId = a?.question || a?.questionId || '';
-        return (qId === 'TRANSFER_AIR_ARRIVAL_AIRLINE' || 
-               qId === 'TRANSFER_AIR_ARRIVAL_FLIGHT_NO' || 
-               qId === 'TRANSFER_ARRIVAL_TIME') && 
+        return (qId === 'TRANSFER_AIR_ARRIVAL_AIRLINE' ||
+               qId === 'TRANSFER_AIR_ARRIVAL_FLIGHT_NO' ||
+               qId === 'TRANSFER_ARRIVAL_TIME') &&
                String(a?.answer || '').trim() !== '';
     });
-    
+
     if (!hasAirFields) {
         shouldNormalize = false;
         console.warn('TRANSFER_ARRIVAL_MODE mantido como OTHER - campos AIR não preenchidos');
@@ -2764,7 +2885,7 @@ ensureAirArrivalFields(bookingQuestionAnswers) {
             answer: airlineInput?.value?.trim() || 'Airline'
         });
     }
-    
+
     // Garantir TRANSFER_AIR_ARRIVAL_FLIGHT_NO
     if (!hasFlightNo) {
         bookingQuestionAnswers.push({
@@ -2772,7 +2893,7 @@ ensureAirArrivalFields(bookingQuestionAnswers) {
             answer: flightNoInput?.value?.trim() || 'FL001'
         });
     }
-    
+
     // Garantir TRANSFER_ARRIVAL_TIME
     if (!hasArrivalTime) {
         const defaultTime = new Date();
@@ -2846,7 +2967,7 @@ if (currentVal === 'OTHER') {
     const hasAirFields = /* verificação campos AIR */;
     const hasSeaFields = /* verificação campos SEA */;
     const hasRailFields = /* verificação campos RAIL */;
-    
+
     // Escolher modo baseado nos campos preenchidos
     if (hasAirFields && allowedFinal.includes('AIR')) {
         targetMode = 'AIR';
@@ -2857,7 +2978,7 @@ if (currentVal === 'OTHER') {
     } else {
         targetMode = allowedFinal[0]; // Primeiro modo permitido
     }
-    
+
     // Se nenhum modo válido, remover o campo completamente
     if (!targetMode) {
         bookingQuestionAnswers.splice(arrIdxFinal, 1);
@@ -2940,6 +3061,66 @@ As correções implementadas demonstraram **eficácia total** na resolução dos
 3. **Resultado Final:** Sistema robusto com 100% de taxa de sucesso nas confirmações
 
 O sistema agora opera de forma **confiável e estável**, proporcionando uma experiência de usuário **sem interrupções** por erros de validação da API.
+
+---
+
+### ✅ Implementação 28: Três Opções de Ponto de Encontro Funcionando
+**Data:** 20 de Agosto de 2025
+**Status:** ✅ Funcional
+
+**Resumo:**
+Todas as três opções de Ponto de Encontro estão funcionando corretamente após a correção implementada para o erro "Missing answer(s) for: TRANSFER_ARRIVAL_DROP_OFF".
+
+**Opções Testadas:**
+
+1. **"📞 Vou decidir depois"**
+   - **Comportamento**: Seleciona automaticamente `CONTACT_SUPPLIER_LATER`
+   - **Envio**: `unit=LOCATION_REFERENCE`
+   - **Status**: ✅ Funcionando
+
+2. **"🏨 Gostaria que me buscassem"**
+   - **Comportamento**: Permite seleção de endereço da lista ou digitação livre
+   - **Envio**: `unit=FREETEXT` (quando endereço customizado) ou `unit=LOCATION_REFERENCE` (quando seleção da lista)
+   - **Status**: ✅ Funcionando
+
+3. **"📍 Informar endereço específico"**
+   - **Comportamento**: Campo de texto livre para endereço customizado
+   - **Envio**: `unit=FREETEXT`
+   - **Status**: ✅ Funcionando
+
+**Evidências dos Logs:**
+
+```json
+// Teste com "Vou decidir depois" - TRANSFER_ARRIVAL_DROP_OFF e PICKUP_POINT
+{
+  "question": "TRANSFER_ARRIVAL_DROP_OFF",
+  "answer": "CONTACT_SUPPLIER_LATER",
+  "unit": "LOCATION_REFERENCE"
+},
+{
+  "question": "PICKUP_POINT",
+  "answer": "CONTACT_SUPPLIER_LATER",
+  "unit": "LOCATION_REFERENCE"
+}
+```
+
+```json
+// Teste com endereço customizado - TRANSFER_ARRIVAL_DROP_OFF
+{
+  "question": "TRANSFER_ARRIVAL_DROP_OFF",
+  "answer": "Test Way 123",
+  "unit": "FREETEXT"
+}
+```
+
+**Fluxo de Confirmação:**
+- ✅ HOLD 200 OK
+- ✅ Pagamento processado
+- ✅ CONFIRM 200 OK com status `CONFIRMED`
+- ✅ Voucher gerado com sucesso
+
+**Correção Aplicada:**
+A lógica de sanitização em `viator-booking.js` foi corrigida para garantir que `TRANSFER_ARRIVAL_DROP_OFF` seja sempre fornecido quando o produto o exige, utilizando `PICKUP_POINT` (se `LOCATION_REFERENCE`) ou `CONTACT_SUPPLIER_LATER` como fallback, independentemente do valor de `allowCustomPickupAir`.
 
 ---
 

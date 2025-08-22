@@ -2043,6 +2043,37 @@ class ViatorBookingSystem {
         );
 
         viator_debug_log('🔍 [AJAX BOOKING QUESTIONS] Perguntas encontradas: ' . count($booking_questions));
+
+        // Opcional: incluir travelerPickup do produto para fonte correta de pickup points
+        $pickup_strict = get_option('viator_pickup_source_strict', '0') === '1';
+        if ($pickup_strict) {
+            $locale_settings = viator_get_locale_settings();
+            $product_url = $this->base_url . "/partner/products/{$product_code}";
+            viator_debug_log('🔍 [AJAX BOOKING QUESTIONS] (pickup_strict) Buscando travelerPickup em:', $product_url);
+            $product_response = wp_remote_get($product_url, [
+                'headers' => [
+                    'Accept' => 'application/json;version=2.0',
+                    'exp-api-key' => $this->api_key,
+                    'Accept-Language' => $locale_settings['accept_language']
+                ],
+                'timeout' => 20
+            ]);
+            if (!is_wp_error($product_response) && wp_remote_retrieve_response_code($product_response) === 200) {
+                $product_body = wp_remote_retrieve_body($product_response);
+                $product_data = json_decode($product_body, true);
+                $traveler_pickup = $product_data['logistics']['travelerPickup'] ?? [];
+                $result['travelerPickup'] = $traveler_pickup;
+                viator_debug_log('✅ [AJAX BOOKING QUESTIONS] travelerPickup incluído (pickup_strict=true):', [
+                    'hasTravelerPickup' => !empty($traveler_pickup),
+                    'keys' => is_array($traveler_pickup) ? array_keys($traveler_pickup) : []
+                ]);
+            } else {
+                viator_debug_log('⚠️ [AJAX BOOKING QUESTIONS] Falha ao obter travelerPickup (pickup_strict=true):', is_wp_error($product_response) ? $product_response->get_error_message() : wp_remote_retrieve_response_code($product_response));
+            }
+        } else {
+            viator_debug_log('ℹ️ [AJAX BOOKING QUESTIONS] pickup_strict desativado - não incluindo travelerPickup no payload');
+        }
+
         viator_debug_log('🔍 [AJAX BOOKING QUESTIONS] Dados das perguntas: ' . json_encode($result));
 
         wp_send_json_success($result);
@@ -2565,6 +2596,7 @@ class ViatorBookingSystem {
             'has_booker_info' => !empty($booker_info)
         ));
 
+        $strict_pickup = get_option('viator_strict_pickup_validation', '0') === '1';
         foreach ($booking_question_answers as $answer) {
             // CORREÇÃO: Frontend envia 'question', não 'questionId'
             $question_id = $answer['question'] ?? $answer['questionId'] ?? '';
@@ -2579,7 +2611,7 @@ class ViatorBookingSystem {
                 'scope' => $scope
             ));
 
-            if (empty($question_id) || empty($answer_value)) {
+            if (empty($question_id) || $answer_value === '') {
                 viator_debug_log('Skipping answer - empty question_id or answer_value', array(
                     'question_id' => $question_id,
                     'answer_value' => $answer_value
@@ -2598,9 +2630,22 @@ class ViatorBookingSystem {
                 $processed_answer['travelerNum'] = intval($traveler_index);
             }
 
-            // Adicionar unit se fornecida
-            if (isset($answer['unit']) && !empty($answer['unit'])) {
-                $processed_answer['unit'] = $answer['unit'];
+            // Normalização/validação estrita para PICKUP_POINT (quando habilitada)
+            if ($strict_pickup && strtoupper($question_id) === 'PICKUP_POINT') {
+                $unit = $answer['unit'] ?? null;
+                $is_loc_ref = is_string($answer_value) && (strpos($answer_value, 'LOC-') === 0 || in_array($answer_value, ['CONTACT_SUPPLIER_LATER','MEET_AT_DEPARTURE_POINT'], true));
+                if ($is_loc_ref) {
+                    $processed_answer['unit'] = 'LOCATION_REFERENCE';
+                } else {
+                    // Só permitir FREETEXT se flag pickup source strict e allowCustomTravelerPickup foram confirmados no front
+                    $processed_answer['unit'] = $unit ?: 'FREETEXT';
+                }
+                viator_debug_log('🔧 [PICKUP NORMALIZE] strict_pickup ativo. question=PICKUP_POINT, unit=' . ($processed_answer['unit'] ?? 'n/a') . ', answer=' . $processed_answer['answer']);
+            } else {
+                // Adicionar unit se fornecida
+                if (isset($answer['unit']) && !empty($answer['unit'])) {
+                    $processed_answer['unit'] = $answer['unit'];
+                }
             }
 
             $processed_questions[] = $processed_answer;

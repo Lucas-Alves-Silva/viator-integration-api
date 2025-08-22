@@ -23,12 +23,20 @@ class ViatorDynamicBookingQuestions {
     
     public function __construct() {
         $this->api_key = get_option('viator_api_key');
-        $this->base_url = 'https://api.viator.com/partner';
-        
+        // Usar sempre a base do ambiente configurado (sandbox nesta fase)
+        if (!function_exists('viator_get_api_base_url')) {
+            // Fallback seguro: sandbox
+            $api_base = 'https://api.sandbox.viator.com';
+        } else {
+            $api_base = rtrim(viator_get_api_base_url(), '/');
+        }
+        $this->base_url = $api_base . '/partner';
+        viator_debug_log('🔧 [BKQ BASEURL] Base URL dinâmica definida para módulo de Booking Questions:', $this->base_url);
+
         // Registrar endpoints AJAX
         add_action('wp_ajax_viator_get_all_booking_questions', array($this, 'get_all_booking_questions'));
         add_action('wp_ajax_nopriv_viator_get_all_booking_questions', array($this, 'get_all_booking_questions'));
-        
+
         add_action('wp_ajax_viator_get_locations_bulk', array($this, 'get_locations_bulk'));
         add_action('wp_ajax_nopriv_viator_get_locations_bulk', array($this, 'get_locations_bulk'));
     }
@@ -284,21 +292,31 @@ class ViatorDynamicBookingQuestions {
      */
     private function call_viator_api($endpoint, $method = 'GET', $data = null) {
         $url = $this->base_url . $endpoint;
-        
+
+        // Flag para headers versionados (rollback via option)
+        $use_versioned = get_option('viator_use_versioned_headers', '1') === '1';
+        $accept = $use_versioned ? 'application/json;version=2.0' : 'application/json';
+        $content_type = $use_versioned ? 'application/json;version=2.0' : 'application/json';
+
+        // Logar estado dos headers
+        if (function_exists('viator_debug_log')) {
+            viator_debug_log('🔧 [BKQ HEADERS] Versioned headers ativo?', $use_versioned ? 'true' : 'false');
+        }
+
         $args = array(
             'method' => $method,
             'headers' => array(
-                'Accept' => 'application/json',
-                'Content-Type' => 'application/json',
+                'Accept' => $accept,
+                'Content-Type' => $content_type,
                 'exp-api-key' => $this->api_key
             ),
             'timeout' => 30
         );
-        
+
         if ($data && in_array($method, array('POST', 'PUT', 'PATCH'))) {
             $args['body'] = json_encode($data);
         }
-        
+
         return wp_remote_request($url, $args);
     }
 }

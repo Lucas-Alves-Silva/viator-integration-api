@@ -8,3 +8,4 @@ https://docs.viator.com/partner-api/technical/#tag/Auxiliary/operation/locations
 https://docs.viator.com/partner-api/technical/#tag/Bookings/operation/bookingsCartBook
 https://docs.viator.com/partner-api/technical/
 Keep this document booking-questions-implementacao-funcional.md updated for each case of Booking Questions implementation that is 100% functional and compliant with the Viator API.
+Only update the booking-questions-implementacao-funcional.md document when explicitly requested. Otherwise, do not make any updates.
