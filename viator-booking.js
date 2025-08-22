@@ -14600,12 +14600,13 @@ class ViatorBookingManager {
                         }
                     } catch(_e) { /* no-op */ }
 
-                // CORREÇÃO ESPECÍFICA: Gerenciar PICKUP_POINT para produtos SEA com campos especializados
-                // Resolve tanto "Extra answer(s) provided" quanto "Missing answer(s) for" PICKUP_POINT
+                // CORREÇÃO ESPECÍFICA: Gerenciar PICKUP_POINT e TRANSFER_ARRIVAL_DROP_OFF para produtos com campos especializados
+                // Resolve tanto "Extra answer(s) provided" quanto "Missing answer(s) for" PICKUP_POINT e TRANSFER_ARRIVAL_DROP_OFF
                 try {
                     const arrivalModeIdx = bookingQuestionAnswers.findIndex(a => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
                     const departureModeIdx = bookingQuestionAnswers.findIndex(a => (a?.question || a?.questionId) === 'TRANSFER_DEPARTURE_MODE');
                     const pickupPointIdx = bookingQuestionAnswers.findIndex(a => (a?.question || a?.questionId) === 'PICKUP_POINT');
+                    const arrivalDropOffIdx = bookingQuestionAnswers.findIndex(a => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_DROP_OFF');
 
                     const arrivalMode = arrivalModeIdx !== -1 ? String(bookingQuestionAnswers[arrivalModeIdx].answer || '').trim() : '';
                     const departureMode = departureModeIdx !== -1 ? String(bookingQuestionAnswers[departureModeIdx].answer || '').trim() : '';
@@ -14622,16 +14623,37 @@ class ViatorBookingManager {
                         return qid === 'TRANSFER_DEPARTURE_PICKUP';
                     });
 
-                    // Verificar se há TRANSFER_ARRIVAL_DROP_OFF (indica que PICKUP_POINT pode ser necessário)
-                    const hasArrivalDropOff = bookingQuestionAnswers.some(a => {
+                    // Verificar se há campos especializados de AIR
+                    const hasAirFields = bookingQuestionAnswers.some(a => {
                         const qid = a?.question || a?.questionId || '';
-                        return qid === 'TRANSFER_ARRIVAL_DROP_OFF';
+                        return typeof qid === 'string' && qid.indexOf('TRANSFER_AIR_') === 0;
                     });
 
-                    // Se modo SEA + campos especializados
-                    if ((arrivalMode === 'SEA' || departureMode === 'SEA') && (hasPortFields || hasSpecializedPickup)) {
+                    // CASO 1: Produtos AIR com TRANSFER_ARRIVAL_DROP_OFF - remover ambos (correção 29.7)
+                    if (arrivalMode === 'AIR' && hasAirFields && arrivalDropOffIdx !== -1) {
+                        const dropOffAnswer = String(bookingQuestionAnswers[arrivalDropOffIdx].answer || '').trim();
+                        // Só remover se for CONTACT_SUPPLIER_LATER (adicionado automaticamente)
+                        if (dropOffAnswer === 'CONTACT_SUPPLIER_LATER') {
+                            bookingQuestionAnswers.splice(arrivalDropOffIdx, 1);
+                            console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF removido para produto AIR (evita extra answer)');
 
-                        // CASO 1: SEM TRANSFER_ARRIVAL_DROP_OFF - remover PICKUP_POINT (correção 29.5)
+                            // Recalcular índice do PICKUP_POINT após remoção
+                            const newPickupPointIdx = bookingQuestionAnswers.findIndex(a => (a?.question || a?.questionId) === 'PICKUP_POINT');
+                            if (newPickupPointIdx !== -1) {
+                                const pickupAnswer = String(bookingQuestionAnswers[newPickupPointIdx].answer || '').trim();
+                                if (pickupAnswer === 'CONTACT_SUPPLIER_LATER') {
+                                    bookingQuestionAnswers.splice(newPickupPointIdx, 1);
+                                    console.log('🔧 [CONFIRM] PICKUP_POINT removido para produto AIR (evita extra answer)');
+                                }
+                            }
+                        }
+                    }
+
+                    // CASO 2: Produtos SEA com campos especializados
+                    else if ((arrivalMode === 'SEA' || departureMode === 'SEA') && (hasPortFields || hasSpecializedPickup)) {
+                        const hasArrivalDropOff = arrivalDropOffIdx !== -1;
+
+                        // CASO 2A: SEM TRANSFER_ARRIVAL_DROP_OFF - remover PICKUP_POINT (correção 29.5)
                         if (!hasArrivalDropOff && pickupPointIdx !== -1) {
                             const pickupAnswer = String(bookingQuestionAnswers[pickupPointIdx].answer || '').trim();
                             // Só remover se for CONTACT_SUPPLIER_LATER (adicionado automaticamente)
@@ -14641,7 +14663,7 @@ class ViatorBookingManager {
                             }
                         }
 
-                        // CASO 2: COM TRANSFER_ARRIVAL_DROP_OFF - garantir PICKUP_POINT (correção 29.6)
+                        // CASO 2B: COM TRANSFER_ARRIVAL_DROP_OFF - garantir PICKUP_POINT (correção 29.6)
                         else if (hasArrivalDropOff && pickupPointIdx === -1) {
                             bookingQuestionAnswers.push({
                                 question: 'PICKUP_POINT',
