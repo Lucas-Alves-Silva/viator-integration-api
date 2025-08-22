@@ -4537,7 +4537,7 @@ class ViatorBookingManager {
             'FULL_NAMES_LAST': 'Sobrenome',
             'DATE_OF_BIRTH': 'Data de Nascimento',
             'AGEBAND': 'Faixa Etária',
-            'PICKUP_POINT': 'Ponto de Encontro',
+            'PICKUP_POINT': '📍 Ponto de Encontro do Tour',
             'SPECIAL_REQUIREMENTS': 'Necessidades Especiais',
             'WEIGHT': 'Peso',
             'HEIGHT': 'Altura',
@@ -4558,12 +4558,10 @@ class ViatorBookingManager {
             'TRANSFER_RAIL_DEPARTURE_STATION': 'Estação de Saída',
             'TRANSFER_RAIL_DEPARTURE_LINE': 'Linha do Trem (Saída)',
             'TRANSFER_ARRIVAL_DROP_OFF': 'Endereço de Desembarque (Chegada - SEA)',
-            'TRANSFER_DEPARTURE_PICKUP': 'Ponto de Encontro (Partida - SEA)',
+            'TRANSFER_DEPARTURE_PICKUP': '✈️ Endereço de Busca para Partida',
             'TRANSFER_ARRIVAL_TIME': 'Horário de Chegada',
             'TRANSFER_DEPARTURE_TIME': 'Horário de Saída',
             'TRANSFER_DEPARTURE_DATE': 'Data de Saída',
-            // Ajuste de tom profissional
-            'TRANSFER_DEPARTURE_PICKUP': 'Ponto de encontro (partida)',
             'TRANSFER_ARRIVAL_DROP_OFF': 'Endereço de desembarque (chegada)'
         };
 
@@ -4608,7 +4606,8 @@ class ViatorBookingManager {
                 const arr = this.getFieldValue('TRANSFER_ARRIVAL_MODE');
                 const dep = this.getFieldValue('TRANSFER_DEPARTURE_MODE');
                 const productIndicatesSea = Boolean((this.productBookingQuestions?.booking_questions || []).some(q => q.id === 'TRANSFER_PORT_CRUISE_SHIP'));
-                const show = dep === 'SEA' || arr === 'SEA' || productIndicatesSea;
+                // CORREÇÃO: TRANSFER_DEPARTURE_PICKUP deve ser visível para AIR e SEA
+                const show = dep === 'SEA' || dep === 'AIR' || arr === 'SEA' || productIndicatesSea;
                 console.log('📍 [COND] TRANSFER_DEPARTURE_PICKUP visible?', show, { arr, dep, productIndicatesSea });
                 return show;
             },
@@ -4933,11 +4932,19 @@ class ViatorBookingManager {
     isFieldRequiredForCurrentMode(questionId) {
         const departureMode = document.querySelector('[data-question-id="TRANSFER_DEPARTURE_MODE"]')?.value || '';
         const isSeaDeparture = departureMode === 'SEA' || departureMode === 'OTHER';
+        const isAirDeparture = departureMode === 'AIR';
 
         // Campos obrigatórios para modo SEA
         if (isSeaDeparture) {
             return questionId === 'TRANSFER_PORT_CRUISE_SHIP' ||
                    questionId === 'TRANSFER_DEPARTURE_PICKUP';
+        }
+
+        // Campos obrigatórios para modo AIR
+        if (isAirDeparture) {
+            return questionId === 'TRANSFER_DEPARTURE_PICKUP' ||
+                   questionId === 'TRANSFER_AIR_DEPARTURE_AIRLINE' ||
+                   questionId === 'TRANSFER_AIR_DEPARTURE_FLIGHT_NO';
         }
 
         return false;
@@ -5051,13 +5058,20 @@ class ViatorBookingManager {
                 // CORREÇÃO: Verificar se o campo é obrigatório para o modo atual
                 const departureMode = document.querySelector('[data-question-id="TRANSFER_DEPARTURE_MODE"]')?.value || '';
                 const isSeaDeparture = departureMode === 'SEA' || departureMode === 'OTHER';
+                const isAirDeparture = departureMode === 'AIR';
                 const isRequiredForSeaMode = isSeaDeparture && (
                     questionId === 'TRANSFER_PORT_CRUISE_SHIP' ||
                     questionId === 'TRANSFER_DEPARTURE_PICKUP'
                 );
+                const isRequiredForAirMode = isAirDeparture && (
+                    questionId === 'TRANSFER_DEPARTURE_PICKUP' ||
+                    questionId === 'TRANSFER_AIR_DEPARTURE_AIRLINE' ||
+                    questionId === 'TRANSFER_AIR_DEPARTURE_FLIGHT_NO'
+                );
 
-                if (isRequiredForSeaMode) {
-                    console.log(`⚠️ [DYNAMIC DEBUG] Campo obrigatório vazio para modo SEA: ${questionId}`);
+                if (isRequiredForSeaMode || isRequiredForAirMode) {
+                    const modeType = isRequiredForSeaMode ? 'SEA' : 'AIR';
+                    console.log(`⚠️ [DYNAMIC DEBUG] Campo obrigatório vazio para modo ${modeType}: ${questionId}`);
                     // Adicionar campo vazio para validação posterior
                     const emptyAnswer = {
                         question: questionId,
@@ -5536,6 +5550,18 @@ class ViatorBookingManager {
                 'TRANSFER_AIR_ARRIVAL_FLIGHT_NO'
             ];
             if (airArrivalFields.includes(questionId)) {
+                return true;
+            }
+        }
+
+        // Campos obrigatórios para modo AIR (partida)
+        if (departureMode === 'AIR') {
+            const airDepartureFields = [
+                'TRANSFER_AIR_DEPARTURE_AIRLINE',
+                'TRANSFER_AIR_DEPARTURE_FLIGHT_NO',
+                'TRANSFER_DEPARTURE_PICKUP'
+            ];
+            if (airDepartureFields.includes(questionId)) {
                 return true;
             }
         }
@@ -7522,7 +7548,7 @@ class ViatorBookingManager {
             'FULL_NAMES_LAST': 'Sobrenome',
             'WEIGHT': 'Peso',
             'AGEBAND': 'Faixa Etária',
-            'PICKUP_POINT': 'Ponto de Encontro',
+            'PICKUP_POINT': '📍 Ponto de Encontro do Tour',
             'SPECIAL_REQUIREMENTS': 'Requisitos Especiais',
             'DATE_OF_BIRTH': 'Data de Nascimento'
         };
@@ -8214,32 +8240,47 @@ class ViatorBookingManager {
         // RAIL (partida)
         renderQ(railDepLineQ);
         renderQ(railDepStationQ);
-        // Pickup especializado de PARTIDA, quando existir
-        renderQ(departurePickupQ);
 
-        // Renderização inteligente de Ponto de Encontro para evitar duplicidades
-        if (pickupQuestions.length > 0) {
+        // CORREÇÃO CRÍTICA: Aplicar lógica de supressão inteligente para evitar duplicação
+        // Verificar contexto antes de renderizar TRANSFER_DEPARTURE_PICKUP e PICKUP_POINT
+        const arrivalMode = document.querySelector('[data-question-id="TRANSFER_ARRIVAL_MODE"]')?.value || '';
+        const departureMode = document.querySelector('[data-question-id="TRANSFER_DEPARTURE_MODE"]')?.value || '';
+        const hasDeparturePickup = transferQuestions.some(q => q.id === 'TRANSFER_DEPARTURE_PICKUP');
+        const hasPickupPoint = pickupQuestions.length > 0;
+
+        // Regras de prioridade baseadas na documentação oficial da Viator:
+        // 1. Se SEA está ativo: usar campos específicos (TRANSFER_DEPARTURE_PICKUP, TRANSFER_ARRIVAL_DROP_OFF)
+        // 2. Se AIR está ativo E tem TRANSFER_DEPARTURE_PICKUP: priorizar TRANSFER_DEPARTURE_PICKUP
+        // 3. Caso contrário: usar PICKUP_POINT genérico
+        const seaActive = arrivalMode === 'SEA' || departureMode === 'SEA' || (this.productBookingQuestions?.booking_questions || []).some(q => q.id === 'TRANSFER_PORT_CRUISE_SHIP');
+        const airWithSpecificPickup = departureMode === 'AIR' && hasDeparturePickup;
+        const shouldUseSpecificPickup = seaActive || airWithSpecificPickup;
+
+        // Renderizar TRANSFER_DEPARTURE_PICKUP apenas quando apropriado
+        if (shouldUseSpecificPickup && departurePickupQ) {
+            renderQ(departurePickupQ);
+            console.log('✈️ [DEPARTURE_PICKUP][LAYOUT] TRANSFER_DEPARTURE_PICKUP exibido (contexto específico)');
+        } else if (departurePickupQ) {
+            console.log('✈️ [DEPARTURE_PICKUP][LAYOUT] TRANSFER_DEPARTURE_PICKUP suprimido (usar PICKUP_POINT genérico)');
+        }
+
+        // Renderizar PICKUP_POINT apenas quando não há campos específicos
+        if (hasPickupPoint && !shouldUseSpecificPickup) {
             const question = pickupQuestions[0];
             const questionId = `booking_question_${question.id}`;
             const isRequired = question.required === 'MANDATORY';
-            const arrivalMode = document.querySelector('[data-question-id="TRANSFER_ARRIVAL_MODE"]')?.value || '';
-            const departureMode = document.querySelector('[data-question-id="TRANSFER_DEPARTURE_MODE"]')?.value || '';
 
-            // Se SEA está ativo em chegada ou partida, suprimimos o PICKUP_POINT genérico
-            // pois o fluxo usa TRANSFER_DEPARTURE_PICKUP (partida) e/ou TRANSFER_ARRIVAL_DROP_OFF (chegada)
-            const seaActive = arrivalMode === 'SEA' || departureMode === 'SEA' || (this.productBookingQuestions?.booking_questions || []).some(q => q.id === 'TRANSFER_PORT_CRUISE_SHIP');
-            if (!seaActive) {
-                html += '<div class="viator-section-subtitle">Ponto de encontro</div>';
-                html += '<div class="pickup-point-question-group">';
-                const safeLabel = this.ensureStringForHTML(question.label, 'Ponto de encontro');
-                html += `<label for="${questionId}">${safeLabel}${isRequired ? ' *' : ''}</label>`;
-                html += this.renderQuestionField(question, questionId, isRequired, false, null);
-                html += `<div class="error-message" id="error_${questionId}" style="display: none;"></div>`;
-                html += '</div>';
-                console.log('📍 [PICKUP][LAYOUT] PICKUP_POINT exibido (SEA inativo)');
-            } else {
-                console.log('📍 [PICKUP][LAYOUT] PICKUP_POINT suprimido (SEA ativo)');
-            }
+            // Div de subtítulo removida - não é mais necessária após correções de duplicação
+            html += '<div class="pickup-point-question-group">';
+            const safeLabel = this.ensureStringForHTML(question.label, 'Ponto de encontro');
+            html += `<label for="${questionId}">${safeLabel}${isRequired ? ' *' : ''}</label>`;
+            html += this.renderQuestionField(question, questionId, isRequired, false, null);
+            html += `<div class="error-message" id="error_${questionId}" style="display: none;"></div>`;
+            html += '</div>';
+            console.log('📍 [PICKUP][LAYOUT] PICKUP_POINT exibido (sem campos específicos)');
+        } else if (hasPickupPoint) {
+            const reason = seaActive ? 'SEA ativo' : 'AIR com TRANSFER_DEPARTURE_PICKUP';
+            console.log(`📍 [PICKUP][LAYOUT] PICKUP_POINT suprimido (${reason})`);
         }
 
         return html;
@@ -8694,9 +8735,12 @@ class ViatorBookingManager {
                 break;
 
             case 'LOCATION_REF_OR_FREE_TEXT':
-                // Verificar se é uma pergunta de ponto de encontro (PICKUP_POINT)
-                if (question.id === 'PICKUP_POINT' || question.subType === 'PICKUP_POINT' || question.label.toLowerCase().includes('pickup') || question.label.toLowerCase().includes('encontro')) {
+                // CORREÇÃO CRÍTICA: Verificar se é PICKUP_POINT ou TRANSFER_DEPARTURE_PICKUP
+                if (question.id === 'PICKUP_POINT' || question.subType === 'PICKUP_POINT' || (question.label.toLowerCase().includes('pickup') && question.id !== 'TRANSFER_DEPARTURE_PICKUP') || question.label.toLowerCase().includes('encontro')) {
                     html += this.renderPickupPointSelection(question, questionId, dataAttrs, requiredAttr);
+                } else if (question.id === 'TRANSFER_DEPARTURE_PICKUP') {
+                    // TRANSFER_DEPARTURE_PICKUP usa renderização específica para endereço de busca
+                    html += this.renderDeparturePickupField(question, questionId, cssClass, dataAttrs, requiredAttr);
                 } else {
                     // Campo de texto livre para outras localizações
                     html += this.renderLocationField(question, questionId, cssClass, dataAttrs, requiredAttr);
@@ -8810,6 +8854,11 @@ class ViatorBookingManager {
         // Para PICKUP_POINT, usar renderização especializada
         if (question.id === 'PICKUP_POINT') {
             return this.renderPickupPointField(question, questionId, cssClass, dataAttrs, requiredAttr);
+        }
+
+        // Para TRANSFER_DEPARTURE_PICKUP, usar renderização específica
+        if (question.id === 'TRANSFER_DEPARTURE_PICKUP') {
+            return this.renderDeparturePickupField(question, questionId, cssClass, dataAttrs, requiredAttr);
         }
 
         // Verificar se há unidades específicas definidas
@@ -10387,8 +10436,8 @@ class ViatorBookingManager {
         // Verificar tipo de pergunta e coletar resposta apropriada
         switch (question.type) {
             case 'LOCATION_REF_OR_FREE_TEXT':
-                // Verificar se é PICKUP_POINT ou outro campo de localização
-                if (question.id === 'PICKUP_POINT' || question.subType === 'PICKUP_POINT' || question.label.toLowerCase().includes('pickup') || question.label.toLowerCase().includes('encontro')) {
+                // CORREÇÃO CRÍTICA: Verificar se é PICKUP_POINT ou TRANSFER_DEPARTURE_PICKUP
+                if (question.id === 'PICKUP_POINT' || question.subType === 'PICKUP_POINT' || (question.label.toLowerCase().includes('pickup') && question.id !== 'TRANSFER_DEPARTURE_PICKUP') || question.label.toLowerCase().includes('encontro')) {
                     // Lógica para PICKUP_POINT com múltiplas unidades
                     if (question.units && question.units.length > 1) {
                         // Verificar se há seleção de rádio (interface avançada)
@@ -10455,6 +10504,45 @@ class ViatorBookingManager {
                                     unit: question.units?.[0] || 'FREETEXT'
                                 };
                             }
+                        }
+                    }
+                } else if (question.id === 'TRANSFER_DEPARTURE_PICKUP') {
+                    // Lógica específica para TRANSFER_DEPARTURE_PICKUP
+                    if (question.units && question.units.length > 1) {
+                        // Verificar se há seleção de rádio (interface de departure pickup)
+                        const selectedRadio = document.querySelector(`input[name="${questionId}"]:checked`);
+                        if (selectedRadio) {
+                            const selectedValue = selectedRadio.value;
+                            const selectedUnit = selectedRadio.dataset.unit || 'LOCATION_REFERENCE';
+
+                            // Se selecionou endereço customizado, pegar o valor do campo de texto
+                            if (selectedValue === 'CUSTOM_LOCATION') {
+                                const customInput = document.getElementById(`${questionId}_custom`);
+                                if (customInput && customInput.value.trim()) {
+                                    answerObj = {
+                                        question: question.id,
+                                        answer: customInput.value.trim(),
+                                        unit: 'FREETEXT'
+                                    };
+                                }
+                            } else {
+                                answerObj = {
+                                    question: question.id,
+                                    answer: selectedValue,
+                                    unit: selectedUnit
+                                };
+                            }
+                        }
+                    } else {
+                        // Campo simples para TRANSFER_DEPARTURE_PICKUP
+                        const element = document.getElementById(questionId);
+                        if (element && element.value.trim()) {
+                            answerValue = element.value.trim();
+                            answerObj = {
+                                question: question.id,
+                                answer: answerValue,
+                                unit: question.units?.[0] || 'FREETEXT'
+                            };
                         }
                     }
                 } else {
@@ -10715,6 +10803,176 @@ class ViatorBookingManager {
                 }
             }, true);
         }
+    }
+
+    /**
+     * Renderizar campo específico para TRANSFER_DEPARTURE_PICKUP
+     * Diferente do PICKUP_POINT, este campo é para endereço de busca para partida
+     */
+    renderDeparturePickupField(question, questionId, cssClass, dataAttrs, requiredAttr) {
+        console.log('✈️ [DEPARTURE_PICKUP] Renderizando campo específico para TRANSFER_DEPARTURE_PICKUP');
+
+        let html = '';
+
+        // Verificar se há unidades específicas definidas
+        if (question.units && question.units.length > 0) {
+            // Se há múltiplas unidades, criar interface de seleção
+            if (question.units.length > 1) {
+                html += `<div class="departure-pickup-container">`;
+
+                // Verificar se há LOCATION_REFERENCE nas unidades
+                if (question.units.includes('LOCATION_REFERENCE') && question.allowedAnswers && question.allowedAnswers.length > 0) {
+                    // Interface com opções pré-definidas
+                    html += `<div class="departure-pickup-options">`;
+
+                    question.allowedAnswers.forEach((answer, index) => {
+                        const radioId = `${questionId}_${index}`;
+                        const isContactSupplier = answer === 'CONTACT_SUPPLIER_LATER';
+                        const isCustomLocation = answer === 'CUSTOM_LOCATION';
+
+                        let displayText = '';
+                        let description = '';
+
+                        if (isContactSupplier) {
+                            displayText = '📞 Vou decidir depois';
+                            description = 'O fornecedor entrará em contato para confirmar o local de busca';
+                        } else if (isCustomLocation) {
+                            displayText = '📍 Informar endereço específico';
+                            description = 'Digite o endereço exato do seu hotel ou local';
+                        } else {
+                            displayText = answer;
+                            description = 'Selecionar local específico';
+                        }
+
+                        html += `
+                            <div class="departure-pickup-option">
+                                <input type="radio"
+                                       id="${radioId}"
+                                       name="${questionId}"
+                                       value="${answer}"
+                                       class="departure-pickup-radio"
+                                       ${dataAttrs}
+                                       ${requiredAttr}
+                                       data-unit="LOCATION_REFERENCE">
+                                <label for="${radioId}" class="departure-pickup-label">
+                                    <span class="option-text">${displayText}</span>
+                                    <span class="option-description">${description}</span>
+                                </label>
+                            </div>
+                        `;
+                    });
+
+                    html += `</div>`;
+
+                    // Campo de texto para endereço customizado (inicialmente oculto)
+                    if (question.units.includes('FREETEXT')) {
+                        html += `
+                            <div class="custom-departure-address" style="display: none;">
+                                <input type="text"
+                                       id="${questionId}_custom"
+                                       name="${questionId}_custom"
+                                       class="${cssClass} custom-address-input"
+                                       placeholder="Digite o endereço exato do seu hotel ou local"
+                                       data-unit="FREETEXT">
+                            </div>
+                        `;
+                    }
+                } else {
+                    // Apenas campo de texto livre
+                    html += `
+                        <input type="text"
+                               id="${questionId}"
+                               name="${questionId}"
+                               class="${cssClass}"
+                               ${dataAttrs}
+                               ${requiredAttr}
+                               placeholder="Endereço de busca para partida"
+                               data-unit="FREETEXT">
+                    `;
+                }
+
+                html += `</div>`;
+            } else {
+                // Apenas uma unidade disponível
+                const unit = question.units[0];
+                if (unit === 'LOCATION_REFERENCE' && question.allowedAnswers && question.allowedAnswers.length > 0) {
+                    // Select simples
+                    html += `
+                        <select id="${questionId}"
+                                name="${questionId}"
+                                class="${cssClass}"
+                                ${dataAttrs}
+                                ${requiredAttr}
+                                data-unit="LOCATION_REFERENCE">
+                            <option value="">Selecione o local de busca</option>
+                    `;
+
+                    question.allowedAnswers.forEach(answer => {
+                        const displayText = answer === 'CONTACT_SUPPLIER_LATER'
+                            ? 'Vou decidir depois'
+                            : answer;
+                        html += `<option value="${answer}">${displayText}</option>`;
+                    });
+
+                    html += `</select>`;
+                } else {
+                    // Campo de texto simples
+                    html += `
+                        <input type="text"
+                               id="${questionId}"
+                               name="${questionId}"
+                               class="${cssClass}"
+                               ${dataAttrs}
+                               ${requiredAttr}
+                               placeholder="Endereço de busca para partida"
+                               data-unit="${unit}">
+                    `;
+                }
+            }
+        } else {
+            // Fallback: campo de texto simples
+            html += `
+                <input type="text"
+                       id="${questionId}"
+                       name="${questionId}"
+                       class="${cssClass}"
+                       ${dataAttrs}
+                       ${requiredAttr}
+                       placeholder="Endereço de busca para partida">
+            `;
+        }
+
+        // Adicionar script para interatividade
+        html += `
+            <script>
+            (function() {
+                const container = document.querySelector('.departure-pickup-container');
+                if (!container) return;
+
+                const radios = container.querySelectorAll('.departure-pickup-radio');
+                const customDiv = container.querySelector('.custom-departure-address');
+                const customInput = container.querySelector('.custom-address-input');
+
+                radios.forEach(radio => {
+                    radio.addEventListener('change', function() {
+                        if (customDiv && customInput) {
+                            if (this.value === 'CUSTOM_LOCATION') {
+                                customDiv.style.display = 'block';
+                                customInput.required = true;
+                                customInput.focus();
+                            } else {
+                                customDiv.style.display = 'none';
+                                customInput.required = false;
+                                customInput.value = '';
+                            }
+                        }
+                    });
+                });
+            })();
+            </script>
+        `;
+
+        return html;
     }
 
     /**
@@ -14212,6 +14470,50 @@ class ViatorBookingManager {
                         }
                     }
                 } catch (e) { /* no-op */ }
+
+                // CORREÇÃO CRÍTICA: Sanitização de TRANSFER_DEPARTURE_PICKUP para modo AIR
+                // Aplicar lógica similar à correção de TRANSFER_ARRIVAL_DROP_OFF
+                try {
+                    const departureModeIdx = bookingQuestionAnswers.findIndex(function(a){
+                        const qid = a && (a.question || a.questionId);
+                        return qid === 'TRANSFER_DEPARTURE_MODE';
+                    });
+                    const departureModeVal = departureModeIdx !== -1 ? String(bookingQuestionAnswers[departureModeIdx].answer || '').trim() : '';
+
+                    if (departureModeVal === 'AIR') {
+                        // 3) TRANSFER_DEPARTURE_PICKUP: CORREÇÃO CRÍTICA - NÃO remover para AIR, a API exige este campo
+                        // Garantir que TRANSFER_DEPARTURE_PICKUP esteja presente quando departureMode=AIR
+                        const productQuestionsRaw = Array.isArray(this.bookingQuestions) && this.bookingQuestions.length > 0
+                            ? this.bookingQuestions
+                            : (Array.isArray(window.productData?.bookingQuestions) ? window.productData.bookingQuestions : []);
+                        const productIdsAir = new Set(productQuestionsRaw.map(function(q){ return q && (q.questionId || q.id || q); }));
+                        const allowCustomPickupAir = !!(window.productData && window.productData.logistics && window.productData.logistics.allowCustomTravelerPickup);
+
+                        const hasDeparturePickupAnswer = bookingQuestionAnswers.find(function(a){
+                            const qid = a && (a.question || a.questionId);
+                            return qid === 'TRANSFER_DEPARTURE_PICKUP';
+                        });
+
+                        if (!hasDeparturePickupAnswer && productIdsAir.has('TRANSFER_DEPARTURE_PICKUP')) {
+                            // Adicionar fallback para TRANSFER_DEPARTURE_PICKUP quando ausente
+                            if (allowCustomPickupAir === false) {
+                                bookingQuestionAnswers.push({
+                                    question: 'TRANSFER_DEPARTURE_PICKUP',
+                                    answer: 'CONTACT_SUPPLIER_LATER',
+                                    unit: 'LOCATION_REFERENCE'
+                                });
+                                console.log('🔧 [CONFIRM] TRANSFER_DEPARTURE_PICKUP adicionado como CONTACT_SUPPLIER_LATER para departureMode=AIR');
+                            } else {
+                                bookingQuestionAnswers.push({
+                                    question: 'TRANSFER_DEPARTURE_PICKUP',
+                                    answer: 'Airport Terminal',
+                                    unit: 'FREETEXT'
+                                });
+                                console.log('🔧 [CONFIRM] TRANSFER_DEPARTURE_PICKUP adicionado como FREETEXT para departureMode=AIR');
+                            }
+                        }
+                    }
+                } catch (_e) { /* no-op */ }
 
                 // NOVO: Sanitização de PICKUP_POINT para evitar resposta extra quando o produto usa campos especializados
                 try {
