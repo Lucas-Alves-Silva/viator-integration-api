@@ -14054,17 +14054,28 @@ class ViatorBookingManager {
                                 }
                             }
 
-                            // 2) TRANSFER_ARRIVAL_DROP_OFF: quando o produto não admite freetext (allowCustom=false), evitar enviar
-                            const hasDropOffSea = productIdsSea.has('TRANSFER_ARRIVAL_DROP_OFF');
-                            if (!hasDropOffSea || allowCustomPickupSea === false) {
-                                const beforeSeaDrop = bookingQuestionAnswers.length;
-                                bookingQuestionAnswers = bookingQuestionAnswers.filter(function(a){
-                                    const qid = a && (a.question || a.questionId);
-                                    return qid !== 'TRANSFER_ARRIVAL_DROP_OFF';
-                                });
-                                const afterSeaDrop = bookingQuestionAnswers.length;
-                                if (afterSeaDrop !== beforeSeaDrop) {
-                                    console.log('🔧 [CONFIRM] Removido TRANSFER_ARRIVAL_DROP_OFF para arrivalMode=SEA (não aplicável)');
+                            // 2) TRANSFER_ARRIVAL_DROP_OFF: CORREÇÃO CRÍTICA - NÃO remover para SEA, a API exige este campo
+                            // Garantir que TRANSFER_ARRIVAL_DROP_OFF esteja presente quando arrivalMode=SEA
+                            const hasDropOffAnswer = bookingQuestionAnswers.find(function(a){
+                                const qid = a && (a.question || a.questionId);
+                                return qid === 'TRANSFER_ARRIVAL_DROP_OFF';
+                            });
+                            if (!hasDropOffAnswer && productIdsSea.has('TRANSFER_ARRIVAL_DROP_OFF')) {
+                                // Adicionar fallback para TRANSFER_ARRIVAL_DROP_OFF quando ausente
+                                if (allowCustomPickupSea === false) {
+                                    bookingQuestionAnswers.push({
+                                        question: 'TRANSFER_ARRIVAL_DROP_OFF',
+                                        answer: 'CONTACT_SUPPLIER_LATER',
+                                        unit: 'LOCATION_REFERENCE'
+                                    });
+                                    console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF adicionado como CONTACT_SUPPLIER_LATER para arrivalMode=SEA');
+                                } else {
+                                    bookingQuestionAnswers.push({
+                                        question: 'TRANSFER_ARRIVAL_DROP_OFF',
+                                        answer: 'Port Terminal',
+                                        unit: 'FREETEXT'
+                                    });
+                                    console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF adicionado como FREETEXT para arrivalMode=SEA');
                                 }
                             }
                         } catch (_e) { /* no-op */ }

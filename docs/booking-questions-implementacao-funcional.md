@@ -1026,6 +1026,7 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 | 1.19 | 2025-08-22 | Caso funcional 101124P5 (arrival=AIR, departure=SEA); correção ReferenceError em confirm; separação chegada vs partida; fallbacks de pickup aplicados | Sistema |
 | 1.20 | 2025-08-22 | Teste bem-sucedido 101124P5 (AIR→SEA + "Gostaria que me buscassem"); PICKUP_POINT=CONTACT_SUPPLIER_LATER; status CONFIRMED; voucher gerado | Sistema |
 | 1.21 | 2025-08-22 | Teste bem-sucedido 101124P5 (AIR→SEA + endereço manual FREETEXT); PICKUP_POINT=CONTACT_SUPPLIER_LATER; status CONFIRMED; voucher gerado | Sistema |
+| 1.22 | 2025-08-22 | Teste bem-sucedido 101124P5 (SEA→SEA + "Vou decidir depois"); correção aplicada para TRANSFER_ARRIVAL_DROP_OFF; status CONFIRMED; voucher gerado | Sistema |
 
 ---
 
@@ -1291,6 +1292,94 @@ Discrepância entre os nomes dos campos no frontend (`booker-firstname`, `booker
 - A diferenciação entre "Gostaria que me buscassem" e "Informar endereço específico" não impacta o payload final quando o produto não permite pickup customizado
 - Entrada manual via FREETEXT funciona corretamente para campos que permitem essa opção
 - A normalização por modo de transporte preserva corretamente os campos de partida SEA quando arrival=AIR
+
+### ✅ Teste Bem-Sucedido: Produto 101124P5 (SEA→SEA + Correção TRANSFER_ARRIVAL_DROP_OFF)
+
+**Data:** 2025-08-22 às 12:06-12:07
+**Status:** ✅ Implementado e Funcional
+
+**Configuração específica do teste:**
+- **Modo de chegada**: Navio (SEA) - Ambev às 15:00
+- **Modo de partida**: Navio (SEA) - em 28/08/2025 às 18:00
+- **Ponto de Encontro**: "Vou decidir depois" → CONTACT_SUPPLIER_LATER (LOCATION_REFERENCE) - fallback aplicado
+- **Endereço final**: "Test 123" (FREETEXT) - entrada manual preservada
+- **Pickup de partida**: "Port Terminal" (FREETEXT) - entrada manual
+
+**Problema identificado e corrigido:**
+- **Problema anterior**: Código removia incorretamente o campo `TRANSFER_ARRIVAL_DROP_OFF` quando `arrivalMode=SEA`
+- **Erro gerado**: `"Missing answer(s) for: TRANSFER_ARRIVAL_DROP_OFF"` (trackingId: AAF79D40)
+- **Correção aplicada**: Modificação no viator-booking.js para **nunca remover** `TRANSFER_ARRIVAL_DROP_OFF` para `arrivalMode=SEA`
+- **Resultado**: Campo preservado corretamente no payload final
+
+**Evidências do Backend (viator-debug.log):**
+- **HOLD** (12:06:42): 200 OK
+  - cartRef: `CR-334bda4889e9596d6076256b1c7b2d88`
+  - status: `BOOKABLE`
+  - paymentSessionToken: válido (JWT)
+  - totalHeldPrice: BRL 1089.24 (recomendado) / BRL 1002.10 (parceiro)
+- **Pagamento** (12:06:58): 200 OK
+  - paymentToken: `STK-lycgqkrpj5el5nmtw7ztxbvfey`
+  - Via TA Payments
+- **Confirmação** (12:07:11): 200 OK
+  - status: `CONFIRMED`
+  - bookingRef: `BR-597877799`
+  - 23 booking questions enviadas corretamente
+  - voucher gerado: `https://api.sandbox.viator.com/ticket?code=1022782377:160d4bc49a2e8fd9ef749a7ed8a22e66e617a06eab87d14edf5383998ad61ef2:597877799`
+
+**Estrutura do payload final (trechos relevantes):**
+```json
+{
+  "question": "PICKUP_POINT",
+  "answer": "CONTACT_SUPPLIER_LATER",
+  "unit": "LOCATION_REFERENCE"
+},
+{
+  "question": "TRANSFER_DEPARTURE_PICKUP",
+  "answer": "Port Terminal",
+  "unit": "FREETEXT"
+},
+{
+  "question": "TRANSFER_ARRIVAL_DROP_OFF",
+  "answer": "Test 123",
+  "unit": "FREETEXT"
+},
+{
+  "question": "TRANSFER_ARRIVAL_MODE",
+  "answer": "SEA"
+},
+{
+  "question": "TRANSFER_DEPARTURE_MODE",
+  "answer": "SEA"
+}
+```
+
+**Campos de transporte SEA preservados:**
+- **SEA (chegada)**: TRANSFER_PORT_CRUISE_SHIP=Ambev, TRANSFER_PORT_ARRIVAL_TIME=15:00
+- **SEA (partida)**: TRANSFER_DEPARTURE_DATE=2025-08-28, TRANSFER_PORT_DEPARTURE_TIME=18:00
+
+**Comparação com teste anterior falhado:**
+
+| Aspecto | Antes da correção (11:56) | Após correção (12:06) |
+|---------|---------------------------|----------------------|
+| TRANSFER_ARRIVAL_DROP_OFF | ❌ **Removido pelo código** | ✅ **Preservado** ("Test 123" FREETEXT) |
+| PICKUP_POINT | ✅ CONTACT_SUPPLIER_LATER (LOCATION_REFERENCE) | ✅ CONTACT_SUPPLIER_LATER (LOCATION_REFERENCE) |
+| TRANSFER_DEPARTURE_PICKUP | ✅ "Port Terminal" (FREETEXT) | ✅ "Port Terminal" (FREETEXT) |
+| Resultado API | ❌ 400 Bad Request ("Missing answer(s)") | ✅ 200 OK (CONFIRMED) |
+| Voucher | ❌ Não gerado | ✅ Gerado com sucesso |
+
+**Observações técnicas importantes:**
+- ✅ **Correção crítica aplicada**: `TRANSFER_ARRIVAL_DROP_OFF` nunca é removido para `arrivalMode=SEA`
+- ✅ **Fallbacks específicos para SEA→SEA**: Sistema preserva entradas manuais quando disponíveis
+- ✅ **Normalização corrigida**: Campos SEA de chegada e partida coexistem corretamente
+- ✅ **Sem erros "Missing answer(s)"**: Todos os campos obrigatórios presentes no payload
+- ✅ **Entrada manual FREETEXT**: Funciona corretamente para ambos pickup e drop-off
+
+**Resultado:**
+- ✅ Fluxo completo bem-sucedido: HOLD → pagamento → CONFIRM 200
+- ✅ Status CONFIRMED com voucher disponível para download
+- ✅ Cenário SEA→SEA agora funciona corretamente após correção do bug
+- ✅ Primeira implementação bem-sucedida de transporte marítimo bidirecional
+- ✅ Correção aplicada no código viator-booking.js (linhas 14057-14080)
 
 
 **Data:** Agosto 2025
