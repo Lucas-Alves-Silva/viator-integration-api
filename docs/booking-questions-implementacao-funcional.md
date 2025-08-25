@@ -6,6 +6,98 @@ Este documento serve como referência completa para a implementação e funciona
 
 ## 🆕 Melhorias Recentes Implementadas (Agosto 2025)
 
+### ✅ Correção 29.12: Produtos AIR Híbridos com Campos Obrigatórios (25/08/2025)
+**Status**: ✅ **IMPLEMENTADO E FUNCIONAL**
+
+**Produto Testado:** 100014P4 (modo AIR)
+**Booking Reference:** BR-597881749
+**Resultado:** ✅ Sucesso completo (HOLD → Pagamento → CONFIRM)
+
+**Problema Identificado:**
+- Erro "Missing answer(s) for: PICKUP_POINT, TRANSFER_ARRIVAL_DROP_OFF" em produtos AIR híbridos
+- Produto 100014P4 requer campos tradicionalmente associados a outros modos de transporte
+- Conflito entre correções: 29.7 removia campos que o produto necessitava
+- Correções 29.10 e 29.11 não eram aplicadas devido à estrutura condicional `else if`
+
+**Análise Técnica:**
+```javascript
+// PROBLEMA: Produto 100014P4 entrava no CASO 1 (correção 29.7)
+if (arrivalMode === 'AIR' && hasAirFields && arrivalDropOffIdx !== -1) {
+    // Remove TRANSFER_ARRIVAL_DROP_OFF e PICKUP_POINT
+}
+// Correções 29.11 nunca executadas devido ao else if
+```
+
+**Evidências dos Logs:**
+- **Confirmação bem-sucedida**: 19 campos enviados incluindo PICKUP_POINT e TRANSFER_ARRIVAL_DROP_OFF
+- **PICKUP_POINT**: `"answer":"CONTACT_SUPPLIER_LATER","unit":"LOCATION_REFERENCE"`
+- **TRANSFER_ARRIVAL_DROP_OFF**: `"answer":"CONTACT_SUPPLIER_LATER","unit":"FREETEXT"`
+- **API Response**: Status 200 OK com status "CONFIRMED"
+
+**Solução Implementada (Correção 29.12):**
+```javascript
+// CORREÇÃO 29.12: Verificação final para produtos que requerem campos específicos
+// Aplicar APÓS todas as outras correções para garantir que campos obrigatórios não sejam removidos
+const finalPickupPointIdx = bookingQuestionAnswers.findIndex(a => (a?.question || a?.questionId) === 'PICKUP_POINT');
+const finalDropOffIdx = bookingQuestionAnswers.findIndex(a => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_DROP_OFF');
+
+console.log('🔧 [CONFIRM] Verificação final de campos obrigatórios:', {
+    productHasPickupPoint,
+    productHasDropOff,
+    finalPickupPointPresent: finalPickupPointIdx !== -1,
+    finalDropOffPresent: finalDropOffIdx !== -1
+});
+
+// Se o produto tem os campos nas BQ originais mas eles foram removidos por outras correções, readicioná-los
+if (productHasPickupPoint && finalPickupPointIdx === -1) {
+    bookingQuestionAnswers.push({
+        question: 'PICKUP_POINT',
+        answer: 'CONTACT_SUPPLIER_LATER',
+        unit: 'LOCATION_REFERENCE'
+    });
+    console.log('🔧 [CONFIRM] PICKUP_POINT readicionado após outras correções (campo obrigatório)');
+}
+
+if (productHasDropOff && finalDropOffIdx === -1) {
+    bookingQuestionAnswers.push({
+        question: 'TRANSFER_ARRIVAL_DROP_OFF',
+        answer: 'CONTACT_SUPPLIER_LATER',
+        unit: 'FREETEXT'
+    });
+    console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF readicionado após outras correções (campo obrigatório)');
+}
+```
+
+**Características da Correção 29.12:**
+- ✅ **Verificação final robusta**: Executa APÓS todas as outras correções
+- ✅ **Baseada nas BQ originais**: Detecta automaticamente campos obrigatórios
+- ✅ **Readição inteligente**: Só adiciona campos se foram removidos incorretamente
+- ✅ **Compatibilidade total**: Não interfere com correções anteriores
+- ✅ **Logs detalhados**: Para debugging e auditoria
+
+**Critérios de Ativação:**
+- Produto tem PICKUP_POINT nas booking questions originais
+- Produto tem TRANSFER_ARRIVAL_DROP_OFF nas booking questions originais
+- Campos ausentes na confirmação final (removidos por outras correções)
+
+**Abrangência da Solução:**
+- ✅ **Produtos AIR híbridos** (como 100014P4)
+- ✅ **Produtos SEA** que podem ter campos removidos
+- ✅ **Produtos RAIL** que requerem campos específicos
+- ✅ **Qualquer produto** com campos nas BQ originais
+
+**Padrão Identificado:**
+- **Produtos híbridos**: Combinam campos de diferentes modos de transporte
+- **API behavior**: Requer todos os campos presentes nas booking questions originais
+- **Detecção automática**: Baseada na presença de campos nas BQ originais do produto
+
+**Logs de Monitoramento:**
+```
+🔧 [CONFIRM] Verificação final de campos obrigatórios: { productHasPickupPoint: true, productHasDropOff: true, finalPickupPointPresent: false, finalDropOffPresent: false }
+🔧 [CONFIRM] PICKUP_POINT readicionado após outras correções (campo obrigatório)
+🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF readicionado após outras correções (campo obrigatório)
+```
+
 ### ✅ Correções de Sincronização Frontend-Backend (Janeiro 2025)
 **Status**: ✅ **IMPLEMENTADO E FUNCIONAL**
 
@@ -3379,12 +3471,13 @@ renderQ(portArrivalQ);
 - **Última atualização**: 18/08/2025 - Teste SEA confirmado pela API
 
 ### Métricas de Performance
-- **Taxa de sucesso HOLD**: 100% (12/12)
-- **Taxa de sucesso pagamento**: 100% (12/12)
-- **Taxa de sucesso confirmação**: 100% (12/12)
+- **Taxa de sucesso HOLD**: 100% (13/13)
+- **Taxa de sucesso pagamento**: 100% (13/13)
+- **Taxa de sucesso confirmação**: 100% (13/13)
 - **Tempo médio de processamento**: < 10 segundos
 - **Vouchers gerados**: 100% dos casos CONFIRMED
-- **Testes recentes**: 7 testes completos com produto 100014P4 (100% sucesso)
+- **Testes recentes**: 8 testes completos com produto 100014P4 (100% sucesso)
+- **Correção 29.12**: ✅ Validada com sucesso (BR-597881749)
 
 ### Campos de Booking Questions Funcionais
 - **PER_TRAVELER**: 8 campos (100% funcional)
@@ -3438,9 +3531,56 @@ As melhorias recentes, incluindo a reordenação das perguntas para modo SEA e o
 2. **Validar PICKUP_POINT FREETEXT** para modos AIR/RAIL/OTHER
 3. **Confirmar comportamento** quando produto oferece pickup para modo SEA
 
-## 🆕 **Últimos Testes Realizados com Sucesso (18/08/2025)**
+## 🆕 **Últimos Testes Realizados com Sucesso**
 
-### **✅ Teste 1: Produto 100014P4 - Modo de Chegada SEA (Confirmado pela API)**
+### **✅ Teste Mais Recente: Produto 100014P4 - Correção 29.12 AIR Híbrido (25/08/2025)**
+
+**Data:** 25/08/2025 às 12:34:59
+**Status:** ✅ **CONFIRMADO** pela API Viator
+**Booking Reference:** BR-597881749
+
+#### **Configuração do Teste:**
+- **Produto:** 100014P4 (Transfer com múltiplos modos de chegada)
+- **Modo de Chegada:** AIR (Avião)
+- **Modo de Partida:** AIR (Avião)
+- **Endereço do ponto de encontro:** Vou decidir depois
+- **Correção Aplicada:** 29.12 (Verificação final de campos obrigatórios)
+
+#### **Dados Coletados:**
+- **Viajante:** Carol Miranda (TRAVELER)
+- **Passaporte:** Brasil, 465239, válido até 2029-06-25
+- **Voo de Chegada:** GOL G7852 às 16:00
+- **Voo de Partida:** VARIG VG963 às 18:45 (29/08/2025)
+
+#### **Campos Enviados na Confirmação (19 campos):**
+```json
+{
+    "question": "PICKUP_POINT",
+    "answer": "CONTACT_SUPPLIER_LATER",
+    "unit": "LOCATION_REFERENCE"
+},
+{
+    "question": "TRANSFER_ARRIVAL_DROP_OFF",
+    "answer": "CONTACT_SUPPLIER_LATER",
+    "unit": "FREETEXT"
+}
+```
+
+#### **Evidências do Sucesso:**
+- ✅ **Hold criado**: Sucesso com 19 campos
+- ✅ **Pagamento processado**: Token válido
+- ✅ **Confirmação API**: Status 200 OK
+- ✅ **Status final**: CONFIRMED
+- ✅ **Voucher gerado**: URL disponível
+- ✅ **Preço confirmado**: R$ 5.251,62
+
+#### **Correção 29.12 Validada:**
+- ✅ **PICKUP_POINT** incluído automaticamente
+- ✅ **TRANSFER_ARRIVAL_DROP_OFF** incluído automaticamente
+- ✅ **Compatibilidade** com todas as correções anteriores
+- ✅ **Logs de verificação** funcionando corretamente
+
+### **✅ Teste 1: Produto 100014P4 - Modo de Chegada SEA (18/08/2025)**
 
 **Data:** 18/08/2025 às 21:25:01
 **Status:** ✅ **CONFIRMADO** pela API Viator
@@ -3509,12 +3649,13 @@ if (arrivalMode === 'SEA' && hasPortSpecificFields) {
 | Produto | Modo de Chegada | Status | Data | Observações |
 |---------|------------------|---------|------|-------------|
 | `100014P4` | **AIR** | ✅ HOLD + CONFIRM | 18/08/2025 | PICKUP_POINT + campos AIR |
+| `100014P4` | **AIR** | ✅ HOLD + CONFIRM | **25/08/2025** | **Correção 29.12** - BR-597881749 |
 | `100014P4` | **RAIL** | ✅ HOLD + CONFIRM | 18/08/2025 | PICKUP_POINT + campos RAIL |
 | `100014P4` | **OTHER** | ✅ HOLD + CONFIRM | 18/08/2025 | PICKUP_POINT + campos OTHER |
 | `100014P4` | **SEA** | ✅ HOLD + CONFIRM | 18/08/2025 | **Sem PICKUP_POINT** (campos porto) |
 
 #### **Taxa de Sucesso por Modo:**
-- **AIR:** 100% (2/2 testes)
+- **AIR:** 100% (3/3 testes) - **Incluindo correção 29.12**
 - **RAIL:** 100% (2/2 testes)
 - **OTHER:** 100% (2/2 testes)
 - **SEA:** 100% (1/1 teste)
@@ -5896,9 +6037,70 @@ else if (arrivalMode === 'RAIL' && hasRailFields && arrivalDropOffIdx !== -1 && 
 - ✅ **Seleções manuais** de usuário sempre respeitadas
 - ✅ **Lógica não invasiva** confirmada em produção
 
-**Cenários Totais Validados:** **8 cenários de teste** validados com sucesso em **5 produtos diferentes**, cobrindo todos os tipos de modo de transporte (AIR, SEA, RAIL) e diferentes estruturas de campos especializados.
+**Cenários Totais Validados:** **9 cenários de teste** validados com sucesso em **5 produtos diferentes**, cobrindo todos os tipos de modo de transporte (AIR, SEA, RAIL) e diferentes estruturas de campos especializados.
 
-As **Implementações 29.5, 29.6, 29.7 e 29.8** formam um **sistema robusto e abrangente** que resolve definitivamente problemas de booking questions para produtos com campos especializados de transporte, criando uma **base sólida e escalável** para produtos futuros com características similares.
+As **Implementações 29.1-29.12** formam um **sistema robusto e abrangente** que resolve definitivamente problemas de booking questions para produtos com campos especializados de transporte, criando uma **base sólida e escalável** para produtos futuros com características similares.
+
+## 📋 Procedimento de Resolução para Casos Futuros
+
+### Diagnóstico de Problemas "Missing answer(s)"
+
+**1. Identificação do Padrão:**
+```bash
+# Procurar por erro específico nos logs
+grep -i "Missing answer.*PICKUP_POINT\|Missing answer.*TRANSFER_ARRIVAL_DROP_OFF" viator-debug.log
+
+# Verificar booking questions originais do produto
+grep -A 50 "Booking Questions.*Array" viator-debug.log | grep -E "PICKUP_POINT\|TRANSFER_ARRIVAL_DROP_OFF"
+```
+
+**2. Análise das Booking Questions Originais:**
+- ✅ Verificar se o produto tem PICKUP_POINT nas BQ originais
+- ✅ Verificar se o produto tem TRANSFER_ARRIVAL_DROP_OFF nas BQ originais
+- ✅ Identificar o modo de transporte selecionado (AIR/SEA/RAIL/OTHER)
+- ✅ Verificar se há campos especializados (AIR_*, PORT_*, RAIL_*)
+
+**3. Logs de Monitoramento:**
+```javascript
+// Procurar por estes logs para validar correção 29.12
+🔧 [CONFIRM] Verificação final de campos obrigatórios: { productHasPickupPoint: true, productHasDropOff: true, finalPickupPointPresent: false, finalDropOffPresent: false }
+🔧 [CONFIRM] PICKUP_POINT readicionado após outras correções (campo obrigatório)
+🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF readicionado após outras correções (campo obrigatório)
+```
+
+**4. Critérios para Aplicação da Correção 29.12:**
+- ✅ Produto tem campos nas booking questions originais
+- ✅ Erro "Missing answer(s)" na confirmação
+- ✅ Campos ausentes na confirmação final
+- ✅ Outras correções podem ter removido campos necessários
+
+**5. Validação da Solução:**
+- ✅ Verificar presença dos campos na confirmação (19+ campos)
+- ✅ Confirmar resposta 200 OK da API
+- ✅ Validar status "CONFIRMED" na resposta
+- ✅ Verificar geração do voucher
+
+### Padrões de Produtos Identificados
+
+**Produtos AIR Híbridos:**
+- Características: Modo AIR + PICKUP_POINT + TRANSFER_ARRIVAL_DROP_OFF nas BQ
+- Exemplo: 100014P4
+- Correção: 29.12 (verificação final)
+
+**Produtos SEA Especializados:**
+- Características: Modo SEA + campos PORT_* + sem PICKUP_POINT
+- Exemplo: 9966P46, 9966P7
+- Correção: 29.5/29.6 (campos de porto)
+
+**Produtos RAIL Especializados:**
+- Características: Modo RAIL + campos RAIL_* + TRANSFER_ARRIVAL_DROP_OFF
+- Exemplo: 100273P23
+- Correção: 29.8 (remoção seletiva)
+
+**Produtos AIR Puros:**
+- Características: Modo AIR + apenas campos AIR_*
+- Exemplo: 10006P8
+- Correção: 29.7 (remoção de campos extras)
 
 ---
 

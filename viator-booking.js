@@ -4595,9 +4595,10 @@ class ViatorBookingManager {
             'TRANSFER_PORT_CRUISE_SHIP': () => {
                 const arr = this.getFieldValue('TRANSFER_ARRIVAL_MODE');
                 const dep = this.getFieldValue('TRANSFER_DEPARTURE_MODE');
-                const productIndicatesSea = Boolean((this.productBookingQuestions?.booking_questions || []).some(q => q.id === 'TRANSFER_PORT_CRUISE_SHIP'));
-                const show = arr === 'SEA' || dep === 'SEA' || productIndicatesSea;
-                console.log('🛳️ [COND] TRANSFER_PORT_CRUISE_SHIP visible?', show, { arr, dep, productIndicatesSea });
+                // CORREÇÃO 29.9: Campos de porto devem ser exibidos APENAS quando modo SEA é selecionado
+                // Não usar productIndicatesSea para evitar exibição incorreta para produtos AIR/RAIL
+                const show = arr === 'SEA' || dep === 'SEA';
+                console.log('🛳️ [COND] TRANSFER_PORT_CRUISE_SHIP visible?', show, { arr, dep, onlySeaMode: true });
                 return show;
             },
             'TRANSFER_PORT_ARRIVAL_TIME': () => this.getFieldValue('TRANSFER_ARRIVAL_MODE') === 'SEA',
@@ -4605,10 +4606,9 @@ class ViatorBookingManager {
             'TRANSFER_DEPARTURE_PICKUP': () => {
                 const arr = this.getFieldValue('TRANSFER_ARRIVAL_MODE');
                 const dep = this.getFieldValue('TRANSFER_DEPARTURE_MODE');
-                const productIndicatesSea = Boolean((this.productBookingQuestions?.booking_questions || []).some(q => q.id === 'TRANSFER_PORT_CRUISE_SHIP'));
-                // CORREÇÃO: TRANSFER_DEPARTURE_PICKUP deve ser visível para AIR e SEA
-                const show = dep === 'SEA' || dep === 'AIR' || arr === 'SEA' || productIndicatesSea;
-                console.log('📍 [COND] TRANSFER_DEPARTURE_PICKUP visible?', show, { arr, dep, productIndicatesSea });
+                // CORREÇÃO 29.9: TRANSFER_DEPARTURE_PICKUP deve ser visível para AIR e SEA baseado apenas no modo selecionado
+                const show = dep === 'SEA' || dep === 'AIR' || arr === 'SEA';
+                console.log('📍 [COND] TRANSFER_DEPARTURE_PICKUP visible?', show, { arr, dep, onlyModeBasedLogic: true });
                 return show;
             },
             'TRANSFER_RAIL_ARRIVAL_STATION': () => this.getFieldValue('TRANSFER_ARRIVAL_MODE') === 'RAIL',
@@ -4637,9 +4637,9 @@ class ViatorBookingManager {
         if (questionId === 'PICKUP_POINT') {
             const arrVal = (arrivalModeEl && arrivalModeEl.value) ? arrivalModeEl.value : '';
             const depVal = (departureModeEl && departureModeEl.value) ? departureModeEl.value : '';
-            const productIndicatesSea = Boolean((this.productBookingQuestions?.booking_questions || []).some(q => q.id === 'TRANSFER_PORT_CRUISE_SHIP'));
-            const seaActive = (arrVal === 'SEA' || depVal === 'SEA' || productIndicatesSea);
-            console.log('📍 [COND] PICKUP_POINT suppressed?', seaActive, { arrVal, depVal, productIndicatesSea });
+            // CORREÇÃO 29.9: PICKUP_POINT deve ser suprimido APENAS quando modo SEA é selecionado
+            const seaActive = (arrVal === 'SEA' || depVal === 'SEA');
+            console.log('📍 [COND] PICKUP_POINT suppressed?', seaActive, { arrVal, depVal, onlySeaMode: true });
             if (seaActive) return false; // ocultar genérico; usar campos específicos
         }
 
@@ -7681,13 +7681,12 @@ class ViatorBookingManager {
         console.log('🚨 [CRITICAL DEBUG] collectBookingQuestionAnswers() finalizado');
         console.error('🚨 [FORCE LOG] collectBookingQuestionAnswers() finalizado');
 
-        // CORREÇÃO: Validar campos obrigatórios para modo SEA sem lançar exceções
+        // CORREÇÃO 29.9: Validar campos obrigatórios para modo SEA baseado apenas no modo selecionado
         const arrivalMode = document.querySelector('[data-question-id="TRANSFER_ARRIVAL_MODE"]')?.value || '';
         const departureMode = document.querySelector('[data-question-id="TRANSFER_DEPARTURE_MODE"]')?.value || '';
-        const productIndicatesSea = Boolean((this.productBookingQuestions?.booking_questions || []).some(q => q.id === 'TRANSFER_PORT_CRUISE_SHIP'));
-        const isSeaActive = arrivalMode === 'SEA' || departureMode === 'SEA' || productIndicatesSea;
+        const isSeaActive = arrivalMode === 'SEA' || departureMode === 'SEA';
         const shouldValidateShip = isSeaActive && this.shouldShowConditionalQuestion('TRANSFER_PORT_CRUISE_SHIP');
-        console.log('🛳️ [SEA][VALIDATION] arrivalMode=', arrivalMode, 'departureMode=', departureMode, 'productIndicatesSea=', productIndicatesSea, 'shouldValidateShip=', shouldValidateShip);
+        console.log('🛳️ [SEA][VALIDATION] arrivalMode=', arrivalMode, 'departureMode=', departureMode, 'isSeaActive=', isSeaActive, 'shouldValidateShip=', shouldValidateShip);
 
         if (isSeaActive) {
             const shipNameEl = document.querySelector('[data-question-id="TRANSFER_PORT_CRUISE_SHIP"]');
@@ -14688,6 +14687,71 @@ class ViatorBookingManager {
                             bookingQuestionAnswers.splice(pickupPointIdx, 1);
                             console.log('🔧 [CONFIRM] PICKUP_POINT removido para produto RAIL (evita extra answer)');
                         }
+                    }
+
+                    // CASO 4: Produtos que requerem campos específicos baseado nas booking questions originais (correção 29.11)
+                    // Aplicar SEMPRE, independente do modo, se o produto tem os campos nas BQ originais
+                    const productHasPickupPoint = Boolean((this.productBookingQuestions?.booking_questions || []).some(q => q.id === 'PICKUP_POINT'));
+                    const productHasDropOff = Boolean((this.productBookingQuestions?.booking_questions || []).some(q => q.id === 'TRANSFER_ARRIVAL_DROP_OFF'));
+
+                    console.log('🔧 [CONFIRM] Verificação de campos obrigatórios:', {
+                        arrivalMode,
+                        hasAirFields,
+                        productHasPickupPoint,
+                        productHasDropOff,
+                        pickupPointPresent: pickupPointIdx !== -1,
+                        dropOffPresent: arrivalDropOffIdx !== -1
+                    });
+
+                    // Se o produto tem PICKUP_POINT nas BQ originais mas não está presente na confirmação
+                    if (productHasPickupPoint && pickupPointIdx === -1) {
+                        bookingQuestionAnswers.push({
+                            question: 'PICKUP_POINT',
+                            answer: 'CONTACT_SUPPLIER_LATER',
+                            unit: 'LOCATION_REFERENCE'
+                        });
+                        console.log('🔧 [CONFIRM] PICKUP_POINT adicionado (campo obrigatório nas BQ originais)');
+                    }
+
+                    // Se o produto tem TRANSFER_ARRIVAL_DROP_OFF nas BQ originais mas não está presente na confirmação
+                    if (productHasDropOff && arrivalDropOffIdx === -1) {
+                        bookingQuestionAnswers.push({
+                            question: 'TRANSFER_ARRIVAL_DROP_OFF',
+                            answer: 'CONTACT_SUPPLIER_LATER',
+                            unit: 'FREETEXT'
+                        });
+                        console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF adicionado (campo obrigatório nas BQ originais)');
+                    }
+
+                    // CORREÇÃO 29.12: Verificação final para produtos que requerem campos específicos
+                    // Aplicar APÓS todas as outras correções para garantir que campos obrigatórios não sejam removidos
+                    const finalPickupPointIdx = bookingQuestionAnswers.findIndex(a => (a?.question || a?.questionId) === 'PICKUP_POINT');
+                    const finalDropOffIdx = bookingQuestionAnswers.findIndex(a => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_DROP_OFF');
+
+                    console.log('🔧 [CONFIRM] Verificação final de campos obrigatórios:', {
+                        productHasPickupPoint,
+                        productHasDropOff,
+                        finalPickupPointPresent: finalPickupPointIdx !== -1,
+                        finalDropOffPresent: finalDropOffIdx !== -1
+                    });
+
+                    // Se o produto tem os campos nas BQ originais mas eles foram removidos por outras correções, readicioná-los
+                    if (productHasPickupPoint && finalPickupPointIdx === -1) {
+                        bookingQuestionAnswers.push({
+                            question: 'PICKUP_POINT',
+                            answer: 'CONTACT_SUPPLIER_LATER',
+                            unit: 'LOCATION_REFERENCE'
+                        });
+                        console.log('🔧 [CONFIRM] PICKUP_POINT readicionado após outras correções (campo obrigatório)');
+                    }
+
+                    if (productHasDropOff && finalDropOffIdx === -1) {
+                        bookingQuestionAnswers.push({
+                            question: 'TRANSFER_ARRIVAL_DROP_OFF',
+                            answer: 'CONTACT_SUPPLIER_LATER',
+                            unit: 'FREETEXT'
+                        });
+                        console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF readicionado após outras correções (campo obrigatório)');
                     }
                 } catch(_e) { /* no-op */ }
 
