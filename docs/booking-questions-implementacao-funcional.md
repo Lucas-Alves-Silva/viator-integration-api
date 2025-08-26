@@ -82,6 +82,70 @@ Configuração: arrivalMode=RAIL, departureMode=AIR, TRANSFER_DEPARTURE_PICKUP="
   - No console do navegador: `window.viatorConfig.forceDepartureAirCompleteness = false;` e recarregar a página
 - Suporte: abrir ticket interno com recortes de Anotações.txt e viator-debug.log, incluindo produto, data/hora e trackingId.
 
+
+### 🧪 Registro do Teste — 100014P4 (RAIL → AIR, "Gostaria que buscassem")
+
+- Data do teste: 26/08/2025 (ambiente local)
+- Produto: 100014P4
+- Configurações utilizadas:
+  - arrivalMode: RAIL (Trem)
+  - departureMode: AIR (Avião)
+  - Endereço do ponto de encontro: "Gostaria que buscassem" → mapeado para TRANSFER_DEPARTURE_PICKUP = CONTACT_SUPPLIER_LATER (unit=LOCATION_REFERENCE)
+  - Campos relevantes enviados: TRANSFER_DEPARTURE_DATE=2025-08-29, TRANSFER_DEPARTURE_TIME=16:00, TRANSFER_AIR_DEPARTURE_AIRLINE=TAM, TRANSFER_AIR_DEPARTURE_FLIGHT_NO=T762
+- Resultado: ✅ Sucesso total — HOLD 200 → CONFIRM 200 → status CONFIRMED com voucher
+- Referências: cartRef=CR-aa28dcc5d874ec97b0169a419fb4d6df, bookingRef=BR-597886923
+
+Evidências extraídas dos logs
+- Anotações.txt (frontend)
+  - "🧩 [STEP3] Respostas coletadas (count): 17"
+  - "🛳️ [SEA][VALIDATION] arrivalMode= RAIL departureMode= AIR ..."
+  - "✅ Todas as booking questions validadas com sucesso"
+  - "📋 Fazendo hold da reserva antes de inicializar pagamento..."
+  - "✅ Hold da reserva criado com sucesso" e "✅ Sistema de pagamento da Viator inicializado"
+- viator-debug.log (backend)
+  - GET BOOKING QUESTIONS (100014P4) com PICKUP_POINT e campos AIR/RAIL
+  - HOLD: Response Code 200; PaymentSessionToken encontrado
+  - bookingQuestionAnswers com:
+    - TRANSFER_ARRIVAL_MODE=RAIL
+    - TRANSFER_DEPARTURE_MODE=AIR
+    - TRANSFER_DEPARTURE_DATE=2025-08-29
+    - TRANSFER_DEPARTURE_PICKUP=CONTACT_SUPPLIER_LATER (unit=LOCATION_REFERENCE)
+  - CONFIRM: HTTP 200; body "status":"CONFIRMED"; bookingRef BR-597886923
+
+Abrangência e limitações
+- Compatível com: produtos que combinam partida AIR (AIR + RAIL/SEA/OTHER na chegada), exigindo DATA/HORA/PICKUP de partida.
+- Benefícios diretos: preserva TRANSFER_DEPARTURE_DATE/TIME e aplica fallback seguro para PICKUP quando necessário.
+- Limitações conhecidas:
+  - Exige que as booking questions originais do produto incluam os campos de partida (DATE/TIME/PICKUP). Caso não estejam presentes, a API pode retornar "Missing departure details".
+  - Quando logistics.allowCustomTravelerPickup=false, respostas FREETEXT podem ser rejeitadas — usar CONTACT_SUPPLIER_LATER (LOCATION_REFERENCE).
+  - Controlado por feature flag: window.viatorConfig.forceDepartureAirCompleteness (default: true).
+
+Cenários de uso suportados
+- "Vou decidir depois"/"Gostaria que me buscassem" → CONTACT_SUPPLIER_LATER (LOCATION_REFERENCE)
+- "Escolher de uma lista" (referência de local) → LOCATION_REFERENCE
+- "Endereço específico" → FREETEXT (quando permitido pelo produto)
+
+Produtos similares que podem se beneficiar
+- 10006P8 (AIR sem DROP_OFF), 100273P23 (AIR com DROP_OFF), 9966P46 e 9966P7 (SEA) — já validados e não afetados negativamente pelas correções 29.5–29.8, 29.12 e 30.10–30.11b.
+
+Logs e rastreabilidade — como interpretar
+- Sinais de sucesso no viator-debug.log:
+  - "Hold - Response Code: 200" com cartRef presente
+  - "Booking Confirmation HTTP Response: code 200" e [CONFIRM RAW BODY] com "status":"CONFIRMED" ou "PENDING"
+  - bookingQuestionAnswers contendo TRANSFER_ARRIVAL_MODE=RAIL, TRANSFER_DEPARTURE_MODE=AIR, TRANSFER_DEPARTURE_DATE (YYYY-MM-DD) e TRANSFER_DEPARTURE_PICKUP=CONTACT_SUPPLIER_LATER (LOCATION_REFERENCE)
+- Sinais de falha comuns:
+  - "Missing departure details" ou ausência de TRANSFER_DEPARTURE_DATE/TIME no JSON final
+  - Remoção indevida de campos de partida quando arrivalMode=RAIL (corrigida por 30.11b)
+
+Procedimento de troubleshooting
+1) Confirmar no viator-debug.log a presença de TRANSFER_DEPARTURE_DATE/TIME/PICKUP nas seções:
+   - "Hold - Booking Questions Added" e "[DETAILED REQUEST] Body JSON" (antes do hold) e nos dados de confirmação
+2) Verificar em Anotações.txt se a validação do Step 3 passou e se o count final de respostas está consistente (ex.: 17)
+3) Garantir que window.viatorConfig.forceDepartureAirCompleteness esteja true
+4) Checar se o produto expõe os campos de partida nas booking questions originais (GET BOOKING QUESTIONS)
+5) Se allowCustomTravelerPickup=false, preferir CONTACT_SUPPLIER_LATER (LOCATION_REFERENCE)
+6) Repetir o fluxo; se persistir, coletar cartRef/bookingRef e abrir ticket interno anexando trechos de Anotações.txt e viator-debug.log
+
 ---
 
 
