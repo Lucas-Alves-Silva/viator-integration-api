@@ -519,6 +519,24 @@ Notas de implementação:
   - Antes: BR-597887155 com "Extra answer(s) provided: TRANSFER_ARRIVAL_DROP_OFF"
   - Depois: BR-597887175 com status CONFIRMED (200 OK)
 
+
+##### 4.1 Cenário adicional: SEA→RAIL + "Gostaria que me buscassem" — ✅ SUCESSO
+
+- Evidências (Anotações.txt):
+  - "🔧 [CONFIRM] TRANSFER_DEPARTURE_PICKUP ajustado para CONTACT_SUPPLIER_LATER (sem custom pickup)"
+  - "🔎 [PAYLOAD CHECK] PICKUP_POINT: ABSENT"
+  - "✅ Status encontrado: CONFIRMED" e "✅ BookingRef encontrado: ..."
+- Observação técnica:
+  - Quando `logistics.allowCustomTravelerPickup=false`, a entrada "Gostaria que me buscassem" é coerida para `CONTACT_SUPPLIER_LATER` (unit=`LOCATION_REFERENCE`), mantendo conformidade com a API.
+  - Se o produto permitir pickup customizado, o valor poderá seguir como `FREETEXT` ou `LOCATION_REFERENCE` conforme seleção, sem reintroduzir campos bloqueados.
+
+Tabela comparativa — Entrada do usuário vs. valor efetivo enviado:
+
+| Cenário | Entrada do usuário | Valor enviado | Regra aplicada |
+|--------|---------------------|---------------|----------------|
+| SEA→RAIL | "Vou decidir depois" | `CONTACT_SUPPLIER_LATER` (LOCATION_REFERENCE) | Bloqueio de DROP_OFF e PICKUP_POINT; preserva specialized pickup |
+| SEA→RAIL | "Gostaria que me buscassem" | `CONTACT_SUPPLIER_LATER` quando `allowCustomTravelerPickup=false` (senão `FREETEXT/LOCATION_REFERENCE`) | Bloqueio de DROP_OFF e PICKUP_POINT; coerção segura se necessário |
+
 #### 5. Abrangência da solução
 
 - Cenários cobertos e validados:
