@@ -13939,6 +13939,15 @@ class ViatorBookingManager {
             }
 
             // Mostrar sucesso final
+            // Limpar chaves de Adaptive Cleanup persistentes ao concluir com sucesso
+            try {
+                const cartRefKey = this.bookingData?.holdData?.cartRef || this.bookingData?.cartRef;
+                if (cartRefKey && typeof sessionStorage !== 'undefined') {
+                    sessionStorage.removeItem(`viator_skip_qs_${cartRefKey}`);
+                    this.logBookingEvent('sea_air_debug', { step: 'adaptive_cleanup_clear_on_success', cartRef: cartRefKey }, 'info');
+                }
+            } catch(_e) { /* no-op */ }
+
             this.showPaymentProgress('🎉 Reserva confirmada com sucesso!', 'success');
 
             // Aguardar 2 segundos para mostrar o sucesso
@@ -15065,12 +15074,18 @@ class ViatorBookingManager {
                         const hasPickupInProduct = productIdsPre.has('PICKUP_POINT');
                         const hasLogisticsPickup = !!(window.productData && window.productData.logistics && window.productData.logistics.travelerPickup);
                         if (hasPickupInProduct || hasLogisticsPickup) {
-                            if (allowCustomPickupPre === false) {
-                                bookingQuestionAnswers.push({ question: 'PICKUP_POINT', answer: 'CONTACT_SUPPLIER_LATER', unit: 'LOCATION_REFERENCE' });
-                                console.log('🔧 [PRE-FLIGHT] PICKUP_POINT adicionado (faltante) como CONTACT_SUPPLIER_LATER');
+                            // CORREÇÃO DEFENSIVA: Verificar se é cenário SEA→AIR com pickup especializado
+                            const preflightShouldSkip = (arrivalMode === 'SEA' && departureMode === 'AIR' && hasSpecializedPickup);
+                            if (!preflightShouldSkip) {
+                                if (allowCustomPickupPre === false) {
+                                    bookingQuestionAnswers.push({ question: 'PICKUP_POINT', answer: 'CONTACT_SUPPLIER_LATER', unit: 'LOCATION_REFERENCE' });
+                                    console.log('🔧 [PRE-FLIGHT] PICKUP_POINT adicionado (faltante) como CONTACT_SUPPLIER_LATER');
+                                } else {
+                                    bookingQuestionAnswers.push({ question: 'PICKUP_POINT', answer: 'CONTACT_SUPPLIER_LATER', unit: 'LOCATION_REFERENCE' });
+                                    console.log('🔧 [PRE-FLIGHT] PICKUP_POINT adicionado (faltante) com fallback conservador');
+                                }
                             } else {
-                                bookingQuestionAnswers.push({ question: 'PICKUP_POINT', answer: 'CONTACT_SUPPLIER_LATER', unit: 'LOCATION_REFERENCE' });
-                                console.log('🔧 [PRE-FLIGHT] PICKUP_POINT adicionado (faltante) com fallback conservador');
+                                console.log('🔧 [PRE-FLIGHT] PICKUP_POINT bloqueado (SEA→AIR com pickup especializado - evita "Extra answer")');
                             }
                         }
                     }
@@ -15201,14 +15216,66 @@ class ViatorBookingManager {
                                 }
                             }
 
-                            // 2) TRANSFER_ARRIVAL_DROP_OFF: CORREÇÃO CRÍTICA - NÃO remover para SEA, a API exige este campo
-                            // Garantir que TRANSFER_ARRIVAL_DROP_OFF esteja presente quando arrivalMode=SEA
+                            // Flag defensiva para SEA→AIR com pickup especializado
+                            const shouldSkipDropOff = (arrivalMode === 'SEA' && departureMode === 'AIR' && hasSpecializedPickup);
+                            this.logBookingEvent('sea_air_debug', {
+                                step: 'ensure SEA fields',
+                                arrivalMode,
+                                departureMode,
+                                hasSpecializedPickup,
+                                shouldSkipDropOff
+                            }, 'info');
+
+                            // 2) Limpeza defensiva: em arrivalMode=SEA, remover campos de chegada RAIL (evita "extras")
+                            {
+                                const before = bookingQuestionAnswers.length;
+                                bookingQuestionAnswers = bookingQuestionAnswers.filter(function(a){
+                                    const qid = a && (a.question || a.questionId);
+                                    return qid !== 'TRANSFER_RAIL_ARRIVAL_LINE' && qid !== 'TRANSFER_RAIL_ARRIVAL_STATION';
+                                });
+                                const after = bookingQuestionAnswers.length;
+                                if (after !== before) {
+                                    console.log('🔧 [CONFIRM] Campos RAIL de chegada removidos por arrivalMode=SEA (evita "Extra answer")');
+                                }
+                            }
+
+                            // 3) Limpeza defensiva: em departureMode=AIR, remover campos de partida SEA (evita "Too many departure answers")
+                            if (departureMode === 'AIR') {
+                                const before = bookingQuestionAnswers.length;
+                                bookingQuestionAnswers = bookingQuestionAnswers.filter(function(a){
+                                    const qid = a && (a.question || a.questionId);
+                                    return qid !== 'TRANSFER_PORT_DEPARTURE_TIME';
+                                });
+                                const after = bookingQuestionAnswers.length;
+                                if (after !== before) {
+                                    console.log('🔧 [CONFIRM] Campos SEA de partida removidos por departureMode=AIR (evita "Too many departure answers")');
+                                }
+                            }
+
+                            // 3) TRANSFER_ARRIVAL_DROP_OFF: para SEA→AIR com pickup especializado, BLOQUEAR
                             const hasDropOffAnswer = bookingQuestionAnswers.find(function(a){
                                 const qid = a && (a.question || a.questionId);
                                 return qid === 'TRANSFER_ARRIVAL_DROP_OFF';
                             });
-                            if (!hasDropOffAnswer && productIdsSea.has('TRANSFER_ARRIVAL_DROP_OFF')) {
-                                // Adicionar fallback para TRANSFER_ARRIVAL_DROP_OFF quando ausente
+                            if (shouldSkipDropOff) {
+                                if (hasDropOffAnswer) {
+                                    // remover caso já exista
+                                    const before = bookingQuestionAnswers.length;
+                                    bookingQuestionAnswers = bookingQuestionAnswers.filter(function(a){
+                                        const qid = a && (a.question || a.questionId);
+                                        return qid !== 'TRANSFER_ARRIVAL_DROP_OFF';
+                                    });
+                                    const after = bookingQuestionAnswers.length;
+                                    if (after !== before) {
+                                        console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF BLOQUEADO (SEA→AIR com pickup especializado) - removido');
+                                    } else {
+                                        console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF BLOQUEADO (SEA→AIR com pickup especializado) - não presente');
+                                    }
+                                } else {
+                                    console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF BLOQUEADO (SEA→AIR com pickup especializado) - não adicionar');
+                                }
+                            } else if (!hasDropOffAnswer && productIdsSea.has('TRANSFER_ARRIVAL_DROP_OFF')) {
+                                // Cenário normal SEA: adicionar quando ausente
                                 if (allowCustomPickupSea === false) {
                                     bookingQuestionAnswers.push({
                                         question: 'TRANSFER_ARRIVAL_DROP_OFF',
@@ -15259,75 +15326,94 @@ class ViatorBookingManager {
                                 return qid === 'TRANSFER_ARRIVAL_DROP_OFF';
                             });
 
-                            // CORREÇÃO CRÍTICA: Se o produto EXIGE TRANSFER_ARRIVAL_DROP_OFF, sempre fornecer
-                            if (productHasDropOff) {
-                                const pickupAns = bookingQuestionAnswers.find(a => (a?.question || a?.questionId) === 'PICKUP_POINT');
-                                const pickupVal = String(pickupAns?.answer || '').trim();
+                            // Flag defensiva para SEA→AIR com pickup especializado
+                            const shouldSkipDropOff = (arrivalMode === 'SEA' && departureMode === 'AIR' && hasSpecializedPickup);
+                            this.logBookingEvent('sea_air_debug', {
+                                step: 'AIR corrections',
+                                arrivalMode,
+                                departureMode,
+                                hasSpecializedPickup,
+                                shouldSkipDropOff
+                            }, 'info');
 
-                                console.log('🔍 [CONFIRM DEBUG] PICKUP_POINT atual:', pickupVal);
-                                console.log('🔍 [CONFIRM DEBUG] TRANSFER_ARRIVAL_DROP_OFF existe:', idxDrop !== -1);
-
+                            if (shouldSkipDropOff) {
                                 if (idxDrop !== -1) {
-                                    // Já existe DROP_OFF, verificar se é válido
-                                    const dropVal = String(bookingQuestionAnswers[idxDrop].answer || '').trim();
-                                    const dropUnit = String(bookingQuestionAnswers[idxDrop].unit || '').trim();
-                                    const isValidDropOff = dropVal.startsWith('LOC-') || dropVal === 'CONTACT_SUPPLIER_LATER' || dropUnit === 'LOCATION_REFERENCE';
+                                    bookingQuestionAnswers.splice(idxDrop, 1);
+                                    console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF BLOQUEADO (SEA→AIR com pickup especializado) - removido em AIR corrections');
+                                } else {
+                                    console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF BLOQUEADO (SEA→AIR com pickup especializado) - não adicionar em AIR corrections');
+                                }
+                            } else {
+                                // CORREÇÃO CRÍTICA: Se o produto EXIGE TRANSFER_ARRIVAL_DROP_OFF, sempre fornecer
+                                if (productHasDropOff) {
+                                    const pickupAns = bookingQuestionAnswers.find(a => (a?.question || a?.questionId) === 'PICKUP_POINT');
+                                    const pickupVal = String(pickupAns?.answer || '').trim();
 
-                                    if (!isValidDropOff && allowCustomPickupAir === false) {
-                                        // Substituir por valor válido
+                                    console.log('🔍 [CONFIRM DEBUG] PICKUP_POINT atual:', pickupVal);
+                                    console.log('🔍 [CONFIRM DEBUG] TRANSFER_ARRIVAL_DROP_OFF existe:', idxDrop !== -1);
+
+                                    if (idxDrop !== -1) {
+                                        // Já existe DROP_OFF, verificar se é válido
+                                        const dropVal = String(bookingQuestionAnswers[idxDrop].answer || '').trim();
+                                        const dropUnit = String(bookingQuestionAnswers[idxDrop].unit || '').trim();
+                                        const isValidDropOff = dropVal.startsWith('LOC-') || dropVal === 'CONTACT_SUPPLIER_LATER' || dropUnit === 'LOCATION_REFERENCE';
+
+                                        if (!isValidDropOff && allowCustomPickupAir === false) {
+                                            // Substituir por valor válido
+                                            if (pickupVal === 'CONTACT_SUPPLIER_LATER') {
+                                                bookingQuestionAnswers[idxDrop] = {
+                                                    question: 'TRANSFER_ARRIVAL_DROP_OFF',
+                                                    answer: 'CONTACT_SUPPLIER_LATER',
+                                                    unit: 'LOCATION_REFERENCE'
+                                                };
+                                                console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF corrigido para CONTACT_SUPPLIER_LATER');
+                                            } else if (pickupVal && pickupVal.startsWith('LOC-')) {
+                                                bookingQuestionAnswers[idxDrop] = {
+                                                    question: 'TRANSFER_ARRIVAL_DROP_OFF',
+                                                    answer: pickupVal,
+                                                    unit: 'LOCATION_REFERENCE'
+                                                };
+                                                console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF corrigido para PICKUP_POINT (LOC-)');
+                                            } else {
+                                                bookingQuestionAnswers[idxDrop] = {
+                                                    question: 'TRANSFER_ARRIVAL_DROP_OFF',
+                                                    answer: 'CONTACT_SUPPLIER_LATER',
+                                                    unit: 'LOCATION_REFERENCE'
+                                                };
+                                                console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF corrigido para fallback final');
+                                            }
+                                        }
+                                    } else {
+                                        // Não existe DROP_OFF, mas produto exige - adicionar
                                         if (pickupVal === 'CONTACT_SUPPLIER_LATER') {
-                                            bookingQuestionAnswers[idxDrop] = {
+                                            bookingQuestionAnswers.push({
                                                 question: 'TRANSFER_ARRIVAL_DROP_OFF',
                                                 answer: 'CONTACT_SUPPLIER_LATER',
                                                 unit: 'LOCATION_REFERENCE'
-                                            };
-                                            console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF corrigido para CONTACT_SUPPLIER_LATER');
+                                            });
+                                            console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF adicionado como CONTACT_SUPPLIER_LATER');
                                         } else if (pickupVal && pickupVal.startsWith('LOC-')) {
-                                            bookingQuestionAnswers[idxDrop] = {
+                                            bookingQuestionAnswers.push({
                                                 question: 'TRANSFER_ARRIVAL_DROP_OFF',
                                                 answer: pickupVal,
                                                 unit: 'LOCATION_REFERENCE'
-                                            };
-                                            console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF corrigido para PICKUP_POINT (LOC-)');
+                                            });
+                                            console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF adicionado a partir do PICKUP_POINT (LOC-)');
                                         } else {
-                                            bookingQuestionAnswers[idxDrop] = {
+                                            bookingQuestionAnswers.push({
                                                 question: 'TRANSFER_ARRIVAL_DROP_OFF',
                                                 answer: 'CONTACT_SUPPLIER_LATER',
                                                 unit: 'LOCATION_REFERENCE'
-                                            };
-                                            console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF corrigido para fallback final');
+                                            });
+                                            console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF adicionado com fallback final');
                                         }
                                     }
                                 } else {
-                                    // Não existe DROP_OFF, mas produto exige - adicionar
-                                    if (pickupVal === 'CONTACT_SUPPLIER_LATER') {
-                                        bookingQuestionAnswers.push({
-                                            question: 'TRANSFER_ARRIVAL_DROP_OFF',
-                                            answer: 'CONTACT_SUPPLIER_LATER',
-                                            unit: 'LOCATION_REFERENCE'
-                                        });
-                                        console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF adicionado como CONTACT_SUPPLIER_LATER');
-                                    } else if (pickupVal && pickupVal.startsWith('LOC-')) {
-                                        bookingQuestionAnswers.push({
-                                            question: 'TRANSFER_ARRIVAL_DROP_OFF',
-                                            answer: pickupVal,
-                                            unit: 'LOCATION_REFERENCE'
-                                        });
-                                        console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF adicionado a partir do PICKUP_POINT (LOC-)');
-                                    } else {
-                                        bookingQuestionAnswers.push({
-                                            question: 'TRANSFER_ARRIVAL_DROP_OFF',
-                                            answer: 'CONTACT_SUPPLIER_LATER',
-                                            unit: 'LOCATION_REFERENCE'
-                                        });
-                                        console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF adicionado com fallback final');
+                                    // Produto não exige DROP_OFF → remover se existir
+                                    if (idxDrop !== -1) {
+                                        bookingQuestionAnswers.splice(idxDrop, 1);
+                                        console.log('🔧 [CONFIRM] Removido TRANSFER_ARRIVAL_DROP_OFF (produto não exige)');
                                     }
-                                }
-                            } else {
-                                // Produto não exige DROP_OFF → remover se existir
-                                if (idxDrop !== -1) {
-                                    bookingQuestionAnswers.splice(idxDrop, 1);
-                                    console.log('🔧 [CONFIRM] Removido TRANSFER_ARRIVAL_DROP_OFF (produto não exige)');
                                 }
                             }
                         } catch (e) {
@@ -15500,12 +15586,18 @@ class ViatorBookingManager {
                             // EXCEÇÃO: se a API exigir PICKUP_POINT (como neste produto), garantir presença
                             if (!hasGenericPickup) {
                                 // Criar PICKUP_POINT coerente com a política do produto
-                                if (allowCustomPickup === false) {
-                                    bookingQuestionAnswers.push({ question: 'PICKUP_POINT', answer: 'CONTACT_SUPPLIER_LATER', unit: 'LOCATION_REFERENCE' });
-                                    console.log('🔧 [CONFIRM] PICKUP_POINT adicionado (exigido) como CONTACT_SUPPLIER_LATER');
+                                // CORREÇÃO DEFENSIVA: Verificar se é cenário SEA→AIR com pickup especializado
+                                const innerShouldSkip = (arrivalMode === 'SEA' && departureMode === 'AIR' && hasSpecializedPickup);
+                                if (!innerShouldSkip) {
+                                    if (allowCustomPickup === false) {
+                                        bookingQuestionAnswers.push({ question: 'PICKUP_POINT', answer: 'CONTACT_SUPPLIER_LATER', unit: 'LOCATION_REFERENCE' });
+                                        console.log('🔧 [CONFIRM] PICKUP_POINT adicionado (exigido) como CONTACT_SUPPLIER_LATER');
+                                    } else {
+                                        bookingQuestionAnswers.push({ question: 'PICKUP_POINT', answer: 'CONTACT_SUPPLIER_LATER', unit: 'LOCATION_REFERENCE' });
+                                        console.log('🔧 [CONFIRM] PICKUP_POINT adicionado (fallback conservador)');
+                                    }
                                 } else {
-                                    bookingQuestionAnswers.push({ question: 'PICKUP_POINT', answer: 'CONTACT_SUPPLIER_LATER', unit: 'LOCATION_REFERENCE' });
-                                    console.log('🔧 [CONFIRM] PICKUP_POINT adicionado (fallback conservador)');
+                                    console.log('🔧 [CONFIRM] PICKUP_POINT bloqueado (SEA→AIR com pickup especializado - evita "Extra answer")');
                                 }
                             }
                         } else if (allowCustomPickup === false) {
@@ -15550,7 +15642,9 @@ class ViatorBookingManager {
                             intentionalFieldRemovals.has('PICKUP_POINT_RAIL_AIR')
                         );
 
-                        if (idxGeneric_fallback === -1 && (productIds_fallback.has('PICKUP_POINT') || hasLogisticsPickup) && !wasIntentionallyRemoved) {
+                        // CORREÇÃO DEFENSIVA: Verificar se é cenário SEA→AIR com pickup especializado
+                        const fallbackShouldSkip = (arrivalMode === 'SEA' && departureMode === 'AIR' && hasSpecializedPickup);
+                        if (idxGeneric_fallback === -1 && (productIds_fallback.has('PICKUP_POINT') || hasLogisticsPickup) && !wasIntentionallyRemoved && !fallbackShouldSkip) {
                             bookingQuestionAnswers.push({
                                 question: 'PICKUP_POINT',
                                 answer: 'CONTACT_SUPPLIER_LATER',
@@ -15559,6 +15653,8 @@ class ViatorBookingManager {
                             console.log('🔧 [CONFIRM] PICKUP_POINT adicionado (faltante) como CONTACT_SUPPLIER_LATER');
                         } else if (wasIntentionallyRemoved) {
                             console.log('🔧 [30.1] Readição de PICKUP_POINT bloqueada (remoção intencional detectada)');
+                        } else if (fallbackShouldSkip) {
+                            console.log('🔧 [30.1] PICKUP_POINT bloqueado (SEA→AIR com pickup especializado - evita "Extra answer")');
                         }
                     } catch(_e) { /* no-op */ }
 
@@ -15640,6 +15736,26 @@ class ViatorBookingManager {
                         }
                     }
 
+                    // CASO 1.5: Produtos SEA→AIR com conflito de campos - remover TRANSFER_ARRIVAL_DROP_OFF (correção defensiva)
+                    else if (arrivalMode === 'SEA' && departureMode === 'AIR' && hasSpecializedPickup && arrivalDropOffIdx !== -1) {
+                        const dropOffAnswer = String(bookingQuestionAnswers[arrivalDropOffIdx].answer || '').trim();
+                        // Remover TRANSFER_ARRIVAL_DROP_OFF para evitar "Extra answer(s) provided"
+                        bookingQuestionAnswers.splice(arrivalDropOffIdx, 1);
+                        console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF removido para SEA→AIR com pickup especializado (evita "Extra answer")');
+                    }
+
+                    // DEBUG: Log das condições para SEA→AIR
+                    if (arrivalMode === 'SEA' && departureMode === 'AIR') {
+                        console.log('🔍 [DEBUG SEA→AIR] Condições:', {
+                            arrivalMode,
+                            departureMode,
+                            hasSpecializedPickup,
+                            arrivalDropOffIdx,
+                            'arrivalDropOffIdx !== -1': arrivalDropOffIdx !== -1,
+                            'condição completa': (arrivalMode === 'SEA' && departureMode === 'AIR' && hasSpecializedPickup && arrivalDropOffIdx !== -1)
+                        });
+                    }
+
                     // CASO 2: Produtos SEA com campos especializados
                     else if ((arrivalMode === 'SEA' || departureMode === 'SEA') && (hasPortFields || hasSpecializedPickup)) {
                         const hasArrivalDropOff = arrivalDropOffIdx !== -1;
@@ -15660,13 +15776,15 @@ class ViatorBookingManager {
                         }
 
                         // CASO 2B: COM TRANSFER_ARRIVAL_DROP_OFF - garantir PICKUP_POINT (correção 29.6)
-                        else if (hasArrivalDropOff && pickupPointIdx === -1) {
+                        // AJUSTE CAUTELOSO: somente adicionar PICKUP_POINT se NÃO houver pickup especializado de partida
+                        // ou se o modo de partida também for SEA. Evita "Extra answer(s) provided" em cenários SEA→AIR.
+                        else if (hasArrivalDropOff && pickupPointIdx === -1 && (!hasSpecializedPickup || departureMode === 'SEA')) {
                             bookingQuestionAnswers.push({
                                 question: 'PICKUP_POINT',
                                 answer: 'CONTACT_SUPPLIER_LATER',
                                 unit: 'LOCATION_REFERENCE'
                             });
-                            console.log('🔧 [CONFIRM] PICKUP_POINT adicionado para produto SEA com ARRIVAL_DROP_OFF (evita missing answer)');
+                            console.log('🔧 [CONFIRM] PICKUP_POINT adicionado (SEA com ARRIVAL_DROP_OFF, sem pickup especializado de partida ou dep=SEA)');
                         }
                     }
 
@@ -15734,23 +15852,32 @@ class ViatorBookingManager {
                     });
 
                     // Se o produto tem PICKUP_POINT nas BQ originais mas não está presente na confirmação
-                    if (productHasPickupPoint && pickupPointIdx === -1) {
+                    // CORREÇÃO DEFENSIVA: Evitar PICKUP_POINT em SEA→AIR com pickup especializado de partida
+                    const shouldSkipPickupPoint = (arrivalMode === 'SEA' && departureMode === 'AIR' && hasSpecializedPickup);
+                    if (productHasPickupPoint && pickupPointIdx === -1 && !shouldSkipPickupPoint) {
                         bookingQuestionAnswers.push({
                             question: 'PICKUP_POINT',
                             answer: 'CONTACT_SUPPLIER_LATER',
                             unit: 'LOCATION_REFERENCE'
                         });
                         console.log('🔧 [CONFIRM] PICKUP_POINT adicionado (campo obrigatório nas BQ originais)');
+                    } else if (shouldSkipPickupPoint) {
+                        console.log('🔧 [CONFIRM] PICKUP_POINT BLOQUEADO (SEA→AIR com pickup especializado - evita "Extra answer")');
                     }
 
                     // Se o produto tem TRANSFER_ARRIVAL_DROP_OFF nas BQ originais mas não está presente na confirmação
-                    if (productHasDropOff && arrivalDropOffIdx === -1) {
+                    // BLOQUEAR em SEA→AIR com pickup especializado
+                    const shouldSkipDropOff = (arrivalMode === 'SEA' && departureMode === 'AIR' && hasSpecializedPickup);
+                    this.logBookingEvent('sea_air_debug', { step: 'mandatory re-add check', arrivalMode, departureMode, hasSpecializedPickup, shouldSkipDropOff }, 'info');
+                    if (productHasDropOff && arrivalDropOffIdx === -1 && !shouldSkipDropOff) {
                         bookingQuestionAnswers.push({
                             question: 'TRANSFER_ARRIVAL_DROP_OFF',
                             answer: 'CONTACT_SUPPLIER_LATER',
                             unit: 'FREETEXT'
                         });
                         console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF adicionado (campo obrigatório nas BQ originais)');
+                    } else if (productHasDropOff && arrivalDropOffIdx === -1 && shouldSkipDropOff) {
+                        console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF BLOQUEADO (SEA→AIR com pickup especializado) - não readicionar (originais)');
                     }
 
                     // CORREÇÃO 29.12: Verificação final para produtos que requerem campos específicos
@@ -15774,7 +15901,9 @@ class ViatorBookingManager {
                         intentionalFieldRemovals.has('PICKUP_POINT_RAIL_AIR')
                     );
 
-                    if (productHasPickupPoint && finalPickupPointIdx === -1 && !wasPickupIntentionallyRemoved) {
+                    // CORREÇÃO DEFENSIVA: Recalcular shouldSkipPickupPoint para verificação final
+                    const finalShouldSkipPickupPoint = (arrivalMode === 'SEA' && departureMode === 'AIR' && hasSpecializedPickup);
+                    if (productHasPickupPoint && finalPickupPointIdx === -1 && !wasPickupIntentionallyRemoved && !finalShouldSkipPickupPoint) {
                         bookingQuestionAnswers.push({
                             question: 'PICKUP_POINT',
                             answer: 'CONTACT_SUPPLIER_LATER',
@@ -15783,15 +15912,22 @@ class ViatorBookingManager {
                         console.log('🔧 [CONFIRM] PICKUP_POINT readicionado após outras correções (campo obrigatório)');
                     } else if (wasPickupIntentionallyRemoved) {
                         console.log('🔧 [30.3] PICKUP_POINT NÃO readicionado - remoção intencional detectada (correções 30.1/30.2)');
+                    } else if (finalShouldSkipPickupPoint) {
+                        console.log('🔧 [30.3] PICKUP_POINT NÃO readicionado - SEA→AIR com pickup especializado (evita "Extra answer")');
                     }
 
-                    if (productHasDropOff && finalDropOffIdx === -1) {
+                    // Verificação final: BLOQUEAR readição em SEA→AIR com pickup especializado
+                    const finalShouldSkipDropOff = (arrivalMode === 'SEA' && departureMode === 'AIR' && hasSpecializedPickup);
+                    this.logBookingEvent('sea_air_debug', { step: 'final re-add check', arrivalMode, departureMode, hasSpecializedPickup, finalShouldSkipDropOff }, 'info');
+                    if (productHasDropOff && finalDropOffIdx === -1 && !finalShouldSkipDropOff) {
                         bookingQuestionAnswers.push({
                             question: 'TRANSFER_ARRIVAL_DROP_OFF',
                             answer: 'CONTACT_SUPPLIER_LATER',
                             unit: 'FREETEXT'
                         });
                         console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF readicionado após outras correções (campo obrigatório)');
+                    } else if (productHasDropOff && finalDropOffIdx === -1 && finalShouldSkipDropOff) {
+                        console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF BLOQUEADO (SEA→AIR com pickup especializado) - não readicionar (verificação final)');
                     }
                 } catch(_e) { /* no-op */ }
 
@@ -15944,6 +16080,82 @@ class ViatorBookingManager {
                             }
                         }
                     }
+
+                // LIMPEZA DEFENSIVA FINAL: Remover campos de partida incompatíveis com o modo selecionado
+                try {
+                    const depModeIdx = bookingQuestionAnswers.findIndex(a => (a?.question || a?.questionId) === 'TRANSFER_DEPARTURE_MODE');
+                    const depMode = depModeIdx !== -1 ? String(bookingQuestionAnswers[depModeIdx].answer || '').trim() : '';
+
+                    if (depMode) {
+                        const before = bookingQuestionAnswers.length;
+                        bookingQuestionAnswers = bookingQuestionAnswers.filter(function(a){
+                            const qid = a && (a.question || a.questionId);
+
+                            // Se departureMode=AIR, remover campos de partida SEA e RAIL
+                            if (depMode === 'AIR') {
+                                return qid !== 'TRANSFER_PORT_DEPARTURE_TIME' &&
+                                       qid !== 'TRANSFER_RAIL_DEPARTURE_LINE' &&
+                                       qid !== 'TRANSFER_RAIL_DEPARTURE_STATION';
+                            }
+                            // Se departureMode=SEA, remover campos de partida AIR e RAIL
+                            else if (depMode === 'SEA') {
+                                return qid !== 'TRANSFER_AIR_DEPARTURE_AIRLINE' &&
+                                       qid !== 'TRANSFER_AIR_DEPARTURE_FLIGHT_NO' &&
+                                       qid !== 'TRANSFER_RAIL_DEPARTURE_LINE' &&
+                                       qid !== 'TRANSFER_RAIL_DEPARTURE_STATION';
+                            }
+                            // Se departureMode=RAIL, remover campos de partida AIR e SEA
+                            else if (depMode === 'RAIL') {
+                                return qid !== 'TRANSFER_AIR_DEPARTURE_AIRLINE' &&
+                                       qid !== 'TRANSFER_AIR_DEPARTURE_FLIGHT_NO' &&
+                                       qid !== 'TRANSFER_PORT_DEPARTURE_TIME';
+                            }
+
+                            return true; // manter outros campos
+                        });
+                        const after = bookingQuestionAnswers.length;
+                        if (after !== before) {
+                            console.log(`🔧 [CONFIRM] Campos de partida incompatíveis removidos para departureMode=${depMode} (evita "Too many departure answers")`);
+                        }
+                    }
+                } catch(_e) { /* no-op */ }
+
+                // CORREÇÃO CAUTELOSA [Adaptive Cleanup]: Remover perguntas marcadas pela API como "Extra answer(s) provided"
+                // Persistência do Adaptive Cleanup por sessão (isolado por cartRef)
+                // Comentários em PT-BR: Persistimos IDs rejeitados para que novas tentativas/reloads mantenham a limpeza
+                try {
+                    const cartRefKey = requestParams?.cartRef || this.bookingData?.holdData?.cartRef || this.bookingData?.cartRef;
+                    if (cartRefKey && typeof sessionStorage !== 'undefined') {
+                        const stored = sessionStorage.getItem(`viator_skip_qs_${cartRefKey}`);
+                        if (stored) {
+                            const arr = JSON.parse(stored);
+                            if (Array.isArray(arr) && arr.length > 0) {
+                                this._confirmSkipQuestions = { cartRef: cartRefKey, questions: new Set(arr) };
+                                this.logBookingEvent('sea_air_debug', { step: 'adaptive_cleanup_load', cartRef: cartRefKey, skipCount: arr.length }, 'info');
+                            }
+                        }
+                    }
+                } catch(_e) { /* no-op */ }
+
+                // Esta filtragem só é aplicada quando uma tentativa anterior falhou com BAD_REQUEST explicitando os IDs excedentes.
+                // Mantém a lógica de renderização intacta e atua apenas de forma reativa e condicional.
+                try {
+                    if (this._confirmSkipQuestions && this._confirmSkipQuestions.cartRef === requestParams.cartRef) {
+                        const skipSet = this._confirmSkipQuestions.questions || new Set();
+                        if (skipSet && skipSet.size > 0) {
+                            const before = bookingQuestionAnswers.length;
+                            bookingQuestionAnswers = bookingQuestionAnswers.filter(function(a){
+                                const qid = (a && (a.question || a.questionId)) || '';
+                                return !skipSet.has(String(qid).trim());
+                            });
+                            const after = bookingQuestionAnswers.length;
+                            if (after !== before) {
+                                console.log('🔧 [CONFIRM][Adaptive Cleanup] Removidos campos previamente sinalizados pela API como extras:', Array.from(skipSet));
+                            }
+                        }
+                    }
+                } catch (_e) { /* no-op */ }
+
                 } catch (_e) { /* no-op */ }
 
                 // REAFIRMAR 30.10: Garantir que as alterações de completude sejam refletidas no payload
@@ -15993,6 +16205,32 @@ class ViatorBookingManager {
                         trackingId: trackingId,
                         fullResponse: confirmationData
                     }, 'error');
+
+                    // Capturar lista de "extras" para limpeza adaptativa no próximo retry (quando mensagem contiver esse padrão)
+                    try {
+                        const msg2 = (errorMessage || '').toString();
+                        const badReq2 = /Extra answer\(s\) provided\s*:\s*(.+)$/i.exec(msg2);
+                        if (badReq2 && badReq2[1]) {
+                            const extras = badReq2[1].split(',').map(s => s.trim()).filter(Boolean);
+                            const cartRef = requestParams?.cartRef || this.bookingData?.holdData?.cartRef || this.bookingData?.cartRef;
+                            this._confirmSkipQuestions = { cartRef: cartRef, questions: new Set(extras) };
+                            console.warn('⚠️ [CONFIRM] BAD_REQUEST (success-path) com extras detectado. Remoção adaptativa configurada para próxima tentativa:', extras);
+                        }
+                    } catch(_e) { /* no-op */ }
+
+                        // Persistência do Adaptive Cleanup também neste caminho (success=true porém erro interno)
+                        try {
+                            const cartRef2 = requestParams?.cartRef || this.bookingData?.holdData?.cartRef || this.bookingData?.cartRef;
+                            if (cartRef2 && typeof sessionStorage !== 'undefined') {
+                                const badReq2 = /Extra answer\(s\) provided\s*:\s*(.+)$/i.exec((errorMessage||'').toString());
+                                if (badReq2 && badReq2[1]) {
+                                    const extras2 = badReq2[1].split(',').map(s => s.trim()).filter(Boolean);
+                                    sessionStorage.setItem(`viator_skip_qs_${cartRef2}`, JSON.stringify(extras2));
+                                    this.logBookingEvent('sea_air_debug', { step: 'adaptive_cleanup_store_success_path', cartRef: cartRef2, extras: extras2 }, 'info');
+                                }
+                            }
+                        } catch(_e) { /* no-op */ }
+
 
                     // CORREÇÃO: Não exibir erro durante retry - apenas lançar exceção com trackingId
                     // O erro será exibido apenas no final se todas as tentativas falharem
@@ -16077,6 +16315,35 @@ class ViatorBookingManager {
                     this.displayConfirmationMessage(this.bookingData.confirmationData);
                     return true;
                 }
+
+                // Sinalizar perguntas extras reportadas pela API (para a próxima tentativa, se houver)
+                try {
+                    const msgBad = (data?.data?.message || '').toString();
+
+                    // Capturar "Extra answer(s) provided: ..."
+                    const badRequest = /Extra answer\(s\) provided\s*:\s*(.+)$/i.exec(msgBad);
+                    if (badRequest && badRequest[1]) {
+                        const extrasRaw = badRequest[1];
+                        const extras = extrasRaw.split(',').map(s => s.trim()).filter(Boolean);
+                        // Armazenar por cartRef para evitar interferência entre diferentes carrinhos
+                        const cartRef = requestParams?.cartRef || this.bookingData?.holdData?.cartRef || this.bookingData?.cartRef;
+                        this._confirmSkipQuestions = { cartRef: cartRef, questions: new Set(extras) };
+                        try {
+                            if (cartRef && typeof sessionStorage !== 'undefined') {
+                                sessionStorage.setItem(`viator_skip_qs_${cartRef}`, JSON.stringify(extras));
+                                this.logBookingEvent('sea_air_debug', { step: 'adaptive_cleanup_store', cartRef, extras }, 'info');
+                            }
+                        } catch(_e) { /* no-op */ }
+                        console.warn('⚠️ [CONFIRM] BAD_REQUEST com extras detectado. Marcaremos para remoção adaptativa na próxima tentativa:', extras);
+                    }
+
+                    // Capturar "Too many departure answers provided" - sinalizar para limpeza de campos de partida
+                    else if (/Too many departure answers provided/i.test(msgBad)) {
+                        console.warn('⚠️ [CONFIRM] "Too many departure answers" detectado - limpeza de campos de partida será aplicada na próxima tentativa');
+                        this.logBookingEvent('sea_air_debug', { step: 'too_many_departure_detected', message: msgBad }, 'info');
+                    }
+                } catch(_e) { /* no-op */ }
+
 
                 // Caso não seja idempotente, lançar para retry
                 const error = new Error(fullErrorMessage);
@@ -18670,6 +18937,15 @@ class ViatorBookingManager {
     closeModal() {
         const modal = document.getElementById('viator-booking-modal');
         if (modal) {
+        try {
+            // Limpar persistência do Adaptive Cleanup ao cancelar/fechar
+            const cartRefKey = this.bookingData?.holdData?.cartRef || this.bookingData?.cartRef;
+            if (cartRefKey && typeof sessionStorage !== 'undefined') {
+                sessionStorage.removeItem(`viator_skip_qs_${cartRefKey}`);
+                this.logBookingEvent('sea_air_debug', { step: 'adaptive_cleanup_clear_on_cancel', cartRef: cartRefKey }, 'info');
+            }
+        } catch(_e) { /* no-op */ }
+
             modal.remove();
         }
 
