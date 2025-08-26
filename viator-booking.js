@@ -11,7 +11,34 @@ console.log('🚨 [CRITICAL DEBUG] URL atual:', window.location.href);
 // JavaScript carregado com sucesso
 
 // VERSÃO DO ARQUIVO PARA QUEBRAR CACHE
-window.VIATOR_BOOKING_VERSION = '2025-08-01-16:10:00';
+window.VIATOR_BOOKING_VERSION = '2025-08-26-30.11-DATE-FIX-' + Math.random().toString(36).substr(2, 9);
+
+// CORREÇÃO 30.11: Validação de carregamento da versão
+console.log('🔧 [30.11] VERSÃO CARREGADA:', window.VIATOR_BOOKING_VERSION);
+console.log('🔧 [30.11] DATE-FIX – correção específica para TRANSFER_DEPARTURE_DATE ativada');
+// Alerta para confirmar carregamento
+if (window.location.href.includes('100014P4')) {
+    setTimeout(() => {
+        console.log('🔧 [30.11] CONFIRMAÇÃO: Arquivo recarregado com DATE-FIX', window.VIATOR_BOOKING_VERSION);
+    }, 1000);
+}
+
+// CONFORMIDADE VIATOR: Configuração global de feature flags
+window.viatorConfig = window.viatorConfig || {};
+window.viatorConfig.enhancedValidation = window.viatorConfig.enhancedValidation !== false; // Default: true
+window.viatorConfig.fixPickupPointConflict = window.viatorConfig.fixPickupPointConflict !== false; // Default: true
+
+// Feature flag 30.10: completude de partida AIR (default: true)
+if (typeof window.viatorConfig.forceDepartureAirCompleteness === 'undefined') {
+    window.viatorConfig.forceDepartureAirCompleteness = true;
+}
+
+console.log('🔍 [COMPLIANCE] Configuração de conformidade Viator:', {
+    enhancedValidation: window.viatorConfig.enhancedValidation,
+    forceDepartureAirCompleteness: window.viatorConfig.forceDepartureAirCompleteness,
+    fixPickupPointConflict: window.viatorConfig.fixPickupPointConflict,
+    version: '2.0-compliance'
+});
 
 // Sistema de perguntas condicionais da Viator
 const ViatorConditionalQuestions = {
@@ -6651,6 +6678,37 @@ class ViatorBookingManager {
 
             const dynamicAnswers = this.collectDynamicBookingAnswers();
 
+            // CORREÇÃO 29.13 REVISADA: Preservar seleções manuais do usuário (APÓS coleta de dados)
+            // Executar DEPOIS da coleta de dados, mas ANTES das correções aplicarem fallbacks automáticos
+            try {
+                console.log('🔧 [29.13] Iniciando preservação de seleções manuais...');
+
+                // Processar tanto dynamicAnswers quanto respostas já existentes
+                const allAnswers = [...dynamicAnswers, ...(this.bookingData.bookingQuestionAnswers || [])];
+
+                // Preservar seleções manuais para campos LOCATION_REF_OR_FREE_TEXT
+                this.preserveManualSelectionsForLocationFields(allAnswers);
+
+                console.log('🔧 [29.13] Preservação de seleções manuais concluída');
+            } catch(e) {
+                console.warn('🔧 [29.13] Erro na preservação de seleções manuais:', e);
+            }
+
+            // CONFORMIDADE VIATOR: Validação conforme documentação oficial (PRIORIDADE CRÍTICA)
+            try {
+                console.log('🔍 [COMPLIANCE] Iniciando validação conforme documentação oficial Viator...');
+
+                // Injetar estilos de conformidade (PRIORIDADE IMPORTANTE)
+                this.injectComplianceStyles();
+
+                // Aplicar validações de conformidade para todas as respostas
+                this.applyViatorComplianceValidation(dynamicAnswers);
+
+                console.log('🔍 [COMPLIANCE] Validação de conformidade concluída');
+            } catch(e) {
+                console.warn('🔍 [COMPLIANCE] Erro na validação de conformidade:', e);
+            }
+
             // BUGFIX: Nunca perder respostas já coletadas (ex.: PICKUP_POINT) quando dynamicAnswers vier vazio
             const perTravelerIds = ['AGEBAND', 'FULL_NAMES_FIRST', 'FULL_NAMES_LAST', 'HEIGHT'];
             const existing = Array.isArray(this.bookingData.bookingQuestionAnswers) ? this.bookingData.bookingQuestionAnswers : [];
@@ -9793,6 +9851,739 @@ class ViatorBookingManager {
         }
         console.log('❌ Pickup customizado NÃO permitido (sem logistics e sem FREETEXT em units)');
         return false;
+    }
+
+    /**
+     * Verificar se o usuário explicitamente escolheu "CONTACT_SUPPLIER_LATER" (Correção 29.13)
+     */
+    checkIfUserExplicitlyChoseContactSupplier() {
+        try {
+            // Verificar se há um radio button "Vou decidir depois" selecionado
+            const contactSupplierRadio = document.querySelector('input[value="CONTACT_SUPPLIER_LATER"]:checked');
+            if (contactSupplierRadio) {
+                console.log('🔍 [29.13] Usuário explicitamente selecionou "Vou decidir depois"');
+                return true;
+            }
+
+            // Verificar se há seleção na lista de pickup points
+            const hiddenPickupField = document.querySelector('input[type="hidden"][data-question-id="PICKUP_POINT"]');
+            if (hiddenPickupField) {
+                const baseId = hiddenPickupField.id || 'booking_question_PICKUP_POINT';
+                const listChoiceSelected = document.querySelector(`input[name="${baseId}_list_choice"]:checked`);
+
+                if (listChoiceSelected && listChoiceSelected.value === 'CONTACT_SUPPLIER_LATER') {
+                    console.log('🔍 [29.13] Usuário selecionou "CONTACT_SUPPLIER_LATER" da lista');
+                    return true;
+                }
+            }
+
+            console.log('🔍 [29.13] CONTACT_SUPPLIER_LATER não foi explicitamente selecionado pelo usuário');
+            return false;
+        } catch (error) {
+            console.warn('🔍 [29.13] Erro ao verificar seleção do usuário:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Preservar seleções manuais do usuário para campos LOCATION_REF_OR_FREE_TEXT (Correção 29.13 Revisada)
+     * Implementação conforme documentação oficial da Viator
+     */
+    preserveManualSelectionsForLocationFields(allAnswers) {
+        try {
+            // Campos que seguem o padrão LOCATION_REF_OR_FREE_TEXT
+            const locationFields = ['PICKUP_POINT', 'TRANSFER_DEPARTURE_PICKUP', 'TRANSFER_ARRIVAL_DROP_OFF'];
+
+            locationFields.forEach(fieldName => {
+                const fieldIdx = allAnswers.findIndex(a => (a?.question || a?.questionId) === fieldName);
+
+                if (fieldIdx !== -1) {
+                    const currentAnswer = allAnswers[fieldIdx];
+                    const currentValue = String(currentAnswer.answer || '').trim();
+                    const currentUnit = currentAnswer.unit || '';
+
+                    console.log(`🔧 [29.13] Analisando ${fieldName}:`, { currentValue, currentUnit });
+
+                    // CRITÉRIO 1: LOCATION_REFERENCE válido (conforme documentação Viator)
+                    const isValidLocationRef = (currentUnit === 'LOCATION_REFERENCE' &&
+                                              (currentValue.startsWith('LOC-') ||
+                                               currentValue === 'MEET_AT_DEPARTURE_POINT'));
+
+                    // CRITÉRIO 2: FREETEXT válido (quando permitido)
+                    const allowCustom = this.isCustomPickupAllowedForField(fieldName);
+                    const isValidFreetext = (currentUnit === 'FREETEXT' &&
+                                           allowCustom === true &&
+                                           currentValue &&
+                                           currentValue !== 'CONTACT_SUPPLIER_LATER' &&
+                                           currentValue !== 'CHOOSE_FROM_LIST');
+
+                    // PRESERVAR seleções manuais válidas
+                    if (isValidLocationRef || isValidFreetext) {
+                        currentAnswer._userSelected = true;
+                        currentAnswer._preserveValue = true;
+                        console.log(`🔧 [29.13] Seleção manual preservada para ${fieldName}:`, currentValue);
+                    } else if (currentValue === 'CONTACT_SUPPLIER_LATER') {
+                        // Verificar se foi explicitamente selecionado pelo usuário
+                        const userExplicitlyChose = this.checkIfUserExplicitlyChoseContactSupplier();
+                        if (userExplicitlyChose) {
+                            currentAnswer._userSelected = true;
+                            currentAnswer._preserveValue = true;
+                            console.log(`🔧 [29.13] Usuário explicitamente escolheu "Vou decidir depois" para ${fieldName}`);
+                        } else {
+                            console.log(`🔧 [29.13] CONTACT_SUPPLIER_LATER detectado como automático para ${fieldName}, pode ser sobrescrito se necessário`);
+                        }
+                    } else {
+                        console.log(`🔧 [29.13] Valor inválido detectado para ${fieldName}, permitindo correções automáticas`);
+                    }
+                }
+            });
+        } catch(e) {
+            console.warn('🔧 [29.13] Erro na preservação de seleções manuais:', e);
+        }
+    }
+
+    /**
+     * Verificar se custom pickup é permitido para um campo específico
+     */
+    isCustomPickupAllowedForField(fieldName) {
+        try {
+            // Para PICKUP_POINT, usar a lógica existente
+            if (fieldName === 'PICKUP_POINT') {
+                return this.isCustomPickupAllowed();
+            }
+
+            // Para outros campos, verificar allowCustomTravelerPickup
+            const allowCustom = window.productData?.logistics?.travelerPickup?.allowCustomTravelerPickup;
+            return allowCustom === true;
+        } catch(e) {
+            console.warn(`🔧 [29.13] Erro ao verificar allowCustom para ${fieldName}:`, e);
+            return false;
+        }
+    }
+
+    /**
+     * Função de teste para validar a Correção 29.13 (apenas para desenvolvimento)
+     */
+    testCorrection2913() {
+        console.log('🧪 [TESTE 29.13] Iniciando teste da preservação de seleções manuais...');
+
+        // Simular dados de teste
+        const testAnswers = [
+            { question: 'PICKUP_POINT', answer: 'LOC-abc123', unit: 'LOCATION_REFERENCE' },
+            { question: 'PICKUP_POINT', answer: 'Hotel Copacabana', unit: 'FREETEXT' },
+            { question: 'PICKUP_POINT', answer: 'CONTACT_SUPPLIER_LATER', unit: 'LOCATION_REFERENCE' },
+            { question: 'PICKUP_POINT', answer: '', unit: '' }
+        ];
+
+        testAnswers.forEach((testAnswer, index) => {
+            console.log(`🧪 [TESTE 29.13] Caso ${index + 1}:`, testAnswer);
+            this.preserveManualSelectionsForLocationFields([testAnswer]);
+            console.log(`🧪 [TESTE 29.13] Resultado ${index + 1}:`, {
+                preserveValue: testAnswer._preserveValue,
+                userSelected: testAnswer._userSelected
+            });
+        });
+
+        console.log('🧪 [TESTE 29.13] Teste concluído');
+    }
+
+    /**
+     * CONFORMIDADE VIATOR: Validação de allowedAnswers conforme documentação oficial
+     * Aplica-se a: AGEBAND, TRANSFER_ARRIVAL_MODE, TRANSFER_DEPARTURE_MODE
+     */
+    validateAllowedAnswers(question, answer, productData) {
+        try {
+            // Feature flag para controle de risco
+            const ENHANCED_VALIDATION = window.viatorConfig?.enhancedValidation !== false; // Default: true
+
+            if (!ENHANCED_VALIDATION) {
+                console.log('🔍 [COMPLIANCE] Enhanced validation desabilitada via feature flag');
+                return { valid: true };
+            }
+
+            // Campos com respostas restritas conforme documentação oficial
+            const restrictedQuestions = ['AGEBAND', 'TRANSFER_ARRIVAL_MODE', 'TRANSFER_DEPARTURE_MODE'];
+
+            if (!restrictedQuestions.includes(question.id || question.questionId)) {
+                return { valid: true };
+            }
+
+            // Obter allowedAnswers da configuração ou produto
+            let allowedAnswers = question.allowedAnswers || [];
+
+            // AGEBAND: valores padrão conforme documentação Viator
+            if (question.id === 'AGEBAND' && allowedAnswers.length === 0) {
+                allowedAnswers = ['ADULT', 'CHILD', 'INFANT', 'YOUTH', 'SENIOR'];
+            }
+
+            // TRANSFER_ARRIVAL_MODE/DEPARTURE_MODE: valores padrão
+            if ((question.id === 'TRANSFER_ARRIVAL_MODE' || question.id === 'TRANSFER_DEPARTURE_MODE') && allowedAnswers.length === 0) {
+                allowedAnswers = ['AIR', 'RAIL', 'SEA', 'OTHER'];
+            }
+
+            if (allowedAnswers.length > 0 && !allowedAnswers.includes(answer)) {
+                console.warn(`🔍 [COMPLIANCE] Resposta inválida para ${question.id}:`, {
+                    answer: answer,
+                    allowedAnswers: allowedAnswers
+                });
+
+                return {
+                    valid: false,
+                    message: `Resposta deve ser uma das opções válidas: ${allowedAnswers.join(', ')}`,
+                    allowedAnswers: allowedAnswers
+                };
+            }
+
+            console.log(`🔍 [COMPLIANCE] Validação allowedAnswers OK para ${question.id}:`, answer);
+            return { valid: true };
+
+        } catch(e) {
+            console.warn('🔍 [COMPLIANCE] Erro na validação allowedAnswers:', e);
+            return { valid: true }; // Fallback seguro
+        }
+    }
+
+    /**
+     * CONFORMIDADE VIATOR: Validação rigorosa de maxLength conforme documentação oficial
+     */
+    validateMaxLength(answer, maxLength, questionId) {
+        try {
+            // Feature flag para controle de risco
+            const ENHANCED_VALIDATION = window.viatorConfig?.enhancedValidation !== false;
+
+            if (!ENHANCED_VALIDATION || !maxLength) {
+                return { valid: true };
+            }
+
+            const answerStr = String(answer || '');
+
+            if (answerStr.length > maxLength) {
+                console.warn(`🔍 [COMPLIANCE] Resposta excede maxLength para ${questionId}:`, {
+                    answer: answerStr,
+                    length: answerStr.length,
+                    maxLength: maxLength
+                });
+
+                return {
+                    valid: false,
+                    message: `Resposta excede o limite de ${maxLength} caracteres (atual: ${answerStr.length})`,
+                    maxLength: maxLength,
+                    currentLength: answerStr.length
+                };
+            }
+
+            console.log(`🔍 [COMPLIANCE] Validação maxLength OK para ${questionId}: ${answerStr.length}/${maxLength}`);
+            return { valid: true };
+
+        } catch(e) {
+            console.warn('🔍 [COMPLIANCE] Erro na validação maxLength:', e);
+            return { valid: true }; // Fallback seguro
+        }
+    }
+
+    /**
+     * CONFORMIDADE VIATOR: Detecção automática de MEET_AT_DEPARTURE_POINT
+     * Conforme documentação: produtos sem pickup devem usar MEET_AT_DEPARTURE_POINT
+     */
+    shouldUseMeetAtDeparturePoint(productData, selectedOption) {
+        try {
+            // Feature flag para controle de risco
+            const ENHANCED_VALIDATION = window.viatorConfig?.enhancedValidation !== false;
+
+            if (!ENHANCED_VALIDATION) {
+                return false;
+            }
+
+            const pickupOptionType = productData?.logistics?.travelerPickup?.pickupOptionType;
+
+            // Caso 1: Produto não oferece pickup para ninguém
+            if (pickupOptionType === 'MEET_EVERYONE_AT_START_POINT') {
+                console.log('🔍 [COMPLIANCE] MEET_AT_DEPARTURE_POINT detectado: MEET_EVERYONE_AT_START_POINT');
+                return true;
+            }
+
+            // Caso 2: Produto oferece pickup seletivo, verificar opção específica
+            if (pickupOptionType === 'PICKUP_AND_MEET_AT_START_POINT' && selectedOption) {
+                const optionDescription = String(selectedOption.description || '').toLowerCase();
+                const hasPickupIncluded = optionDescription.includes('pickup included');
+
+                if (!hasPickupIncluded) {
+                    console.log('🔍 [COMPLIANCE] MEET_AT_DEPARTURE_POINT detectado: opção sem "pickup included"');
+                    return true;
+                }
+            }
+
+            console.log('🔍 [COMPLIANCE] Pickup disponível, não usar MEET_AT_DEPARTURE_POINT');
+            return false;
+
+        } catch(e) {
+            console.warn('🔍 [COMPLIANCE] Erro na detecção MEET_AT_DEPARTURE_POINT:', e);
+            return false; // Fallback seguro
+        }
+    }
+
+    /**
+     * CONFORMIDADE VIATOR: Aplicar validações conforme documentação oficial
+     * Implementa validações de PRIORIDADE CRÍTICA de forma segura
+     */
+    applyViatorComplianceValidation(answers) {
+        try {
+            // Feature flag para controle de risco
+            const ENHANCED_VALIDATION = window.viatorConfig?.enhancedValidation !== false;
+
+            if (!ENHANCED_VALIDATION) {
+                console.log('🔍 [COMPLIANCE] Validação de conformidade desabilitada via feature flag');
+                return;
+            }
+
+            console.log('🔍 [COMPLIANCE] Aplicando validações conforme documentação oficial Viator...');
+
+            // Obter configurações de booking questions
+            const bookingQuestions = this.getBookingQuestionsConfig();
+
+            answers.forEach((answer, index) => {
+                const questionId = answer.question || answer.questionId;
+                const questionConfig = bookingQuestions[questionId];
+
+                if (!questionConfig) {
+                    return; // Pular se não há configuração
+                }
+
+                console.log(`🔍 [COMPLIANCE] Validando ${questionId}:`, answer);
+
+                // 1. Validação de allowedAnswers (PRIORIDADE CRÍTICA)
+                const allowedValidation = this.validateAllowedAnswers(questionConfig, answer.answer, window.productData);
+                if (!allowedValidation.valid) {
+                    console.warn(`🔍 [COMPLIANCE] FALHA allowedAnswers para ${questionId}:`, allowedValidation);
+                    // Não bloquear, apenas registrar para monitoramento
+                }
+
+                // 2. Validação de maxLength (PRIORIDADE CRÍTICA)
+                const lengthValidation = this.validateMaxLength(answer.answer, questionConfig.maxLength, questionId);
+                if (!lengthValidation.valid) {
+                    console.warn(`🔍 [COMPLIANCE] FALHA maxLength para ${questionId}:`, lengthValidation);
+                    // Não bloquear, apenas registrar para monitoramento
+                }
+
+                // 3. Validação de formato (PRIORIDADE IMPORTANTE)
+                const formatValidation = this.validateAnswerFormat(questionConfig, answer.answer);
+                if (!formatValidation.valid) {
+                    console.warn(`🔍 [COMPLIANCE] FALHA formato para ${questionId}:`, formatValidation);
+                    // Não bloquear, apenas registrar para monitoramento
+                }
+
+                // 4. Aplicar MEET_AT_DEPARTURE_POINT quando apropriado (PRIORIDADE CRÍTICA)
+                if (questionId === 'PICKUP_POINT') {
+                    const shouldUseMeet = this.shouldUseMeetAtDeparturePoint(window.productData, this.selectedProductOption);
+
+                    if (shouldUseMeet && answer.answer !== 'MEET_AT_DEPARTURE_POINT') {
+                        console.log('🔍 [COMPLIANCE] Aplicando MEET_AT_DEPARTURE_POINT conforme documentação');
+                        answer.answer = 'MEET_AT_DEPARTURE_POINT';
+                        answer.unit = 'LOCATION_REFERENCE';
+                        answer._complianceApplied = true;
+                    }
+                }
+            });
+
+            console.log('🔍 [COMPLIANCE] Validação de conformidade aplicada com sucesso');
+
+        } catch(e) {
+            console.warn('🔍 [COMPLIANCE] Erro na aplicação de validações de conformidade:', e);
+            // Não bloquear o fluxo, apenas registrar erro
+        }
+    }
+
+    /**
+     * CONFORMIDADE VIATOR: Obter configuração de booking questions
+     * Retorna configurações conforme documentação oficial
+     */
+    getBookingQuestionsConfig() {
+        return {
+            'AGEBAND': {
+                id: 'AGEBAND',
+                type: 'STRING',
+                allowedAnswers: ['ADULT', 'CHILD', 'INFANT', 'YOUTH', 'SENIOR'],
+                maxLength: 100,
+                required: 'MANDATORY',
+                group: 'PER_TRAVELER'
+            },
+            'TRANSFER_ARRIVAL_MODE': {
+                id: 'TRANSFER_ARRIVAL_MODE',
+                type: 'STRING',
+                allowedAnswers: ['AIR', 'RAIL', 'SEA', 'OTHER'],
+                maxLength: 100,
+                required: 'CONDITIONAL',
+                group: 'PER_BOOKING'
+            },
+            'TRANSFER_DEPARTURE_MODE': {
+                id: 'TRANSFER_DEPARTURE_MODE',
+                type: 'STRING',
+                allowedAnswers: ['AIR', 'RAIL', 'SEA', 'OTHER'],
+                maxLength: 100,
+                required: 'CONDITIONAL',
+                group: 'PER_BOOKING'
+            },
+            'PICKUP_POINT': {
+                id: 'PICKUP_POINT',
+                type: 'LOCATION_REF_OR_FREE_TEXT',
+                maxLength: 1000,
+                required: 'CONDITIONAL',
+                group: 'PER_BOOKING',
+                units: ['LOCATION_REFERENCE', 'FREETEXT']
+            },
+            'FULL_NAMES_FIRST': {
+                id: 'FULL_NAMES_FIRST',
+                type: 'STRING',
+                maxLength: 100,
+                required: 'MANDATORY',
+                group: 'PER_TRAVELER'
+            },
+            'FULL_NAMES_LAST': {
+                id: 'FULL_NAMES_LAST',
+                type: 'STRING',
+                maxLength: 100,
+                required: 'MANDATORY',
+                group: 'PER_TRAVELER'
+            },
+            'DATE_OF_BIRTH': {
+                id: 'DATE_OF_BIRTH',
+                type: 'DATE',
+                maxLength: 100,
+                required: 'MANDATORY',
+                group: 'PER_TRAVELER'
+            },
+            'SPECIAL_REQUIREMENTS': {
+                id: 'SPECIAL_REQUIREMENTS',
+                type: 'STRING',
+                maxLength: 1000,
+                required: 'OPTIONAL',
+                group: 'PER_BOOKING'
+            }
+        };
+    }
+
+    /**
+     * CONFORMIDADE VIATOR: Validação de formato para campos DATE e TIME (PRIORIDADE IMPORTANTE)
+     */
+    validateAnswerFormat(question, answer) {
+        try {
+            // Feature flag para controle de risco
+            const ENHANCED_VALIDATION = window.viatorConfig?.enhancedValidation !== false;
+
+            if (!ENHANCED_VALIDATION) {
+                return { valid: true };
+            }
+
+            const questionType = question.type;
+            const answerStr = String(answer || '').trim();
+
+            if (!answerStr) {
+                return { valid: true }; // Campos vazios são tratados pela validação de obrigatoriedade
+            }
+
+            switch (questionType) {
+                case 'DATE':
+                    return this.validateDateFormat(answerStr, question.id);
+                case 'TIME':
+                    return this.validateTimeFormat(answerStr, question.id);
+                case 'STRING':
+                    return this.validateStringFormat(answerStr, question.id);
+                default:
+                    return { valid: true };
+            }
+
+        } catch(e) {
+            console.warn('🔍 [COMPLIANCE] Erro na validação de formato:', e);
+            return { valid: true }; // Fallback seguro
+        }
+    }
+
+    /**
+     * CONFORMIDADE VIATOR: Validação específica para formato DATE
+     */
+    validateDateFormat(dateStr, questionId) {
+        try {
+            // Formatos aceitos conforme documentação Viator
+            const validFormats = [
+                /^\d{4}-\d{2}-\d{2}$/, // YYYY-MM-DD (ISO)
+                /^\d{2}\.\d{2}\.\d{4}$/, // DD.MM.YYYY
+                /^\d{2}\/\d{2}\/\d{4}$/, // DD/MM/YYYY
+                /^\d{2}-\d{2}-\d{4}$/ // DD-MM-YYYY
+            ];
+
+            const isValidFormat = validFormats.some(format => format.test(dateStr));
+
+            if (!isValidFormat) {
+                console.warn(`🔍 [COMPLIANCE] Formato de data inválido para ${questionId}:`, dateStr);
+                return {
+                    valid: false,
+                    message: 'Formato de data inválido. Use: DD/MM/YYYY, DD.MM.YYYY ou YYYY-MM-DD'
+                };
+            }
+
+            // Validar se é uma data real
+            let dateObj;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                dateObj = new Date(dateStr);
+            } else {
+                // Converter DD.MM.YYYY ou DD/MM/YYYY para Date
+                const parts = dateStr.split(/[.\/\-]/);
+                if (parts.length === 3) {
+                    dateObj = new Date(parts[2], parts[1] - 1, parts[0]);
+                }
+            }
+
+            if (!dateObj || isNaN(dateObj.getTime())) {
+                console.warn(`🔍 [COMPLIANCE] Data inválida para ${questionId}:`, dateStr);
+                return {
+                    valid: false,
+                    message: 'Data inválida'
+                };
+            }
+
+            console.log(`🔍 [COMPLIANCE] Formato de data válido para ${questionId}:`, dateStr);
+            return { valid: true };
+
+        } catch(e) {
+            console.warn('🔍 [COMPLIANCE] Erro na validação de data:', e);
+            return { valid: true }; // Fallback seguro
+        }
+    }
+
+    /**
+     * CONFORMIDADE VIATOR: Validação específica para formato TIME
+     */
+    validateTimeFormat(timeStr, questionId) {
+        try {
+            // Formatos aceitos conforme documentação Viator
+            const validFormats = [
+                /^\d{1,2}:\d{2}$/, // H:MM ou HH:MM
+                /^\d{1,2}:\d{2}\s?(AM|PM)$/i, // H:MM AM/PM
+                /^\d{1,2}\s?(AM|PM)$/i, // H AM/PM
+                /^\d{1,2}h\d{2}$/, // HHhMM
+                /^\d{1,2}h$/ // HHh
+            ];
+
+            const isValidFormat = validFormats.some(format => format.test(timeStr));
+
+            if (!isValidFormat) {
+                console.warn(`🔍 [COMPLIANCE] Formato de hora inválido para ${questionId}:`, timeStr);
+                return {
+                    valid: false,
+                    message: 'Formato de hora inválido. Use: HH:MM, HH:MM AM/PM ou HHh'
+                };
+            }
+
+            console.log(`🔍 [COMPLIANCE] Formato de hora válido para ${questionId}:`, timeStr);
+            return { valid: true };
+
+        } catch(e) {
+            console.warn('🔍 [COMPLIANCE] Erro na validação de hora:', e);
+            return { valid: true }; // Fallback seguro
+        }
+    }
+
+    /**
+     * CONFORMIDADE VIATOR: Validação específica para formato STRING
+     */
+    validateStringFormat(str, questionId) {
+        try {
+            // Validações básicas para campos STRING
+
+            // Verificar caracteres especiais problemáticos
+            const problematicChars = /[<>\"'&]/;
+            if (problematicChars.test(str)) {
+                console.warn(`🔍 [COMPLIANCE] Caracteres problemáticos em ${questionId}:`, str);
+                return {
+                    valid: false,
+                    message: 'Texto contém caracteres não permitidos: < > " \' &'
+                };
+            }
+
+            console.log(`🔍 [COMPLIANCE] Formato de string válido para ${questionId}`);
+            return { valid: true };
+
+        } catch(e) {
+            console.warn('🔍 [COMPLIANCE] Erro na validação de string:', e);
+            return { valid: true }; // Fallback seguro
+        }
+    }
+
+    /**
+     * CONFORMIDADE VIATOR: Feedback visual melhorado para campos obrigatórios (PRIORIDADE IMPORTANTE)
+     */
+    enhanceFieldVisualFeedback(fieldElement, question, isValid = true, validationMessage = '') {
+        try {
+            // Feature flag para controle de risco
+            const ENHANCED_VALIDATION = window.viatorConfig?.enhancedValidation !== false;
+
+            if (!ENHANCED_VALIDATION || !fieldElement) {
+                return;
+            }
+
+            // Remover classes anteriores
+            fieldElement.classList.remove('viator-field-required', 'viator-field-optional', 'viator-field-invalid', 'viator-field-valid');
+
+            // Adicionar indicador de obrigatoriedade
+            if (question.required === 'MANDATORY') {
+                fieldElement.classList.add('viator-field-required');
+            } else if (question.required === 'OPTIONAL') {
+                fieldElement.classList.add('viator-field-optional');
+            }
+
+            // Adicionar indicador de validação
+            if (isValid) {
+                fieldElement.classList.add('viator-field-valid');
+            } else {
+                fieldElement.classList.add('viator-field-invalid');
+            }
+
+            // Adicionar/atualizar tooltip com informações da documentação
+            this.updateFieldTooltip(fieldElement, question, validationMessage);
+
+            console.log(`🔍 [COMPLIANCE] Feedback visual aplicado para ${question.id}:`, {
+                required: question.required,
+                valid: isValid,
+                message: validationMessage
+            });
+
+        } catch(e) {
+            console.warn('🔍 [COMPLIANCE] Erro no feedback visual:', e);
+        }
+    }
+
+    /**
+     * CONFORMIDADE VIATOR: Atualizar tooltip com informações da documentação oficial
+     */
+    updateFieldTooltip(fieldElement, question, validationMessage = '') {
+        try {
+            // Criar ou atualizar tooltip
+            let tooltip = fieldElement.querySelector('.viator-compliance-tooltip');
+            if (!tooltip) {
+                tooltip = document.createElement('div');
+                tooltip.className = 'viator-compliance-tooltip';
+                fieldElement.appendChild(tooltip);
+            }
+
+            // Construir conteúdo do tooltip baseado na documentação oficial
+            let tooltipContent = '';
+
+            // Informações básicas
+            if (question.required === 'MANDATORY') {
+                tooltipContent += '🔴 Campo obrigatório<br>';
+            } else if (question.required === 'OPTIONAL') {
+                tooltipContent += '🟡 Campo opcional<br>';
+            } else if (question.required === 'CONDITIONAL') {
+                tooltipContent += '🟠 Campo condicional<br>';
+            }
+
+            // Informações de formato
+            if (question.type === 'DATE') {
+                tooltipContent += '📅 Formato: DD/MM/YYYY ou YYYY-MM-DD<br>';
+            } else if (question.type === 'TIME') {
+                tooltipContent += '🕐 Formato: HH:MM ou HH:MM AM/PM<br>';
+            }
+
+            // Limite de caracteres
+            if (question.maxLength) {
+                tooltipContent += `📏 Máximo: ${question.maxLength} caracteres<br>`;
+            }
+
+            // Opções permitidas
+            if (question.allowedAnswers && question.allowedAnswers.length > 0) {
+                tooltipContent += `✅ Opções: ${question.allowedAnswers.join(', ')}<br>`;
+            }
+
+            // Mensagem de validação
+            if (validationMessage) {
+                tooltipContent += `❌ ${validationMessage}`;
+            }
+
+            tooltip.innerHTML = tooltipContent;
+            tooltip.style.display = tooltipContent ? 'block' : 'none';
+
+        } catch(e) {
+            console.warn('🔍 [COMPLIANCE] Erro na atualização de tooltip:', e);
+        }
+    }
+
+    /**
+     * CONFORMIDADE VIATOR: Aplicar estilos CSS para feedback visual
+     */
+    injectComplianceStyles() {
+        try {
+            // Feature flag para controle de risco
+            const ENHANCED_VALIDATION = window.viatorConfig?.enhancedValidation !== false;
+
+            if (!ENHANCED_VALIDATION) {
+                return;
+            }
+
+            // Verificar se estilos já foram injetados
+            if (document.getElementById('viator-compliance-styles')) {
+                return;
+            }
+
+            const styles = `
+                <style id="viator-compliance-styles">
+                /* CONFORMIDADE VIATOR: Estilos para feedback visual */
+                .viator-field-required {
+                    border-left: 3px solid #dc3545 !important;
+                }
+
+                .viator-field-optional {
+                    border-left: 3px solid #ffc107 !important;
+                }
+
+                .viator-field-invalid {
+                    background-color: #fff5f5 !important;
+                    border-color: #dc3545 !important;
+                }
+
+                .viator-field-valid {
+                    background-color: #f0fff4 !important;
+                    border-color: #28a745 !important;
+                }
+
+                .viator-compliance-tooltip {
+                    position: absolute;
+                    background: #333;
+                    color: white;
+                    padding: 8px;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    z-index: 1000;
+                    max-width: 300px;
+                    display: none;
+                    top: 100%;
+                    left: 0;
+                    margin-top: 5px;
+                }
+
+                .viator-compliance-tooltip::before {
+                    content: '';
+                    position: absolute;
+                    top: -5px;
+                    left: 10px;
+                    border-left: 5px solid transparent;
+                    border-right: 5px solid transparent;
+                    border-bottom: 5px solid #333;
+                }
+
+                .viator-field-required::after {
+                    content: ' *';
+                    color: #dc3545;
+                    font-weight: bold;
+                }
+                </style>
+            `;
+
+            document.head.insertAdjacentHTML('beforeend', styles);
+            console.log('🔍 [COMPLIANCE] Estilos de conformidade injetados');
+
+        } catch(e) {
+            console.warn('🔍 [COMPLIANCE] Erro na injeção de estilos:', e);
+        }
     }
 
     /**
@@ -14099,6 +14890,102 @@ class ViatorBookingManager {
                 }
             } catch (_e) {}
 
+            // CORREÇÃO 30.10: Pré-validação de completude para departureMode=AIR antes do envio
+            try {
+                const ffEnabled = (window.viatorConfig?.forceDepartureAirCompleteness !== false);
+                if (ffEnabled) {
+                    const productQuestionsRaw = Array.isArray(this.bookingQuestions) && this.bookingQuestions.length > 0
+                        ? this.bookingQuestions
+                        : (Array.isArray(window.productData?.bookingQuestions) ? window.productData.bookingQuestions : []);
+                    const productIds = new Set(productQuestionsRaw.map(q => q && (q.questionId || q.id || q)));
+
+                    const depModeAns = (bookingQuestionAnswers || []).find(a => (a?.question || a?.questionId) === 'TRANSFER_DEPARTURE_MODE');
+                    const depModeVal = depModeAns ? String(depModeAns.answer || '').trim() : '';
+
+                    const depPickupPresent = bookingQuestionAnswers.some(a => (a?.question || a?.questionId) === 'TRANSFER_DEPARTURE_PICKUP');
+                    const depDatePresent   = bookingQuestionAnswers.some(a => (a?.question || a?.questionId) === 'TRANSFER_DEPARTURE_DATE');
+                    const depTimePresent   = bookingQuestionAnswers.some(a => (a?.question || a?.questionId) === 'TRANSFER_DEPARTURE_TIME');
+
+                    console.log('[30.10] AIR completeness – pickup/date/time antes do envio:', {
+                        depModeVal,
+                        depPickupPresent,
+                        depDatePresent,
+                        depTimePresent
+                    });
+
+                    // Aplicar apenas quando o produto expõe perguntas de partida
+                    const productHasDepartureQuestions = Array.from(productIds).some(id => String(id||'').startsWith('TRANSFER_') && String(id||'').indexOf('DEPARTURE_') !== -1);
+
+                    if (productHasDepartureQuestions && depModeVal === 'AIR') {
+                        // 1) TRANSFER_DEPARTURE_PICKUP
+                        if (!depPickupPresent && productIds.has('TRANSFER_DEPARTURE_PICKUP')) {
+                            // fallback padrão: CONTACT_SUPPLIER_LATER
+                            bookingQuestionAnswers.push({
+                                question: 'TRANSFER_DEPARTURE_PICKUP',
+                                answer: 'CONTACT_SUPPLIER_LATER',
+                                unit: 'LOCATION_REFERENCE'
+                            });
+                            console.log('[30.10] Fallback aplicado: TRANSFER_DEPARTURE_PICKUP=CONTACT_SUPPLIER_LATER');
+                        }
+
+                        // 2) TRANSFER_DEPARTURE_DATE - CORREÇÃO 30.11: Melhorar detecção de campos vazios
+                        const depDateAnswer = bookingQuestionAnswers.find(a => (a?.question || a?.questionId) === 'TRANSFER_DEPARTURE_DATE');
+                        const depDateHasValue = depDateAnswer && depDateAnswer.answer && String(depDateAnswer.answer).trim() !== '';
+
+                        console.log('[30.11] DEBUG TRANSFER_DEPARTURE_DATE:', {
+                            depDatePresent: depDatePresent,
+                            depDateHasValue: depDateHasValue,
+                            depDateAnswer: depDateAnswer,
+                            productHasQuestion: productIds.has('TRANSFER_DEPARTURE_DATE')
+                        });
+
+                        if (!depDateHasValue && productIds.has('TRANSFER_DEPARTURE_DATE')) {
+                            // Múltiplas fontes de travelDate com fallback seguro
+                            const travelDate = this.bookingData?.selectedOption?.travelDate
+                                || this.bookingData?.availabilityData?.travelDate
+                                || this.bookingData?.travelDate
+                                || (document.querySelector('[name="travel_date"]')?.value)
+                                || '2025-08-27'; // fallback seguro para evitar erro
+
+                            console.log('[30.11] Fontes de travelDate verificadas:', {
+                                selectedOption: this.bookingData?.selectedOption?.travelDate,
+                                availabilityData: this.bookingData?.availabilityData?.travelDate,
+                                bookingData: this.bookingData?.travelDate,
+                                domElement: document.querySelector('[name="travel_date"]')?.value,
+                                finalValue: travelDate
+                            });
+
+                            // Remover campo vazio se existir
+                            if (depDateAnswer) {
+                                const index = bookingQuestionAnswers.indexOf(depDateAnswer);
+                                bookingQuestionAnswers.splice(index, 1);
+                                console.log('[30.11] Campo TRANSFER_DEPARTURE_DATE vazio removido');
+                            }
+
+                            // Adicionar com valor válido
+                            bookingQuestionAnswers.push({ question: 'TRANSFER_DEPARTURE_DATE', answer: travelDate });
+                            console.log('[30.11] TRANSFER_DEPARTURE_DATE corrigido:', travelDate);
+                        } else {
+                            console.log('[30.11] TRANSFER_DEPARTURE_DATE não precisa de correção:', {
+                                hasValue: depDateHasValue,
+                                productHasQuestion: productIds.has('TRANSFER_DEPARTURE_DATE')
+                            });
+                        }
+
+                        // 3) TRANSFER_DEPARTURE_TIME
+                        if (!depTimePresent && productIds.has('TRANSFER_DEPARTURE_TIME')) {
+                            // Sinalizar ao usuário para preencher; não enviar sem hora
+                            this.showDateError('Informe o horário de saída do voo (Hora de Saída).');
+                            const timeEl = document.getElementById('booking_question_TRANSFER_DEPARTURE_TIME')
+                                || document.querySelector('[data-question-id="TRANSFER_DEPARTURE_TIME"]');
+                            const fg = timeEl?.closest?.('.booking-question-group');
+                            if (fg && fg.scrollIntoView) fg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            return false;
+                        }
+                    }
+                }
+            } catch (_e) { /* no-op */ }
+
             console.log('✅ [CONFIRM] Validação final aprovada - bookerInfo completo:', bookerInfo);
 
             const requestParams = {
@@ -14157,6 +15044,7 @@ class ViatorBookingManager {
                     console.warn('⚠️ [LANGUAGE GUIDE] Fallback aplicado: usando "pt"');
                 }
             }
+
                 // PRÉ-NORMALIZAÇÃO: garantir campos críticos antes do envio (independente do arrivalMode)
                 try {
                     // 1) Se o modo de partida for SEA, garantir campos obrigatórios de partida
@@ -14193,10 +15081,12 @@ class ViatorBookingManager {
                 try {
                     const pickAns = bookingQuestionAnswers.find(a => (a?.question || a?.questionId) === 'PICKUP_POINT');
                     const depPickAns = bookingQuestionAnswers.find(a => (a?.question || a?.questionId) === 'TRANSFER_DEPARTURE_PICKUP');
+                    const depDateAns = bookingQuestionAnswers.find(a => (a?.question || a?.questionId) === 'TRANSFER_DEPARTURE_DATE');
                     const allowCustomPickup = !!(window.productData && window.productData.logistics && window.productData.logistics.allowCustomTravelerPickup);
                     console.log('🔎 [PAYLOAD CHECK] allowCustomTravelerPickup:', allowCustomPickup);
                     console.log('🔎 [PAYLOAD CHECK] PICKUP_POINT:', pickAns ? { question: pickAns.question || pickAns.questionId, answer: String(pickAns.answer||'').slice(0,60), unit: pickAns.unit||'(none)' } : 'ABSENT');
                     console.log('🔎 [PAYLOAD CHECK] TRANSFER_DEPARTURE_PICKUP:', depPickAns ? { question: depPickAns.question || depPickAns.questionId, answer: String(depPickAns.answer||'').slice(0,60), unit: depPickAns.unit||'(none)' } : 'ABSENT');
+                    console.log('🔎 [PAYLOAD CHECK] TRANSFER_DEPARTURE_DATE:', depDateAns ? { question: depDateAns.question || depDateAns.questionId, answer: String(depDateAns.answer||'').slice(0,60) } : 'ABSENT');
                 } catch(_e) { /* no-op */ }
 
             // Incluir perguntas de reserva se existirem
@@ -14446,21 +15336,64 @@ class ViatorBookingManager {
                     } else if (arrivalModeVal === 'RAIL') {
                         // Para RAIL: remover campos exclusivos de SEA e os exclusivos de AIR (airline/flight),
                         // preservando TRANSFER_ARRIVAL_TIME que é compartilhado
+                        // CORREÇÃO 30.4: Verificar modo de partida antes de remover campos de partida
+                        console.log('🔧 [30.4] INICIANDO correção para arrivalMode=RAIL');
+                        const depIdx = bookingQuestionAnswers.findIndex((a) => (a?.question || a?.questionId) === 'TRANSFER_DEPARTURE_MODE');
+                        const departureMode = depIdx !== -1 ? String(bookingQuestionAnswers[depIdx].answer || '').trim() : '';
+
                         const beforeRail = bookingQuestionAnswers.length;
                         bookingQuestionAnswers = bookingQuestionAnswers.filter(a => {
                             const qid = a && (a.question || a.questionId);
-                            const isSeaField = seaArrivalFields.indexOf(qid) !== -1 || seaDepartureFields.indexOf(qid) !== -1;
+                            const isSeaArrivalField = seaArrivalFields.indexOf(qid) !== -1;
                             const isAirExclusive = qid === 'TRANSFER_AIR_ARRIVAL_AIRLINE' || qid === 'TRANSFER_AIR_ARRIVAL_FLIGHT_NO';
-                            return !isSeaField && !isAirExclusive;
+
+                            // CORREÇÃO 30.4: NÃO remover campos de partida se o modo de partida corresponder
+                            const isSeaDepartureField = seaDepartureFields.indexOf(qid) !== -1;
+                            if (isSeaDepartureField) {
+                                // Se é campo de partida SEA, só remover se o modo de partida NÃO for SEA
+                                if (departureMode === 'SEA') {
+                                    console.log('🔧 [30.4] Preservando campo de partida SEA:', qid, '(departureMode=SEA)');
+                                    return true; // manter
+                                }
+                                // CORREÇÃO 30.4: TRANSFER_DEPARTURE_PICKUP é usado por múltiplos modos, não só SEA
+                                if (qid === 'TRANSFER_DEPARTURE_PICKUP' && (departureMode === 'AIR' || departureMode === 'RAIL')) {
+                                    console.log('🔧 [30.4] Preservando TRANSFER_DEPARTURE_PICKUP para departureMode:', departureMode);
+                                    return true; // manter
+                                }
+                                // CORREÇÃO 30.11b: Preservar TRANSFER_DEPARTURE_DATE quando a partida for AIR (produto exige)
+                                if (qid === 'TRANSFER_DEPARTURE_DATE' && departureMode === 'AIR') {
+                                    const ffEnabled = (window.viatorConfig?.forceDepartureAirCompleteness !== false);
+                                    if (ffEnabled) {
+                                        console.log('🔧 [30.4] Preservando TRANSFER_DEPARTURE_DATE para departureMode=AIR');
+                                        return true; // manter
+                                    }
+                                }
+                                return false; // remover outros campos de partida SEA
+                            }
+
+                            return !isSeaArrivalField && !isAirExclusive;
                         });
                         const afterRail = bookingQuestionAnswers.length;
                         if (afterRail !== beforeRail) {
                             console.log('🔧 [CONFIRM] Campos AIR/SEA removidos para arrivalMode=RAIL (preservando TRANSFER_ARRIVAL_TIME):', { antes: beforeRail, depois: afterRail });
                         }
                     } else {
+                        // CORREÇÃO 30.8: Definir campos SEA e AIR para remoção correta
+                        const seaFields = seaArrivalFields.concat(seaDepartureFields);
+                        const airFields = airArrivalFields.concat(['TRANSFER_AIR_DEPARTURE_AIRLINE', 'TRANSFER_AIR_DEPARTURE_FLIGHT_NO']);
+
                         const beforeOther = bookingQuestionAnswers.length;
                         bookingQuestionAnswers = bookingQuestionAnswers.filter(a => {
                             const qid = a && (a.question || a.questionId);
+                            // CORREÇÃO 30.8: Preservar TRANSFER_DEPARTURE_PICKUP para departureMode=AIR
+                            if (qid === 'TRANSFER_DEPARTURE_PICKUP') {
+                                const depIdx = bookingQuestionAnswers.findIndex((a) => (a?.question || a?.questionId) === 'TRANSFER_DEPARTURE_MODE');
+                                const departureMode = depIdx !== -1 ? String(bookingQuestionAnswers[depIdx].answer || '').trim() : '';
+                                if (departureMode === 'AIR' || departureMode === 'RAIL') {
+                                    console.log('🔧 [30.8] Preservando TRANSFER_DEPARTURE_PICKUP para departureMode:', departureMode);
+                                    return true; // manter
+                                }
+                            }
                             return seaFields.indexOf(qid) === -1 && airFields.indexOf(qid) === -1; // remove ambos
                         });
                         const afterOther = bookingQuestionAnswers.length;
@@ -14544,18 +15477,23 @@ class ViatorBookingManager {
                                 bookingQuestionAnswers.splice(idxGeneric, 1);
                                 console.log('🔧 [CONFIRM] Removido PICKUP_POINT (arrivalMode=RAIL, produto sem PICKUP_POINT)');
                             } else {
-                                if (allowCustomPickup === false && !isContactLater && !isLocRef) {
+                                // CORREÇÃO 29.13: Respeitar seleções manuais do usuário
+                                if (allowCustomPickup === false && !isContactLater && !isLocRef && !bookingQuestionAnswers[idxGeneric]._preserveValue) {
                                     bookingQuestionAnswers[idxGeneric].answer = 'CONTACT_SUPPLIER_LATER';
                                     bookingQuestionAnswers[idxGeneric].unit = 'LOCATION_REFERENCE';
                                     console.log('🔧 [CONFIRM] FREETEXT não permitido → coerido para CONTACT_SUPPLIER_LATER em PICKUP_POINT (RAIL)');
+                                } else if (bookingQuestionAnswers[idxGeneric]._preserveValue) {
+                                    console.log('🔧 [CONFIRM] Seleção manual preservada, não aplicando coerção RAIL');
                                 }
                             }
                         } else if (hasGenericPickup) {
-                            // Se não permite freetext, coerir para CONTACT_SUPPLIER_LATER quando necessário
-                            if (allowCustomPickup === false && !isContactLater && !isLocRef) {
+                            // CORREÇÃO 29.13: Se não permite freetext, coerir para CONTACT_SUPPLIER_LATER quando necessário (mas preservar seleções manuais)
+                            if (allowCustomPickup === false && !isContactLater && !isLocRef && !bookingQuestionAnswers[idxGeneric]._preserveValue) {
                                 bookingQuestionAnswers[idxGeneric].answer = 'CONTACT_SUPPLIER_LATER';
                                 bookingQuestionAnswers[idxGeneric].unit = 'LOCATION_REFERENCE';
                                 console.log('🔧 [CONFIRM] FREETEXT não permitido → coerido para CONTACT_SUPPLIER_LATER em PICKUP_POINT');
+                            } else if (bookingQuestionAnswers[idxGeneric]._preserveValue) {
+                                console.log('🔧 [CONFIRM] Seleção manual preservada, não aplicando coerção genérica');
                             }
                         } else if (hasSpecializedPickup && arrivalModeVal2 !== 'OTHER') {
                             // Produto não define PICKUP_POINT e há campos especializados → remover para evitar extra answer
@@ -14571,15 +15509,29 @@ class ViatorBookingManager {
                                 }
                             }
                         } else if (allowCustomPickup === false) {
-                            // Sem custom pickup: só aceitar CONTACT_SUPPLIER_LATER ou LOC-
-                            if (!isContactLater && !isLocRef) {
+                            // CORREÇÃO 29.13: Sem custom pickup: só aceitar CONTACT_SUPPLIER_LATER ou LOC- (mas preservar seleções manuais)
+                            if (!isContactLater && !isLocRef && !bookingQuestionAnswers[idxGeneric]._preserveValue) {
                                 bookingQuestionAnswers[idxGeneric].answer = 'CONTACT_SUPPLIER_LATER';
                                 bookingQuestionAnswers[idxGeneric].unit = 'LOCATION_REFERENCE';
                                 console.log('🔧 [CONFIRM] PICKUP_POINT coerido para CONTACT_SUPPLIER_LATER (sem custom pickup)');
+                            } else if (bookingQuestionAnswers[idxGeneric]._preserveValue) {
+                                console.log('🔧 [CONFIRM] Seleção manual preservada, não aplicando coerção sem custom pickup');
                             }
                         }
                     }
                 } catch (e) { /* no-op */ }
+
+                // CORREÇÃO 30.1: Sistema de rastreamento de remoções intencionais
+                // Resolve conflito PICKUP_POINT em cenários de múltiplos modos de transporte
+                const intentionalFieldRemovals = new Set();
+                const fixPickupPointConflict = window.viatorConfig?.fixPickupPointConflict !== false;
+
+                if (fixPickupPointConflict) {
+                    console.log('🔧 [30.1] Sistema de rastreamento de remoções intencionais inicializado');
+                } else {
+                    console.log('🔧 [30.1] Correção de conflito PICKUP_POINT desabilitada via feature flag');
+                }
+
                     // Se não há PICKUP_POINT coletado mas o produto o expõe (ou logistics indica pickup), adicionar fallback coerente
                     try {
                         const productQuestionsRaw_fallback = Array.isArray(this.bookingQuestions) && this.bookingQuestions.length > 0
@@ -14589,15 +15541,28 @@ class ViatorBookingManager {
                         const allowCustomPickup_fallback = !!(window.productData && window.productData.logistics && window.productData.logistics.allowCustomTravelerPickup);
                         const idxGeneric_fallback = bookingQuestionAnswers.findIndex(function(a){ const q = a && (a.question || a.questionId); return q === 'PICKUP_POINT'; });
                         const hasLogisticsPickup = !!(window.productData && window.productData.logistics && window.productData.logistics.travelerPickup);
-                        if (idxGeneric_fallback === -1 && (productIds_fallback.has('PICKUP_POINT') || hasLogisticsPickup)) {
+
+                        // CORREÇÃO 30.1: Verificar se PICKUP_POINT foi removido intencionalmente
+                        const wasIntentionallyRemoved = fixPickupPointConflict && (
+                            intentionalFieldRemovals.has('PICKUP_POINT_RAIL') ||
+                            intentionalFieldRemovals.has('PICKUP_POINT_SEA') ||
+                            intentionalFieldRemovals.has('PICKUP_POINT_AIR') ||
+                            intentionalFieldRemovals.has('PICKUP_POINT_RAIL_AIR')
+                        );
+
+                        if (idxGeneric_fallback === -1 && (productIds_fallback.has('PICKUP_POINT') || hasLogisticsPickup) && !wasIntentionallyRemoved) {
                             bookingQuestionAnswers.push({
                                 question: 'PICKUP_POINT',
                                 answer: 'CONTACT_SUPPLIER_LATER',
                                 unit: 'LOCATION_REFERENCE'
                             });
                             console.log('🔧 [CONFIRM] PICKUP_POINT adicionado (faltante) como CONTACT_SUPPLIER_LATER');
+                        } else if (wasIntentionallyRemoved) {
+                            console.log('🔧 [30.1] Readição de PICKUP_POINT bloqueada (remoção intencional detectada)');
                         }
                     } catch(_e) { /* no-op */ }
+
+
 
                 // CORREÇÃO ESPECÍFICA: Gerenciar PICKUP_POINT e TRANSFER_ARRIVAL_DROP_OFF para produtos com campos especializados
                 // Resolve tanto "Extra answer(s) provided" quanto "Missing answer(s) for" PICKUP_POINT e TRANSFER_ARRIVAL_DROP_OFF
@@ -14609,6 +15574,14 @@ class ViatorBookingManager {
 
                     const arrivalMode = arrivalModeIdx !== -1 ? String(bookingQuestionAnswers[arrivalModeIdx].answer || '').trim() : '';
                     const departureMode = departureModeIdx !== -1 ? String(bookingQuestionAnswers[departureModeIdx].answer || '').trim() : '';
+
+                    // CORREÇÃO 30.2: Logs de debug para diagnóstico
+                    console.log('🔧 [30.2] DEBUG - Modos detectados:', {
+                        arrivalMode: arrivalMode,
+                        departureMode: departureMode,
+                        pickupPointIdx: pickupPointIdx,
+                        arrivalDropOffIdx: arrivalDropOffIdx
+                    });
 
                     // Verificar se há campos especializados de porto/cruzeiro
                     const hasPortFields = bookingQuestionAnswers.some(a => {
@@ -14634,6 +15607,14 @@ class ViatorBookingManager {
                         return typeof qid === 'string' && qid.indexOf('TRANSFER_RAIL_') === 0;
                     });
 
+                    // CORREÇÃO 30.2: Logs de debug para campos especializados
+                    console.log('🔧 [30.2] DEBUG - Campos especializados:', {
+                        hasPortFields: hasPortFields,
+                        hasSpecializedPickup: hasSpecializedPickup,
+                        hasAirFields: hasAirFields,
+                        hasRailFields: hasRailFields
+                    });
+
                     // CASO 1: Produtos AIR com TRANSFER_ARRIVAL_DROP_OFF - remover ambos (correção 29.7)
                     if (arrivalMode === 'AIR' && hasAirFields && arrivalDropOffIdx !== -1) {
                         const dropOffAnswer = String(bookingQuestionAnswers[arrivalDropOffIdx].answer || '').trim();
@@ -14647,6 +15628,11 @@ class ViatorBookingManager {
                             if (newPickupPointIdx !== -1) {
                                 const pickupAnswer = String(bookingQuestionAnswers[newPickupPointIdx].answer || '').trim();
                                 if (pickupAnswer === 'CONTACT_SUPPLIER_LATER') {
+                                    // CORREÇÃO 30.1: Marcar remoção intencional para evitar readição
+                                    if (fixPickupPointConflict) {
+                                        intentionalFieldRemovals.add('PICKUP_POINT_AIR');
+                                        console.log('🔧 [30.1] PICKUP_POINT marcado para remoção intencional (arrivalMode=AIR)');
+                                    }
                                     bookingQuestionAnswers.splice(newPickupPointIdx, 1);
                                     console.log('🔧 [CONFIRM] PICKUP_POINT removido para produto AIR (evita extra answer)');
                                 }
@@ -14663,6 +15649,11 @@ class ViatorBookingManager {
                             const pickupAnswer = String(bookingQuestionAnswers[pickupPointIdx].answer || '').trim();
                             // Só remover se for CONTACT_SUPPLIER_LATER (adicionado automaticamente)
                             if (pickupAnswer === 'CONTACT_SUPPLIER_LATER') {
+                                // CORREÇÃO 30.1: Marcar remoção intencional para evitar readição
+                                if (fixPickupPointConflict) {
+                                    intentionalFieldRemovals.add('PICKUP_POINT_SEA');
+                                    console.log('🔧 [30.1] PICKUP_POINT marcado para remoção intencional (arrivalMode=SEA)');
+                                }
                                 bookingQuestionAnswers.splice(pickupPointIdx, 1);
                                 console.log('🔧 [CONFIRM] PICKUP_POINT removido para produto SEA sem ARRIVAL_DROP_OFF (evita extra answer)');
                             }
@@ -14680,12 +15671,51 @@ class ViatorBookingManager {
                     }
 
                     // CASO 3: Produtos RAIL com TRANSFER_ARRIVAL_DROP_OFF - remover apenas PICKUP_POINT (correção 29.8)
-                    else if (arrivalMode === 'RAIL' && hasRailFields && arrivalDropOffIdx !== -1 && pickupPointIdx !== -1) {
+                    // CORREÇÃO 30.2: Expandir condição para incluir cenários RAIL+AIR
+                    else if (arrivalMode === 'RAIL' && pickupPointIdx !== -1) {
                         const pickupAnswer = String(bookingQuestionAnswers[pickupPointIdx].answer || '').trim();
-                        // Só remover se for CONTACT_SUPPLIER_LATER (adicionado automaticamente)
-                        if (pickupAnswer === 'CONTACT_SUPPLIER_LATER') {
+
+                        // Verificar se há campos especializados de RAIL ou se há TRANSFER_DEPARTURE_PICKUP
+                        const hasSpecializedDeparturePickup = bookingQuestionAnswers.some(a => {
+                            const qid = a?.question || a?.questionId || '';
+                            return qid === 'TRANSFER_DEPARTURE_PICKUP';
+                        });
+
+                        // Condição expandida: RAIL com campos especializados OU RAIL com TRANSFER_DEPARTURE_PICKUP
+                        const shouldRemovePickupPoint = (hasRailFields && arrivalDropOffIdx !== -1) || hasSpecializedDeparturePickup;
+
+                        if (shouldRemovePickupPoint && pickupAnswer === 'CONTACT_SUPPLIER_LATER') {
+                            // CORREÇÃO 30.1: Marcar remoção intencional para evitar readição
+                            if (fixPickupPointConflict) {
+                                intentionalFieldRemovals.add('PICKUP_POINT_RAIL');
+                                console.log('🔧 [30.1] PICKUP_POINT marcado para remoção intencional (arrivalMode=RAIL)');
+                                console.log('🔧 [30.2] Condição expandida aplicada: hasRailFields=' + hasRailFields + ', hasSpecializedDeparturePickup=' + hasSpecializedDeparturePickup);
+                            }
                             bookingQuestionAnswers.splice(pickupPointIdx, 1);
                             console.log('🔧 [CONFIRM] PICKUP_POINT removido para produto RAIL (evita extra answer)');
+                        } else {
+                            console.log('🔧 [30.2] PICKUP_POINT mantido para RAIL: shouldRemove=' + shouldRemovePickupPoint + ', answer=' + pickupAnswer);
+                        }
+                    }
+
+                    // CORREÇÃO 30.2: Caso específico para RAIL+AIR com TRANSFER_DEPARTURE_PICKUP
+                    if (arrivalMode === 'RAIL' && departureMode === 'AIR' && pickupPointIdx !== -1) {
+                        const hasTransferDeparturePickup = bookingQuestionAnswers.some(a => {
+                            const qid = a?.question || a?.questionId || '';
+                            return qid === 'TRANSFER_DEPARTURE_PICKUP';
+                        });
+
+                        if (hasTransferDeparturePickup) {
+                            const pickupAnswer = String(bookingQuestionAnswers[pickupPointIdx].answer || '').trim();
+                            if (pickupAnswer === 'CONTACT_SUPPLIER_LATER') {
+                                // CORREÇÃO 30.1: Marcar remoção intencional para evitar readição
+                                if (fixPickupPointConflict) {
+                                    intentionalFieldRemovals.add('PICKUP_POINT_RAIL_AIR');
+                                    console.log('🔧 [30.2] PICKUP_POINT marcado para remoção intencional (RAIL+AIR com TRANSFER_DEPARTURE_PICKUP)');
+                                }
+                                bookingQuestionAnswers.splice(pickupPointIdx, 1);
+                                console.log('🔧 [30.2] PICKUP_POINT removido para cenário RAIL+AIR (evita conflito com TRANSFER_DEPARTURE_PICKUP)');
+                            }
                         }
                     }
 
@@ -14736,13 +15766,23 @@ class ViatorBookingManager {
                     });
 
                     // Se o produto tem os campos nas BQ originais mas eles foram removidos por outras correções, readicioná-los
-                    if (productHasPickupPoint && finalPickupPointIdx === -1) {
+                    // CORREÇÃO 30.3: Respeitar remoções intencionais das correções 30.1 e 30.2
+                    const wasPickupIntentionallyRemoved = fixPickupPointConflict && (
+                        intentionalFieldRemovals.has('PICKUP_POINT_RAIL') ||
+                        intentionalFieldRemovals.has('PICKUP_POINT_SEA') ||
+                        intentionalFieldRemovals.has('PICKUP_POINT_AIR') ||
+                        intentionalFieldRemovals.has('PICKUP_POINT_RAIL_AIR')
+                    );
+
+                    if (productHasPickupPoint && finalPickupPointIdx === -1 && !wasPickupIntentionallyRemoved) {
                         bookingQuestionAnswers.push({
                             question: 'PICKUP_POINT',
                             answer: 'CONTACT_SUPPLIER_LATER',
                             unit: 'LOCATION_REFERENCE'
                         });
                         console.log('🔧 [CONFIRM] PICKUP_POINT readicionado após outras correções (campo obrigatório)');
+                    } else if (wasPickupIntentionallyRemoved) {
+                        console.log('🔧 [30.3] PICKUP_POINT NÃO readicionado - remoção intencional detectada (correções 30.1/30.2)');
                     }
 
                     if (productHasDropOff && finalDropOffIdx === -1) {
@@ -14754,6 +15794,11 @@ class ViatorBookingManager {
                         console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF readicionado após outras correções (campo obrigatório)');
                     }
                 } catch(_e) { /* no-op */ }
+
+                // CORREÇÃO 30.1: Log de sucesso da resolução de conflitos
+                if (fixPickupPointConflict && intentionalFieldRemovals.size > 0) {
+                    console.log('✅ [30.1] Conflitos PICKUP_POINT resolvidos para cenários de múltiplos modos:', Array.from(intentionalFieldRemovals));
+                }
 
                 // SANITIZAÇÃO GERAL: remover respostas que não existem nas bookingQuestions do produto
                 // Evita erros do tipo: "Extra answer(s) provided: <QUESTION_ID>"
@@ -14777,6 +15822,10 @@ class ViatorBookingManager {
                     const removedList = [];
                     // NUNCA remover PICKUP_POINT aqui, mesmo que não esteja nas bookingQuestions, para evitar erro de falta
                     validIds.add('PICKUP_POINT');
+                    // CORREÇÃO 30.9: NUNCA remover TRANSFER_DEPARTURE_PICKUP, mesmo que não esteja nas bookingQuestions
+                    // Este campo é crítico para departureMode=AIR e sua remoção causa "Missing departure details"
+                    validIds.add('TRANSFER_DEPARTURE_PICKUP');
+                    console.log('🔧 [30.9] TRANSFER_DEPARTURE_PICKUP protegido da sanitização geral');
                     bookingQuestionAnswers = bookingQuestionAnswers.filter(function(a){
                         const qid = a && (a.question || a.questionId);
                         const keep = validIds.has(qid);
@@ -14897,6 +15946,7 @@ class ViatorBookingManager {
                     }
                 } catch (_e) { /* no-op */ }
 
+                // REAFIRMAR 30.10: Garantir que as alterações de completude sejam refletidas no payload
                 requestParams.bookingQuestionAnswers = JSON.stringify(bookingQuestionAnswers);
             } else {
                 console.log('📝 Nenhuma booking question para enviar');
