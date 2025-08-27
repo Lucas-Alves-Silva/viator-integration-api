@@ -4678,10 +4678,37 @@ class ViatorBookingManager {
 
     /**
      * Obter valor de campo específico
+     * CORREÇÃO: Buscar campo por múltiplas estratégias para garantir compatibilidade
      */
     getFieldValue(fieldId) {
-        const field = document.getElementById(fieldId);
-        return field ? field.value : null;
+        // Estratégia 1: Buscar pelo ID exato
+        let field = document.getElementById(fieldId);
+
+        // Estratégia 2: Buscar pelo ID com prefixo "booking_question_"
+        if (!field) {
+            field = document.getElementById(`booking_question_${fieldId}`);
+        }
+
+        // Estratégia 3: Buscar pelo atributo data-question-id
+        if (!field) {
+            field = document.querySelector(`[data-question-id="${fieldId}"]`);
+        }
+
+        // Estratégia 4: Buscar por seletor mais amplo (fallback)
+        if (!field) {
+            field = document.querySelector(`[id*="${fieldId}"]`);
+        }
+
+        const value = field ? field.value : null;
+
+        // Debug para rastreamento de problemas
+        if (!field) {
+            console.warn(`🔍 [getFieldValue] Campo não encontrado: ${fieldId}`);
+        } else {
+            console.log(`🔍 [getFieldValue] Campo encontrado: ${fieldId} = "${value}" (via ${field.id || field.getAttribute('data-question-id')})`);
+        }
+
+        return value;
     }
 
     /**
@@ -5128,6 +5155,7 @@ class ViatorBookingManager {
             // Unidade obrigatória para DROP_OFF (sempre FREETEXT quando via texto)
             if (questionId === 'TRANSFER_ARRIVAL_DROP_OFF') {
                 answer.unit = 'FREETEXT';
+                console.log('🔍 [TRANSFER_ARRIVAL_DROP_OFF] Coletado:', { value, unit: 'FREETEXT', inputId: input.id });
             }
 
             // Adicionar travelerNum se for PER_TRAVELER
@@ -5531,6 +5559,176 @@ class ViatorBookingManager {
         this.ensureCriticalPerTravelerAnswers(answers);
 
         console.log('✅ Respostas dinâmicas coletadas:', answers.length);
+
+        // Correção defensiva: sincronizar ARRIVAL/DEPARTURE MODE com o valor atual do UI
+        try {
+            const FEATURE_FORCE_UI_TRANSFER_MODES = window.viatorConfig?.forceUiTransferModes !== false; // default: true
+            if (FEATURE_FORCE_UI_TRANSFER_MODES) {
+                console.log('🔄 [SYNC] Iniciando sincronização robusta de modos de transporte...');
+
+                const normalizeMode = (val) => {
+                    if (!val) return val;
+                    const map = { 'Avião': 'AIR', 'Trem': 'RAIL', 'Navio': 'SEA', 'Outros': 'OTHER' };
+                    return map[val] || String(val).trim();
+                };
+
+                // Estratégias ultra-robustas para encontrar elementos e detectar valor real
+                const findElementAndRealValue = (questionId) => {
+                    console.log(`🔍 [ULTRA-SYNC] Iniciando busca ultra-robusta para ${questionId}...`);
+
+                    const strategies = [
+                        () => document.querySelector(`[data-question-id="${questionId}"]`),
+                        () => document.getElementById(`booking_question_${questionId}`),
+                        () => document.getElementById(questionId),
+                        () => document.querySelector(`[id*="${questionId}"]`),
+                        () => document.querySelector(`select[name*="${questionId}"]`),
+                        () => document.querySelector(`input[name*="${questionId}"]`),
+                        () => document.querySelector(`[name="${questionId}"]`),
+                        () => document.querySelector(`[data-field="${questionId}"]`)
+                    ];
+
+                    let foundElements = [];
+
+                    // Buscar todos os elementos possíveis
+                    for (let i = 0; i < strategies.length; i++) {
+                        try {
+                            const el = strategies[i]();
+                            if (el && el.value !== undefined) {
+                                foundElements.push({
+                                    element: el,
+                                    strategy: i + 1,
+                                    value: el.value,
+                                    id: el.id,
+                                    name: el.name,
+                                    className: el.className
+                                });
+                                console.log(`🔍 [ULTRA-SYNC] ${questionId} encontrado via estratégia ${i + 1}:`, {
+                                    value: el.value,
+                                    id: el.id,
+                                    name: el.name,
+                                    className: el.className
+                                });
+                            }
+                        } catch(_e) { /* continue */ }
+                    }
+
+                    if (foundElements.length === 0) {
+                        console.warn(`⚠️ [ULTRA-SYNC] ${questionId} não encontrado em nenhuma estratégia`);
+                        return { element: null, realValue: null };
+                    }
+
+                    // Se encontrou múltiplos elementos, usar lógica inteligente para escolher o correto
+                    let bestElement = foundElements[0];
+
+                    // Priorizar elementos com data-question-id (mais específicos)
+                    const dataQuestionElement = foundElements.find(el => el.element.hasAttribute('data-question-id'));
+                    if (dataQuestionElement) {
+                        bestElement = dataQuestionElement;
+                        console.log(`✅ [ULTRA-SYNC] Usando elemento com data-question-id:`, bestElement.value);
+                    }
+
+                    // Detectar valor real baseado no contexto visual
+                    let realValue = bestElement.value;
+
+                    // Para TRANSFER_ARRIVAL_MODE, verificar se há indicações visuais de SEA
+                    if (questionId === 'TRANSFER_ARRIVAL_MODE') {
+                        // Buscar por elementos relacionados a SEA que estejam visíveis
+                        const seaIndicators = [
+                            () => document.querySelector('[data-mode="SEA"]:checked'),
+                            () => document.querySelector('input[value="SEA"]:checked'),
+                            () => document.querySelector('select option[value="SEA"]:selected'),
+                            () => document.querySelector('.mode-sea.selected'),
+                            () => document.querySelector('.arrival-mode.sea.active')
+                        ];
+
+                        for (let indicator of seaIndicators) {
+                            try {
+                                const seaEl = indicator();
+                                if (seaEl) {
+                                    console.log(`🌊 [ULTRA-SYNC] Indicador SEA encontrado:`, seaEl);
+                                    realValue = 'SEA';
+                                    break;
+                                }
+                            } catch(_e) { /* continue */ }
+                        }
+
+                        // Verificar texto visível que indique seleção de navio
+                        const textIndicators = document.querySelectorAll('*');
+                        for (let el of textIndicators) {
+                            if (el.textContent && el.textContent.includes('Navio') &&
+                                (el.classList.contains('selected') || el.classList.contains('active'))) {
+                                console.log(`🌊 [ULTRA-SYNC] Texto "Navio" selecionado encontrado:`, el.textContent);
+                                realValue = 'SEA';
+                                break;
+                            }
+                        }
+                    }
+
+                    console.log(`✅ [ULTRA-SYNC] Valor final determinado para ${questionId}:`, realValue);
+                    return { element: bestElement.element, realValue: realValue };
+                };
+
+                // ARRIVAL - Sincronização Ultra-Robusta
+                const arrResult = findElementAndRealValue('TRANSFER_ARRIVAL_MODE');
+                const uiArrVal = normalizeMode(arrResult.realValue || '');
+                console.log(`🔍 [ULTRA-SYNC] ARRIVAL - elemento:`, !!arrResult.element, 'valor detectado:', arrResult.realValue, 'valor normalizado:', uiArrVal);
+
+                if (uiArrVal) {
+                    const allowedArr = (typeof this.getProductAllowedAnswers === 'function') ? (this.getProductAllowedAnswers('TRANSFER_ARRIVAL_MODE') || []) : [];
+                    const canUseArr = !Array.isArray(allowedArr) || allowedArr.length === 0 || allowedArr.includes(uiArrVal);
+                    const idxArr = answers.findIndex(a => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
+                    const prevArr = idxArr !== -1 ? String(answers[idxArr].answer || '') : '';
+
+                    console.log(`🔍 [ULTRA-SYNC] ARRIVAL - allowed:`, allowedArr, 'canUse:', canUseArr, 'previous:', prevArr, 'current:', uiArrVal);
+
+                    if (canUseArr && uiArrVal !== prevArr) {
+                        if (idxArr === -1) {
+                            answers.push({ question: 'TRANSFER_ARRIVAL_MODE', answer: uiArrVal });
+                        } else {
+                            answers[idxArr].answer = uiArrVal;
+                        }
+                        console.log(`✅ [ULTRA-SYNC] ARRIVAL sincronizado: ${prevArr} → ${uiArrVal}`);
+                        try { this.logBookingEvent && this.logBookingEvent('ultra_sync_transfer_modes', { field: 'ARRIVAL', previous: prevArr, current: uiArrVal, allowed: allowedArr, detection_method: 'ultra_robust' }, 'info'); } catch(_e) {}
+                    } else if (!canUseArr) {
+                        console.warn(`⚠️ [ULTRA-SYNC] ARRIVAL valor ${uiArrVal} não permitido:`, allowedArr);
+                    }
+                } else {
+                    console.warn(`⚠️ [ULTRA-SYNC] ARRIVAL valor não detectado`);
+                }
+
+                // DEPARTURE - Sincronização Ultra-Robusta
+                const depResult = findElementAndRealValue('TRANSFER_DEPARTURE_MODE');
+                const uiDepVal = normalizeMode(depResult.realValue || '');
+                console.log(`🔍 [ULTRA-SYNC] DEPARTURE - elemento:`, !!depResult.element, 'valor detectado:', depResult.realValue, 'valor normalizado:', uiDepVal);
+
+                if (uiDepVal) {
+                    const allowedDep = (typeof this.getProductAllowedAnswers === 'function') ? (this.getProductAllowedAnswers('TRANSFER_DEPARTURE_MODE') || []) : [];
+                    const canUseDep = !Array.isArray(allowedDep) || allowedDep.length === 0 || allowedDep.includes(uiDepVal);
+                    const idxDep = answers.findIndex(a => (a?.question || a?.questionId) === 'TRANSFER_DEPARTURE_MODE');
+                    const prevDep = idxDep !== -1 ? String(answers[idxDep].answer || '') : '';
+
+                    console.log(`🔍 [ULTRA-SYNC] DEPARTURE - allowed:`, allowedDep, 'canUse:', canUseDep, 'previous:', prevDep, 'current:', uiDepVal);
+
+                    if (canUseDep && uiDepVal !== prevDep) {
+                        if (idxDep === -1) {
+                            answers.push({ question: 'TRANSFER_DEPARTURE_MODE', answer: uiDepVal });
+                        } else {
+                            answers[idxDep].answer = uiDepVal;
+                        }
+                        console.log(`✅ [ULTRA-SYNC] DEPARTURE sincronizado: ${prevDep} → ${uiDepVal}`);
+                        try { this.logBookingEvent && this.logBookingEvent('ultra_sync_transfer_modes', { field: 'DEPARTURE', previous: prevDep, current: uiDepVal, allowed: allowedDep, detection_method: 'ultra_robust' }, 'info'); } catch(_e) {}
+                    } else if (!canUseDep) {
+                        console.warn(`⚠️ [ULTRA-SYNC] DEPARTURE valor ${uiDepVal} não permitido:`, allowedDep);
+                    }
+                } else {
+                    console.warn(`⚠️ [ULTRA-SYNC] DEPARTURE valor não detectado`);
+                }
+
+                console.log('🔄 [SYNC] Sincronização de modos de transporte concluída');
+            }
+        } catch(_e) {
+            console.error('❌ [SYNC] Erro na sincronização de modos:', _e);
+        }
 
         // Não persistir aqui para não sobrescrever PER_TRAVELER coletadas na Etapa 2
         return answers;
@@ -6652,6 +6850,264 @@ class ViatorBookingManager {
         console.log('🎨 Estilos de validação padronizados injetados');
     }
     /**
+     * Aplicar correção final no payload antes do envio para API
+     */
+    applyFinalPayloadFix(bookingQuestionAnswers) {
+        try {
+            const FEATURE_FINAL_PAYLOAD_FIX = window.viatorConfig?.finalPayloadFix !== false; // default: true
+            if (!FEATURE_FINAL_PAYLOAD_FIX) {
+                console.log('🔧 [PAYLOAD-FIX] Correção final desabilitada');
+                return bookingQuestionAnswers;
+            }
+
+            console.log('🔧 [PAYLOAD-FIX] Aplicando correção final no payload...');
+            let correctedAnswers = [...bookingQuestionAnswers];
+
+            // Detectar modo de chegada real baseado na UI
+            const detectRealArrivalMode = () => {
+                // Estratégias para detectar seleção real do usuário
+                const strategies = [
+                    // Verificar elementos com texto "Navio" selecionados
+                    () => {
+                        const elements = document.querySelectorAll('*');
+                        for (let el of elements) {
+                            if (el.textContent && el.textContent.includes('Navio') &&
+                                (el.classList.contains('selected') || el.classList.contains('active') ||
+                                 el.getAttribute('aria-selected') === 'true')) {
+                                return 'SEA';
+                            }
+                        }
+                        return null;
+                    },
+                    // Verificar radio buttons ou checkboxes com value SEA
+                    () => {
+                        const seaInputs = document.querySelectorAll('input[value="SEA"]:checked, input[value="Navio"]:checked');
+                        return seaInputs.length > 0 ? 'SEA' : null;
+                    },
+                    // Verificar select options selecionadas
+                    () => {
+                        const selects = document.querySelectorAll('select option:checked');
+                        for (let option of selects) {
+                            if (option.value === 'SEA' || option.textContent.includes('Navio')) {
+                                return 'SEA';
+                            }
+                        }
+                        return null;
+                    }
+                ];
+
+                for (let strategy of strategies) {
+                    try {
+                        const result = strategy();
+                        if (result) {
+                            console.log(`🌊 [PAYLOAD-FIX] Modo SEA detectado via estratégia visual`);
+                            return result;
+                        }
+                    } catch(_e) { /* continue */ }
+                }
+
+                return null;
+            };
+
+            const realMode = detectRealArrivalMode();
+
+            if (realMode === 'SEA') {
+                console.log('🌊 [PAYLOAD-FIX] Forçando TRANSFER_ARRIVAL_MODE para SEA baseado na detecção visual');
+
+                // Corrigir TRANSFER_ARRIVAL_MODE
+                const arrivalModeIndex = correctedAnswers.findIndex(q =>
+                    (q?.question || q?.questionId) === 'TRANSFER_ARRIVAL_MODE'
+                );
+
+                if (arrivalModeIndex !== -1) {
+                    correctedAnswers[arrivalModeIndex].answer = 'SEA';
+                    console.log('✅ [PAYLOAD-FIX] TRANSFER_ARRIVAL_MODE corrigido para SEA');
+                } else {
+                    correctedAnswers.push({ question: 'TRANSFER_ARRIVAL_MODE', answer: 'SEA' });
+                    console.log('✅ [PAYLOAD-FIX] TRANSFER_ARRIVAL_MODE adicionado como SEA');
+                }
+
+                // Remover campos incompatíveis com modo SEA
+                const incompatibleWithSea = [
+                    'TRANSFER_AIR_ARRIVAL_AIRLINE',
+                    'TRANSFER_AIR_ARRIVAL_FLIGHT_NO'
+                ];
+
+                const beforeCount = correctedAnswers.length;
+                correctedAnswers = correctedAnswers.filter(q => {
+                    const questionId = q?.question || q?.questionId;
+                    const shouldRemove = incompatibleWithSea.includes(questionId);
+                    if (shouldRemove) {
+                        console.log(`🗑️ [PAYLOAD-FIX] Removendo campo incompatível com SEA: ${questionId}`);
+                    }
+                    return !shouldRemove;
+                });
+
+                console.log(`🔧 [PAYLOAD-FIX] Campos removidos: ${beforeCount - correctedAnswers.length}`);
+            }
+
+            // Sempre remover TRANSFER_ARRIVAL_DROP_OFF se modo for AIR (baseado na evidência da API)
+            const finalMode = correctedAnswers.find(q =>
+                (q?.question || q?.questionId) === 'TRANSFER_ARRIVAL_MODE'
+            )?.answer;
+
+            if (finalMode === 'AIR') {
+                const beforeCount = correctedAnswers.length;
+                correctedAnswers = correctedAnswers.filter(q => {
+                    const questionId = q?.question || q?.questionId;
+                    const shouldRemove = questionId === 'TRANSFER_ARRIVAL_DROP_OFF';
+                    if (shouldRemove) {
+                        console.log(`🗑️ [PAYLOAD-FIX] Removendo TRANSFER_ARRIVAL_DROP_OFF para modo AIR`);
+                    }
+                    return !shouldRemove;
+                });
+
+                console.log(`🔧 [PAYLOAD-FIX] TRANSFER_ARRIVAL_DROP_OFF removido para modo AIR`);
+            }
+
+            try {
+                this.logBookingEvent && this.logBookingEvent('final_payload_fix', {
+                    detected_mode: realMode,
+                    final_mode: finalMode,
+                    original_count: bookingQuestionAnswers.length,
+                    final_count: correctedAnswers.length
+                }, 'info');
+            } catch(_e) {}
+
+            return correctedAnswers;
+
+        } catch(e) {
+            console.error('❌ [PAYLOAD-FIX] Erro na correção final do payload:', e);
+            return bookingQuestionAnswers; // Retorna original em caso de erro
+        }
+    }
+
+    /**
+     * Filtrar campos incompatíveis baseado no modo de transporte
+     */
+    filterTransferModeCompatibility(answers) {
+        try {
+            const FEATURE_TRANSFER_MODE_FILTER = window.viatorConfig?.transferModeFilter !== false; // default: true
+            if (!FEATURE_TRANSFER_MODE_FILTER) {
+                console.log('🔧 [FILTER] Filtro de compatibilidade desabilitado');
+                return answers;
+            }
+
+            console.log('🔧 [FILTER] Iniciando filtro de compatibilidade de modos de transporte...');
+
+            // Encontrar o modo de chegada final
+            const arrivalModeAnswer = answers.find(a => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE');
+            const arrivalMode = arrivalModeAnswer?.answer;
+
+            console.log('🔧 [FILTER] Modo de chegada detectado:', arrivalMode);
+
+            if (!arrivalMode) {
+                console.log('🔧 [FILTER] Nenhum modo de chegada encontrado, mantendo todos os campos');
+                return answers;
+            }
+
+            // Campos problemáticos específicos por modo (baseado em evidências da API)
+            const problematicFields = {
+                'AIR': [
+                    'TRANSFER_ARRIVAL_DROP_OFF', // API rejeitou este campo para modo AIR no produto 9895P69
+                    'TRANSFER_PORT_CRUISE_SHIP', // Campos de navio não são compatíveis com modo aéreo
+                    'TRANSFER_PORT_ARRIVAL_TIME',
+                    'TRANSFER_PORT_DEPARTURE_TIME'
+                ],
+                'SEA': [
+                    'TRANSFER_AIR_ARRIVAL_AIRLINE', // Campos de avião não são compatíveis com modo marítimo
+                    'TRANSFER_AIR_ARRIVAL_FLIGHT_NO'
+                ],
+                'RAIL': [
+                    'TRANSFER_AIR_ARRIVAL_AIRLINE', // Campos de avião não são compatíveis com modo ferroviário
+                    'TRANSFER_AIR_ARRIVAL_FLIGHT_NO',
+                    'TRANSFER_PORT_CRUISE_SHIP', // Campos de navio não são compatíveis com modo ferroviário
+                    'TRANSFER_PORT_ARRIVAL_TIME',
+                    'TRANSFER_PORT_DEPARTURE_TIME'
+                ],
+                'OTHER': [
+                    'TRANSFER_AIR_ARRIVAL_AIRLINE', // Para modo OTHER, remover campos específicos
+                    'TRANSFER_AIR_ARRIVAL_FLIGHT_NO',
+                    'TRANSFER_PORT_CRUISE_SHIP',
+                    'TRANSFER_PORT_ARRIVAL_TIME',
+                    'TRANSFER_PORT_DEPARTURE_TIME'
+                ]
+            };
+
+            // Definir campos incompatíveis por modo (apenas os que causam conflito real)
+            const incompatibleFields = {
+                'AIR': [
+                    // Quando modo é AIR, remover campos específicos de SEA/RAIL se estiverem vazios ou causarem conflito
+                    ...(problematicFields['AIR'] || [])
+                ],
+                'SEA': [
+                    // Quando modo é SEA, remover campos específicos de AIR se estiverem vazios ou causarem conflito
+                    ...(problematicFields['SEA'] || [])
+                ],
+                'RAIL': [
+                    // Quando modo é RAIL, remover campos específicos de AIR/SEA se estiverem vazios ou causarem conflito
+                    ...(problematicFields['RAIL'] || [])
+                ],
+                'OTHER': [
+                    // Quando modo é OTHER, remover campos específicos de todos os outros modos se estiverem vazios
+                    ...(problematicFields['OTHER'] || [])
+                ]
+            };
+
+            const fieldsToRemove = incompatibleFields[arrivalMode] || [];
+
+            if (fieldsToRemove.length === 0) {
+                console.log('🔧 [FILTER] Nenhum campo para remover para o modo:', arrivalMode);
+                return answers;
+            }
+
+            const originalCount = answers.length;
+            let filteredAnswers = answers.filter(answer => {
+                const questionId = answer?.question || answer?.questionId;
+                const shouldRemove = fieldsToRemove.includes(questionId);
+
+                if (shouldRemove) {
+                    console.log(`🗑️ [FILTER] Removendo campo incompatível: ${questionId} (modo: ${arrivalMode})`);
+                    try {
+                        this.logBookingEvent && this.logBookingEvent('transfer_mode_filter', {
+                            mode: arrivalMode,
+                            removed_field: questionId,
+                            reason: 'incompatible_with_mode'
+                        }, 'info');
+                    } catch(_e) {}
+                }
+
+                return !shouldRemove;
+            });
+
+            // Verificação adicional: garantir que TRANSFER_ARRIVAL_DROP_OFF seja removido para modo AIR
+            if (arrivalMode === 'AIR') {
+                const dropOffStillPresent = filteredAnswers.find(a => (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_DROP_OFF');
+                if (dropOffStillPresent) {
+                    console.warn(`⚠️ [FILTER] TRANSFER_ARRIVAL_DROP_OFF ainda presente para modo AIR, removendo forçadamente...`);
+                    filteredAnswers = filteredAnswers.filter(a => (a?.question || a?.questionId) !== 'TRANSFER_ARRIVAL_DROP_OFF');
+                    try {
+                        this.logBookingEvent && this.logBookingEvent('transfer_mode_filter_force', {
+                            mode: arrivalMode,
+                            forced_removal: 'TRANSFER_ARRIVAL_DROP_OFF',
+                            reason: 'api_rejection_prevention'
+                        }, 'warning');
+                    } catch(_e) {}
+                }
+            }
+
+            const removedCount = originalCount - filteredAnswers.length;
+            console.log(`🔧 [FILTER] Filtro concluído: ${removedCount} campos removidos de ${originalCount} total`);
+
+            return filteredAnswers;
+
+        } catch(e) {
+            console.error('❌ [FILTER] Erro no filtro de compatibilidade:', e);
+            return answers; // Retorna original em caso de erro
+        }
+    }
+
+    /**
      * Coletar todas as respostas das booking questions (formato compatível com backend PHP)
      */
     collectBookingQuestionAnswers() {
@@ -6746,9 +7202,30 @@ class ViatorBookingManager {
             });
 
             // 4) Converter mapa em array final estável
-            const merged = Array.from(mergedMap.values());
+            let merged = Array.from(mergedMap.values());
+
+            // 5) Aplicar filtro de compatibilidade de modos de transporte
+            merged = this.filterTransferModeCompatibility(merged);
 
             this.bookingData.bookingQuestionAnswers = merged;
+
+            // Atualizar input oculto raw_booking_questions com lista saneada (para o backend usar a versão correta)
+            try {
+                const FEATURE_OVERRIDE_RAW = window.viatorConfig?.overrideRawBookingQuestions !== false; // default: true
+                if (FEATURE_OVERRIDE_RAW) {
+                    const hiddenRaw = document.querySelector('input[name="raw_booking_questions"]');
+                    if (hiddenRaw) {
+                        const sanitized = JSON.stringify(merged);
+                        hiddenRaw.value = sanitized;
+                        console.log('🧩 [RAW OVERRIDE] raw_booking_questions atualizado com versão saneada, tamanho:', merged.length);
+                        try { this.logBookingEvent && this.logBookingEvent('override_raw_booking_questions', { count: merged.length }, 'info'); } catch(_e) {}
+                    } else {
+                        console.warn('⚠️ [RAW OVERRIDE] input[name="raw_booking_questions"] não encontrado no DOM');
+                    }
+                }
+            } catch(e) {
+                console.warn('⚠️ [RAW OVERRIDE] Erro ao atualizar raw_booking_questions:', e);
+            }
 
             console.log('✅ Respostas dinâmicas coletadas (PER_BOOKING):', dynamicAnswers.length);
             console.log('✅ Respostas PER_TRAVELER preservadas:', perTravelerExisting.length);
@@ -14105,7 +14582,7 @@ class ViatorBookingManager {
                     action: 'viator_request_hold',
                     availability_data: JSON.stringify(availabilityDataWithSelection),
                     travelers_details: JSON.stringify(travelersDetails),
-                    booking_question_answers: JSON.stringify(bookingQuestionAnswers),
+                    booking_question_answers: JSON.stringify(this.applyFinalPayloadFix(bookingQuestionAnswers)),
                     booker_info: JSON.stringify(this.bookingData.bookerInfo || {}),
                     nonce: viatorBookingAjax.nonce
                 }),
@@ -14529,6 +15006,63 @@ class ViatorBookingManager {
 
             // CORREÇÃO: Resetar flag de erro específico no início de nova tentativa
             this.specificErrorAlreadyDisplayed = false;
+
+            // CORREÇÃO FINAL: Sincronização de última hora dos modos de transporte
+            try {
+                const FEATURE_FINAL_SYNC = window.viatorConfig?.finalTransferModeSync !== false; // default: true
+                if (FEATURE_FINAL_SYNC && this.bookingData?.bookingQuestionAnswers) {
+                    console.log('🔄 [FINAL-SYNC] Sincronização final de modos de transporte antes da confirmação...');
+
+                    const normalizeMode = (val) => {
+                        if (!val) return val;
+                        const map = { 'Avião': 'AIR', 'Trem': 'RAIL', 'Navio': 'SEA', 'Outros': 'OTHER' };
+                        return map[val] || String(val).trim();
+                    };
+
+                    // Buscar elemento de chegada no UI
+                    const arrEl = document.querySelector('[data-question-id="TRANSFER_ARRIVAL_MODE"]')
+                        || document.getElementById('booking_question_TRANSFER_ARRIVAL_MODE')
+                        || document.getElementById('TRANSFER_ARRIVAL_MODE')
+                        || document.querySelector('[id*="TRANSFER_ARRIVAL_MODE"]');
+
+                    if (arrEl && arrEl.value) {
+                        const uiValue = normalizeMode(arrEl.value);
+                        const currentAnswer = this.bookingData.bookingQuestionAnswers.find(a =>
+                            (a?.question || a?.questionId) === 'TRANSFER_ARRIVAL_MODE'
+                        );
+
+                        if (currentAnswer && currentAnswer.answer !== uiValue) {
+                            console.log(`🔄 [FINAL-SYNC] Corrigindo ARRIVAL_MODE: ${currentAnswer.answer} → ${uiValue}`);
+                            currentAnswer.answer = uiValue;
+
+                            // Aplicar filtro de compatibilidade novamente
+                            console.log(`🔧 [FINAL-SYNC] Aplicando filtro de compatibilidade após correção...`);
+                            const beforeFilter = this.bookingData.bookingQuestionAnswers.length;
+                            this.bookingData.bookingQuestionAnswers = this.filterTransferModeCompatibility(this.bookingData.bookingQuestionAnswers);
+                            const afterFilter = this.bookingData.bookingQuestionAnswers.length;
+                            console.log(`🔧 [FINAL-SYNC] Filtro aplicado: ${beforeFilter} → ${afterFilter} campos`);
+
+                            try {
+                                this.logBookingEvent && this.logBookingEvent('final_transfer_mode_sync', {
+                                    previous: currentAnswer.answer,
+                                    corrected: uiValue,
+                                    fields_before_filter: beforeFilter,
+                                    fields_after_filter: afterFilter
+                                }, 'info');
+                            } catch(_e) {}
+                        } else {
+                            // Mesmo sem correção, aplicar filtro para garantir compatibilidade
+                            console.log(`🔧 [FINAL-SYNC] Aplicando filtro de compatibilidade preventivo...`);
+                            const beforeFilter = this.bookingData.bookingQuestionAnswers.length;
+                            this.bookingData.bookingQuestionAnswers = this.filterTransferModeCompatibility(this.bookingData.bookingQuestionAnswers);
+                            const afterFilter = this.bookingData.bookingQuestionAnswers.length;
+                            console.log(`🔧 [FINAL-SYNC] Filtro preventivo aplicado: ${beforeFilter} → ${afterFilter} campos`);
+                        }
+                    }
+                }
+            } catch(e) {
+                console.warn('🔄 [FINAL-SYNC] Erro na sincronização final:', e);
+            }
 
             // CORREÇÃO: Evitar reconfirmação desnecessária (idempotência)
             try {
@@ -15451,6 +15985,28 @@ class ViatorBookingManager {
                             }
                         } catch (e) {
                             console.error('❌ [CONFIRM] Erro na sanitização de TRANSFER_ARRIVAL_DROP_OFF:', e);
+                            // CORREÇÃO: Fallback defensivo em caso de erro na sanitização
+                            try {
+                                const idxDrop = bookingQuestionAnswers.findIndex(function(a){
+                                    const qid = a && (a.question || a.questionId);
+                                    return qid === 'TRANSFER_ARRIVAL_DROP_OFF';
+                                });
+                                if (idxDrop !== -1) {
+                                    const currentAnswer = bookingQuestionAnswers[idxDrop];
+                                    const currentValue = String(currentAnswer.answer || '').trim();
+                                    // Se o valor atual está vazio ou inválido, aplicar fallback seguro
+                                    if (!currentValue || (!currentValue.startsWith('LOC-') && currentValue !== 'CONTACT_SUPPLIER_LATER')) {
+                                        bookingQuestionAnswers[idxDrop] = {
+                                            question: 'TRANSFER_ARRIVAL_DROP_OFF',
+                                            answer: 'CONTACT_SUPPLIER_LATER',
+                                            unit: 'LOCATION_REFERENCE'
+                                        };
+                                        console.log('🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF corrigido com fallback defensivo');
+                                    }
+                                }
+                            } catch (fallbackError) {
+                                console.error('❌ [CONFIRM] Erro no fallback defensivo:', fallbackError);
+                            }
                         }
                     } else if (arrivalModeVal === 'RAIL') {
                         // Para RAIL: remover campos exclusivos de SEA e os exclusivos de AIR (airline/flight),
@@ -16206,6 +16762,9 @@ class ViatorBookingManager {
                 } catch (_e) { /* no-op */ }
 
                 } catch (_e) { /* no-op */ }
+
+                // CORREÇÃO FINAL: Aplicar correção no payload antes do envio
+                bookingQuestionAnswers = this.applyFinalPayloadFix(bookingQuestionAnswers);
 
                 // REAFIRMAR 30.10: Garantir que as alterações de completude sejam refletidas no payload
                 requestParams.bookingQuestionAnswers = JSON.stringify(bookingQuestionAnswers);
