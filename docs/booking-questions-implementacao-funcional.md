@@ -9,7 +9,10 @@ Este documento serve como referência completa para a implementação e funciona
 ### ✅ Correção de Payload Final (27/08/2025) - Produto 9895P69
 - **Problema**: Divergência entre seleção UI e valores DOM causando rejeição da API
 - **Solução**: Interceptação e correção de payload com detecção visual
-- **Status**: ✅ FUNCIONAL - BookingRef: BR-597888805
+- **Status**: ✅ FUNCIONAL - Múltiplas variações testadas com sucesso
+- **Variações confirmadas**:
+  - **SEA→SEA**: BookingRef BR-597888805 (Navio → Navio)
+  - **RAIL→SEA**: BookingRef BR-597888821 (Trem → Navio)
 - **Abrangência**: Todos os produtos com modos de transporte AIR/SEA/RAIL/OTHER
 
 ### ✅ Correção SEA→(AIR|RAIL|SEA) (27/08/2025) - Produto 100014P4
@@ -27,8 +30,23 @@ Este documento serve como referência completa para a implementação e funciona
 **Produto de referência**: 9895P69
 **Data da implementação**: 27/08/2025
 **Data da resolução**: 27/08/2025
-**Configuração testada**: arrivalMode=SEA (Navio), departureMode=SEA (Navio), "Vou por conta própria até o ponto de encontro"
-**BookingRef de sucesso**: BR-597888805
+
+#### Variações testadas com sucesso:
+
+**Variação 1: SEA→SEA (Navio → Navio)**
+- **Configuração**: arrivalMode=SEA (Navio), departureMode=SEA (Navio), "Vou por conta própria até o ponto de encontro"
+- **BookingRef de sucesso**: BR-597888805
+- **Data do teste**: 27/08/2025 14:00
+
+**Variação 2: RAIL→SEA (Trem → Navio)**
+- **Configuração**: arrivalMode=RAIL (Trem), departureMode=SEA (Navio), "Vou por conta própria até o ponto de encontro"
+- **BookingRef de sucesso**: BR-597888821
+- **Data do teste**: 27/08/2025 14:23
+- **CartRef**: CR-d5ca56be12c364544f18c80878d6f956
+- **Valor confirmado**: R$ 7.390,60 (4 adultos)
+- **Diferencial**: Primeira variação com modo RAIL funcionando corretamente
+- **Campos específicos RAIL**: TRANSFER_RAIL_ARRIVAL_LINE, TRANSFER_RAIL_ARRIVAL_STATION
+- **Sincronização**: Ultra-robusta detectou RAIL corretamente via estratégia 4
 
 #### 1. Análise detalhada do problema de sincronização UI→API
 
@@ -92,33 +110,39 @@ bookingQuestionAnswers = this.applyFinalPayloadFix(bookingQuestionAnswers);
 
 #### 3. Evidências de sucesso da correção
 
-**Logs de funcionamento correto:**
+**Variação 1 - SEA→SEA (Navio → Navio):**
 - `🔧 [PAYLOAD-FIX] Aplicando correção final no payload...`
 - `🗑️ [PAYLOAD-FIX] Removendo TRANSFER_ARRIVAL_DROP_OFF para modo AIR`
 - `✅ Booking Confirmation Response (Parsed): status=PENDING`
+- **BookingRef**: BR-597888805, **CartRef**: CR-31e7b29f7293141df5b217ebb83a7f23
 
-**Payload final enviado à API:**
+**Variação 2 - RAIL→SEA (Trem → Navio):**
+- `✅ [ULTRA-SYNC] Valor final determinado para TRANSFER_ARRIVAL_MODE: RAIL`
+- `🔧 [PAYLOAD-FIX] Aplicando correção final no payload...`
+- `✅ Booking Confirmation Response (Parsed): status=PENDING`
+- **BookingRef**: BR-597888821, **CartRef**: CR-d5ca56be12c364544f18c80878d6f956
+
+**Payload final enviado à API (Variação RAIL→SEA):**
 ```json
 {
   "raw_booking_questions": [
-    {"question":"TRANSFER_ARRIVAL_MODE","answer":"AIR"},
-    {"question":"TRANSFER_AIR_ARRIVAL_AIRLINE","answer":"GOL"},
-    {"question":"TRANSFER_AIR_ARRIVAL_FLIGHT_NO","answer":"G248"},
-    {"question":"TRANSFER_ARRIVAL_TIME","answer":"15:00"},
-    {"question":"TRANSFER_DEPARTURE_DATE","answer":"2025-09-10"},
+    {"question":"TRANSFER_ARRIVAL_MODE","answer":"RAIL"},
+    {"question":"TRANSFER_ARRIVAL_TIME","answer":"11:50"},
+    {"question":"TRANSFER_ARRIVAL_DROP_OFF","answer":"Test Way 123","unit":"FREETEXT"},
+    {"question":"TRANSFER_RAIL_ARRIVAL_LINE","answer":"SuperVia"},
+    {"question":"TRANSFER_RAIL_ARRIVAL_STATION","answer":"Centro Rj"},
     {"question":"TRANSFER_DEPARTURE_MODE","answer":"SEA"},
-    {"question":"TRANSFER_PORT_DEPARTURE_TIME","answer":"11:10"},
+    {"question":"TRANSFER_PORT_DEPARTURE_TIME","answer":"11:23"},
+    {"question":"TRANSFER_DEPARTURE_DATE","answer":"2025-08-29"},
     {"question":"TRANSFER_PORT_CRUISE_SHIP","answer":"Cruise Ship"},
     {"question":"TRANSFER_DEPARTURE_PICKUP","answer":"CONTACT_SUPPLIER_LATER","unit":"LOCATION_REFERENCE"}
   ]
 }
 ```
 
-**Confirmação bem-sucedida:**
-- **BookingRef**: BR-597888805
-- **Status**: PENDING (confirmação aceita pela API)
-- **CartRef**: CR-31e7b29f7293141df5b217ebb83a7f23
-- **Valor**: R$ 7.390,60 (4 adultos)
+**Confirmações bem-sucedidas:**
+- **Variação SEA→SEA**: BR-597888805, Status PENDING, R$ 7.390,60 (4 adultos)
+- **Variação RAIL→SEA**: BR-597888821, Status PENDING, R$ 7.390,60 (4 adultos)
 
 #### 4. Abrangência da solução para produtos similares
 
@@ -150,6 +174,7 @@ window.viatorConfig = {
 **Logs específicos para troubleshooting futuro:**
 - `🔧 [PAYLOAD-FIX] Aplicando correção final no payload...`
 - `🌊 [PAYLOAD-FIX] Modo SEA detectado via estratégia visual`
+- `✅ [ULTRA-SYNC] Valor final determinado para TRANSFER_ARRIVAL_MODE: RAIL`
 - `✅ [PAYLOAD-FIX] TRANSFER_ARRIVAL_MODE corrigido para SEA`
 - `🗑️ [PAYLOAD-FIX] Removendo TRANSFER_ARRIVAL_DROP_OFF para modo AIR`
 - `🗑️ [PAYLOAD-FIX] Removendo campo incompatível com SEA: [campo]`
