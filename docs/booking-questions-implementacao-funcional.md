@@ -6,9 +6,192 @@ Este documento serve como referência completa para a implementação e funciona
 
 ## 🆕 Melhorias Recentes Implementadas (Agosto 2025)
 
-### ✅ Correção para Conflitos de Booking Questions em Produtos Híbridos (SEA→AIR) — 26/08/2025
+### ✅ Correção Abrangente para Conflitos de Booking Questions em Produtos Híbridos SEA→(AIR|RAIL|SEA) — 27/08/2025
 
 **Status**: ✅ **IMPLEMENTADO E FUNCIONAL**
+
+**Produto de referência**: 100014P4
+**Data da implementação**: 27/08/2025
+**Data da resolução**: 27/08/2025
+**Configuração testada**: arrivalMode=SEA (Navio), departureMode=SEA (Navio), "Vou decidir depois"
+**BookingRef de sucesso**: BR-597888533
+
+#### 1. Análise detalhada do problema SEA→SEA
+
+**Evolução dos erros encontrados:**
+
+1. **Erro inicial**: `"Extra answer(s) provided: PICKUP_POINT, TRANSFER_ARRIVAL_DROP_OFF"`
+   - Causa: Sistema enviava campos genéricos junto com campos especializados de partida
+   - Evidência: viator-debug.log - `"message":"BR-597887197: Extra answer(s) provided: PICKUP_POINT, TRANSFER_ARRIVAL_DROP_OFF"`
+
+2. **Erro intermediário**: `"Too many departure answers provided"`
+   - Causa: Campos genéricos de partida (TRANSFER_DEPARTURE_TIME) sendo enviados junto com campos específicos de SEA (TRANSFER_PORT_DEPARTURE_TIME)
+   - Evidência: viator-debug.log - `"message":"BR-597887213: Too many departure answers provided"`
+
+**Análise comparativa com produtos funcionais:**
+- **10006P8, 100273P23, 9966P46, 9966P7**: Produtos com modos únicos ou combinações já validadas
+- **100014P4 RAIL→AIR**: Funcionava porque não havia conflito entre campos especializados
+- **100014P4 SEA→AIR e SEA→RAIL**: Funcionavam após correções anteriores
+- **100014P4 SEA→SEA**: Falhava devido à combinação específica de campos genéricos e especializados de partida
+
+#### 2. Detalhes técnicos da correção implementada
+
+**Correção 1: Extensão do escopo de bloqueio para SEA→(AIR|RAIL|SEA)**
+
+```javascript
+// Flag defensiva estendida para incluir SEA→SEA
+const shouldSkipDropOff = (
+    arrivalMode === 'SEA' &&
+    ['AIR', 'RAIL', 'SEA'].includes(departureMode) &&
+    hasSpecializedPickup
+);
+
+// Aplicação em múltiplos pontos críticos
+if (arrivalMode === 'SEA' && ['AIR', 'RAIL', 'SEA'].includes(departureMode)
+    && hasSpecializedPickup && arrivalDropOffIdx !== -1) {
+    bookingQuestionAnswers.splice(arrivalDropOffIdx, 1);
+    console.log(`🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF removido para SEA→${departureMode}`);
+}
+```
+
+**Correção 2: Bloqueio de PICKUP_POINT para SEA→SEA com pickup especializado**
+
+```javascript
+// Remoção da exceção que permitia PICKUP_POINT quando departureMode === 'SEA'
+// ANTES: (!hasSpecializedPickup || departureMode === 'SEA')
+// AGORA: !hasSpecializedPickup
+
+else if (hasArrivalDropOff && pickupPointIdx === -1 && !hasSpecializedPickup) {
+    bookingQuestionAnswers.push({
+        question: 'PICKUP_POINT',
+        answer: 'CONTACT_SUPPLIER_LATER',
+        unit: 'LOCATION_REFERENCE'
+    });
+} else if (hasArrivalDropOff && pickupPointIdx === -1 && hasSpecializedPickup) {
+    console.log(`🔧 [CONFIRM] PICKUP_POINT BLOQUEADO (SEA→${departureMode} com pickup especializado)`);
+}
+```
+
+**Correção 3: Tripla proteção contra conflitos de campos de partida**
+
+```javascript
+// 1. Remoção inicial durante sanitização
+if (departureMode === 'SEA') {
+    bookingQuestionAnswers = bookingQuestionAnswers.filter(a => {
+        const qid = a && (a.question || a.questionId);
+        return qid !== 'TRANSFER_DEPARTURE_TIME';
+    });
+}
+
+// 2. Remoção na limpeza final por modo
+else if (depMode === 'SEA') {
+    return qid !== 'TRANSFER_AIR_DEPARTURE_AIRLINE' &&
+           qid !== 'TRANSFER_AIR_DEPARTURE_FLIGHT_NO' &&
+           qid !== 'TRANSFER_RAIL_DEPARTURE_LINE' &&
+           qid !== 'TRANSFER_RAIL_DEPARTURE_STATION' &&
+           qid !== 'TRANSFER_DEPARTURE_TIME'; // CORREÇÃO: Remover campo genérico
+}
+
+// 3. Remoção após normalização
+if (preferred === 'SEA') {
+    this.ensureSeaDepartureFields(bookingQuestionAnswers);
+    // Remoção defensiva após ensureSeaDepartureFields
+    bookingQuestionAnswers = bookingQuestionAnswers.filter(a => {
+        const qid = a && (a.question || a.questionId);
+        return qid !== 'TRANSFER_DEPARTURE_TIME';
+    });
+}
+```
+
+#### 3. Evidências de sucesso
+
+**Logs de confirmação (Anotações.txt):**
+```
+🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF removido para SEA→SEA com pickup especializado (evita "Extra answer")
+🔧 [CONFIRM] PICKUP_POINT BLOQUEADO (SEA→SEA com pickup especializado - evita "Extra answer")
+🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF BLOQUEADO (SEA→SEA com pickup especializado) - não readicionar (verificação final)
+🔧 [CONFIRM] Campos de partida incompatíveis removidos para departureMode=SEA (evita "Too many departure answers")
+✅ Status encontrado: CONFIRMED
+✅ BookingRef encontrado: BR-597888533
+```
+
+**Payload final bem-sucedido (viator-debug.log):**
+```json
+"raw_booking_questions": [
+    {"question":"FULL_NAMES_FIRST","answer":"Shiny","travelerNum":1},
+    {"question":"FULL_NAMES_LAST","answer":"Inox","travelerNum":1},
+    {"question":"DATE_OF_BIRTH","answer":"1991-08-27","travelerNum":1},
+    {"question":"AGEBAND","answer":"TRAVELER","travelerNum":1},
+    {"question":"PASSPORT_NATIONALITY","answer":"Brasil","travelerNum":1},
+    {"question":"PASSPORT_PASSPORT_NO","answer":"46523658","travelerNum":1},
+    {"question":"PASSPORT_EXPIRY","answer":"2031-01-01","travelerNum":1},
+    {"question":"TRANSFER_ARRIVAL_MODE","answer":"SEA"},
+    {"question":"TRANSFER_DEPARTURE_MODE","answer":"SEA"},
+    {"question":"TRANSFER_PORT_CRUISE_SHIP","answer":"Brilhauto"},
+    {"question":"TRANSFER_PORT_ARRIVAL_TIME","answer":"15:00"},
+    {"question":"TRANSFER_DEPARTURE_DATE","answer":"2025-08-30"},
+    {"question":"TRANSFER_PORT_DEPARTURE_TIME","answer":"16:00"},
+    {"question":"TRANSFER_DEPARTURE_PICKUP","answer":"CONTACT_SUPPLIER_LATER","unit":"LOCATION_REFERENCE"}
+]
+```
+
+**Campos ausentes (corretamente removidos):**
+- ❌ `PICKUP_POINT` (genérico, conflitava com TRANSFER_DEPARTURE_PICKUP)
+- ❌ `TRANSFER_ARRIVAL_DROP_OFF` (genérico, desnecessário para SEA→SEA)
+- ❌ `TRANSFER_DEPARTURE_TIME` (genérico, conflitava com TRANSFER_PORT_DEPARTURE_TIME)
+
+#### 4. Critérios de ativação da correção
+
+**Condições estritas para ativação:**
+1. `arrivalMode === 'SEA'`
+2. `departureMode` ∈ `['AIR', 'RAIL', 'SEA']`
+3. `hasSpecializedPickup === true` (presença de TRANSFER_DEPARTURE_PICKUP)
+
+**Logs de rastreabilidade:**
+- Eventos estruturados: `sea_rail_debug` e `sea_air_debug`
+- Console logs dinâmicos: `SEA→${departureMode}`
+- Logs de debug para diagnóstico: `🔍 [DEBUG] Verificando remoção de TRANSFER_DEPARTURE_TIME`
+
+#### 5. Garantias de compatibilidade
+
+**Produtos não afetados (mantidos funcionais):**
+- ✅ **10006P8**: Modo único, fora do escopo
+- ✅ **100273P23**: Modo único, fora do escopo
+- ✅ **9966P46**: Modo único, fora do escopo
+- ✅ **9966P7**: Modo único, fora do escopo
+- ✅ **100014P4 RAIL→AIR**: arrivalMode diferente, fora do escopo
+- ✅ **100014P4 SEA→AIR**: Mantido funcional (correção anterior)
+- ✅ **100014P4 SEA→RAIL**: Mantido funcional (correção anterior)
+
+**Produtos beneficiados:**
+- ✅ **100014P4 SEA→SEA**: Agora funcional (nova correção)
+- ✅ **Qualquer produto futuro**: Com arrivalMode=SEA e pickup especializado
+
+#### 6. Abrangência da solução
+
+**Padrão replicável para produtos similares:**
+- Qualquer produto com `arrivalMode=SEA` e pickup especializado de partida
+- Proteção automática contra conflitos entre campos genéricos e especializados
+- Extensível para novos modos de transporte seguindo o mesmo padrão
+
+**Benefícios técnicos:**
+- Tripla proteção contra conflitos de campos de partida
+- Logs detalhados para diagnóstico e manutenção
+- Implementação defensiva que não afeta produtos funcionais
+- Padrão de feature flags condicionais para isolamento de correções
+
+#### 7. Versão da correção
+
+**Versão**: v3.1 - Correção Abrangente SEA→(AIR|RAIL|SEA)
+**Arquivo**: viator-booking.js
+**Linhas modificadas**: 15268-15279, 15753-15760, 15857, 15871, 15884-15894, 15920, 15933-15944, 16132-16138, 16110-16127
+**Commit**: [Pendente - aguardando confirmação final]
+
+---
+
+### ✅ Correção Inicial para Conflitos de Booking Questions em Produtos Híbridos (SEA→AIR) — 26/08/2025
+
+**Status**: ✅ **IMPLEMENTADO E FUNCIONAL** (Estendido em 27/08/2025)
 
 **Produto de referência**: 100014P4
 **Data da implementação**: 26/08/2025

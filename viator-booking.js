@@ -15216,8 +15216,8 @@ class ViatorBookingManager {
                                 }
                             }
 
-                            // Flag defensiva para SEA→(AIR|RAIL) com pickup especializado
-                            const shouldSkipDropOff = (arrivalMode === 'SEA' && ['AIR', 'RAIL'].includes(departureMode) && hasSpecializedPickup);
+                            // Flag defensiva para SEA→(AIR|RAIL|SEA) com pickup especializado
+                            const shouldSkipDropOff = (arrivalMode === 'SEA' && ['AIR', 'RAIL', 'SEA'].includes(departureMode) && hasSpecializedPickup);
                             this.logBookingEvent('sea_air_debug', {
                                 step: 'ensure SEA fields',
                                 arrivalMode,
@@ -15227,15 +15227,15 @@ class ViatorBookingManager {
                                 scope: shouldSkipDropOff ? `SEA→${departureMode}` : 'none'
                             }, 'info');
 
-                            // Log específico para SEA→RAIL, para facilitar rastreamento dedicado
-                            if (arrivalMode === 'SEA' && departureMode === 'RAIL' && hasSpecializedPickup) {
+                            // Log específico para SEA→RAIL e SEA→SEA, para facilitar rastreamento dedicado
+                            if (arrivalMode === 'SEA' && ['RAIL', 'SEA'].includes(departureMode) && hasSpecializedPickup) {
                                 this.logBookingEvent('sea_rail_debug', {
                                     step: 'ensure SEA fields',
                                     arrivalMode,
                                     departureMode,
                                     hasSpecializedPickup,
                                     shouldSkipDropOff,
-                                    scope: 'SEA→RAIL'
+                                    scope: `SEA→${departureMode}`
                                 }, 'info');
                             }
 
@@ -15265,7 +15265,27 @@ class ViatorBookingManager {
                                 }
                             }
 
-                            // 3) TRANSFER_ARRIVAL_DROP_OFF: para SEA→(AIR|RAIL) com pickup especializado, BLOQUEAR
+                            // 3.1) Para departureMode=SEA, remover TRANSFER_DEPARTURE_TIME genérico (evita respostas duplicadas de partida)
+                            console.log('🔍 [DEBUG] Verificando remoção de TRANSFER_DEPARTURE_TIME:', { departureMode, 'departureMode === SEA': departureMode === 'SEA' });
+                            if (departureMode === 'SEA') {
+                                const beforeSeaDep = bookingQuestionAnswers.length;
+                                const hasTransferDepartureTime = bookingQuestionAnswers.some(a => (a?.question || a?.questionId) === 'TRANSFER_DEPARTURE_TIME');
+                                console.log('🔍 [DEBUG] TRANSFER_DEPARTURE_TIME presente antes da remoção:', hasTransferDepartureTime);
+
+                                bookingQuestionAnswers = bookingQuestionAnswers.filter(function(a){
+                                    const qid = a && (a.question || a.questionId);
+                                    return qid !== 'TRANSFER_DEPARTURE_TIME';
+                                });
+                                const afterSeaDep = bookingQuestionAnswers.length;
+                                if (afterSeaDep !== beforeSeaDep) {
+                                    console.log('🔧 [CONFIRM] Campo genérico TRANSFER_DEPARTURE_TIME removido por departureMode=SEA (evita "Too many departure answers")');
+                                } else {
+                                    console.log('🔍 [DEBUG] TRANSFER_DEPARTURE_TIME não foi removido (não estava presente)');
+                                }
+                            }
+
+
+                            // 3) TRANSFER_ARRIVAL_DROP_OFF: para SEA→(AIR|RAIL|SEA) com pickup especializado, BLOQUEAR
                             const hasDropOffAnswer = bookingQuestionAnswers.find(function(a){
                                 const qid = a && (a.question || a.questionId);
                                 return qid === 'TRANSFER_ARRIVAL_DROP_OFF';
@@ -15750,12 +15770,12 @@ class ViatorBookingManager {
                     }
 
                     // CASO 1.5: Produtos SEA→AIR com conflito de campos - remover TRANSFER_ARRIVAL_DROP_OFF (correção defensiva)
-                    else if (arrivalMode === 'SEA' && ['AIR', 'RAIL'].includes(departureMode) && hasSpecializedPickup && arrivalDropOffIdx !== -1) {
+                    else if (arrivalMode === 'SEA' && ['AIR', 'RAIL', 'SEA'].includes(departureMode) && hasSpecializedPickup && arrivalDropOffIdx !== -1) {
                         const dropOffAnswer = String(bookingQuestionAnswers[arrivalDropOffIdx].answer || '').trim();
                         // Remover TRANSFER_ARRIVAL_DROP_OFF para evitar "Extra answer(s) provided"
                         bookingQuestionAnswers.splice(arrivalDropOffIdx, 1);
                         console.log(`🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF removido para SEA→${departureMode} com pickup especializado (evita "Extra answer")`);
-                        if (departureMode === 'RAIL') {
+                        if (['RAIL', 'SEA'].includes(departureMode)) {
                             this.logBookingEvent('sea_rail_debug', { step: 'remove_drop_off_conflict', arrivalMode, departureMode, hasSpecializedPickup }, 'info');
                         }
                     }
@@ -15792,15 +15812,17 @@ class ViatorBookingManager {
                         }
 
                         // CASO 2B: COM TRANSFER_ARRIVAL_DROP_OFF - garantir PICKUP_POINT (correção 29.6)
-                        // AJUSTE CAUTELOSO: somente adicionar PICKUP_POINT se NÃO houver pickup especializado de partida
-                        // ou se o modo de partida também for SEA. Evita "Extra answer(s) provided" em cenários SEA→AIR.
-                        else if (hasArrivalDropOff && pickupPointIdx === -1 && (!hasSpecializedPickup || departureMode === 'SEA')) {
+                        // CORREÇÃO DEFENSIVA: BLOQUEAR PICKUP_POINT se houver pickup especializado de partida, independente do modo
+                        // Evita "Extra answer(s) provided" em cenários SEA→(AIR|RAIL|SEA) com pickup especializado.
+                        else if (hasArrivalDropOff && pickupPointIdx === -1 && !hasSpecializedPickup) {
                             bookingQuestionAnswers.push({
                                 question: 'PICKUP_POINT',
                                 answer: 'CONTACT_SUPPLIER_LATER',
                                 unit: 'LOCATION_REFERENCE'
                             });
-                            console.log('🔧 [CONFIRM] PICKUP_POINT adicionado (SEA com ARRIVAL_DROP_OFF, sem pickup especializado de partida ou dep=SEA)');
+                            console.log('🔧 [CONFIRM] PICKUP_POINT adicionado (SEA com ARRIVAL_DROP_OFF, sem pickup especializado de partida)');
+                        } else if (hasArrivalDropOff && pickupPointIdx === -1 && hasSpecializedPickup) {
+                            console.log(`🔧 [CONFIRM] PICKUP_POINT BLOQUEADO (SEA→${departureMode} com pickup especializado - evita "Extra answer")`);
                         }
                     }
 
@@ -15868,8 +15890,8 @@ class ViatorBookingManager {
                     });
 
                     // Se o produto tem PICKUP_POINT nas BQ originais mas não está presente na confirmação
-                    // CORREÇÃO DEFENSIVA: Evitar PICKUP_POINT em SEA→(AIR|RAIL) com pickup especializado de partida
-                    const shouldSkipPickupPoint = (arrivalMode === 'SEA' && ['AIR', 'RAIL'].includes(departureMode) && hasSpecializedPickup);
+                    // CORREÇÃO DEFENSIVA: Evitar PICKUP_POINT em SEA→(AIR|RAIL|SEA) com pickup especializado de partida
+                    const shouldSkipPickupPoint = (arrivalMode === 'SEA' && ['AIR', 'RAIL', 'SEA'].includes(departureMode) && hasSpecializedPickup);
                     if (productHasPickupPoint && pickupPointIdx === -1 && !shouldSkipPickupPoint) {
                         bookingQuestionAnswers.push({
                             question: 'PICKUP_POINT',
@@ -15882,8 +15904,8 @@ class ViatorBookingManager {
                     }
 
                     // Se o produto tem TRANSFER_ARRIVAL_DROP_OFF nas BQ originais mas não está presente na confirmação
-                    // BLOQUEAR em SEA→(AIR|RAIL) com pickup especializado
-                    const shouldSkipDropOff = (arrivalMode === 'SEA' && ['AIR', 'RAIL'].includes(departureMode) && hasSpecializedPickup);
+                    // BLOQUEAR em SEA→(AIR|RAIL|SEA) com pickup especializado
+                    const shouldSkipDropOff = (arrivalMode === 'SEA' && ['AIR', 'RAIL', 'SEA'].includes(departureMode) && hasSpecializedPickup);
                     this.logBookingEvent('sea_air_debug', { step: 'mandatory re-add check', arrivalMode, departureMode, hasSpecializedPickup, shouldSkipDropOff }, 'info');
                     if (productHasDropOff && arrivalDropOffIdx === -1 && !shouldSkipDropOff) {
                         bookingQuestionAnswers.push({
@@ -15917,8 +15939,8 @@ class ViatorBookingManager {
                         intentionalFieldRemovals.has('PICKUP_POINT_RAIL_AIR')
                     );
 
-                    // CORREÇÃO DEFENSIVA: Recalcular shouldSkipPickupPoint para verificação final (SEA→AIR|RAIL)
-                    const finalShouldSkipPickupPoint = (arrivalMode === 'SEA' && ['AIR', 'RAIL'].includes(departureMode) && hasSpecializedPickup);
+                    // CORREÇÃO DEFENSIVA: Recalcular shouldSkipPickupPoint para verificação final (SEA→AIR|RAIL|SEA)
+                    const finalShouldSkipPickupPoint = (arrivalMode === 'SEA' && ['AIR', 'RAIL', 'SEA'].includes(departureMode) && hasSpecializedPickup);
                     if (productHasPickupPoint && finalPickupPointIdx === -1 && !wasPickupIntentionallyRemoved && !finalShouldSkipPickupPoint) {
                         bookingQuestionAnswers.push({
                             question: 'PICKUP_POINT',
@@ -15932,8 +15954,8 @@ class ViatorBookingManager {
                         console.log(`🔧 [30.3] PICKUP_POINT NÃO readicionado - SEA→${departureMode} com pickup especializado (evita "Extra answer")`);
                     }
 
-                    // Verificação final: BLOQUEAR readição em SEA→(AIR|RAIL) com pickup especializado
-                    const finalShouldSkipDropOff = (arrivalMode === 'SEA' && ['AIR', 'RAIL'].includes(departureMode) && hasSpecializedPickup);
+                    // Verificação final: BLOQUEAR readição em SEA→(AIR|RAIL|SEA) com pickup especializado
+                    const finalShouldSkipDropOff = (arrivalMode === 'SEA' && ['AIR', 'RAIL', 'SEA'].includes(departureMode) && hasSpecializedPickup);
                     this.logBookingEvent('sea_air_debug', { step: 'final re-add check', arrivalMode, departureMode, hasSpecializedPickup, finalShouldSkipDropOff }, 'info');
                     if (productHasDropOff && finalDropOffIdx === -1 && !finalShouldSkipDropOff) {
                         bookingQuestionAnswers.push({
@@ -16093,6 +16115,16 @@ class ViatorBookingManager {
                             // Nota: A função ensureSeaDepartureFields é chamada tanto na coleta dinâmica quanto após a filtragem por modo de chegada
                             if (preferred === 'SEA') {
                                 this.ensureSeaDepartureFields(bookingQuestionAnswers);
+                                // CORREÇÃO DEFENSIVA: Remover TRANSFER_DEPARTURE_TIME genérico após ensureSeaDepartureFields
+                                const beforeCleanup = bookingQuestionAnswers.length;
+                                bookingQuestionAnswers = bookingQuestionAnswers.filter(a => {
+                                    const qid = a && (a.question || a.questionId);
+                                    return qid !== 'TRANSFER_DEPARTURE_TIME';
+                                });
+                                const afterCleanup = bookingQuestionAnswers.length;
+                                if (afterCleanup !== beforeCleanup) {
+                                    console.log('🔧 [CONFIRM] TRANSFER_DEPARTURE_TIME genérico removido após normalização para SEA');
+                                }
                             }
                         }
                     }
@@ -16113,12 +16145,13 @@ class ViatorBookingManager {
                                        qid !== 'TRANSFER_RAIL_DEPARTURE_LINE' &&
                                        qid !== 'TRANSFER_RAIL_DEPARTURE_STATION';
                             }
-                            // Se departureMode=SEA, remover campos de partida AIR e RAIL
+                            // Se departureMode=SEA, remover campos de partida AIR e RAIL, incluindo TRANSFER_DEPARTURE_TIME genérico
                             else if (depMode === 'SEA') {
                                 return qid !== 'TRANSFER_AIR_DEPARTURE_AIRLINE' &&
                                        qid !== 'TRANSFER_AIR_DEPARTURE_FLIGHT_NO' &&
                                        qid !== 'TRANSFER_RAIL_DEPARTURE_LINE' &&
-                                       qid !== 'TRANSFER_RAIL_DEPARTURE_STATION';
+                                       qid !== 'TRANSFER_RAIL_DEPARTURE_STATION' &&
+                                       qid !== 'TRANSFER_DEPARTURE_TIME'; // CORREÇÃO: Remover campo genérico para SEA
                             }
                             // Se departureMode=RAIL, remover campos de partida AIR e SEA
                             else if (depMode === 'RAIL') {
