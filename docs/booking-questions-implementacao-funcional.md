@@ -180,11 +180,65 @@ if (preferred === 'SEA') {
 - Implementação defensiva que não afeta produtos funcionais
 - Padrão de feature flags condicionais para isolamento de correções
 
-#### 7. Versão da correção
+#### 7. Validação adicional - Variação com pickup customizado
+
+**Configuração testada**: SEA→SEA com "Gostaria que me buscassem" (pickup customizado)
+**Data do teste**: 27/08/2025
+**BookingRef de sucesso**: BR-597888551
+
+**Evidências de sucesso:**
+
+**Logs de confirmação (Anotações.txt):**
+```
+❌ Pickup customizado NÃO permitido (logistics.allowCustomTravelerPickup = false)
+⚠️ [CONFIRM] TRANSFER_DEPARTURE_PICKUP ajustado para CONTACT_SUPPLIER_LATER (sem custom pickup)
+🔧 [CONFIRM] TRANSFER_ARRIVAL_DROP_OFF removido para SEA→SEA com pickup especializado (evita "Extra answer")
+🔧 [CONFIRM] PICKUP_POINT BLOQUEADO (SEA→SEA com pickup especializado - evita "Extra answer")
+🔧 [CONFIRM] Campos de partida incompatíveis removidos para departureMode=SEA (evita "Too many departure answers")
+✅ Status encontrado: CONFIRMED
+✅ BookingRef encontrado: BR-597888551
+```
+
+**Payload final bem-sucedido (viator-debug.log):**
+```json
+"raw_booking_questions": [
+    {"question":"FULL_NAMES_FIRST","answer":"Eder","travelerNum":1},
+    {"question":"FULL_NAMES_LAST","answer":"Pereira","travelerNum":1},
+    {"question":"DATE_OF_BIRTH","answer":"1994-04-04","travelerNum":1},
+    {"question":"AGEBAND","answer":"TRAVELER","travelerNum":1},
+    {"question":"PASSPORT_NATIONALITY","answer":"Brasil","travelerNum":1},
+    {"question":"PASSPORT_PASSPORT_NO","answer":"46258963","travelerNum":1},
+    {"question":"PASSPORT_EXPIRY","answer":"2026-02-02","travelerNum":1},
+    {"question":"TRANSFER_ARRIVAL_MODE","answer":"SEA"},
+    {"question":"TRANSFER_DEPARTURE_MODE","answer":"SEA"},
+    {"question":"TRANSFER_PORT_CRUISE_SHIP","answer":"Titanic"},
+    {"question":"TRANSFER_PORT_ARRIVAL_TIME","answer":"13:00"},
+    {"question":"TRANSFER_DEPARTURE_DATE","answer":"2025-08-30"},
+    {"question":"TRANSFER_PORT_DEPARTURE_TIME","answer":"17:00"},
+    {"question":"TRANSFER_DEPARTURE_PICKUP","answer":"CONTACT_SUPPLIER_LATER","unit":"LOCATION_REFERENCE"}
+]
+```
+
+**Análise comparativa:**
+
+| Aspecto | "Vou decidir depois" (BR-597888533) | "Gostaria que me buscassem" (BR-597888551) |
+|---------|-------------------------------------|---------------------------------------------|
+| **allowCustomTravelerPickup** | false | false |
+| **TRANSFER_DEPARTURE_PICKUP** | CONTACT_SUPPLIER_LATER | CONTACT_SUPPLIER_LATER |
+| **Comportamento da correção** | Idêntico | Idêntico |
+| **Campos removidos** | PICKUP_POINT, TRANSFER_ARRIVAL_DROP_OFF, TRANSFER_DEPARTURE_TIME | PICKUP_POINT, TRANSFER_ARRIVAL_DROP_OFF, TRANSFER_DEPARTURE_TIME |
+| **Status final** | CONFIRMED | CONFIRMED |
+
+**Conclusão**: A correção funciona consistentemente independente da opção de pickup selecionada pelo usuário, pois o produto 100014P4 não permite pickup customizado (`allowCustomTravelerPickup = false`), resultando sempre em `TRANSFER_DEPARTURE_PICKUP = CONTACT_SUPPLIER_LATER`.
+
+#### 8. Versão da correção
 
 **Versão**: v3.1 - Correção Abrangente SEA→(AIR|RAIL|SEA)
 **Arquivo**: viator-booking.js
 **Linhas modificadas**: 15268-15279, 15753-15760, 15857, 15871, 15884-15894, 15920, 15933-15944, 16132-16138, 16110-16127
+**Testes validados**:
+- SEA→SEA + "Vou decidir depois" ✅ (BR-597888533)
+- SEA→SEA + "Gostaria que me buscassem" ✅ (BR-597888551)
 **Commit**: [Pendente - aguardando confirmação final]
 
 ---
