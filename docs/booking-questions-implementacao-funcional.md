@@ -8674,3 +8674,70 @@ if (isPickupError && !this._pickupFallbackAttempted) {
   - TRANSFER_ARRIVAL_DROP_OFF digitado → FREETEXT; sentinela também aceito como FREETEXT neste produto
 - A guarda de idempotência garante que o Step 5 não reconfirme pedidos já bem‑sucedidos, estabilizando a UX pós‑pagamento
 - Logs específicos (PICKUP_POINT_FIX, COMPLIANCE, IDEMPOTÊNCIA) facilitam auditoria e troubleshooting
+
+
+### 📚 Estudo de Caso: Produto 6613GRANDCELE (PICKUP genérico, sem modos de transporte)
+
+#### 1) Evidências técnicas do teste
+
+- BookingRef: BR-597895497
+- Status de confirmação: PENDING
+- Booking questions processadas (e units):
+  - PICKUP_POINT: CONTACT_SUPPLIER_LATER (unit=LOCATION_REFERENCE, `_userSelected: true`, `_preserveValue: true`)
+  - FULL_NAMES_FIRST: Eder (PER_TRAVELER)
+  - FULL_NAMES_LAST: Pereira (PER_TRAVELER)
+  - AGEBAND: ADULT (PER_TRAVELER)
+  - WEIGHT: 89 (unit=kg, PER_TRAVELER)
+- Erros encontrados:
+  - Sem ReferenceError do nosso código; houve um TypeError em cc.js de terceiros: `Cannot read properties of undefined (reading 'digest')` (não impactou a confirmação)
+- Fallback automático:
+  - Não acionado; seleção do usuário foi CONTACT_SUPPLIER_LATER e foi preservada
+- Guarda de idempotência/duplicidade:
+  - Não evidenciada; fluxo exibiu PENDING diretamente, sem repetição de confirmação ou erro de duplicidade
+
+Excertos dos logs:
+```
+[CONFIRM RAW BODY] ... "bookingRef":"BR-597895497","status":"PENDING" ...
+"bookingQuestionAnswers": [
+  {"question":"PICKUP_POINT","answer":"CONTACT_SUPPLIER_LATER","unit":"LOCATION_REFERENCE","_userSelected":true,"_preserveValue":true},
+  {"question":"FULL_NAMES_FIRST","answer":"Eder","travelerNum":1},
+  {"question":"FULL_NAMES_LAST","answer":"Pereira","travelerNum":1},
+  {"question":"AGEBAND","answer":"ADULT","travelerNum":1},
+  {"question":"WEIGHT","answer":"89","travelerNum":1,"unit":"kg"}
+]
+```
+
+#### 2) Comparação com implementações existentes
+
+- Cobertura na documentação atual: este produto ainda não estava descrito especificamente
+- Principais diferenças em relação aos casos anteriores:
+  - 100978P31 (AIR com TRANSFER_ARRIVAL_DROP_OFF): exigia campos de transferência; aqui, arrivalMode é `undefined` e não há campos TRANSFER_* — o filtro “produto sem modos de transporte” manteve os campos
+  - 100978P31 usou FREETEXT para endereço específico; aqui, o usuário selecionou explicitamente CONTACT_SUPPLIER_LATER e a unit apropriada foi LOCATION_REFERENCE
+  - 100978P31 precisou de fallback no caminho success=true em um teste; aqui não houve fallback
+  - 100143P7/9895P69/100014P4: preservação de seleções e compatibilidade mantidas; 6613GRANDCELE confirma a robustez do mecanismo de preservação quando allowCustomTravelerPickup=false
+
+#### 3) Análise de impacto e compatibilidade
+
+- Idempotência: não acionada; não houve duplicidade
+- Sanitização: executou caminho “sem modos de transporte” (arrivalMode indefinido), preservando PICKUP_POINT corretamente
+- Fallback de PICKUP: não necessário (seleção compatível)
+- Regressões: não observadas
+- Características únicas: produto sem TRANSFER_*; `allowCustomTravelerPickup=false` → CONTACT_SUPPLIER_LATER é aceito e deve usar LOCATION_REFERENCE
+
+#### 4) Orientações e lições aprendidas
+
+- Para produtos sem modos de transporte (arrivalMode indefinido):
+  - Não aplicar regras de remoção baseadas em AIR/SEA/RAIL; manter PICKUP_POINT conforme seleção do usuário
+- Para allowCustomTravelerPickup=false:
+  - Se usuário optar por “Vou decidir depois” (CONTACT_SUPPLIER_LATER), enviar unit=LOCATION_REFERENCE e preservar
+- Monitorar logs:
+  - `[PICKUP_POINT_FIX] Seleção do usuário preservada corretamente: CONTACT_SUPPLIER_LATER`
+  - `🚗 Validando PICKUP_POINT | hasGenericPickup=true ... arrivalMode=  ...`
+  - PENDING: verificar ausência de `voucherInfo` no primeiro retorno e experiência de UI adequada
+
+#### 5) Conclusão de estabilidade
+
+- As implementações recentes (idempotência, sanitização, preservação de seleção, fallback condicionado) permaneceram compatíveis:
+  - Nenhum erro de compatibilidade detectado
+  - Fluxo PENDING exibido corretamente sem reconfirmações indevidas
+- Risco de quebra: baixo; manter atenção em produtos PENDING para mensagens de UI (voucher ausente) e eventual polling/atualização quando aplicável
