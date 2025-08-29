@@ -184,26 +184,36 @@ class ViatorBookingSystem {
             viator_debug_log('Hold - Detailed Pricing:', $availability_data['selectedOption']['pricing']);
         }
         
-        // Processar booking questions se fornecidas
+        // CORREÇÃO CRÍTICA: Processar booking questions se fornecidas
         if (!empty($booking_question_answers)) {
-            // Validar perguntas de reserva (MANDATORY + CONDITIONAL) antes de processar
+            // CORREÇÃO: Validar perguntas de reserva (MANDATORY + CONDITIONAL) antes de processar
             $validation_result = $this->validate_conditional_booking_questions($booking_question_answers, $product_code);
+
+            // CORREÇÃO CRÍTICA: Log detalhado do resultado da validação
+            viator_debug_log('🔧 [HOLD] Validation result for product ' . $product_code, array(
+                'validation_valid' => $validation_result['valid'],
+                'validation_errors_count' => count($validation_result['errors'] ?? []),
+                'validation_answers_count' => $validation_result['answers_count'] ?? 0,
+                'validation_questions_processed' => $validation_result['questions_processed'] ?? [],
+                'original_answers_count' => count($booking_question_answers)
+            ));
+
             if (!$validation_result['valid']) {
-                viator_debug_log('Hold - Booking Questions Validation Failed:', $validation_result['errors']);
+                viator_debug_log('🔧 [HOLD] Booking Questions Validation Failed:', $validation_result['errors']);
                 return array('error' => 'Validação de perguntas de reserva falhou: ' . implode(', ', $validation_result['errors']));
             }
-            
+
             $processed_questions = $this->process_booking_questions_for_hold($booking_question_answers, $booker_info);
             if (!empty($processed_questions)) {
                 // Adicionar booking questions ao primeiro item
                 $request_data['items'][0]['bookingQuestionAnswers'] = $processed_questions;
-                viator_debug_log('Hold - Booking Questions Added:', $processed_questions);
+                viator_debug_log('🔧 [HOLD] Booking Questions Added:', $processed_questions);
             }
         } else {
             // Verificar se há perguntas obrigatórias que não foram fornecidas
             $required_questions = $this->get_required_booking_questions($product_code);
             if (!empty($required_questions)) {
-                viator_debug_log('Hold - Missing Required Questions:', $required_questions);
+                viator_debug_log('🔧 [HOLD] Missing Required Questions:', $required_questions);
                 return array('error' => 'Perguntas obrigatórias não respondidas: ' . implode(', ', array_column($required_questions, 'title')));
             }
         }
@@ -523,6 +533,28 @@ class ViatorBookingSystem {
         // Os dados do responsável devem vir do frontend via booker_info
         viator_debug_log('Booker Info recebido na confirmação:', $booker_info);
         
+        // VALIDAÇÃO PRÉ-CONFIRMAÇÃO: Detectar problemas antes do envio
+        $validation_result = $this->validate_booking_before_confirmation(
+            $hold_items[0]['productCode'] ?? 'UNKNOWN',
+            $booking_question_answers,
+            $booker_info
+        );
+
+        if ($validation_result['has_issues']) {
+            viator_debug_log('⚠️ [PRE-VALIDATION] Problemas detectados antes da confirmação:', $validation_result);
+
+            // Se há problemas críticos, retornar erro preventivo
+            if ($validation_result['is_critical']) {
+                return array(
+                    'error' => true,
+                    'message' => 'Dados insuficientes para confirmação: ' . implode(', ', $validation_result['issues']),
+                    'error_code' => 'PRE_VALIDATION_FAILED',
+                    'validation_details' => $validation_result,
+                    'should_retry' => false
+                );
+            }
+        }
+
         // Validar se os dados obrigatórios do responsável estão presentes
         if (empty($booker_info['firstName']) || empty($booker_info['lastName'])) {
             viator_debug_log('ERRO: Dados do responsável não fornecidos - firstName: ' . ($booker_info['firstName'] ?? 'vazio') . ', lastName: ' . ($booker_info['lastName'] ?? 'vazio'));
@@ -1053,6 +1085,39 @@ class ViatorBookingSystem {
 
         // Log da resposta completa
         viator_debug_log('✅ Booking Confirmation Response (Parsed):', $data);
+
+        // Tratamento específico para SOFT_DECLINE
+        if (is_array($data) && isset($data['items']) && is_array($data['items'])) {
+            foreach ($data['items'] as $item) {
+                if (isset($item['status']) && $item['status'] === 'REJECTED' &&
+                    isset($item['rejectionReasonCode']) && $item['rejectionReasonCode'] === 'SOFT_DECLINE') {
+
+                    viator_debug_log('🚨 [SOFT_DECLINE DETECTED] Booking rejeitado pela API Viator:', [
+                        'bookingRef' => $item['bookingRef'] ?? 'N/A',
+                        'rejectionReasonCode' => $item['rejectionReasonCode'],
+                        'product_code' => $request_data['productCode'] ?? 'N/A',
+                        'booking_questions_count' => isset($request_data['bookingQuestionAnswers']) ? count($request_data['bookingQuestionAnswers']) : 0,
+                        'payload_summary' => $this->analyze_booking_payload($request_data)
+                    ]);
+
+                    // Retornar erro específico para SOFT_DECLINE
+                    return array(
+                        'error' => true,
+                        'message' => 'Reserva rejeitada pela operadora. Isso pode ocorrer por: disponibilidade limitada, dados insuficientes ou restrições específicas do produto.',
+                        'error_code' => 'SOFT_DECLINE',
+                        'booking_ref' => $item['bookingRef'] ?? null,
+                        'should_retry' => true,
+                        'retry_suggestions' => [
+                            'Verificar se todos os campos obrigatórios estão preenchidos',
+                            'Confirmar disponibilidade para a data selecionada',
+                            'Revisar informações do viajante (peso, idade, etc.)',
+                            'Tentar novamente em alguns minutos'
+                        ]
+                    );
+                }
+            }
+        }
+
         // Se a API devolver mensagem conhecida de language guide, dar evidência do request
         if (is_array($data) && isset($data['message']) && stripos($data['message'], 'Language guide required') !== false) {
             viator_debug_log('🚨 [LANGUAGE GUIDE REQUIRED] A API retornou exigência de language guide. Dump do payload enviado:', [
@@ -1615,6 +1680,92 @@ class ViatorBookingSystem {
 
         // Nenhum erro detectado
         return null;
+    }
+
+    /**
+     * Analisar payload de booking para diagnóstico de SOFT_DECLINE
+     */
+    private function analyze_booking_payload($request_data) {
+        $analysis = [
+            'has_booking_questions' => isset($request_data['bookingQuestionAnswers']),
+            'booking_questions_count' => isset($request_data['bookingQuestionAnswers']) ? count($request_data['bookingQuestionAnswers']) : 0,
+            'has_language_guide' => isset($request_data['languageGuide']),
+            'has_booker_info' => isset($request_data['booker']),
+            'question_types' => []
+        ];
+
+        if (isset($request_data['bookingQuestionAnswers']) && is_array($request_data['bookingQuestionAnswers'])) {
+            foreach ($request_data['bookingQuestionAnswers'] as $question) {
+                if (isset($question['question'])) {
+                    $analysis['question_types'][] = $question['question'];
+                }
+            }
+        }
+
+        // Verificar se campos críticos estão presentes
+        $critical_fields = ['FULL_NAMES_FIRST', 'FULL_NAMES_LAST', 'AGEBAND', 'WEIGHT'];
+        $analysis['missing_critical_fields'] = array_diff($critical_fields, $analysis['question_types']);
+
+        return $analysis;
+    }
+
+    /**
+     * Validar dados de booking antes da confirmação para prevenir SOFT_DECLINE
+     */
+    private function validate_booking_before_confirmation($product_code, $booking_question_answers, $booker_data) {
+        $issues = [];
+        $is_critical = false;
+
+        // Validar dados do responsável
+        if (empty($booker_data['firstName']) || empty($booker_data['lastName'])) {
+            $issues[] = 'Dados do responsável incompletos';
+            $is_critical = true;
+        }
+
+        // Validar booking questions críticas
+        $critical_questions = ['FULL_NAMES_FIRST', 'FULL_NAMES_LAST', 'AGEBAND'];
+        $present_questions = array_column($booking_question_answers, 'question');
+
+        foreach ($critical_questions as $critical) {
+            if (!in_array($critical, $present_questions)) {
+                $issues[] = "Campo obrigatório ausente: {$critical}";
+            }
+        }
+
+        // Validar se há respostas vazias para campos obrigatórios
+        foreach ($booking_question_answers as $answer) {
+            if (in_array($answer['question'], $critical_questions) && empty($answer['answer'])) {
+                $issues[] = "Campo obrigatório vazio: {$answer['question']}";
+                $is_critical = true;
+            }
+        }
+
+        // Validações específicas por produto
+        if ($product_code === '6613GRANDCELE') {
+            // Produto de helicóptero - validar peso
+            $weight_answer = array_filter($booking_question_answers, function($a) {
+                return $a['question'] === 'WEIGHT';
+            });
+
+            if (empty($weight_answer)) {
+                $issues[] = 'Peso do viajante obrigatório para passeios de helicóptero';
+                $is_critical = true;
+            } else {
+                $weight = reset($weight_answer)['answer'];
+                if (is_numeric($weight) && ($weight < 20 || $weight > 136)) {
+                    $issues[] = 'Peso fora dos limites permitidos (20-136kg)';
+                    $is_critical = true;
+                }
+            }
+        }
+
+        return [
+            'has_issues' => !empty($issues),
+            'is_critical' => $is_critical,
+            'issues' => $issues,
+            'product_code' => $product_code,
+            'questions_count' => count($booking_question_answers)
+        ];
     }
 
     /**
@@ -2669,9 +2820,10 @@ class ViatorBookingSystem {
         $validation_errors = [];
         $answers_by_question = [];
         
-        // Organizar respostas por questionId para facilitar validação
+        // CORREÇÃO CRÍTICA: Organizar respostas por question/questionId para facilitar validação
         foreach ($booking_question_answers as $answer) {
-            $question_id = $answer['questionId'] ?? '';
+            // CORREÇÃO: Aceitar tanto 'question' quanto 'questionId' para compatibilidade
+            $question_id = $answer['question'] ?? $answer['questionId'] ?? '';
             if (!empty($question_id)) {
                 $answers_by_question[$question_id] = $answer;
             }
@@ -2767,22 +2919,36 @@ class ViatorBookingSystem {
             }
         }
 
-        // Log dos resultados da validação
+        // CORREÇÃO CRÍTICA: Log detalhado dos resultados da validação
         if (!empty($validation_errors)) {
-            viator_debug_log('Conditional booking questions validation failed', array(
+            viator_debug_log('🔧 [VALIDATION] Conditional booking questions validation failed', array(
+                'product_code' => $product_code,
+                'total_answers_processed' => count($answers_by_question),
+                'validation_errors_count' => count($validation_errors),
                 'errors' => $validation_errors,
                 'answers_provided' => array_keys($answers_by_question)
             ));
         } else {
-            viator_debug_log('Conditional booking questions validation passed');
+            viator_debug_log('🔧 [VALIDATION] Conditional booking questions validation passed', array(
+                'product_code' => $product_code,
+                'total_answers_validated' => count($answers_by_question),
+                'questions_validated' => array_keys($answers_by_question)
+            ));
         }
 
-        // Retornar resultado estruturado conforme esperado pelo código
+        // CORREÇÃO CRÍTICA: Retornar resultado estruturado com informações de debug
         return array(
             'valid' => empty($validation_errors),
             'errors' => array_map(function($error) {
                 return $error['message'];
-            }, $validation_errors)
+            }, $validation_errors),
+            'answers_count' => count($answers_by_question),
+            'questions_processed' => array_keys($answers_by_question),
+            'debug_info' => array(
+                'original_answers_count' => count($booking_question_answers),
+                'processed_answers_count' => count($answers_by_question),
+                'product_code' => $product_code
+            )
         );
     }
 
