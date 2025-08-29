@@ -8829,3 +8829,80 @@ Excertos (Anotações.txt):
   - Se CONFIRMED não vier com voucherInfo: verificar se o produto suporta voucher imediato ou se há atraso do fornecedor
   - Se ocorrer rejeição de PICKUP_POINT: validar se foi enviado com a unit adequada (LOCATION_REFERENCE para CONTACT_SUPPLIER_LATER)
   - Se algum campo de passaporte falhar: revisar maxLength e formatação de data
+
+
+### 📚 Estudo de Caso: Produto 101607P2 (Endereço específico FREETEXT com confirmação CONFIRMED)
+
+#### 1) Evidências técnicas do teste
+
+- BookingRef: BR-597895543
+- Status de confirmação: CONFIRMED (com voucherInfo presente)
+- PICKUP_POINT utilizado:
+  - answer: "My Local Test 123"
+  - unit: FREETEXT
+  - metadados: `_userSelected: true`, `_preserveValue: true`, `_source: "freetext_input"`
+- Campos adicionais (MANDATORY): PASSPORT_* por viajante preenchidos
+- Erros/fallback/ReferenceError:
+  - Sem ReferenceError do nosso código
+  - Sem fallback automático de PICKUP — preservação respeitada
+  - Sem indícios de erro de duplicidade/idempotência
+
+Excertos (viator-debug.log):
+```
+"bookingQuestionAnswers": [
+  {"question":"PICKUP_POINT","answer":"My Local Test 123","unit":"FREETEXT","_userSelected":true,"_preserveValue":true,"_source":"freetext_input"},
+  {"question":"FULL_NAMES_FIRST","answer":"Shiny","travelerNum":1},
+  {"question":"FULL_NAMES_LAST","answer":"Inox","travelerNum":1},
+  {"question":"AGEBAND","answer":"ADULT","travelerNum":1},
+  {"question":"PASSPORT_NATIONALITY","answer":"Brasil","travelerNum":1},
+  {"question":"PASSPORT_PASSPORT_NO","answer":"46852369","travelerNum":1},
+  {"question":"PASSPORT_EXPIRY","answer":"2026-06-04","travelerNum":1}
+]
+...
+[CONFIRM RAW BODY] ... "bookingRef":"BR-597895543","status":"CONFIRMED", ...
+```
+
+#### 2) Comparação com o cenário CONTACT_SUPPLIER_LATER já documentado
+
+- Cenário anterior (CONTACT_SUPPLIER_LATER):
+  - BookingRef: BR-597895515 — Status: CONFIRMED
+  - PICKUP_POINT: CONTACT_SUPPLIER_LATER (unit=LOCATION_REFERENCE)
+- Cenário atual (Endereço FREETEXT):
+  - BookingRef: BR-597895543 — Status: CONFIRMED
+  - PICKUP_POINT: "My Local Test 123" (unit=FREETEXT)
+- Diferenças observadas:
+  - Unit usada para PICKUP_POINT: FREETEXT (endereço) vs LOCATION_REFERENCE (sentinela)
+  - Em ambos os casos, a seleção do usuário foi preservada e não houve fallback
+  - Em ambos os casos, a confirmação retornou CONFIRMED com voucher
+
+#### 3) Orientações específicas para 101607P2
+
+- Quando usar CONTACT_SUPPLIER_LATER (LOCATION_REFERENCE):
+  - Se o usuário escolher explicitamente “Vou decidir depois”
+  - Se a API rejeitar um endereço/LOC incompatível (o sistema faz fallback controlado no retry)
+- Quando usar FREETEXT:
+  - Sempre que o usuário digitar um endereço válido no campo de texto livre
+  - Respeitar maxLength (até 1000) e sanitização básica
+- Preservação de seleção do usuário:
+  - Sempre marcar `_userSelected: true` e `_preserveValue: true` nas respostas preservadas
+- Logs a monitorar:
+  - `📋 [BOOKING QUESTIONS]` com PICKUP_POINT `unit: FREETEXT`
+  - `freetext_input` no `_source` e validações `[VALIDATION]`
+  - `Booking Confirmation Response` (CONFIRMED) e presença de `voucherInfo`
+
+#### 4) Troubleshooting para FREETEXT
+
+- Se a API rejeitar o endereço (ex.: “pickup is not available / wrong type”):
+  - Verificar se o produto aceita FREETEXT e, se necessário, aplicar fallback para CONTACT_SUPPLIER_LATER (LOCATION_REFERENCE) no retry controlado
+- Se ocorrer erro de formatação/tamanho:
+  - Ajustar o endereço para atender maxLength/validações
+- Se voucher não vier:
+  - Confirmar se o produto suporta voucher imediato ou se há atraso do fornecedor
+
+#### 5) Conclusão de estabilidade
+
+- As implementações recentes (preservação de seleção, idempotência, fallback condicionado e correções de ReferenceError) mantiveram a funcionalidade estável
+- Padrões para 101607P2:
+  - CONTACT_SUPPLIER_LATER funciona com unit=LOCATION_REFERENCE
+  - Endereço específico funciona com unit=FREETEXT
+  - Ambos confirmaram com sucesso e sem fallback

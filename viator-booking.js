@@ -1847,6 +1847,8 @@ class ViatorBookingManager {
                     const holdResult = await this.requestBookingHoldForPayment();
                     if (!holdResult) {
                         console.error('❌ [SHOW-STEP] Falha ao criar hold automaticamente:', holdResult);
+                        // Garantir que o loading seja removido em caso de erro
+                        try { this.hideHoldLoadingState(); } catch (_) {}
                         this.showDateError('Erro ao preparar pagamento. Tente novamente.');
                         await this.showStep(3); // Voltar para step 3
                         return;
@@ -3113,6 +3115,14 @@ class ViatorBookingManager {
         this.generateBookingSummary();
         this.formatCardNumber();
 
+        // Caso o hold já exista, os campos de pagamento já estão prontos — remover loading preventivamente
+        if (this.bookingData.holdData) {
+            try {
+                this.hideHoldLoadingState();
+                console.log('⏹️ [LOADING] Loading ocultado (hold pré-existente, campos prontos)');
+            } catch (_) {}
+        }
+
         // Fazer hold da reserva antes de inicializar o sistema de pagamento
         if (!this.bookingData.holdData) {
             console.log('📋 Fazendo hold da reserva antes de inicializar pagamento...');
@@ -3187,8 +3197,8 @@ class ViatorBookingManager {
                         margin: 0 auto;
                     "></div>
                 </div>
-                <h3 style="margin: 0 0 10px 0; color: #333;">Criando Sessão de Reserva</h3>
-                <p style="margin: 0; color: #666; font-size: 14px;">Aguarde enquanto preparamos sua reserva...</p>
+                <h3 style="margin: 0 0 10px 0; color: #333;">Preparando pagamento...</h3>
+                <p style="margin: 0; color: #666; font-size: 14px;">Processando informações e criando a sessão de reserva. Isso pode levar alguns segundos.</p>
             `;
 
             // Adicionar animação CSS
@@ -14111,6 +14121,17 @@ class ViatorBookingManager {
         console.log(`🔧 [STEP-PROGRESSION] Resultado da validação do step ${this.currentStep}:`, isValid);
 
         if (isValid) {
+            // NOVO: Exibir loading imediatamente após validação bem-sucedida do Step 3
+            // para comunicar processamento enquanto criamos o hold e preparamos o pagamento.
+            if (this.currentStep === 3) {
+                try {
+                    console.log('⏳ [LOADING] Exibindo loading de transição (Step 3 → Step 4)');
+                    this.showHoldLoadingState();
+                } catch (e) {
+                    console.warn('⚠️ [LOADING] Falha ao exibir loading (prosseguindo mesmo assim):', e);
+                }
+            }
+
             if (this.currentStep < 5) { // Atualizado para 5 steps
                 console.log(`🔧 [STEP-PROGRESSION] Avançando para step ${this.currentStep + 1}...`);
                 await this.showStep(this.currentStep + 1);
