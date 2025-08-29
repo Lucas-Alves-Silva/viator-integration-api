@@ -8741,3 +8741,91 @@ Excertos dos logs:
   - Nenhum erro de compatibilidade detectado
   - Fluxo PENDING exibido corretamente sem reconfirmações indevidas
 - Risco de quebra: baixo; manter atenção em produtos PENDING para mensagens de UI (voucher ausente) e eventual polling/atualização quando aplicável
+
+
+### 📚 Estudo de Caso: Produto 101607P2 (CONTACT_SUPPLIER_LATER com confirmação CONFIRMED)
+
+#### 1) Evidências técnicas do teste
+
+- BookingRef: BR-597895515
+- Status de confirmação: CONFIRMED (com voucherInfo presente)
+- Booking questions processadas (e units):
+  - PICKUP_POINT: CONTACT_SUPPLIER_LATER (unit=LOCATION_REFERENCE, `_userSelected: true`, `_preserveValue: true`)
+  - FULL_NAMES_FIRST: Shiny (PER_TRAVELER)
+  - FULL_NAMES_LAST: Inox (PER_TRAVELER)
+  - AGEBAND: ADULT (PER_TRAVELER)
+  - PASSPORT_NATIONALITY: Brasil (PER_TRAVELER)
+  - PASSPORT_PASSPORT_NO: 46598725 (PER_TRAVELER)
+  - PASSPORT_EXPIRY: 2029-04-04 (PER_TRAVELER)
+- Erros/fallback/ReferenceError:
+  - Sem ReferenceError do nosso código
+  - Fallback automático de PICKUP: bloqueado (seleção explícita do usuário = CONTACT_SUPPLIER_LATER)
+  - Erro de terceiros (cc.js): `Cannot read properties of undefined (reading 'digest')` — sem impacto na confirmação
+- Idempotência/duplicidade:
+  - Não houve duplicidade (“already exists”) nem guarda acionada; a confirmação foi exibida e reutilizada na etapa 5 normalmente
+
+Excertos dos logs (viator-debug.log):
+```
+[CONFIRM RAW BODY] ... "bookingRef":"BR-597895515","status":"CONFIRMED", ... ,"voucherInfo":{...}
+"bookingQuestionAnswers": [
+  {"question":"PICKUP_POINT","answer":"CONTACT_SUPPLIER_LATER","unit":"LOCATION_REFERENCE"},
+  {"question":"FULL_NAMES_FIRST","answer":"Shiny","travelerNum":1},
+  {"question":"FULL_NAMES_LAST","answer":"Inox","travelerNum":1},
+  {"question":"AGEBAND","answer":"ADULT","travelerNum":1},
+  {"question":"PASSPORT_NATIONALITY","answer":"Brasil","travelerNum":1},
+  {"question":"PASSPORT_PASSPORT_NO","answer":"46598725","travelerNum":1},
+  {"question":"PASSPORT_EXPIRY","answer":"2029-04-04","travelerNum":1}
+]
+```
+
+Excertos (Anotações.txt):
+```
+✅ BookingRef extraído: BR-597895515
+🔍 [LOC VALIDATION] Validando PICKUP_POINT antes do envio: ...
+🔧 [PICKUP_POINT_FIX] Seleção específica do usuário detectada, não aplicando fallback: CONTACT_SUPPLIER_LATER
+✅ Status encontrado: CONFIRMED
+✅ VoucherInfo encontrado: Object
+```
+
+#### 2) Comparação com implementações existentes
+
+- 6613GRANDCELE:
+  - Ambos sem modos de transporte ativos (arrivalMode indefinido); aqui o resultado foi CONFIRMED (com voucher), enquanto 6613GRANDCELE retornou PENDING no primeiro retorno
+  - 6613GRANDCELE tinha allowCustomTravelerPickup=false; aqui há registros de “permitido” durante coleta, porém o payload-check mostra `allowCustomTravelerPickup: false` na confirmação — não afetou, pois CONTACT_SUPPLIER_LATER/LOCATION_REFERENCE foi aceito
+- 100978P31 (endereço FREETEXT vs sentinela):
+  - 101607P2 usou CONTACT_SUPPLIER_LATER (LOCATION_REFERENCE) e confirmou sem fallback
+  - 100978P31 teve cenário FREETEXT e, em outro teste, fallback automático em success=true
+- 100143P7 / 9895P69 / 100014P4:
+  - Mecanismos de preservação e validação consistentes; 101607P2 adiciona a particularidade de campos de passaporte MANDATORY
+
+#### 3) Análise de impacto e compatibilidade
+
+- Idempotência: não acionada; nenhuma duplicidade registrada
+- Sanitização: caminho “sem modos de transporte” preservou PICKUP_POINT; campos de passaporte passaram pelas validações e foram incluídos
+- Fallback de PICKUP: bloqueado (seleção explícita); comportamento esperado
+- Regressões: não observadas; voucher renderizado corretamente na etapa 5
+- Particularidades do produto:
+  - Exige PASSPORT_* por viajante (MANDATORY); atenção a maxLength e formato de DATA em PASSPORT_EXPIRY
+
+#### 4) Orientações específicas para 101607P2
+
+- PICKUP_POINT:
+  - Se o usuário escolher “Vou decidir depois” (CONTACT_SUPPLIER_LATER), enviar unit=LOCATION_REFERENCE e preservar (`_userSelected/_preserveValue`)
+  - Não forçar FREETEXT mesmo que alguma camada indique allowCustomTravelerPickup=true; a escolha explícita do usuário prevalece
+- Campos de passaporte (MANDATORY):
+  - Incluir PASSPORT_NATIONALITY, PASSPORT_PASSPORT_NO, PASSPORT_EXPIRY por viajante
+  - Garantir formatação ISO (YYYY-MM-DD) em PASSPORT_EXPIRY e respeitar maxLength nos demais
+- Logs a monitorar:
+  - `[PICKUP_POINT_FIX] Seleção específica do usuário detectada, não aplicando fallback`
+  - `🔍 [LOC VALIDATION]` e `📋 [BOOKING QUESTIONS]`
+  - `Booking Confirmation Response` com status CONFIRMED e voucherInfo
+
+#### 5) Lições aprendidas e troubleshooting
+
+- Lições:
+  - CONTACT_SUPPLIER_LATER com unit=LOCATION_REFERENCE é amplamente aceito e reduz a necessidade de fallback
+  - A presença de campos MANDATORY adicionais (ex.: passaporte) não conflita com a preservação de PICKUP_POINT
+- Troubleshooting:
+  - Se CONFIRMED não vier com voucherInfo: verificar se o produto suporta voucher imediato ou se há atraso do fornecedor
+  - Se ocorrer rejeição de PICKUP_POINT: validar se foi enviado com a unit adequada (LOCATION_REFERENCE para CONTACT_SUPPLIER_LATER)
+  - Se algum campo de passaporte falhar: revisar maxLength e formatação de data
