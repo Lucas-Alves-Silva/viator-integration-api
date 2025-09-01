@@ -1832,6 +1832,45 @@ class ViatorBookingManager {
                 break;
             case 4:
                 console.log('🔧 [SHOW-STEP] Inicializando step 4 (pagamento)...');
+                // Gating adicional do Step 3 → Step 4 para impedir bypass quando validação falhou
+                // Ativo por feature flag; padrão: ligado
+                try {
+                    const ENFORCE_SEA_COMPLETENESS = window.viatorConfig?.forceSeaArrivalCompleteness !== false; // default: true
+                    if (ENFORCE_SEA_COMPLETENESS) {
+                        // Bloquear avanço se Step 3 não foi validado com sucesso
+                        if (this._step3ValidatedOK !== true) {
+                            console.warn('❌ [STEP-PROGRESSION] Step 3 não validado. Bloqueando exibição do Step 4.');
+                            this.showDateError('Por favor, preencha as perguntas obrigatórias antes de prosseguir para o pagamento.');
+                            await this.showStep(3);
+                            return;
+                        }
+                        // Se chegada é SEA, exigir completude mínima ANTES de iniciar hold/pagamento, SOMENTE se o produto expõe os campos
+                        const answers = Array.isArray(this.bookingData?.bookingQuestionAnswers) ? this.bookingData.bookingQuestionAnswers : [];
+                        const getAns = (id) => answers.find(a => (a?.question || a?.questionId) === id);
+                        const arrMode = (getAns('TRANSFER_ARRIVAL_MODE')?.answer || '').trim();
+                        if (arrMode === 'SEA') {
+                            const productQuestionsRaw = Array.isArray(this.bookingQuestions) && this.bookingQuestions.length > 0
+                                ? this.bookingQuestions
+                                : (Array.isArray(window.productData?.bookingQuestions) ? window.productData.bookingQuestions : []);
+                            const productIds = new Set(productQuestionsRaw.map(q => q && (q.questionId || q.id || q)));
+                            const hasSeaArrivalFields = productIds.has('TRANSFER_PORT_CRUISE_SHIP') || productIds.has('TRANSFER_PORT_ARRIVAL_TIME');
+                            if (hasSeaArrivalFields) {
+                                const ship = (getAns('TRANSFER_PORT_CRUISE_SHIP')?.answer || '').trim();
+                                const arrTime = (getAns('TRANSFER_PORT_ARRIVAL_TIME')?.answer || '').trim();
+                                const missing = [];
+                                if (!ship && productIds.has('TRANSFER_PORT_CRUISE_SHIP')) missing.push('Nome do Navio (Chegada)');
+                                if (!arrTime && productIds.has('TRANSFER_PORT_ARRIVAL_TIME')) missing.push('Hora de Desembarque (Chegada)');
+                                if (missing.length > 0) {
+                                    console.warn('❌ [SEA COMPLETENESS] Campos obrigatórios de chegada (SEA) ausentes:', missing);
+                                    this.showBookingQuestionsErrors(missing.map(f => `${f} é obrigatório`));
+                                    await this.showStep(3);
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                } catch(e) { console.warn('⚠️ [STEP-PROGRESSION] Erro no gating Step 3→4:', e); }
+
 
                 // CORREÇÃO CRÍTICA: Verificar se hold existe antes de exibir step de pagamento
                 if (!this.bookingData.holdData) {
@@ -8469,6 +8508,10 @@ class ViatorBookingManager {
      * Validar todas as booking questions
      */
     async validateBookingQuestions() {
+        // Guarda de estado para progressão de etapas: por padrão, considerar inválido até concluir todas as validações
+        // Comentário: Mantém rastreabilidade para impedir avanço ao Step 4 quando Step 3 não passou nas validações
+        this._step3ValidatedOK = false;
+
         console.log('🔧 [VALIDATION] Validando booking questions para step 3...');
         console.log('🔧 [VALIDATION] Timestamp:', new Date().toISOString());
 
@@ -8519,11 +8562,35 @@ class ViatorBookingManager {
             const shipName = shipNameEl?.value || '';
             const pickupLocation = pickupEl?.value || '';
 
+
+            // Preparação: verificar se o produto realmente expõe os campos SEA de chegada
+            const productQuestionsRawSEA = Array.isArray(this.bookingQuestions) && this.bookingQuestions.length > 0
+                ? this.bookingQuestions
+                : (Array.isArray(window.productData?.bookingQuestions) ? window.productData.bookingQuestions : []);
+            const productIdsSEA = new Set(productQuestionsRawSEA.map(q => q && (q.questionId || q.id || q)));
+            const hasShipField = productIdsSEA.has('TRANSFER_PORT_CRUISE_SHIP');
+            const hasArrivalTimeField = productIdsSEA.has('TRANSFER_PORT_ARRIVAL_TIME');
+
             const missingFields = [];
-            if (shouldValidateShip && !shipName.trim()) {
+
+            // Validação específica: quando ARRIVAL=SEA e o produto possui o campo, exigir hora de chegada do navio
+            const shouldValidateArrivalTime = (arrivalMode === 'SEA') && hasArrivalTimeField && this.shouldShowConditionalQuestion('TRANSFER_PORT_ARRIVAL_TIME');
+            if (shouldValidateArrivalTime) {
+                const arrivalTimeEl = document.querySelector('[data-question-id="TRANSFER_PORT_ARRIVAL_TIME"]');
+                const arrivalTimeVal = arrivalTimeEl?.value || '';
+                if (!arrivalTimeVal.trim()) {
+                    if (arrivalTimeEl) this.showFieldError(arrivalTimeEl, 'Obrigatório');
+                    missingFields.push('Hora de Desembarque (Chegada)');
+                }
+            }
+
+            // Validar nome do navio apenas se produto expõe o campo e a lógica condicional exigir
+            const shouldValidateShipName = isSeaActive && hasShipField && this.shouldShowConditionalQuestion('TRANSFER_PORT_CRUISE_SHIP');
+            if (shouldValidateShipName && !shipName.trim()) {
                 missingFields.push('Nome do Navio');
                 if (shipNameEl) this.showFieldError(shipNameEl, 'Obrigatório');
             }
+
             if (!pickupLocation.trim()) {
                 missingFields.push('Local de Embarque');
                 if (pickupEl) this.showFieldError(pickupEl, 'Obrigatório');
@@ -8586,6 +8653,9 @@ class ViatorBookingManager {
 
         console.log('✅ Todas as booking questions validadas com sucesso');
         console.log('📝 Total de respostas coletadas:', this.bookingData.bookingQuestionAnswers?.length || 0);
+
+        // Marcar validação do Step 3 como concluída com sucesso para progressão segura
+        this._step3ValidatedOK = true;
 
         return true;
     }
@@ -14205,6 +14275,24 @@ class ViatorBookingManager {
                 console.log('✅ [STEP-VALIDATION] Hold válido, prosseguindo com pagamento...');
 
                 // Validar conectividade antes do pagamento
+
+        // Guarda adicional de consistência do paxMix (evita 400 Invalid paxMix)
+        try {
+            const VALIDATE_PAXMIX = window.viatorConfig?.validatePaxMixBeforeAvailability !== false; // default: true
+            if (VALIDATE_PAXMIX) {
+                const paxMix = this.collectTravelersData();
+                const hasIssues = paxMix.some(group => {
+                    const count = Number(group?.numberOfTravelers) || 0;
+                    const band = (group?.ageBand || '').trim();
+                    return count <= 0 || !band;
+                });
+                if (hasIssues) {
+                    this.showDateError('Selecione os viajantes para continuar.');
+                    return false;
+                }
+            }
+        } catch(e) { console.warn('⚠️ [AVAILABILITY_VALIDATE] Erro ao validar paxMix (checkAvailability):', e); }
+
                 const isConnected = await this.validateApiConnectivity();
                 if (!isConnected) {
                     this.showErrorWithRetry(
@@ -15212,6 +15300,8 @@ class ViatorBookingManager {
 
             clearTimeout(timeoutId);
             this.stopHoldHeartbeat();
+
+
 
             const data = await response.json();
             console.log('📥 Resposta do hold (inicialização pagamento):', data);
